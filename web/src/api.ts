@@ -6,6 +6,8 @@
 // answers that there is none, or it ended, the page hears it through
 // onSignedOut and asks to sign in; so does the socket (socket.ts).
 
+import { t as say } from "./i18n";
+
 export type Theme = "system" | "light" | "dark";
 export type Role = "owner" | "admin" | "member" | "observer";
 export type MachineKind = "server" | "computer";
@@ -173,7 +175,7 @@ export interface Note {
  * the note as it is saved now. */
 export class NoteConflict extends Error {
   constructor(readonly note: Note) {
-    super("The note changed elsewhere meanwhile.");
+    super(say("api.note_changed"));
   }
 }
 
@@ -192,6 +194,12 @@ export interface Me {
   /** One's own photo (0.1.7): where the page loads it from, or null for the
    * initials. The app before signing in sends none. */
   photo?: string | null;
+  /** The language chosen (0.1.16), kept in the account, or in the app
+   * before signing in on this computer; null until one is chosen. */
+  language?: string | null;
+  /** In the app (0.6.0): the system's language, when it is one of the
+   * twelve; the page takes it until one is chosen. tTerm Web sends none. */
+  systemLanguage?: string | null;
 }
 
 export type TerminalState = "connecting" | "open" | "ended" | "gone";
@@ -376,9 +384,9 @@ async function check(response: Response): Promise<Response> {
     }
     if (response.status === 401 && body.signedOut) {
       signedOutNow();
-      throw new SignedOut(body.error ?? "Sign in to go on.", 401);
+      throw new SignedOut(body.error ?? say("api.sign_in"), 401);
     }
-    throw new CoreError(body.error || `tTerm Web answered ${response.status}`,
+    throw new CoreError(body.error || say("api.answered", { status: String(response.status) }),
       response.status);
   }
   return response;
@@ -476,7 +484,7 @@ async function auth<T>(path: string, body?: unknown): Promise<T> {
     // Not JSON: the status says enough.
   }
   if (!response.ok) {
-    throw new Refused(data.error || `tTerm Web answered ${response.status}`,
+    throw new Refused(data.error || say("api.answered", { status: String(response.status) }),
       response.status, data.left, data.wait);
   }
   return data as T;
@@ -656,10 +664,10 @@ export async function allowApp(link: {
     const body: { error?: string; confirm?: boolean; changed?: boolean } =
       await response.clone().json().catch(() => ({}));
     if (body.confirm) {
-      throw new ConfirmFirst(body.error ?? "Confirm it is you first.", 403);
+      throw new ConfirmFirst(body.error ?? say("api.confirm_first"), 403);
     }
     if (body.changed) {
-      throw new AccountChanged(body.error ?? "Another account is signed in now.", 409);
+      throw new AccountChanged(body.error ?? say("api.account_changed"), 409);
     }
   }
   return (await check(response)).json();
@@ -722,6 +730,12 @@ export async function saveTheme(theme: Theme): Promise<void> {
 
 export async function saveProjectTint(projectTint: ProjectTint): Promise<void> {
   await check(await fetch("/api/me", change("PATCH", { projectTint })));
+}
+
+/** The language chosen (0.1.16): to the account, or in the app before
+ * signing in to this computer. */
+export async function saveLanguage(language: string): Promise<void> {
+  await check(await fetch("/api/me", change("PATCH", { language })));
 }
 
 /** One's own photo (0.1.7): the JPEG the page made, 256 pixels square.
@@ -987,7 +1001,7 @@ export async function loadNote(id: string, background = false): Promise<Note> {
   const response = await fetch(`/api/notes/${id}`, {
     cache: "no-store", headers: background ? BACKGROUND : {},
   });
-  if (response.status === 404) throw new NoteGone("The note is deleted.");
+  if (response.status === 404) throw new NoteGone(say("app.note_gone"));
   return (await check(response)).json();
 }
 
@@ -998,7 +1012,7 @@ export async function saveNote(id: string, baseVersion: number, title: string,
   blocks: Block[]): Promise<Note> {
   const response = await fetch(`/api/notes/${id}`,
     change("PUT", { baseVersion, title, blocks }));
-  if (response.status === 404) throw new NoteGone("The note is deleted.");
+  if (response.status === 404) throw new NoteGone(say("app.note_gone"));
   if (response.status === 409) {
     const body = await response.json();
     if (body.conflict && body.note) throw new NoteConflict(body.note);
@@ -1011,7 +1025,7 @@ export async function tickNote(id: string, blockId: string,
   const response = await fetch(`/api/notes/${id}/tick`,
     change("POST", { blockId, done }));
   // An item that went answers 422; 404 is the note.
-  if (response.status === 404) throw new NoteGone("The note is deleted.");
+  if (response.status === 404) throw new NoteGone(say("app.note_gone"));
   return (await check(response)).json();
 }
 

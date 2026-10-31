@@ -51,6 +51,31 @@ async def test_theme_change_needs_the_page_header(h):
         assert r.status == 422 and "error" in r.json(), r.text
 
 
+async def test_the_language_is_kept_with_the_person(h):
+    """0.1.16: none until chosen, then the one chosen, one of the twelve;
+    a wrong one changes nothing, the theme beside it neither."""
+    async with h.core() as core:
+        state = (await request(core.page_port, "GET", "/api/state")).json()
+        assert state["me"]["language"] is None, state["me"]
+        for language in ("de", "pt-BR", "zh-CN", "en"):
+            r = await request(core.page_port, "PATCH", "/api/me", headers=CHANGE,
+                              body=json.dumps({"language": language}).encode())
+            assert r.status == 204, (language, r.status)
+            state = (await request(core.page_port, "GET", "/api/state")).json()
+            assert state["me"]["language"] == language, state["me"]
+        for wrong in ("EN", "pt", "zh", "uk", "", "en-US"):
+            r = await request(core.page_port, "PATCH", "/api/me", headers=CHANGE,
+                              body=json.dumps({"theme": "dark",
+                                               "language": wrong}).encode())
+            assert r.status == 422 and "error" in r.json(), (wrong, r.text)
+        state = (await request(core.page_port, "GET", "/api/state")).json()
+        assert (state["me"]["language"], state["me"]["theme"]) == ("en", "system")
+        r = await request(core.page_port, "PATCH", "/api/me",
+                          body=json.dumps({"language": "ru"}).encode(),
+                          headers={"content-type": "application/json"})
+        assert r.status == 403, f"without x-tterm: {r.status}"
+
+
 async def test_other_sites_cannot_act(h):
     async with h.core() as core:
         body = json.dumps({"theme": "dark"}).encode()

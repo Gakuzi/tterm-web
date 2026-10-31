@@ -1,7 +1,7 @@
 // Who may do what with a project's machines and notes, as the core decides
 // it (core/notes.py): the page only hides what would be refused anyway.
 
-import type { Folder, NoteSummary, Project } from "./api";
+import type { Folder, NoteSummary, Project, Role } from "./api";
 
 /** The owner and admins: machines, and folders with notes in them. */
 export function manages(project: Project): boolean {
@@ -32,13 +32,10 @@ export function deletesFolder(project: Project, folder: Folder,
     (writes(project) && folder.createdBy?.id === meId && folder.notes.length === 0);
 }
 
-/** "2 notes", "1 machine". */
-export function many(n: number, one: string, more: string): string {
-  return `${n} ${n === 1 ? one : more}`;
-}
-
-/** "A, B and C". */
-export function listed(names: string[]): string {
-  if (names.length <= 1) return names.join("");
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-}
+/** The words for each role (0.1.16: strings of i18n/<code>.txt). */
+export const ROLE_KEY: Record<Role, string> = {
+  owner: "role.owner",
+  admin: "role.admin",
+  member: "role.member",
+  observer: "role.observer",
+};

@@ -6,7 +6,7 @@ import {
   CoreError, createFolder, createNote, createProject, deleteFolder, deleteNote,
   deleteProject, editProject, endTerminal, loadNote, loadState, moveMachine,
   moveNote, NoteGone, onSignedOut, openTerminal, removeMachine, renameFolder,
-  renameTerminal, saveProjectTint, saveTheme, SignedOut, signInApp, signOut,
+  renameTerminal, saveLanguage, saveProjectTint, saveTheme, SignedOut, signInApp, signOut,
   welcomeSeen, type Folder, type FoundBlock, type FoundNote,
   type Machine, type MachineKind, type Note, type NoteSummary, type Project,
   type ProjectFields, type ProjectTint, type State, type TerminalInfo,
@@ -21,7 +21,10 @@ import {
   Moon, Pencil, Person, Pin, Plus, Server, SignIn as SignInIcon,
   SignOut as SignOutIcon, Sun, Trash,
 } from "./icons";
-import { hereWord } from "./local";
+import {
+  languageOf, list, showLanguage, t as say, useT, type Lang, type Translate,
+} from "./i18n";
+import { hereWord, onMac } from "./local";
 import { InApp, LocalOnly } from "./local";
 import { Machines } from "./Machines";
 import { FolderDialog } from "./Menus";
@@ -34,7 +37,7 @@ import {
 } from "./ProjectDialog";
 import { ProjectPage } from "./ProjectPage";
 import { Search, type LocalEntry } from "./Search";
-import { alone, deletesNote, listed, manages, many, writes } from "./rights";
+import { alone, deletesNote, manages, writes } from "./rights";
 import { Settings } from "./Settings";
 import { Sidebar, type AccountPage } from "./Sidebar";
 import { SignIn } from "./SignIn";
@@ -81,17 +84,13 @@ function pageOf(path: string): AccountPage | null {
 }
 
 /** The sign-in screen's note when a session ends with nothing done here:
- * eight hours away, or signed out from another device. */
-const SESSION_ENDED = "Your session ended. Sign in again: your terminals " +
-  "kept running.";
+ * eight hours away, or signed out from another device. A key: said in the
+ * language shown when it ends. */
+const SESSION_ENDED = "app.session_ended";
 
 /** The core is on this very computer (the owner's laptop): then it is the
  * window running it that is worth a look. */
 const LOCAL = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
-
-function capital(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
 
 /** A first guess at the window in characters, for the shell to start with;
  * the terminal measures itself exactly as soon as it is on screen. */
@@ -271,15 +270,17 @@ async function copyLater(text: Promise<string>): Promise<void> {
 }
 
 /** How saving goes in the note in front, for the line on top. */
-function saveLine(state: SaveState | undefined): SaveLine | null {
-  if (state === "saved") return { text: "Saved", kind: "saved" };
-  if (state === "saving" || state === "unsaved") return { text: "Saving…", kind: "saving" };
-  if (state === "offline") return { text: "Not saved: no connection", kind: "warn" };
-  if (state === "refused" || state === "conflict") return { text: "Not saved", kind: "warn" };
+function saveLine(state: SaveState | undefined, t: Translate): SaveLine | null {
+  if (state === "saved") return { text: t("app.saved"), kind: "saved" };
+  if (state === "saving" || state === "unsaved") return { text: t("app.saving"), kind: "saving" };
+  if (state === "offline") return { text: t("app.not_saved_offline"), kind: "warn" };
+  if (state === "refused" || state === "conflict") return { text: t("app.not_saved"), kind: "warn" };
   return null;
 }
 
+
 export function App() {
+  const t = useT();
   const [state, setState] = useState<State | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>("system");
@@ -369,6 +370,7 @@ export function App() {
         }
         lastUser.current = loaded.me.id;
         setState(loaded);
+        void showLanguage(languageOf(loaded.me));
         setTheme(loaded.me.theme);
         setTint(loaded.me.projectTint ?? "badge");
         if (!pruned.current) {
@@ -391,11 +393,7 @@ export function App() {
       .catch((error) => {
         // Not signed in: onSignedOut below shows the sign-in screen.
         if (error instanceof SignedOut) return;
-        setProblem(LOCAL
-          ? "tTerm Web is not answering. Is python -m tterm.dev running in " +
-            "a terminal window?"
-          : "tTerm Web is not answering. Check the connection, then try " +
-            "again.");
+        setProblem(LOCAL ? "app.not_answering_local" : "app.not_answering");
       });
   }, []);
 
@@ -428,7 +426,7 @@ export function App() {
   }, []);
 
   useEffect(() => onSignedOut(() =>
-    endSession(lastUser.current ? SESSION_ENDED : null, false)), [endSession]);
+    endSession(lastUser.current ? say(SESSION_ENDED) : null, false)), [endSession]);
 
   const signedIn = useCallback(() => {
     socket.signedIn();
@@ -626,15 +624,15 @@ export function App() {
         refresh();
         then?.(terminal.id);
       })
-      .catch((e: Error) => notYet(`Could not open a terminal: ${e.message}`));
+      .catch((e: Error) => notYet(say("app.no_terminal", { why: e.message })));
   }, [navigate, refresh, notYet, unfold]);
 
   /** A new terminal from a machine's "+": an offline computer says so. */
   const newTerminal = useCallback((machine: Machine) => {
     if (machine.kind === "computer" && !machine.online) {
-      const seen = lastSeen(machine.lastSeen);
-      notYet(`${machine.name} is offline${seen ? `, ${seen}` : ""}: it comes ` +
-        "back when its agent connects.");
+      const seen = lastSeen(machine.lastSeen, say);
+      notYet(seen ? say("app.offline_seen", { name: machine.name, seen })
+        : say("app.offline", { name: machine.name }));
       return;
     }
     startTerminal(machine.id);
@@ -658,12 +656,10 @@ export function App() {
     refresh();
     if (result.cleanup) setRemoved({ name: result.name, cleanup: result.cleanup });
     else if (result.shared) {
-      notYet(`${result.name} is removed from tTerm Web. The same server is in ` +
-        "another project too, so tTerm Web's access on it stays.");
+      notYet(say("app.removed_shared", { name: result.name }));
     } else if (result.accessRemoved) {
-      notYet(`${result.name} is removed from tTerm Web, and tTerm Web's ` +
-        "access on the server is taken back.");
-    } else notYet(`${result.name} is removed from tTerm Web.`);
+      notYet(say("app.removed_access", { name: result.name }));
+    } else notYet(say("app.removed", { name: result.name }));
   }, [refresh, notYet]);
   const end = useCallback(async (terminal: TerminalInfo) => {
     await endTerminal(terminal.id);
@@ -686,7 +682,7 @@ export function App() {
         openTab(noteTab(note.id));
         refresh();
       })
-      .catch((e: Error) => notYet(`Could not start a note: ${e.message}`));
+      .catch((e: Error) => notYet(say("app.no_note", { why: e.message })));
   }, [notYet, openTab, refresh, unfold]);
 
   const saveFolder = useCallback(async (asked: Naming, name: string) => {
@@ -721,9 +717,8 @@ export function App() {
     closeTabs([noteTab(asked.noteId)], true);
     setState((s) => s && eachFolder(s, (f) =>
       ({ ...f, notes: f.notes.filter((n) => n.id !== asked.noteId) })));
-    notYet(`The note ${titled(result.title)} is deleted from ` +
-      `${asked.folder.name}.${alone(asked.project) ? ""
-        : " The journal has a line about it."}`);
+    notYet(say(alone(asked.project) ? "app.note_deleted" : "app.note_deleted_journal",
+      { title: titled(result.title, say), folder: asked.folder.name }));
     refresh();
   }, [closeTabs, notYet, refresh]);
 
@@ -741,10 +736,11 @@ export function App() {
     setState((s) => s && withFolders(s, asked.project.id, (fs) =>
       fs.filter((f) => f.id !== asked.folder.id)));
     const n = result.notes;
-    notYet(`The folder ${result.name}${n === 0 ? " is deleted."
-      : n === 1 ? " and its note are deleted."
-      : ` and its ${n} notes are deleted.`}${alone(asked.project) ? ""
-        : " The journal has a line about it."}`);
+    const journal = !alone(asked.project);
+    notYet(n === 0
+      ? say(journal ? "app.folder_deleted_journal" : "app.folder_deleted", { name: result.name })
+      : say(journal ? "app.folder_notes_deleted_journal" : "app.folder_notes_deleted",
+        { name: result.name, n }));
     refresh();
   }, [closeTabs, notYet, refresh]);
 
@@ -753,13 +749,13 @@ export function App() {
   const moved = useCallback((note: Note) => {
     setState((s) => s && moveListed(s, note));
     unfold(`f:${note.folderId}`);
-    notYet(`Moved to ${note.folder}.`);
+    notYet(say("app.moved_to", { folder: note.folder }));
     refresh();
   }, [notYet, refresh, unfold]);
   const moveFromList = useCallback((noteId: string, folderId: string) => {
     moveNote(noteId, { folderId })
       .then(moved)
-      .catch((e: Error) => notYet(`Could not move it: ${e.message}`));
+      .catch((e: Error) => notYet(say("app.no_move", { why: e.message })));
   }, [moved, notYet]);
 
   /** A note to another project (0.1.2): first the window that asks where. */
@@ -778,21 +774,22 @@ export function App() {
     setState((s) => s && moveListed(s, note));
     unfold(`p:${note.projectId}`, `f:${note.folderId}`);
     if (asked.from === "tab" && was) {
-      setMovedHere((m) => ({ ...m, [note.id]: `Moved here from ${was.project.name}.` +
-        (alone(was.project) ? "" : " Its journal has a line about it.") }));
+      setMovedHere((m) => ({ ...m, [note.id]: say(alone(was.project)
+        ? "app.moved_here" : "app.moved_here_journal", { project: was.project.name }) }));
     } else {
       const there = stateNow.current?.projects.find((p) => p.id === note.projectId);
-      notYet(`Moved to ${there?.name ?? "the other project"}, folder ${note.folder}.`);
+      notYet(there ? say("app.moved_to_project", { project: there.name, folder: note.folder })
+        : say("app.moved_to_other", { folder: note.folder }));
     }
     refresh();
   }, [notYet, refresh, unfold]);
 
   const copyNote = useCallback((noteId: string) => {
     copyLater(loadNote(noteId).then((n) => toMarkdown(n.title, n.blocks)))
-      .then(() => notYet("Copied as Markdown."))
-      .catch((e: Error) => notYet(e instanceof NoteGone ? "The note is deleted."
-        : e instanceof CoreError ? `Could not copy: ${e.message}`
-        : "Could not copy: the browser did not let the page."));
+      .then(() => notYet(say("app.copied_markdown")))
+      .catch((e: Error) => notYet(e instanceof NoteGone ? say("app.note_gone")
+        : e instanceof CoreError ? say("app.no_copy", { why: e.message })
+        : say("app.no_copy_browser")));
   }, [notYet]);
 
   // ---------------------------------------------------- projects (0.1.1)
@@ -833,8 +830,8 @@ export function App() {
     for (const id of inside) markDeleted(id);
     closeTabs([projectTab(project.id), ...inside.map(noteTab)], true);
     setState((s) => s && { ...s, projects: s.projects.filter((p) => p.id !== project.id) });
-    notYet(`${result.name} is deleted${result.notes === 1 ? ", with its note"
-      : result.notes ? `, with its ${result.notes} notes` : ""}.`);
+    notYet(result.notes ? say("app.project_deleted_notes", { name: result.name, n: result.notes })
+      : say("app.project_deleted", { name: result.name }));
     refresh();
   }, [closeTabs, notYet, refresh]);
 
@@ -853,8 +850,8 @@ export function App() {
       return without.length === p.machines.length ? p : { ...p, machines: without };
     }) });
     unfold(`p:${moved.projectId}`, `m:${moved.id}`);
-    notYet(`${machine.name} is in ${moved.project} now, as ${moved.code}/${moved.name}. ` +
-      "Its terminals keep running.");
+    notYet(say("app.machine_moved", { name: machine.name, project: moved.project,
+      label: `${moved.code}/${moved.name}` }));
     refresh();
   }, [notYet, refresh, unfold]);
 
@@ -885,7 +882,7 @@ export function App() {
       })
       .catch((e: Error) => {
         stopRenaming(id, asked);
-        notYet(`Could not rename it: ${e.message}`);
+        notYet(say("app.no_rename", { why: e.message }));
       });
   }, [notYet, refresh, stopRenaming]);
 
@@ -918,25 +915,30 @@ export function App() {
     .then(() => {
       // The browser forgets the person: their unsaved notes too.
       forgetDrafts();
-      endSession("You signed out. Your terminals keep running.");
+      endSession(say("app.signed_out"));
     })
     .catch((error) => {
-      notYet("Could not sign out: tTerm Web did not answer. Try again.");
+      notYet(say("app.no_sign_out"));
       throw error;
     }), [endSession, notYet]);
 
   const chooseTheme = useCallback((next: Theme) => {
     setTheme(next);
-    saveTheme(next).catch(() =>
-      notYet("Could not save the theme: tTerm Web did not answer."));
+    saveTheme(next).catch(() => notYet(say("app.no_theme")));
+  }, [notYet]);
+  /** Another language (0.1.16): shown at once, then kept in the account
+   * (in the app before signing in, on this computer). */
+  const chooseLanguage = useCallback((next: Lang) => {
+    void showLanguage(next);
+    setState((was) => (was ? { ...was, me: { ...was.me, language: next } } : was));
+    saveLanguage(next).catch(() => notYet(say("app.no_language")));
   }, [notYet]);
   const toggleTheme = useCallback(() => {
     chooseTheme(shown(theme) === "light" ? "dark" : "light");
   }, [theme, chooseTheme]);
   const chooseTint = useCallback((next: ProjectTint) => {
     setTint(next);
-    saveProjectTint(next).catch(() =>
-      notYet("Could not save the project colors: tTerm Web did not answer."));
+    saveProjectTint(next).catch(() => notYet(say("app.no_tints")));
   }, [notYet]);
 
   /** The name changed on the account page: the sidebar and the greetings
@@ -1027,34 +1029,35 @@ export function App() {
       const title = live[id]?.title ?? where?.note.title ?? "";
       return {
         id: tab, kind, code: where?.project.code ?? "", color: where?.project.color,
-        label: titled(title),
+        label: titled(title, t),
         untitled: !title.trim(), checklist: (live[id]?.total ?? where?.note.total ?? 0) > 0,
-        title: where ? `Note in ${where.folder.name}` : "Note",
-        closeTitle: "Close the note. It stays in its folder.",
+        title: where ? t("app.tab.note_in", { folder: where.folder.name }) : t("app.tab.note"),
+        closeTitle: t("app.tab.close_note"),
       };
     }
     if (kind === "project") {
       const project = projects.find((p) => p.id === id);
       return {
         id: tab, kind, code: project?.code ?? "", color: project?.color,
-        label: project?.name ?? "Project",
-        title: project ? `${project.name}: its machines and notes` : "Project",
-        closeTitle: "Close the page",
+        label: project?.name ?? t("app.tab.project"),
+        title: project ? t("app.tab.project_title", { name: project.name }) : t("app.tab.project"),
+        closeTitle: t("app.tab.close_page"),
       };
     }
     const status = statuses[tab];
     const known = liveTerminals.find((t) => t.id === tab);
-    const full = status?.label ?? known?.label ?? "Terminal";
-    const machine = status?.machine || known?.machine || "its machine";
+    const full = status?.label ?? known?.label ?? t("app.tab.terminal");
+    const machine = status?.machine || known?.machine || "";
     const dot = dotOf(status, known, !!state && !known && !status);
     const where = status?.where ? ` · ${status.where}` : "";
     const slash = full.indexOf("/");
     const home = known && projects.find((p) => p.machines.some((m) => m.id === known.machineId));
     const canRename = !!known && dot !== "ended";
     const said = dot === "away"
-      ? `${full}: ${machine} is asleep or offline, the terminal waits for it`
-      : dot === "ended" ? `${full}: ended`
-      : dot === "busy" && status?.running ? `${full}${where}: a command is running`
+      ? (machine ? t("app.tab.away", { label: full, machine })
+        : t("app.tab.away_unknown", { label: full }))
+      : dot === "ended" ? t("app.tab.ended", { label: full })
+      : dot === "busy" && status?.running ? t("app.tab.running", { label: `${full}${where}` })
       : `${full}${where}`;
     const there = home?.machines.find((m) => m.id === known?.machineId);
     return {
@@ -1062,9 +1065,8 @@ export function App() {
       label: slash > 0 ? full.slice(slash + 1) : full, dot,
       here: !!there?.here, cutOff: cutOff && !!there && !there.here,
       machine, name: known?.name, canRename,
-      title: canRename ? `${said}\nDouble-click to rename` : said,
-      closeTitle: "Close the tab. The terminal keeps running, in the sidebar " +
-        "under its machine.",
+      title: canRename ? `${said}\n${t("sidebar.double_click")}` : said,
+      closeTitle: t("app.tab.close_terminal"),
     };
   });
   const front = tabViews.find((t) => t.id === current);
@@ -1103,8 +1105,8 @@ export function App() {
   const pageOpen = local && shownPage === "account" ? null : shownPage;
   const title = front
     ? `${front.kind === "terminal" && front.code ? `${front.code}/` : ""}${front.label} · tTerm`
-    : pageOpen === "settings" ? "Settings · tTerm"
-    : pageOpen === "account" ? "Account · tTerm" : "tTerm";
+    : pageOpen === "settings" ? `${t("settings.title")} · tTerm`
+    : pageOpen === "account" ? `${t("account.title")} · tTerm` : "tTerm";
   useEffect(() => {
     document.title = title;
   }, [title]);
@@ -1146,10 +1148,10 @@ export function App() {
     return (
       <div className="status-page">
         <div className="status-card" role="alert">
-          <h1>No connection</h1>
-          <p>{problem}</p>
+          <h1>{t("app.no_connection")}</h1>
+          <p>{t(problem)}</p>
           <button type="button" className="button-accent" onClick={load}>
-            Try again
+            {t("common.try_again")}
           </button>
         </div>
       </div>
@@ -1225,7 +1227,7 @@ export function App() {
       .then((started) => {
         // An engine before 0.3.0 gives no code: then only the words.
         if (started.code) setLinking(started.code);
-        else notYet("Go on in your browser: sign in there, and allow this computer.");
+        else notYet(say("app.go_on_in_browser"));
       })
       .catch((error: Error) => notYet(error.message));
   };
@@ -1262,7 +1264,7 @@ export function App() {
 
   const sidebarButton = !pinned && (
     <button type="button" className="icon-button"
-      aria-label="Open sidebar" aria-expanded={sidebarShown}
+      aria-label={t("app.open_sidebar")} aria-expanded={sidebarShown}
       onClick={() => (sidebarShown ? closeSidebar() : setOpen(true))}
       onMouseEnter={hoverOpen}
       onMouseLeave={() => window.clearTimeout(openTimer.current)}>
@@ -1282,9 +1284,10 @@ export function App() {
         return {
           key: `m-${m.id}`,
           label: `${p.code}/${m.name}`,
-          hint: m.here ? hereWord()
-            : waits ? "no connection"
-            : offline ? ["offline", lastSeen(m.lastSeen)].filter(Boolean).join(", ")
+          hint: m.here ? hereWord(t)
+            : waits ? t("app.machine.no_connection")
+            : offline ? (m.lastSeen ? t("app.machine.offline_seen", { seen: lastSeen(m.lastSeen, t) })
+              : t("app.machine.offline"))
             : m.os ?? m.host ?? undefined,
           icon: m.kind === "server" ? <Server size={15} /> : <Computer size={15} />,
           muted: offline || waits,
@@ -1295,10 +1298,10 @@ export function App() {
     }));
   const addItem: FinderItem[] = canAddTo ? [{
     key: "add-machine",
-    label: "Add a machine",
-    hint: "a server or a computer",
+    label: t("app.action.add_machine"),
+    hint: t("app.action.add_machine_hint"),
     icon: <Plus size={15} />,
-    words: "new server computer connect",
+    words: t("app.action.add_machine_words"),
     run: () => startAdding(canAddTo.id),
   }] : [];
 
@@ -1308,53 +1311,58 @@ export function App() {
   // printed and notes, whole, come from the core.
   const searchSources = (): { entries: LocalEntry[]; recent: LocalEntry[] } => {
     const listedTabs = new Set(shownTabs);
-    const stateOf = (dot: Dot) => (dot === "away" ? "waits for its computer"
-      : dot === "ended" ? "ended" : dot === "busy" ? "a command runs" : "at the prompt");
+    const stateOf = (dot: Dot) => (dot === "away" ? t("app.search.state_away")
+      : dot === "ended" ? t("app.search.state_ended") : dot === "busy" ? t("app.search.state_busy")
+        : t("app.search.state_prompt"));
     const terminalEntry = (id: string, label: string, machine: string, dot: Dot,
       tab: boolean, machineId?: string, name?: string): LocalEntry => ({
       key: `t-${id}`, kind: "terminals", title: label,
-      sub: [tab ? (id === current ? "this tab" : "tab") : "running, no tab",
-        stateOf(dot)].join(" · "),
-      words: `terminal ${machine} ${name ?? ""}`,
+      sub: [tab ? (id === current ? t("app.search.this_tab") : t("app.search.tab"))
+        : t("app.search.no_tab"), stateOf(dot)].join(" · "),
+      words: `${t("app.search.terminal_words")} ${machine} ${name ?? ""}`,
       icon: <span className={`dot ${dot}`} aria-hidden="true" />,
-      rows: ([["Machine", machine], ["Folder", statuses[id]?.where ?? ""],
-        ["Now", stateOf(dot)]] as [string, string][]).filter((r) => r[1]),
-      run: () => goTo(id), act: "Open", machineId,
+      rows: ([[t("app.search.row_machine"), machine],
+        [t("app.search.row_folder"), statuses[id]?.where ?? ""],
+        [t("app.search.row_now"), stateOf(dot)]] as [string, string][]).filter((r) => r[1]),
+      run: () => goTo(id), act: t("app.search.open"), machineId,
     });
     const terminals: LocalEntry[] = [
-      ...tabViews.filter((t) => t.kind === "terminal").map((t) => {
-        const known = liveTerminals.find((x) => x.id === t.id);
-        return terminalEntry(t.id, `${t.code ? `${t.code}/` : ""}${t.label}`,
-          t.machine ?? "", t.dot ?? "open", true, known?.machineId, known?.name);
+      ...tabViews.filter((v) => v.kind === "terminal").map((v) => {
+        const known = liveTerminals.find((x) => x.id === v.id);
+        return terminalEntry(v.id, `${v.code ? `${v.code}/` : ""}${v.label}`,
+          v.machine ?? "", v.dot ?? "open", true, known?.machineId, known?.name);
       }),
-      ...liveTerminals.filter((t) => !listedTabs.has(t.id)).map((t) =>
-        terminalEntry(t.id, t.label, t.machine, dotFor(t), false, t.machineId, t.name)),
+      ...liveTerminals.filter((x) => !listedTabs.has(x.id)).map((x) =>
+        terminalEntry(x.id, x.label, x.machine, dotFor(x), false, x.machineId, x.name)),
     ];
     const notes: LocalEntry[] = projects.flatMap((p) => p.folders.flatMap((f) =>
       f.notes.map((n): LocalEntry => ({
-        key: `n-${n.id}`, kind: "notes", noteId: n.id, title: titled(n.title),
-        sub: `${p.name} / ${f.name}${listedTabs.has(noteTab(n.id)) ? " · tab" : ""}`,
-        words: `note ${f.name} ${n.excerpt}`,
+        key: `n-${n.id}`, kind: "notes", noteId: n.id, title: titled(n.title, t),
+        sub: `${p.name} / ${f.name}${listedTabs.has(noteTab(n.id)) ? ` · ${t("app.search.tab")}` : ""}`,
+        words: `${t("app.search.note_words")} ${f.name} ${n.excerpt}`,
         icon: n.total > 0 ? <ListCheck size={15} /> : <Doc size={15} />,
-        rows: [["In", `${p.name} / ${f.name}`], ["Edited", ago(n.editedAt)]],
-        run: () => openTab(noteTab(n.id)), act: "Open the note", at: n.editedAt,
+        rows: [[t("app.search.row_in"), `${p.name} / ${f.name}`],
+          [t("app.search.row_edited"), ago(n.editedAt, t)]],
+        run: () => openTab(noteTab(n.id)), act: t("app.search.open_note"), at: n.editedAt,
       }))));
     const machines: LocalEntry[] = projects.flatMap((p) => p.machines.map((m): LocalEntry => {
       const offline = m.kind === "computer" && !m.online;
       const waits = cutOff && !m.here;
-      const status = m.here ? hereWord() : waits ? "no connection"
-        : offline ? ["offline", lastSeen(m.lastSeen)].filter(Boolean).join(", ")
-        : m.kind === "computer" ? "online" : "";
-      const open = liveTerminals.filter((t) => t.machineId === m.id).length;
+      const status = m.here ? hereWord(t) : waits ? t("app.machine.no_connection")
+        : offline ? (m.lastSeen ? t("app.machine.offline_seen", { seen: lastSeen(m.lastSeen, t) })
+          : t("app.machine.offline"))
+        : m.kind === "computer" ? t("app.machine.online") : "";
+      const open = liveTerminals.filter((x) => x.machineId === m.id).length;
       return {
         key: `m-${m.id}`, kind: "machines", title: m.name,
         sub: [p.name, m.os, m.host, status].filter(Boolean).join(" · "),
         words: [p.code, m.kind, m.host, m.os].filter(Boolean).join(" "),
         icon: m.kind === "server" ? <Server size={15} /> : <Computer size={15} />,
-        rows: ([["Project", p.name], ["System", m.os ?? ""], ["Address", m.host ?? ""],
-          ["Status", status], ["Terminals", open ? `${open} open` : ""]] as
+        rows: ([[t("app.search.row_project"), p.name], [t("app.search.row_system"), m.os ?? ""],
+          [t("app.search.row_address"), m.host ?? ""], [t("app.search.row_status"), status],
+          [t("app.search.row_terminals"), open ? t("app.search.open_count", { n: open }) : ""]] as
           [string, string][]).filter((r) => r[1]),
-        run: () => newTerminal(m), act: "New terminal", machineId: m.id,
+        run: () => newTerminal(m), act: t("sidebar.new_terminal"), machineId: m.id,
         muted: offline || waits,
       };
     }));
@@ -1362,13 +1370,14 @@ export function App() {
       const count = p.folders.reduce((n, f) => n + f.notes.length, 0);
       return {
         key: `p-${p.id}`, kind: "projects", title: p.name,
-        sub: [p.code, many(p.machines.length, "machine", "machines"),
-          many(count, "note", "notes")].join(" · "),
-        words: `project page ${p.code} folders`,
+        sub: [p.code, t("count.machines", { n: p.machines.length }),
+          t("count.notes", { n: count })].join(" · "),
+        words: `${t("app.search.project_words")} ${p.code}`,
         icon: <span className={`code-chip ${colorClass(p.color)}`} aria-hidden="true">{p.code}</span>,
-        rows: [["Code", p.code], ["Machines", String(p.machines.length)],
-          ["Notes", String(count)]],
-        run: () => openTab(projectTab(p.id)), act: "Open its page",
+        rows: [[t("app.search.row_code"), p.code],
+          [t("sidebar.machines"), String(p.machines.length)],
+          [t("sidebar.notes"), String(count)]],
+        run: () => openTab(projectTab(p.id)), act: t("app.search.open_page"),
       };
     });
     const noteHere = frontKind === "note" ? findNote(projects, tabTarget(current!)) : null;
@@ -1376,111 +1385,111 @@ export function App() {
       ...addItem,
       {
         key: "new-project",
-        label: "New project",
-        hint: "its own machines and notes",
+        label: t("sidebar.new_project"),
+        hint: t("app.action.new_project_hint"),
         icon: <Plus size={15} />,
-        words: "project new create make",
+        words: t("app.action.new_project_words"),
         run: startProject,
       },
       ...(pageProject && manages(pageProject) ? [{
         key: "edit-project",
-        label: `Edit ${pageProject.name}`,
-        hint: "name, code and color",
+        label: t("app.action.edit_project", { name: pageProject.name }),
+        hint: t("app.action.edit_project_hint"),
         icon: <Pencil size={15} />,
-        words: "project rename edit code color colour",
+        words: t("app.action.edit_project_words"),
         run: () => setProjectWindow({ project: pageProject }),
       }] : []),
       ...projects.filter((p) => p.role !== "observer").map((p): FinderItem => ({
         key: `folder-${p.id}`,
-        label: projects.length > 1 ? `New folder in ${p.name}` : "New folder",
-        hint: "for notes",
+        label: projects.length > 1 ? t("app.action.new_folder_in", { name: p.name })
+          : t("sidebar.new_folder"),
+        hint: t("app.action.new_folder_hint"),
         icon: <FolderIcon size={15} />,
-        words: "notes folder new create",
+        words: t("app.action.new_folder_words"),
         run: () => setNaming({ kind: "new", project: p }),
       })),
       {
         key: "machines",
-        label: "All machines",
+        label: t("sidebar.all_machines"),
         icon: <Server size={15} />,
-        words: "machines home overview",
+        words: t("app.action.machines_words"),
         run: () => navigate("/"),
       },
       ...(current ? [{
         key: "close-tab",
-        label: "Close this tab",
-        hint: frontKind === "terminal" ? "the terminal keeps running"
-          : frontKind === "note" ? "the note stays in its folder" : undefined,
+        label: t("app.action.close_tab"),
+        hint: frontKind === "terminal" ? t("app.action.close_tab_terminal")
+          : frontKind === "note" ? t("app.action.close_tab_note") : undefined,
         icon: <Close size={15} />,
-        words: "tab close",
+        words: t("app.action.close_tab_words"),
         run: () => closeTab(current),
       }] : []),
       ...(runningHere ? [{
         key: "rename-terminal",
-        label: "Name this terminal",
-        hint: "instead of its number",
+        label: t("app.action.rename_terminal"),
+        hint: t("app.action.rename_terminal_hint"),
         icon: <Pencil size={15} />,
-        words: "terminal rename name label",
+        words: t("app.action.rename_terminal_words"),
         run: () => setRenaming({ id: runningHere.id, where: "tab" }),
       }, {
         key: "end-terminal",
-        label: "End this terminal",
-        hint: "its shell ends",
+        label: t("app.action.end_terminal"),
+        hint: t("app.action.end_terminal_hint"),
         icon: <Close size={15} />,
-        words: "terminal end stop kill exit shell",
+        words: t("app.action.end_terminal_words"),
         run: () => askEnd(runningHere),
       }] : []),
       ...(noteHere && deletesNote(noteHere.project, noteHere.note, state.me.id) ? [{
         key: "delete-note",
-        label: "Delete this note",
-        hint: `from ${noteHere.folder.name}`,
+        label: t("app.action.delete_note"),
+        hint: t("app.action.delete_note_hint", { folder: noteHere.folder.name }),
         icon: <Trash size={15} />,
-        words: "note delete remove",
+        words: t("app.action.delete_note_words"),
         run: () => askDeleteNote(noteHere.note.id),
       }] : []),
       {
         key: "theme",
-        label: shownTheme === "light" ? "Switch to the dark theme"
-          : "Switch to the light theme",
+        label: shownTheme === "light" ? t("app.action.theme_dark")
+          : t("app.action.theme_light"),
         icon: shownTheme === "light" ? <Moon size={15} /> : <Sun size={15} />,
-        words: "theme dark light colours colors",
+        words: t("app.action.theme_words"),
         run: toggleTheme,
       },
       {
         key: "pin",
-        label: pinned ? "Let the sidebar slide away" : "Keep the sidebar open",
+        label: pinned ? t("sidebar.let_slide") : t("sidebar.keep_open_title"),
         icon: <Pin size={15} />,
-        words: "sidebar panel pin",
+        words: t("app.action.pin_words"),
         run: togglePin,
       },
       {
         key: "settings",
-        label: "Settings",
-        hint: local ? "theme, project colors" : "theme, project colors, devices",
+        label: t("settings.title"),
+        hint: local ? t("app.action.settings_hint_local") : t("app.action.settings_hint"),
         icon: <Gear size={15} />,
-        words: "settings preferences theme dark light colors colours " +
-          (local ? "" : "devices quick code forget browsers ") + "support",
+        words: local ? t("app.action.settings_words_local") : t("app.action.settings_words"),
         run: () => openPage("settings"),
       },
       ...(local ? [{
         key: "sign-in",
-        label: "Sign in",
-        hint: "your servers, projects and team",
+        label: t("common.sign_in"),
+        hint: t("app.action.sign_in_hint"),
         icon: <SignInIcon size={15} />,
-        words: "sign in log in login account cloud servers",
+        words: t("app.action.sign_in_words"),
         run: signInHere,
       }] : [{
         key: "account",
-        label: "Account",
-        hint: "name, photo and plan",
+        label: t("account.title"),
+        hint: t("app.action.account_hint"),
         icon: <Person size={15} />,
-        words: "account profile name photo picture avatar plan limits delete",
+        words: t("app.action.account_words"),
         run: () => openPage("account"),
       }, {
         key: "sign-out",
-        label: "Sign out",
-        hint: "this browser forgets you",
+        label: t("account_menu.sign_out"),
+        hint: t("app.action.sign_out_hint"),
         icon: <SignOutIcon size={15} />,
-        words: "sign out log out logout leave switch account",
+        words: t("app.action.sign_out_words"),
         run: () => {
           setPalette(false);
           void signOutHere().catch(() => {});
@@ -1489,8 +1498,8 @@ export function App() {
     ];
     const things: LocalEntry[] = actions.map((a): LocalEntry => ({
       key: `a-${a.key}`, kind: "actions", title: a.label, sub: a.hint ?? "",
-      words: a.words ?? "", icon: a.icon, rows: a.hint ? [["Does", a.hint]] : [],
-      run: a.run, act: "Do it", muted: a.muted,
+      words: a.words ?? "", icon: a.icon, rows: a.hint ? [[t("app.search.row_does"), a.hint]] : [],
+      run: a.run, act: t("app.search.do_it"), muted: a.muted,
     }));
     const entries = [...terminals, ...notes, ...machines, ...pages, ...things];
     const byKey = new Map(entries.map((e) => [e.key, e]));
@@ -1529,8 +1538,7 @@ export function App() {
     };
     if (frontTerminal && statuses[frontTerminal.id]?.running) {
       // Its line is the running program's: what goes in would go to it.
-      notYet("A command is running in this terminal, so its line is not " +
-        "free. Try again when it ends.");
+      notYet(t("app.paste_busy"));
       return;
     }
     if (frontTerminal && dotFor(frontTerminal) !== "ended") {
@@ -1545,8 +1553,7 @@ export function App() {
     }
     const machine = projects.flatMap((p) => p.machines).find((m) => m.id === block.machineId);
     if (!machine) {
-      notYet(`${block.machine} is not in tTerm Web any more. Open a terminal ` +
-        "elsewhere, and put the command into its line from there.");
+      notYet(t("app.paste_gone", { machine: block.machine }));
       return;
     }
     if (machine.kind === "computer" && !machine.online) {
@@ -1571,17 +1578,17 @@ export function App() {
           setPicking((was) => !was);
         }}
         renderPicker={(around) => (
-          <Finder className="machine-picker" label="New terminal"
-            placeholder="A machine in any project" around={around}
+          <Finder className="machine-picker" label={t("sidebar.new_terminal")}
+            placeholder={t("app.picker.placeholder")} around={around}
             groups={[...machineGroups(),
-              ...(addItem.length ? [{ title: "More", items: addItem }] : [])]}
+              ...(addItem.length ? [{ title: t("common.more"), items: addItem }] : [])]}
             onClose={() => setPicking(false)} />
         )}
         onJump={() => {
           setPicking(false);
           setPalette(true);
         }}
-        saving={frontKind === "note" ? saveLine(saveStates[tabTarget(current!)]) : null}
+        saving={frontKind === "note" ? saveLine(saveStates[tabTarget(current!)], t) : null}
         renaming={renaming?.where === "tab" ? renaming.id : null}
         onStartRename={(id) => {
           setPicking(false);
@@ -1641,11 +1648,11 @@ export function App() {
             ) : (
               <div className="status-page">
                 <div className="status-card" role="status">
-                  <h1>No such project</h1>
-                  <p>It is not among your projects any more.</p>
+                  <h1>{t("app.no_project")}</h1>
+                  <p>{t("app.no_project_text")}</p>
                   <button type="button" className="button-plain"
                     onClick={() => closeTab(current!)}>
-                    Close the tab
+                    {t("app.close_the_tab")}
                   </button>
                 </div>
               </div>
@@ -1687,16 +1694,16 @@ export function App() {
         )}
         {!online && shownTabs.some(isTerminalTab) && (
           <div className="lost-strip" role="status">
-            Connection lost. Reconnecting; your terminals keep running.
+            {t("app.connection_lost")}
           </div>
         )}
         {cutOff && (
           <div className="offline-strip" role="status">
             <CloudOff size={17} />
             <span>
-              <strong>No connection to tTerm.</strong>{" "}
-              {capital(hereWord())} works as usual. Terminals on servers go on
-              there and come back here with the connection.
+              {t.rich(onMac() ? "app.cut_off.mac" : "app.cut_off.computer", {
+                b: (inner) => <strong>{inner}</strong>,
+              })}
             </span>
           </div>
         )}
@@ -1755,6 +1762,8 @@ export function App() {
           onAccount={() => openPage("account")}
           onSignOut={() => void signOutHere().catch(() => {})}
           onSignIn={signInHere}
+          language={t.lang}
+          onLanguage={chooseLanguage}
           onHome={away(() => navigate("/"))}
           notYet={notYet}
         />
@@ -1781,17 +1790,16 @@ export function App() {
 
       {naming && (
         <FolderDialog
-          title={naming.kind === "new" ? `New folder in ${naming.project.name}`
-            : "Rename folder"}
+          title={naming.kind === "new"
+            ? t("app.folder.new_title", { name: naming.project.name })
+            : t("app.folder.rename_title")}
           initial={naming.kind === "rename" ? naming.folder.name : ""}
-          action={naming.kind === "new" ? "Create folder" : "Save"}
+          action={naming.kind === "new" ? t("app.folder.create") : t("common.save")}
           help={naming.kind === "new"
-            ? `${alone(naming.project) ? "Only you see it."
-              : `Everyone in ${naming.project.name} sees it and can write notes in it.`}` +
-              " Then + next to the folder starts the first note."
-            : alone(naming.project) ? "Only you see it."
-            : `Everyone in ${naming.project.name} sees the new name at once. ` +
-              "The notes inside stay as they are."}
+            ? (alone(naming.project) ? t("app.folder.new_help_alone")
+              : t("app.folder.new_help", { name: naming.project.name }))
+            : alone(naming.project) ? t("app.folder.rename_help_alone")
+            : t("app.folder.rename_help", { name: naming.project.name })}
           onSave={(name) => saveFolder(naming, name)}
           onCancel={() => setNaming(null)} />
       )}
@@ -1829,7 +1837,7 @@ export function App() {
       {movingNote && (() => {
         const where = findNote(projects, movingNote.noteId);
         return where && (
-          <MoveNoteDialog title={titled(where.note.title)} project={where.project}
+          <MoveNoteDialog title={titled(where.note.title, t)} project={where.project}
             folder={where.folder}
             targets={projects.filter((p) => p.id !== where.project.id && writes(p))}
             onMove={(to) => moveNoteOut(movingNote, to)}
@@ -1845,84 +1853,66 @@ export function App() {
       )}
 
       {asking?.kind === "remove" && (
-        <Confirm title={`Remove ${asking.machine.name}?`}
-          confirm={`Remove ${asking.machine.name}`}
+        <Confirm title={t("app.remove.title", { name: asking.machine.name })}
+          confirm={t("app.remove.confirm", { name: asking.machine.name })}
           onConfirm={() => remove(asking.machine)}
           onCancel={() => setAsking(null)}>
-          <p>
-            It disappears from tTerm Web, and its terminals end. The commands
-            typed there stay in the history.
-          </p>
+          <p>{t("app.remove.text")}</p>
           {asking.machine.kind === "computer" ? (
-            <p className="hint">
-              Its agent hears that the computer is removed and stops. To
-              connect the computer again: Add a machine, then Computer.
-            </p>
+            <p className="hint">{t("app.remove.computer")}</p>
           ) : (
-            <p className="hint">
-              tTerm Web stops signing in to it and takes its access back on
-              the server itself. If the server does not answer, the command
-              for that comes next.
-            </p>
+            <p className="hint">{t("app.remove.server")}</p>
           )}
         </Confirm>
       )}
 
       {asking?.kind === "end" && (
-        <Confirm title={`End ${asking.terminal.label}?`} confirm="End the terminal"
+        <Confirm title={t("app.end.title", { label: asking.terminal.label })}
+          confirm={t("app.end.confirm")}
           onConfirm={() => end(asking.terminal)}
           onCancel={() => setAsking(null)}>
-          <p>
-            Its shell ends, and whatever runs in it stops, as when a terminal
-            window is closed. What it ran stays in its tab and in the history.
-          </p>
+          <p>{t("app.end.text")}</p>
         </Confirm>
       )}
 
       {asking?.kind === "note" && (
-        <Confirm title={`Delete the note ${titled(asking.title)}?`}
-          sub={`In ${asking.folder.name}.`} confirm="Delete note"
+        <Confirm title={t("app.delete_note.title", { title: titled(asking.title, t) })}
+          sub={t("app.delete_note.sub", { folder: asking.folder.name })}
+          confirm={t("app.delete_note.confirm")}
           onConfirm={() => removeNote(asking)}
           onCancel={() => setAsking(null)}>
           <p>
-            {alone(asking.project) ? "It is gone for good."
-              : `Everyone in ${asking.project.name} loses it, also whoever has ` +
-                "it open now. The journal keeps a line: who deleted it, and when."}
+            {alone(asking.project) ? t("app.delete_note.alone")
+              : t("app.delete_note.shared", { project: asking.project.name })}
           </p>
         </Confirm>
       )}
 
       {asking?.kind === "folder" && (() => {
         const inside = asking.folder.notes;
-        const titles = inside.map((n) => titled(n.title));
+        const titles = inside.map((n) => titled(n.title, t));
         const named = titles.length > 5
-          ? listed([...titles.slice(0, 4), `${titles.length - 4} more`])
-          : listed(titles);
+          ? list([...titles.slice(0, 4), t("count.more", { n: titles.length - 4 })], t.lang)
+          : list(titles, t.lang);
         return (
-          <Confirm title={`Delete the folder ${asking.folder.name}?`}
+          <Confirm title={t("app.delete_folder.title", { name: asking.folder.name })}
             confirm={inside.length
-              ? `Delete folder and ${many(inside.length, "note", "notes")}`
-              : "Delete folder"}
+              ? t("app.delete_folder.confirm_notes", { n: inside.length })
+              : t("app.delete_folder.confirm")}
             onConfirm={() => removeFolder(asking)}
             onCancel={() => setAsking(null)}>
             <p className="ink">
               {inside.length
-                ? `Its ${inside.length === 1 ? "note goes" : `${inside.length} notes go`} ` +
-                  `with it: ${named}.`
-                : "The folder is empty."}
+                ? t("app.delete_folder.notes_go", { n: inside.length, names: named })
+                : t("app.delete_folder.empty")}
             </p>
             {inside.length > 0 && !alone(asking.project) && (
-              <p>
-                Everyone in {asking.project.name} loses them, also whoever has
-                one open now. The journal keeps a line: who deleted the folder,
-                and when.
-              </p>
+              <p>{t("app.delete_folder.shared", { project: asking.project.name })}</p>
             )}
             {inside.length > 0 && (
               <p className="keep-note">
                 <FolderIcon size={15} />
-                <span>To keep a note, move it first: ⋯ next to the note, then
-                  another folder.</span>
+                <span>{t("app.delete_folder.keep")}</span>
               </p>
             )}
           </Confirm>

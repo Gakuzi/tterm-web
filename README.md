@@ -4,7 +4,14 @@ tTerm in the browser: a real terminal with command blocks, for people who work
 with servers and for their teams. Projects, roles, a journal of who ran what,
 and watching a colleague's terminal, always with them knowing.
 
-**Status:** early development. Version 0.1.15 shows how tTerm for the
+**Status:** early development. Version 0.1.16 speaks the twelve languages
+of the site: English, Deutsch, Español, Français, Italiano, Polski,
+Português, Türkçe, Русский, 日本語, 한국어 and 简体中文. The account's menu
+has Language after Settings, the languages beside it, the one shown on top
+with a check; the one chosen is kept in the account, and until one is,
+the page speaks the browser's language when it is one of them, English
+otherwise. It comes with the app 0.6.0, whose own menus speak the same.
+Version 0.1.15 shows how tTerm for the
 Mac updates itself, with the app 0.5.0: while a new version is ready,
 Restart to update in the top bar next to Search and a card above the
 account in the sidebar; once after the restart, tTerm is updated with
@@ -203,6 +210,21 @@ tterm/
 web/             the page: React, TypeScript, Vite, xterm.js
 deploy/          a server: the setup script, systemd, nginx, backups
 ```
+
+**Languages.** Every word the page shows is a string of
+`web/src/i18n/<language>.txt`, as the site's are: `key = text` a line,
+`{name}` a value the page puts in, `one: … | other: …` the forms a language
+counts with (Unicode CLDR), `<b>…</b>` a part the page makes a link, bold or
+code. English is the source; it comes with the page, and another language
+is a file of its own, loaded once it is wanted. Components take their words
+from `useT()` (`web/src/i18n.ts`) and draw again in another language as soon
+as it is chosen. Before every build `web/scripts/strings.mjs` checks that
+every language has every key of English, with its values and parts and its
+own forms, that every key is used, and that no words are left in the code;
+the build stops if not. The language chosen is the account's
+(`users.language`); in the browser the one last shown is kept too, so the
+first paint is in it. The core's own messages and the emails are in
+English for now.
 
 **How a server connects.** "Add a machine" makes a one-time command that
 works for ten minutes. On the server it creates the user `tterm` with no

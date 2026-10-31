@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { savePhoto } from "./api";
+import { useT } from "./i18n";
 import { Close } from "./icons";
 
 /** The frame, and the circle in it, in pixels. */
@@ -32,6 +33,7 @@ interface Spot {
 
 export function PhotoDialog(props: Props) {
   const { image } = props;
+  const t = useT();
   const width = image.naturalWidth;
   const height = image.naturalHeight;
   /** At zoom 1 the photo's shorter side just fills the circle. */
@@ -106,7 +108,7 @@ export function PhotoDialog(props: Props) {
       canvas.width = SIDE;
       canvas.height = SIDE;
       const g = canvas.getContext("2d");
-      if (!g) throw new Error("The browser could not make the photo.");
+      if (!g) throw new Error(t("photo.browser_failed"));
       // A transparent PNG gets white behind it: a JPEG has no transparency.
       g.fillStyle = "#ffffff";
       g.fillRect(0, 0, SIDE, SIDE);
@@ -114,11 +116,11 @@ export function PhotoDialog(props: Props) {
       g.drawImage(image, crop.x, crop.y, crop.side, crop.side, 0, 0, SIDE, SIDE);
       const jpeg = await new Promise<Blob | null>((resolve) =>
         canvas.toBlob(resolve, "image/jpeg", 0.9));
-      if (!jpeg) throw new Error("The browser could not make the photo.");
+      if (!jpeg) throw new Error(t("photo.browser_failed"));
       const { photo } = await savePhoto(jpeg);
       props.onSaved(photo);
     } catch (error) {
-      setProblem((error as Error).message || "tTerm did not answer. Try again.");
+      setProblem((error as Error).message || t("photo.no_answer"));
       setBusy(false);
     }
   };
@@ -151,16 +153,16 @@ export function PhotoDialog(props: Props) {
         aria-modal="true" aria-labelledby="ph-title">
         <div className="dialog-head">
           <div className="dialog-title">
-            <h2 id="ph-title">Your photo</h2>
+            <h2 id="ph-title">{t("photo.title")}</h2>
           </div>
-          <button type="button" className="icon-button small" aria-label="Close"
+          <button type="button" className="icon-button small" aria-label={t("common.close")}
             onClick={props.onCancel}>
             <Close size={16} />
           </button>
         </div>
         <div className="photo-body">
           <div className="photo-frame" tabIndex={0} role="img"
-            aria-label="Your photo in a circle. Drag it, or move it with the arrows; + and - zoom."
+            aria-label={t("photo.frame")}
             onKeyDown={nudge}
             onPointerDown={(event) => {
               event.currentTarget.setPointerCapture(event.pointerId);
@@ -181,17 +183,17 @@ export function PhotoDialog(props: Props) {
             }}>
             <img src={image.src} alt="" draggable={false}
               style={{ width: shownWidth, height: shownHeight,
-                transform: `translate(${left}px, ${top}px)` }} />
+                transform: `translate(${left}px, ${top}px)` /* i18n-ignore */ }} />
             <span className="photo-circle" aria-hidden="true" />
           </div>
           <div className="photo-side">
             <label className="photo-zoom">
-              <span>Zoom</span>
+              <span>{t("photo.zoom")}</span>
               <input type="range" min={100} max={ZOOM_MAX * 100} step={5}
                 value={Math.round(zoom * 100)}
                 onChange={(event) => zoomTo(Number(event.target.value) / 100)} />
             </label>
-            <p className="hint">Drag the photo to place it in the circle.</p>
+            <p className="hint">{t("photo.drag")}</p>
             <div className="photo-previews">
               {PREVIEWS.map((size, i) => (
                 <canvas key={size} className="photo-preview" aria-hidden="true"
@@ -200,23 +202,21 @@ export function PhotoDialog(props: Props) {
                   }}
                   style={{ width: size, height: size }} />
               ))}
-              <span className="hint">As others see it</span>
+              <span className="hint">{t("photo.preview")}</span>
             </div>
           </div>
         </div>
         <p className="dialog-note photo-note">
-          JPEG, PNG or WebP of up to 5 MB. tTerm keeps a 256-pixel copy,
-          without what the photo says about itself, such as where it was
-          taken.
+          {t("photo.note")}
         </p>
         {problem && <div className="error-box" role="alert">{problem}</div>}
         <div className="button-row photo-buttons">
           <button type="button" className="button-plain quiet" onClick={props.onCancel}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button type="button" className="button-accent" disabled={busy}
             onClick={() => void save()}>
-            {busy ? "Saving…" : "Save photo"}
+            {busy ? t("photo.saving") : t("photo.save")}
           </button>
         </div>
       </section>

@@ -5,16 +5,18 @@
 // values live in tokens.css under .pc-<color>, one set for each theme.
 
 import { PROJECT_COLORS, type Project, type ProjectColor } from "./api";
+import type { Translate } from "./i18n";
 
-export const COLOR_NAMES: Record<ProjectColor, string> = {
-  violet: "Violet",
-  sky: "Sky",
-  teal: "Teal",
-  pink: "Pink",
-  orange: "Orange",
-  lime: "Lime",
-  indigo: "Indigo",
-  slate: "Slate",
+/** Each color's name, as strings of i18n/<code>.txt (0.1.16). */
+export const COLOR_KEY: Record<ProjectColor, string> = {
+  violet: "color.violet",
+  sky: "color.sky",
+  teal: "color.teal",
+  pink: "color.pink",
+  orange: "color.orange",
+  lime: "color.lime",
+  indigo: "color.indigo",
+  slate: "color.slate",
 };
 
 /** The class that gives an element and what is inside it the project's
@@ -75,6 +77,6 @@ export function freeName(wanted: string, taken: string[]): string {
 
 /** A terminal as lists name it: "terminal 2" while it has its number, or
  * the name its owner gave it. */
-export function terminalName(name: string): string {
-  return /^\d+$/.test(name) ? `terminal ${name}` : name;
+export function terminalName(name: string, t: Translate): string {
+  return /^\d+$/.test(name) ? t("terminal.numbered", { number: name }) : name;
 }

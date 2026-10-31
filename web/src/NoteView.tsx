@@ -21,6 +21,7 @@ import {
 } from "./drafts";
 import { colorClass } from "./colors";
 import { forgetNoteMark, goneThere, useFoundNote, wentThere } from "./found";
+import { t as say, useT } from "./i18n";
 import { Check, Folder as FolderIcon } from "./icons";
 import { MenuButton, NoteMenuItems } from "./Menus";
 import { fit, NoteEditor } from "./NoteEditor";
@@ -132,6 +133,7 @@ interface Props {
 
 export function NoteView(props: Props) {
   const { noteId, active, me } = props;
+  const t = useT();
   const [note, setNote] = useState<Note | null>(null);
   const [doc, setDoc] = useState<Doc | null>(null);
   const [conflict, setConflict] = useState<Note | null>(null);
@@ -308,7 +310,7 @@ export function NoteView(props: Props) {
           // Asking again the same way gets the same no: the next change
           // tries again.
           report("refused");
-          callbacks.current.notify(`Not saved: ${(e as Error).message}`);
+          callbacks.current.notify(say("note_view.not_saved", { why: (e as Error).message }));
         } else {
           report("offline");
           if (!closed.current) {
@@ -384,7 +386,7 @@ export function NoteView(props: Props) {
       report("conflict");
     }
     keepDraft(true);
-    callbacks.current.notify("What was typed in this note and not saved is back.");
+    callbacks.current.notify(say("note_view.draft_back"));
   }, [me.id, noteId, adopt, keepDraft, known, report, save, show]);
 
   // The note, from what this page has or from the core.
@@ -408,7 +410,7 @@ export function NoteView(props: Props) {
           dropDrafts(me.id, noteId);
           markGone();
         } else {
-          setProblem((e as Error).message || "tTerm Web did not answer.");
+          setProblem((e as Error).message || say("note_view.no_answer"));
         }
       });
     return () => {
@@ -531,7 +533,7 @@ export function NoteView(props: Props) {
       tellSummary(true);
       if (e instanceof NoteGone) markGone();
       else if (!(e instanceof SignedOut)) {
-        callbacks.current.notify(`Could not tick it: ${(e as Error).message}`);
+        callbacks.current.notify(say("note_view.no_tick", { why: (e as Error).message }));
       }
     }
   }, [adopt, flush, known, markGone, me.id, noteId, show, tellSummary]);
@@ -617,9 +619,8 @@ export function NoteView(props: Props) {
           else kept = true;
         }
         if (kept && !draftsOff()) {
-          callbacks.current.notify(`${titled(titleNow)}: what was typed is not ` +
-            "saved yet. It is kept in this browser and comes back when you " +
-            "open the note again.");
+          callbacks.current.notify(say("note_view.kept_draft",
+            { title: titled(titleNow, say) }));
         }
         callbacks.current.onSettled(noteId);
       };
@@ -694,8 +695,8 @@ export function NoteView(props: Props) {
     const now = docRef.current;
     if (!now) return;
     navigator.clipboard.writeText(toMarkdown(now.title, meaningful(now.blocks)))
-      .then(() => props.notify("Copied as Markdown."))
-      .catch(() => props.notify("Could not copy: the browser did not let the page."));
+      .then(() => props.notify(t("note_view.copied_markdown")))
+      .catch(() => props.notify(t("note_view.no_copy")));
   };
   const move = (to: string) => {
     if (!note) return;
@@ -705,20 +706,33 @@ export function NoteView(props: Props) {
         setNote((n) => (n ? { ...n, folderId: moved.folderId, folder: moved.folder } : n));
         props.onMoved(moved, from);
       })
-      .catch((e) => props.notify(`Could not move it: ${(e as Error).message}`));
+      .catch((e) => props.notify(t("note_view.no_move", { why: (e as Error).message })));
   };
 
-  const who = (w: Who | null) => (!w ? "Someone" : w.id === me.id ? "You" : w.firstName);
+  // Who did it: someone no longer known, the person, or another by name,
+  // each a sentence of its own.
+  const started = (w: Who | null, when: string) => !w
+    ? t("note_view.someone_started", { ago: when, folder: folderName })
+    : w.id === me.id ? t("note_view.you_started", { ago: when, folder: folderName })
+      : t("note_view.started", { name: w.firstName, ago: when, folder: folderName });
+  const edited = (w: Who | null, when: string) => !w
+    ? t("note_view.someone_edited", { ago: when })
+    : w.id === me.id ? t("note_view.you_edited", { ago: when })
+      : t("note_view.edited", { name: w.firstName, ago: when });
+  const wrote = (w: Who | null, day: string) => !w
+    ? t("note_view.someone_wrote", { day })
+    : w.id === me.id ? t("note_view.you_wrote", { day })
+      : t("note_view.wrote", { name: w.firstName, day });
   let meta = "";
   if (note) {
     const untouched = note.editedAt - note.createdAt < 60_000;
     meta = untouched
-      ? `${who(note.createdBy)} started it ${ago(note.createdAt)} in ${folderName}`
-      : `${who(note.editedBy)} edited it ${ago(note.editedAt)} · ` +
-        `${who(note.createdBy)} wrote it ${onDay(note.createdAt)}`;
+      ? started(note.createdBy, ago(note.createdAt, t))
+      : `${edited(note.editedBy, ago(note.editedAt, t))} · ` +
+        wrote(note.createdBy, onDay(note.createdAt, t));
     if (project) {
-      meta += project.personal || project.alone ? " · only you see it"
-        : ` · everyone in ${project.name} can edit`;
+      meta += project.personal || project.alone ? ` · ${t("note_view.only_you")}`
+        : ` · ${t("note_view.everyone_edits", { project: project.name })}`;
     }
   }
 
@@ -726,17 +740,16 @@ export function NoteView(props: Props) {
   if (gone) {
     body = (
       <div className="note-gone" role="status">
-        <h1>This note is deleted</h1>
-        <p>It was deleted, or the folder it was in, from another tab or
-          device.</p>
+        <h1>{t("note_view.gone_title")}</h1>
+        <p>{t("note_view.gone_text")}</p>
         <div className="button-row">
           <button type="button" className="button-accent big"
             onClick={() => props.onCloseTab(noteTab(noteId), true)}>
-            Close the tab
+            {t("note_view.close_tab")}
           </button>
           {doc && (
             <button type="button" className="button-plain" onClick={copyMarkdown}>
-              Copy what was here as Markdown
+              {t("note_view.copy_what_was_here")}
             </button>
           )}
         </div>
@@ -745,13 +758,13 @@ export function NoteView(props: Props) {
   } else if (problem) {
     body = (
       <div className="error-box" role="alert">
-        <span>Could not open the note: {problem}</span>
+        <span>{t("note_view.no_open", { why: problem })}</span>
         <button type="button" className="button-plain"
           onClick={() => {
             setProblem(null);
             setAttempt((n) => n + 1);
           }}>
-          Try again
+          {t("common.try_again")}
         </button>
       </div>
     );
@@ -769,15 +782,16 @@ export function NoteView(props: Props) {
             <FolderIcon size={13} />
             <span className="note-where-name">{folderName}</span>
           </span>
-          <MenuButton label="Note menu"
+          <MenuButton label={t("note_view.menu")}
             title={elsewhere && note.canDelete
-              ? "Folder, Move to another project, Copy as Markdown, Delete note"
-              : "Folder, Copy as Markdown, Delete note"}
+              ? t("note_view.menu_title_move")
+              : t("note_view.menu_title")}
             className="note-menu">
             {(close) => (
               <NoteMenuItems folders={folders} folderId={folderId}
                 canWrite={note.canWrite} canDelete={note.canDelete}
-                elsewhere={elsewhere} author={who(note.createdBy)} close={close}
+                elsewhere={elsewhere} author={note.createdBy?.firstName ?? null}
+                close={close}
                 onMove={move} onMoveOut={() => props.onMoveOut(noteId)}
                 onCopy={copyMarkdown}
                 onDelete={() => props.onDelete(noteId, docRef.current?.title ?? note.title)} />
@@ -785,7 +799,7 @@ export function NoteView(props: Props) {
           </MenuButton>
         </div>
         <textarea ref={title} className="note-title" value={doc.title} rows={1}
-          placeholder="Untitled" aria-label="Title" maxLength={200}
+          placeholder={t("note.untitled")} aria-label={t("note_view.title")} maxLength={200}
           readOnly={!note.canWrite} autoComplete="off"
           onChange={(e) => onTitle(e.target.value)}
           onKeyDown={(e) => {
@@ -809,19 +823,15 @@ export function NoteView(props: Props) {
         )}
         {conflict && (
           <div className="note-conflict" role="alert">
-            <span>
-              This note changed elsewhere while you were writing, in the same
-              places. There, keep yours or the other version? Everything else
-              stays from both.
-            </span>
+            <span>{t("note_view.conflict")}</span>
             <span className="button-row">
               <button type="button" className="button-plain small"
                 onClick={() => resolve("mine")}>
-                Keep mine
+                {t("note_view.keep_mine")}
               </button>
               <button type="button" className="button-plain small"
                 onClick={() => resolve("theirs")}>
-                Keep the other version
+                {t("note_view.keep_theirs")}
               </button>
             </span>
           </div>

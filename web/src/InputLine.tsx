@@ -9,12 +9,13 @@
 
 import {
   useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState,
-  type MutableRefObject,
+  type MutableRefObject, type ReactNode,
 } from "react";
 import {
   completeWord, listBranches, listDirs, type CompleteItem, type Completion,
 } from "./api";
 import { shortPath } from "./BlockView";
+import { useT } from "./i18n";
 import { ArrowUp, Branch, Folder } from "./icons";
 import { typeInto, type Home } from "./keys";
 import { LocalOnly } from "./local";
@@ -56,7 +57,7 @@ function shQuote(value: string): string {
 
 /** cd into a directory, written the plainest way that is still safe. */
 export function cdCommand(target: string): string {
-  if (target === "..") return "cd ..";
+  if (target === "..") return "cd .."; // i18n-ignore
   if (target === "~") return "cd ~";
   if (target.startsWith("~/")) {
     const rest = target.slice(2);
@@ -67,7 +68,7 @@ export function cdCommand(target: string): string {
 }
 
 export function switchCommand(branch: string): string {
-  return SPECIAL.test(branch) ? `git switch ${shQuote(branch)}`
+  return SPECIAL.test(branch) ? `git switch ${shQuote(branch)}` // i18n-ignore
     : `git switch ${branch}`;
 }
 
@@ -89,9 +90,12 @@ interface Listing {
 
 type Open = "dirs" | "branches" | "history" | null;
 
+const kbd = (inner: ReactNode) => <kbd>{inner}</kbd>;
+
 export function InputLine(props: Props) {
   // In the app before signing in, history stays on this computer (0.1.4).
   const local = useContext(LocalOnly);
+  const t = useT();
   const { phase, prompt, history, terminalId } = props;
   const [text, setText] = useState("");
   const [atEnd, setAtEnd] = useState(true);
@@ -149,8 +153,7 @@ export function InputLine(props: Props) {
     const command = el ? el.value : "";
     if (!command.trim()) return;
     if (!ready) {
-      props.notify("A command is still running. Wait for it, or stop it " +
-        "with Ctrl+C in its block.");
+      props.notify(t("input.still_running"));
       return;
     }
     props.onRun(command);
@@ -158,7 +161,7 @@ export function InputLine(props: Props) {
     setFromSearch(false);
     nav.current = null;
     setListing(null);
-  }, [props, ready]);
+  }, [props, ready, t]);
 
   // The line, for the keys that belong to it.
   useEffect(() => {
@@ -336,7 +339,7 @@ export function InputLine(props: Props) {
     setItems(null);
     const request = which === "dirs"
       ? listDirs(terminalId).then((d): PickerItem[] => [
-        ...(d.cwd !== "/" ? [{ key: "..", label: "..", hint: "up a level",
+        ...(d.cwd !== "/" ? [{ key: "..", label: "..", hint: t("input.up_level"),
           icon: <ArrowUp size={14} /> }] : []),
         ...d.dirs.map((name) => ({ key: name, label: name,
           icon: <Folder size={14} />, hidden: name.startsWith(".") })),
@@ -344,17 +347,19 @@ export function InputLine(props: Props) {
       : listBranches(terminalId).then((b): PickerItem[] => {
         const local = new Set(b.local);
         return [
-          ...b.local.map((name) => ({ key: `l:${name}`, label: name,
-            hint: name === b.current ? "current" : undefined,
+          // The branch one is on is marked by its key, "c:": what it says
+          // is in the language shown.
+          ...b.local.map((name) => ({ key: name === b.current ? `c:${name}` : `l:${name}`,
+            label: name, hint: name === b.current ? t("input.branch_current") : undefined,
             icon: <Branch size={14} /> })),
           ...b.remote
             .filter((r) => !local.has(r.slice(r.indexOf("/") + 1)))
-            .map((name) => ({ key: `r:${name}`, label: name, hint: "remote",
+            .map((name) => ({ key: `r:${name}`, label: name, hint: t("input.branch_remote"),
               icon: <Branch size={14} /> })),
         ];
       });
     request.then(setItems).catch((e: Error) =>
-      setProblem(`The machine did not answer: ${e.message}`));
+      setProblem(t("input.no_answer", { error: e.message })));
   };
 
   const close = () => {
@@ -372,7 +377,7 @@ export function InputLine(props: Props) {
     if (which === "dirs") {
       props.onRun(cdCommand(item.label));
     } else if (which === "branches") {
-      if (item.hint === "current") return;
+      if (item.key.startsWith("c:")) return;
       const name = item.key.startsWith("r:")
         ? item.label.slice(item.label.indexOf("/") + 1) : item.label;
       props.onRun(switchCommand(name));
@@ -380,9 +385,9 @@ export function InputLine(props: Props) {
   };
 
   const where = shortPath(prompt.cwd, prompt.home) || "…";
-  const placeholder = phase === "start" ? "Starting the shell…"
+  const placeholder = phase === "start" ? t("input.starting")
     : phase === "running" || phase === "input" || phase === "full"
-      ? "Keys go to the running command. Click here to type the next one."
+      ? t("input.keys_go")
       : "";
 
   return (
@@ -390,11 +395,11 @@ export function InputLine(props: Props) {
       <div className="input-row">
         {open && (
           <Picker
-            label={open === "dirs" ? "Change directory"
-              : open === "branches" ? "Switch branch" : "History"}
+            label={open === "dirs" ? t("input.change_dir")
+              : open === "branches" ? t("input.switch_branch") : t("input.history")}
             items={items} error={problem}
-            placeholder={open === "dirs" ? "Find a directory, or type a path"
-              : open === "branches" ? "Find a branch" : "Find a command"}
+            placeholder={open === "dirs" ? t("input.find_dir")
+              : open === "branches" ? t("input.find_branch") : t("input.find_command")}
             onPick={picked} onClose={close}
             onTyped={open === "dirs" ? (typed) => {
               close();
@@ -404,12 +409,12 @@ export function InputLine(props: Props) {
         )}
         <div className="prompt-chips">
           <button type="button" className="chip chip-dir" disabled={!ready}
-            title="Change directory" onClick={() => openPicker("dirs")}>
+            title={t("input.change_dir")} onClick={() => openPicker("dirs")}>
             {where}
           </button>
           {prompt.branch && (
             <button type="button" className="chip chip-branch" disabled={!ready}
-              title="Switch branch" onClick={() => openPicker("branches")}>
+              title={t("input.switch_branch")} onClick={() => openPicker("branches")}>
               <Branch size={12} />
               {prompt.branch}
             </button>
@@ -419,7 +424,7 @@ export function InputLine(props: Props) {
         </div>
         <div className="input-box">
           {listing && (
-            <ul className="complete-list" role="listbox" aria-label="Completions">
+            <ul className="complete-list" role="listbox" aria-label={t("input.completions")}>
               {listing.completion.items.map((item, i) => (
                 <li key={item.text} role="option"
                   aria-selected={i === listing.active}
@@ -433,7 +438,7 @@ export function InputLine(props: Props) {
               ))}
               {listing.completion.more && (
                 <li className="complete-more" aria-disabled="true">
-                  More not shown: type a few more letters
+                  {t("input.more_not_shown")}
                 </li>
               )}
             </ul>
@@ -443,7 +448,7 @@ export function InputLine(props: Props) {
             <span className="ghost-rest">{ghost}</span>
           </div>
           <textarea ref={field} className="input-field" rows={1} value={text}
-            aria-label="Command" spellCheck={false} autoComplete="off"
+            aria-label={t("input.command")} spellCheck={false} autoComplete="off"
             autoCapitalize="off" autoCorrect="off" placeholder={placeholder}
             disabled={!usable}
             onChange={(e) => {
@@ -459,16 +464,17 @@ export function InputLine(props: Props) {
       </div>
       {fromSearch && text ? (
         <div className="input-hints from-search" role="status">
-          <span>From search, not run yet</span>
-          <span><kbd>Enter</kbd> runs it here</span>
-          <span><kbd>Esc</kbd> clears the line</span>
+          <span>{t("input.from_search")}</span>
+          <span>{t.rich("input.enter_runs", { kbd })}</span>
+          <span>{t.rich("input.esc_clears", { kbd })}</span>
         </div>
       ) : (
         <div className="input-hints">
-          <span><kbd>Tab</kbd> complete, or take the suggestion</span>
-          <span><kbd>↑</kbd> history {local ? "on this computer" : "across your devices"}</span>
-          <span><kbd>⇧↵</kbd> new line</span>
-          <span>While a command runs, what you type goes to it</span>
+          <span>{t.rich("input.tab_complete", { kbd })}</span>
+          <span>{local ? t.rich("input.history_local", { kbd })
+            : t.rich("input.history_devices", { kbd })}</span>
+          <span>{t.rich("input.new_line", { kbd })}</span>
+          <span>{t("input.while_running")}</span>
         </div>
       )}
     </footer>
@@ -481,13 +487,14 @@ export function ModeToggle({ mode, onLine, onClassic, disabled }: {
   onClassic: () => void;
   disabled?: string;
 }) {
+  const t = useT();
   return (
-    <div role="group" aria-label="Input mode" className="mode-toggle"
+    <div role="group" aria-label={t("input.mode")} className="mode-toggle"
       title={disabled}>
       <button type="button" aria-pressed={mode === "line"} disabled={!!disabled}
-        onClick={onLine}>Line</button>
+        onClick={onLine}>{t("input.mode_line")}</button>
       <button type="button" aria-pressed={mode === "classic"} onClick={onClassic}>
-        Classic
+        {t("input.mode_classic")}
       </button>
     </div>
   );

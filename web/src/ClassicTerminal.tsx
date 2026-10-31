@@ -14,12 +14,13 @@ import "@xterm/xterm/css/xterm.css";
 import { useEffect, useRef } from "react";
 import type { TerminalInfo } from "./api";
 import { takePaste } from "./found";
+import { useT } from "./i18n";
 import { keepKeys, typingElsewhere } from "./keys";
 import { socket, type Channel, type MarkerEvent } from "./socket";
 import type { Shown } from "./theme";
 import { terminalTheme } from "./xtermTheme";
 
-export const FONT = '"JetBrains Mono Variable", "JetBrains Mono", ' +
+export const FONT = '"JetBrains Mono Variable", "JetBrains Mono", ' + // i18n-ignore
   'ui-monospace, SFMono-Regular, Menlo, monospace';
 export const FONT_SIZE = 13;
 /** Output handed to the terminal but not drawn yet. Above HIGH the core is
@@ -50,6 +51,7 @@ interface Props {
 
 export function ClassicTerminal(props: Props) {
   const { terminalId, shownTheme } = props;
+  const t = useT();
   const box = useRef<HTMLDivElement>(null);
   const term = useRef<Terminal | null>(null);
   const channelRef = useRef<Channel | null>(null);
@@ -83,7 +85,7 @@ export function ClassicTerminal(props: Props) {
     const start = async () => {
       // The font must be there before the terminal measures its cells.
       try {
-        await document.fonts.load(`${FONT_SIZE}px "JetBrains Mono Variable"`);
+        await document.fonts.load(`${FONT_SIZE}px "JetBrains Mono Variable"`); // i18n-ignore
       } catch {
         // A fallback font is measured instead; still a working terminal.
       }
@@ -114,16 +116,16 @@ export function ClassicTerminal(props: Props) {
       }
       fit.fit();
 
-      const t = xterm;
+      const x = xterm;
       // An ended terminal takes no keys and shows no cursor: nothing there
       // reads them any more. Its last screen stays, under the note.
       const stop = () => {
-        t.options.disableStdin = true;
-        t.options.cursorBlink = false;
-        t.write("\x1b[?25l");
-        t.blur();
+        x.options.disableStdin = true;
+        x.options.cursorBlink = false;
+        x.write("\x1b[?25l");
+        x.blur();
       };
-      channel = channelRef.current = socket.attach(terminalId, t.cols, t.rows, {
+      channel = channelRef.current = socket.attach(terminalId, x.cols, x.rows, {
         attached: (terminal, resumed) => {
           // Back after a moment away: what was missed is old news too, up
           // to `replayed`.
@@ -134,13 +136,13 @@ export function ClassicTerminal(props: Props) {
           events.current.attached(terminal);
         },
         reset: () => {
-          t.reset();
+          x.reset();
           pending = 0;
           replaying = true;
           ready.current = false;
         },
         replayed: () => {
-          t.write(new Uint8Array(0), () => {
+          x.write(new Uint8Array(0), () => {
             replaying = false;
             ready.current = true;
             pasteWaiting.current();
@@ -149,7 +151,7 @@ export function ClassicTerminal(props: Props) {
         output: (data) => {
           pending += data.length;
           if (pending > HIGH) channel?.pause();
-          t.write(data, () => {
+          x.write(data, () => {
             pending -= data.length;
             if (pending < LOW) channel?.resume();
           });
@@ -164,16 +166,16 @@ export function ClassicTerminal(props: Props) {
           events.current.gone(terminal);
         },
       });
-      t.onData((data) => {
+      x.onData((data) => {
         if (!replaying) channel?.input(data);
       });
-      t.onBinary((data) => {
+      x.onBinary((data) => {
         if (!replaying) channel?.inputBinary(data);
       });
       // The page clicked into last is the one that types (see Watcher in
       // tterm/core/terminals.py).
-      t.textarea?.addEventListener("focus", () => channel?.focus());
-      t.onResize(({ cols, rows }) => channel?.resize(cols, rows));
+      x.textarea?.addEventListener("focus", () => channel?.focus());
+      x.onResize(({ cols, rows }) => channel?.resize(cols, rows));
       observer = new ResizeObserver(() => {
         cancelAnimationFrame(frame);
         frame = requestAnimationFrame(() => {
@@ -183,10 +185,10 @@ export function ClassicTerminal(props: Props) {
       observer.observe(element);
       cleanups.push(keepKeys(() => disposed || ended.current || !active.current
         ? null : {
-        element: t.textarea ?? null,
-        type: (data) => t.input(data),
+        element: x.textarea ?? null,
+        type: (data) => x.input(data),
       }));
-      if (active.current && !typingElsewhere(element)) t.focus();
+      if (active.current && !typingElsewhere(element)) x.focus();
     };
     void start();
 
@@ -208,17 +210,16 @@ export function ClassicTerminal(props: Props) {
   // would each run, so then it stays out. A terminal just opened for it
   // takes it once its history is drawn.
   pasteWaiting.current = () => {
-    const t = term.current;
+    const x = term.current;
     const p = waiting.current;
-    if (!t || !p || !ready.current) return;
+    if (!x || !p || !ready.current) return;
     waiting.current = null;
-    if (p.text.includes("\n") && !t.modes.bracketedPasteMode) {
-      props.notify?.("This command has several lines, and the classic mode " +
-        "would run each as it goes in. Switch to Line under the terminal.");
+    if (p.text.includes("\n") && !x.modes.bracketedPasteMode) {
+      props.notify?.(t("classic.several_lines"));
       return;
     }
-    t.paste(p.text);
-    t.focus();
+    x.paste(p.text);
+    x.focus();
   };
   useEffect(() => {
     const p = props.paste;

@@ -16,6 +16,7 @@
 // the connection ("offline") a strip says so and the cloud's machines wait.
 
 import { createContext } from "react";
+import type { Translate } from "./i18n";
 
 /** True in the app before signing in. */
 export const LocalOnly = createContext(false);
@@ -26,9 +27,15 @@ export const LocalOnly = createContext(false);
  * connection is back (`online`). */
 export const InApp = createContext({ inApp: false, online: true });
 
-/** What the app's own computer is called on the page: "this Mac" on a Mac,
- * "this computer" elsewhere. */
-export function hereWord(): string {
-  return /Macintosh|Mac OS X/.test(navigator.userAgent) ? "this Mac"
-    : "this computer";
+/** Whether the page runs on a Mac: the app's own computer is "this Mac"
+ * there, "this computer" elsewhere. A sentence that names it comes in
+ * both, as strings of their own (.mac and .computer), since languages
+ * change the words around it. */
+export function onMac(): boolean {
+  return /Macintosh|Mac OS X/.test(navigator.userAgent); // i18n-ignore
+}
+
+/** What the app's own computer is called on the page, alone: "this Mac". */
+export function hereWord(t: Translate): string {
+  return onMac() ? t("here.mac") : t("here.computer");
 }

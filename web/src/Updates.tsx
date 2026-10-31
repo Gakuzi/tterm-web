@@ -18,8 +18,9 @@ import {
   checkUpdate, loadUpdate, moveToApplications, restartToUpdate, setUpdateMode, updateSeen,
   type AppUpdate, type UpdateMode,
 } from "./api";
+import { useT, type Translate } from "./i18n";
 import { Check, Close, Restart, Warning } from "./icons";
-import { hereWord } from "./local";
+import { hereWord, onMac } from "./local";
 import { ago, clock, onDay } from "./time";
 
 /** How often the page asks the app, by itself; in Settings, more often. */
@@ -93,6 +94,7 @@ function readyVersion(update: AppUpdate | null): string | null {
 /** A, in the top bar: Restart to update, with what it means on hover. */
 export function UpdatePill() {
   const { update } = useContext(UpdateState);
+  const t = useT();
   const restart = useRestart();
   const version = readyVersion(update);
   if (!update || !version) return null;
@@ -100,9 +102,11 @@ export function UpdatePill() {
   return (
     <button type="button" className="update-pill" disabled={installing}
       onClick={restart}
-      title={`tTerm ${version} is ready. The restart takes a few seconds; if terminals run on ${hereWord()}, tTerm asks first.`}>
+      title={t(onMac() ? "updates.pill_title.mac" : "updates.pill_title.computer", { version })}>
       <Restart size={14} />
-      <span className="update-pill-text">{installing ? "Restarting…" : "Restart to update"}</span>
+      <span className="update-pill-text">
+        {installing ? t("updates.restarting") : t("updates.restart_to_update")}
+      </span>
     </button>
   );
 }
@@ -110,6 +114,7 @@ export function UpdatePill() {
 /** B, in the sidebar above the account. */
 export function UpdateCard() {
   const { update } = useContext(UpdateState);
+  const t = useT();
   const restart = useRestart();
   const version = readyVersion(update);
   if (!update || !version) return null;
@@ -119,16 +124,18 @@ export function UpdateCard() {
       <div className="update-card-head">
         <Restart size={16} />
         <span className="update-card-text">
-          <strong>tTerm {version} is ready</strong>
-          <span>The restart takes a few seconds.</span>
+          <strong>{t("updates.ready", { version })}</strong>
+          <span>{t("updates.restart_takes")}</span>
         </span>
       </div>
       <div className="update-card-actions">
         <button type="button" className="button-accent" disabled={installing}
           onClick={restart}>
-          {installing ? "Restarting…" : "Restart"}
+          {installing ? t("updates.restarting") : t("updates.restart")}
         </button>
-        {update.notes && <a href={update.notes} target="_blank" rel="noreferrer">What's new</a>}
+        {update.notes && (
+          <a href={update.notes} target="_blank" rel="noreferrer">{t("updates.whats_new")}</a>
+        )}
       </div>
     </div>
   );
@@ -138,6 +145,7 @@ export function UpdateCard() {
  * it is seen: started in the menu bar, the window may open much later. */
 export function UpdatedToast() {
   const { update, set } = useContext(UpdateState);
+  const t = useT();
   const updated = update?.updated ?? null;
   const [visible, setVisible] = useState(document.visibilityState === "visible");
   useEffect(() => {
@@ -157,9 +165,9 @@ export function UpdatedToast() {
   return (
     <div className="update-toast" role="status">
       <span className="update-toast-mark" aria-hidden="true"><Check size={13} /></span>
-      <strong>tTerm is updated to {updated.to}</strong>
-      <a href={updated.notes} target="_blank" rel="noreferrer">What's new</a>
-      <button type="button" className="icon-button tiny" aria-label="Close"
+      <strong>{t("updates.updated", { version: updated.to })}</strong>
+      <a href={updated.notes} target="_blank" rel="noreferrer">{t("updates.whats_new")}</a>
+      <button type="button" className="icon-button tiny" aria-label={t("common.close")}
         onClick={done}>
         <Close size={13} />
       </button>
@@ -167,27 +175,28 @@ export function UpdatedToast() {
   );
 }
 
-const MODES: { value: UpdateMode; label: string; recommended?: boolean; text: (mac: string) => string }[] = [
+const MODES: { value: UpdateMode; label: string; recommended?: boolean; text: (t: Translate) => string }[] = [
   {
     value: "auto",
-    label: "Update by itself",
+    label: "updates.auto",
     recommended: true,
-    text: (mac) => `A new version goes in as tTerm quits, and, with tTerm in the menu bar and its window closed, as soon as nothing runs on ${mac}.`,
+    text: (t) => t(onMac() ? "updates.auto_text.mac" : "updates.auto_text.computer"),
   },
   {
     value: "ask",
-    label: "Ask me first",
-    text: () => "A new version waits until you press Restart to update.",
+    label: "updates.ask",
+    text: (t) => t("updates.ask_text"),
   },
 ];
 
 /** Settings: Updates. */
 export function UpdatesSection() {
   const { update, set } = useContext(UpdateState);
+  const t = useT();
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const restart = useRestart();
-  const mac = hereWord();
+  const mac = hereWord(t);
 
   useEffect(() => {
     let live = true;
@@ -234,13 +243,12 @@ export function UpdatesSection() {
   return (
     <section className="account-section" aria-labelledby="st-updates">
       <div className="account-section-head">
-        <h2 id="st-updates">Updates</h2>
+        <h2 id="st-updates">{t("updates.title")}</h2>
         <p>
-          tTerm for Mac updates itself from tTerm's releases. Only a version
-          signed by tTerm goes in.
+          {t("updates.about")}
         </p>
       </div>
-      <div className="account-card update-modes" role="radiogroup" aria-label="How tTerm updates">
+      <div className="account-card update-modes" role="radiogroup" aria-label={t("updates.how")}>
         {MODES.map((m) => (
           <label key={m.value} className="update-mode">
             <input type="radio" name="update-mode" value={m.value}
@@ -248,10 +256,10 @@ export function UpdatesSection() {
               onChange={() => choose(m.value)} />
             <span className="update-mode-text">
               <span className="update-mode-name">
-                {m.label}
-                {m.recommended && <span className="update-recommended">Recommended</span>}
+                {t(m.label)}
+                {m.recommended && <span className="update-recommended">{t("updates.recommended")}</span>}
               </span>
-              <span>{m.text(mac)}</span>
+              <span>{m.text(t)}</span>
             </span>
           </label>
         ))}
@@ -269,30 +277,39 @@ function UpdateLine(props: {
   onCheck: () => void; onRestart: () => void; onMove: () => void;
 }) {
   const { update } = props;
+  const t = useT();
   let body;
   switch (update.state) {
     case "checking":
-      body = <span className="waiting"><span className="spinner" />Looking for a new version…</span>;
+      body = <span className="waiting"><span className="spinner" />{t("updates.checking")}</span>;
       break;
     case "downloading":
-      body = <span className="waiting"><span className="spinner" />Downloading tTerm {update.next}…</span>;
+      body = (
+        <span className="waiting">
+          <span className="spinner" />{t("updates.downloading", { version: update.next ?? "" })}
+        </span>
+      );
       break;
     case "installing":
-      body = <span className="waiting"><span className="spinner" />Restarting…</span>;
+      body = <span className="waiting"><span className="spinner" />{t("updates.restarting")}</span>;
       break;
     case "ready":
       body = (
         <>
           <span className="update-line-text">
-            <strong>tTerm {update.next} is ready</strong>
+            <strong>{t("updates.ready", { version: update.next ?? "" })}</strong>
             <span className="update-line-detail">
-              You have {update.version}.
-              {update.readyAt && ` Downloaded ${onDay(update.readyAt)} at ${clock(update.readyAt)}.`}
-              {update.notes && <> <a href={update.notes} target="_blank" rel="noreferrer">What's new</a></>}
+              {update.readyAt
+                ? t("updates.you_have_downloaded", { version: update.version,
+                  day: onDay(update.readyAt, t), time: clock(update.readyAt) })
+                : t("updates.you_have", { version: update.version })}
+              {update.notes && (
+                <> <a href={update.notes} target="_blank" rel="noreferrer">{t("updates.whats_new")}</a></>
+              )}
             </span>
           </span>
           <button type="button" className="button-accent" onClick={props.onRestart}>
-            Restart to update
+            {t("updates.restart_to_update")}
           </button>
         </>
       );
@@ -304,18 +321,20 @@ function UpdateLine(props: {
           <span className="update-line-text">
             {update.next ? (
               <>
-                <strong>Could not update to {update.next}</strong>
+                <strong>{t("updates.failed", { version: update.next })}</strong>
                 <span className="update-line-detail">{update.problem}</span>
               </>
             ) : <strong>{update.problem}</strong>}
             <span className="update-line-detail">
-              Or download tTerm from <a href="https://tterm.net" target="_blank" rel="noreferrer">tterm.net</a> and
-              drag it to Applications.
+              {t.rich("updates.download", {
+                site: "tterm.net",
+                link: (inner) => <a href="https://tterm.net" target="_blank" rel="noreferrer">{inner}</a>,
+              })}
             </span>
           </span>
           <button type="button" className="button-plain small" disabled={props.busy}
             onClick={props.onCheck}>
-            Try again
+            {t("common.try_again")}
           </button>
         </>
       );
@@ -329,7 +348,7 @@ function UpdateLine(props: {
           {update.movable && (
             <button type="button" className="button-accent" disabled={props.busy}
               onClick={props.onMove}>
-              Move to Applications
+              {t("updates.move")}
             </button>
           )}
         </>
@@ -340,13 +359,17 @@ function UpdateLine(props: {
         <>
           <span className="update-line-text">
             <span>
-              {update.checkedAt ? `tTerm ${update.version} is up to date. Looked ${ago(update.checkedAt)}.`
-                : `This is tTerm ${update.version}.`}
+              {update.checkedAt
+                // A day written short may end in its own period ("12 окт.",
+                // "12. Okt."): at the end of the sentence it is the one.
+                ? t("updates.looked", { version: update.version, ago: ago(update.checkedAt, t) })
+                  .replace(/\.\.$/, ".")
+                : t("updates.this_is", { version: update.version })}
             </span>
           </span>
           <button type="button" className="button-plain small" disabled={props.busy}
             onClick={props.onCheck}>
-            Check now
+            {t("updates.check_now")}
           </button>
         </>
       );

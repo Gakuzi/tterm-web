@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Folder } from "./api";
+import { useT } from "./i18n";
 import {
   Close, Copy, Dots, Folder as FolderIcon, Layers, Lock, Pencil, Trash,
 } from "./icons";
@@ -97,8 +98,9 @@ export function NoteMenuItems(props: {
   canDelete: boolean;
   /** There is another project the person writes notes in. */
   elsewhere: boolean;
-  /** Who may delete it, when this person may not. */
-  author: string;
+  /** Who may delete it, when this person may not: its author's first
+   * name, or null when the author is not known. */
+  author: string | null;
   close: () => void;
   onMove: (folderId: string) => void;
   onMoveOut: () => void;
@@ -106,11 +108,12 @@ export function NoteMenuItems(props: {
   onDelete: () => void;
 }) {
   const { close } = props;
+  const t = useT();
   return (
     <>
       {props.canWrite && props.folders.length > 1 && (
         <>
-          <div className="menu-label">Folder</div>
+          <div className="menu-label">{t("menus.folder")}</div>
           {props.folders.map((f) => (
             <button key={f.id} type="button" className="menu-item"
               role="menuitemradio" aria-checked={f.id === props.folderId}
@@ -134,7 +137,7 @@ export function NoteMenuItems(props: {
             props.onMoveOut();
           }}>
           <Layers size={15} />
-          <span className="menu-text">Move to another project…</span>
+          <span className="menu-text">{t("menus.move_out")}</span>
         </button>
       )}
       <button type="button" className="menu-item" role="menuitem"
@@ -143,7 +146,7 @@ export function NoteMenuItems(props: {
           props.onCopy();
         }}>
         <Copy size={15} />
-        <span className="menu-text">Copy as Markdown</span>
+        <span className="menu-text">{t("menus.copy_markdown")}</span>
       </button>
       {props.canDelete ? (
         <button type="button" className="menu-item danger" role="menuitem"
@@ -152,13 +155,16 @@ export function NoteMenuItems(props: {
             props.onDelete();
           }}>
           <Trash size={15} />
-          <span className="menu-text">Delete note</span>
+          <span className="menu-text">{t("menus.delete_note")}</span>
         </button>
       ) : props.canWrite && (
         <div className="menu-note">
           <Lock size={14} />
-          <span>{props.author}, the owner and admins can {props.elsewhere
-            ? "move it to another project or delete it" : "delete it"}</span>
+          <span>{props.author !== null
+            ? (props.elsewhere ? t("menus.note_rights_move", { name: props.author })
+              : t("menus.note_rights_delete", { name: props.author }))
+            : props.elsewhere ? t("menus.note_rights_move_someone")
+              : t("menus.note_rights_delete_someone")}</span>
         </div>
       )}
     </>
@@ -174,6 +180,7 @@ export function FolderMenuItems(props: {
   onDelete: () => void;
 }) {
   const { close } = props;
+  const t = useT();
   return (
     <>
       {props.canWrite && (
@@ -183,7 +190,7 @@ export function FolderMenuItems(props: {
             props.onRename();
           }}>
           <Pencil size={15} />
-          <span className="menu-text">Rename folder</span>
+          <span className="menu-text">{t("menus.rename_folder")}</span>
         </button>
       )}
       {props.canDelete ? (
@@ -193,12 +200,12 @@ export function FolderMenuItems(props: {
             props.onDelete();
           }}>
           <Trash size={15} />
-          <span className="menu-text">Delete folder</span>
+          <span className="menu-text">{t("menus.delete_folder")}</span>
         </button>
       ) : (
         <div className="menu-note">
           <Lock size={14} />
-          <span>The owner and admins delete a folder with notes in it</span>
+          <span>{t("menus.folder_rights")}</span>
         </div>
       )}
     </>
@@ -215,6 +222,7 @@ export function FolderDialog(props: {
   onSave: (name: string) => Promise<void>;
   onCancel: () => void;
 }) {
+  const t = useT();
   const [name, setName] = useState(props.initial);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -243,7 +251,7 @@ export function FolderDialog(props: {
     try {
       await props.onSave(name.trim());
     } catch (e) {
-      setProblem((e as Error).message || "tTerm Web did not answer.");
+      setProblem((e as Error).message || t("menus.no_answer"));
       setBusy(false);
     }
   };
@@ -256,22 +264,22 @@ export function FolderDialog(props: {
           <div className="dialog-title">
             <h2 id="fd-title">{props.title}</h2>
           </div>
-          <button type="button" className="icon-button small" aria-label="Close"
+          <button type="button" className="icon-button small" aria-label={t("common.close")}
             onClick={props.onCancel}>
             <Close size={16} />
           </button>
         </div>
         <form className="folder-form" onSubmit={(e) => void submit(e)}>
-          <label htmlFor="fd-name">Name</label>
+          <label htmlFor="fd-name">{t("menus.name")}</label>
           <input id="fd-name" ref={input} className="text-input" value={name}
             maxLength={80} autoComplete="off" spellCheck={false}
-            placeholder="For example, Runbooks"
+            placeholder={t("menus.name_example")}
             onChange={(e) => setName(e.target.value)} />
           <p className="hint">{props.help}</p>
           {problem && <div className="error-box" role="alert">{problem}</div>}
           <div className="button-row end">
             <button type="button" className="button-plain" onClick={props.onCancel}>
-              Cancel
+              {t("common.cancel")}
             </button>
             <button type="submit" className="button-accent big"
               disabled={busy || !name.trim()}>

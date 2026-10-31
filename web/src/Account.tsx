@@ -15,6 +15,7 @@ import {
   loadAccount, removePhoto, saveName, type AccountInfo, type Me,
 } from "./api";
 import { Face } from "./Face";
+import { list, useT, type Translate } from "./i18n";
 import { Camera, Close } from "./icons";
 import { PhotoDialog } from "./PhotoDialog";
 
@@ -31,27 +32,31 @@ interface Props {
  * itself. */
 const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const PHOTO_MAX = 5 * 1024 * 1024;
-export const NOT_A_PHOTO = "This file is not a photo tTerm takes. Choose a " +
-  "JPEG, PNG or WebP of up to 5 MB.";
+export const NOT_A_PHOTO = "account.not_a_photo";
 
 export const SUPPORT = "support@tterm.net";
 
-function limitsText(limits: AccountInfo["plan"]["limits"]): string {
+function limitsText(limits: AccountInfo["plan"]["limits"], t: Translate): string {
   const parts = [
-    limits.machines !== null ? `${limits.machines} machines` : null,
-    limits.terminals !== null ? `${limits.terminals} open terminals` : null,
-  ].filter(Boolean);
-  return parts.length ? `Up to ${parts.join(" and ")}` : "No limits";
+    limits.machines !== null ? t("account.limit_machines", { n: limits.machines }) : null,
+    limits.terminals !== null ? t("account.limit_terminals", { n: limits.terminals }) : null,
+  ].filter(Boolean) as string[];
+  return parts.length ? t("account.up_to", { limits: list(parts, t.lang) })
+    : t("account.no_limits");
 }
 
 function Meter(props: { label: string; used: number; most: number | null }) {
   const { label, used, most } = props;
+  const t = useT();
   const share = most ? Math.min(100, (used / most) * 100) : 0;
   return (
     <div className="meter">
       <span className="meter-text">
         <strong>{label}</strong>
-        <span>{most !== null ? `${used} of ${most}` : `${used}, no limit`}</span>
+        <span>
+          {most !== null ? t("account.used_of", { used, limit: most })
+            : t("account.used_no_limit", { used })}
+        </span>
       </span>
       {most !== null && (
         <span className="meter-bar" aria-hidden="true">
@@ -83,13 +88,14 @@ export function useEscCloses(onClose: () => void, busy: { current: boolean }) {
 
 /** The title of Account and Settings, with Close and its Esc. */
 export function PageHead(props: { title: string; id: string; onClose: () => void }) {
+  const t = useT();
   return (
     <div className="account-head">
       <h1 id={props.id}>{props.title}</h1>
       <button type="button" className="account-close" onClick={props.onClose}
-        title="Back to where you were">
+        title={t("account.close_title")}>
         <Close size={14} />
-        Close
+        {t("common.close")}
         <kbd>Esc</kbd>
       </button>
     </div>
@@ -98,6 +104,7 @@ export function PageHead(props: { title: string; id: string; onClose: () => void
 
 export function Account(props: Props) {
   const { me } = props;
+  const t = useT();
   const [info, setInfo] = useState<AccountInfo | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -160,17 +167,17 @@ export function Account(props: Props) {
     if (!file) return;
     setPhotoProblem(null);
     if (!PHOTO_TYPES.includes(file.type) || !file.size || file.size > PHOTO_MAX) {
-      setPhotoProblem(NOT_A_PHOTO);
+      setPhotoProblem(t(NOT_A_PHOTO));
       return;
     }
     const reader = new FileReader();
-    reader.onerror = () => setPhotoProblem(NOT_A_PHOTO);
+    reader.onerror = () => setPhotoProblem(t(NOT_A_PHOTO));
     reader.onload = () => {
       const image = new Image();
-      image.onerror = () => setPhotoProblem(NOT_A_PHOTO);
+      image.onerror = () => setPhotoProblem(t(NOT_A_PHOTO));
       image.onload = () => {
         if (image.naturalWidth < 16 || image.naturalHeight < 16) {
-          setPhotoProblem(NOT_A_PHOTO);
+          setPhotoProblem(t(NOT_A_PHOTO));
           return;
         }
         setCropping(image);
@@ -186,7 +193,7 @@ export function Account(props: Props) {
     try {
       await removePhoto();
       props.onPhoto(null);
-      props.notify("Photo removed: your initials are back.");
+      props.notify(t("account.photo_removed"));
     } catch (error) {
       setPhotoProblem((error as Error).message);
     } finally {
@@ -198,13 +205,13 @@ export function Account(props: Props) {
 
   return (
     <main className="account-view" aria-labelledby="ac-title">
-      <PageHead title="Account" id="ac-title" onClose={props.onClose} />
+      <PageHead title={t("account.title")} id="ac-title" onClose={props.onClose} />
 
-      <section className="account-card profile-card" aria-label="Profile">
+      <section className="account-card profile-card" aria-label={t("account.profile")}>
         <div className="profile-row">
           <button type="button" className="profile-photo" onClick={choosePhoto}
-            title={me.photo ? "Change photo" : "Add a photo"}
-            aria-label={me.photo ? "Change photo" : "Add a photo"}>
+            title={me.photo ? t("account.change_photo") : t("account.add_photo")}
+            aria-label={me.photo ? t("account.change_photo") : t("account.add_photo")}>
             <Face initials={me.initials} photo={me.photo} className="huge mine" />
             <span className="photo-badge" aria-hidden="true"><Camera size={13} /></span>
           </button>
@@ -214,7 +221,7 @@ export function Account(props: Props) {
               void save();
             }}>
               <label className="profile-label">
-                <span>Your name</span>
+                <span>{t("account.your_name")}</span>
                 <input ref={nameInput} className="text-input" name="name"
                   autoComplete="name" maxLength={100} value={draft}
                   disabled={saving}
@@ -229,11 +236,11 @@ export function Account(props: Props) {
               <span className="button-row profile-buttons">
                 <button type="submit" className="button-accent"
                   disabled={saving || !draft.trim()}>
-                  {saving ? "Saving…" : "Save"}
+                  {saving ? t("account.saving") : t("common.save")}
                 </button>
                 <button type="button" className="button-plain quiet"
                   disabled={saving} onClick={cancelEdit}>
-                  Cancel
+                  {t("common.cancel")}
                 </button>
               </span>
             </form>
@@ -245,7 +252,7 @@ export function Account(props: Props) {
               </span>
               <button type="button" className="button-plain small"
                 onClick={startEdit}>
-                Edit name
+                {t("account.edit_name")}
               </button>
             </>
           )}
@@ -255,41 +262,41 @@ export function Account(props: Props) {
           {me.photo ? (
             <>
               <button type="button" className="button-plain small" onClick={choosePhoto}>
-                Change photo
+                {t("account.change_photo")}
               </button>
               <button type="button" className="button-plain small quiet"
                 disabled={removing} onClick={() => void dropPhoto()}>
-                Remove photo
+                {t("account.remove_photo")}
               </button>
             </>
           ) : (
             <button type="button" className="button-plain small" onClick={choosePhoto}>
-              Add a photo
+              {t("account.add_photo")}
             </button>
           )}
-          <span className="hint">It shows next to your name, in place of your
-            initials.</span>
+          <span className="hint">{t("account.photo_hint")}</span>
         </div>
         {photoProblem && <div className="error-box" role="alert">{photoProblem}</div>}
         <input ref={fileInput} type="file" accept={PHOTO_TYPES.join(",")} hidden
-          aria-label="Choose a photo"
+          aria-label={t("account.choose_photo")}
           onChange={(event) => {
             chosen(event.target.files?.[0]);
             // The same file chosen again is news too.
             event.target.value = "";
           }} />
         <p className="profile-note">
-          You sign in with this address. To change it, write
-          to <a href={`mailto:${support}`}>{support}</a>.
+          {t.rich("account.address_note", {
+            email: support,
+            link: (inner) => <a href={`mailto:${support}`}>{inner}</a>,
+          })}
         </p>
       </section>
 
       <section className="account-section" aria-labelledby="ac-plan">
         <div className="account-section-head">
-          <h2 id="ac-plan">Plan</h2>
+          <h2 id="ac-plan">{t("account.plan")}</h2>
           <p>
-            tTerm is free while we build it. Other plans will appear here, and
-            you will hear about them before anything changes.
+            {t("account.plan_note")}
           </p>
         </div>
         <div className="account-card plan-card">
@@ -297,19 +304,19 @@ export function Account(props: Props) {
             <>
               <div className="plan-line">
                 <span className="plan-badge">{info.plan.name}</span>
-                <span>{limitsText(info.plan.limits)}</span>
+                <span>{limitsText(info.plan.limits, t)}</span>
               </div>
               <div className="meters">
-                <Meter label="Machines" used={info.usage.machines}
+                <Meter label={t("account.machines")} used={info.usage.machines}
                   most={info.plan.limits.machines} />
-                <Meter label="Open terminals" used={info.usage.terminals}
+                <Meter label={t("account.open_terminals")} used={info.usage.terminals}
                   most={info.plan.limits.terminals} />
               </div>
             </>
           ) : problem ? (
             <div className="error-box" role="alert">{problem}</div>
           ) : (
-            <div className="waiting"><span className="spinner" />Loading…</div>
+            <div className="waiting"><span className="spinner" />{t("common.loading")}</div>
           )}
         </div>
       </section>
@@ -319,15 +326,14 @@ export function Account(props: Props) {
           onSaved={(photo) => {
             setCropping(null);
             props.onPhoto(photo);
-            props.notify("Your photo is in: at the bottom of the sidebar and in its menu.");
+            props.notify(t("account.photo_saved"));
           }}
           onCancel={() => setCropping(null)} />
       )}
 
       <footer className="account-foot">
         <span className="hint">
-          To delete your account, write to {support} from the address you sign
-          in with.
+          {t("account.delete_note", { email: support })}
         </span>
       </footer>
     </main>

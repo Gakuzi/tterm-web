@@ -22,6 +22,11 @@ OWNER_LOCK = 0x7474_0002
 
 THEMES = ("system", "light", "dark")
 
+#: The page's languages (0.1.16), as the site has them (tterm-net/site,
+#: sitelib.py) and the page lists them (web/src/i18n.ts).
+LANGUAGES = ("en", "de", "es", "fr", "it", "pl", "pt-BR", "tr", "ru", "ja",
+             "ko", "zh-CN")
+
 #: A project's colors (0.1.1), in the order new projects take them.
 COLORS = ("violet", "sky", "teal", "pink", "orange", "lime", "indigo", "slate")
 
@@ -221,6 +226,22 @@ async def set_theme(pool: asyncpg.Pool, user_id: uuid.UUID, theme: str) -> None:
     if theme not in THEMES:
         raise ValueError(f"theme must be one of {', '.join(THEMES)}")
     await pool.execute("UPDATE users SET theme = $2 WHERE id = $1", user_id, theme)
+
+
+async def set_language(pool: asyncpg.Pool, user_id: uuid.UUID,
+                       language: str) -> None:
+    """The language the person chose for the page (0.1.16)."""
+    if language not in LANGUAGES:
+        raise ValueError(f"language must be one of {', '.join(LANGUAGES)}")
+    await pool.execute("UPDATE users SET language = $2 WHERE id = $1",
+                       user_id, language)
+
+
+async def language_of(pool: asyncpg.Pool, user_id: uuid.UUID) -> str | None:
+    """The language the person chose, or None while they have not: then the
+    page shows the browser's."""
+    return await pool.fetchval("SELECT language FROM users WHERE id = $1",
+                               user_id)
 
 
 async def set_name(pool: asyncpg.Pool, user_id: uuid.UUID, name: str) -> None:

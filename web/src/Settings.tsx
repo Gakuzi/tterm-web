@@ -9,12 +9,14 @@
 // signed in (0.1.14), This computer comes between the two: whether tTerm
 // Web and the phone open it (ThisComputer.tsx). In the app, signed in or
 // not (0.1.15), Updates: how tTerm for Mac takes its new versions
-// (Updates.tsx). Tabs stay above it; Close or Esc goes back.
+// (Updates.tsx). Tabs stay above it; Close or Esc goes back. The language
+// is not here (0.1.16): it is in the account's menu, after Settings.
 
 import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { loadAccount, type AccountInfo, type ProjectTint, type Theme } from "./api";
 import { PageHead, SUPPORT, useEscCloses } from "./Account";
 import { DevicesSection } from "./Devices";
+import { useT } from "./i18n";
 import { Monitor, Moon, Sun } from "./icons";
 import { InApp } from "./local";
 import { ThisComputerSection } from "./ThisComputer";
@@ -36,19 +38,20 @@ interface Props {
 }
 
 const THEMES: { value: Theme; label: string; icon: ReactNode }[] = [
-  { value: "system", label: "System", icon: <Monitor size={14} /> },
-  { value: "light", label: "Light", icon: <Sun size={14} /> },
-  { value: "dark", label: "Dark", icon: <Moon size={14} /> },
+  { value: "system", label: "settings.theme_system", icon: <Monitor size={14} /> },
+  { value: "light", label: "settings.theme_light", icon: <Sun size={14} /> },
+  { value: "dark", label: "settings.theme_dark", icon: <Moon size={14} /> },
 ];
 
 const TINTS: { value: ProjectTint; label: string }[] = [
-  { value: "badge", label: "Code badge" },
-  { value: "block", label: "Whole project" },
+  { value: "badge", label: "settings.tint_badge" },
+  { value: "block", label: "settings.tint_block" },
 ];
 
 export function Settings(props: Props) {
   const { local } = props;
   const { inApp } = useContext(InApp);
+  const t = useT();
   const [info, setInfo] = useState<AccountInfo | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const nothingTyped = useRef(false);
@@ -66,39 +69,36 @@ export function Settings(props: Props) {
 
   return (
     <main className="account-view" aria-labelledby="st-title">
-      <PageHead title="Settings" id="st-title" onClose={props.onClose} />
+      <PageHead title={t("settings.title")} id="st-title" onClose={props.onClose} />
 
       <section className="account-section" aria-labelledby="st-appearance">
         <div className="account-section-head">
-          <h2 id="st-appearance">Appearance</h2>
+          <h2 id="st-appearance">{t("settings.appearance")}</h2>
           <p>
-            {local ? "Saved on this computer. System follows the setting of this computer."
-              : "Saved to your account. System follows the setting of each computer you use."}
-            {" "}A project's color fills its code badge, or tints the whole
-            project in the sidebar.
+            {local ? t("settings.appearance_local") : t("settings.appearance_account")}
           </p>
         </div>
         <div className="account-card theme-card">
-          <span className="theme-label">Theme</span>
-          <div className="segmented" role="group" aria-label="Theme">
-            {THEMES.map((t) => (
-              <button key={t.value} type="button"
-                aria-pressed={props.theme === t.value}
-                onClick={() => props.onTheme(t.value)}>
-                {t.icon}
-                {t.label}
+          <span className="theme-label">{t("settings.theme")}</span>
+          <div className="segmented" role="group" aria-label={t("settings.theme")}>
+            {THEMES.map((m) => (
+              <button key={m.value} type="button"
+                aria-pressed={props.theme === m.value}
+                onClick={() => props.onTheme(m.value)}>
+                {m.icon}
+                {t(m.label)}
               </button>
             ))}
           </div>
         </div>
         <div className="account-card theme-card">
-          <span className="theme-label">Project colors</span>
-          <div className="segmented" role="group" aria-label="Project colors">
-            {TINTS.map((t) => (
-              <button key={t.value} type="button"
-                aria-pressed={props.tint === t.value}
-                onClick={() => props.onTint(t.value)}>
-                {t.label}
+          <span className="theme-label">{t("settings.tints")}</span>
+          <div className="segmented" role="group" aria-label={t("settings.tints")}>
+            {TINTS.map((m) => (
+              <button key={m.value} type="button"
+                aria-pressed={props.tint === m.value}
+                onClick={() => props.onTint(m.value)}>
+                {t(m.label)}
               </button>
             ))}
           </div>
@@ -115,11 +115,11 @@ export function Settings(props: Props) {
       ) : (
         <section className="account-section" aria-labelledby="st-devices">
           <div className="account-section-head">
-            <h2 id="st-devices">Devices</h2>
+            <h2 id="st-devices">{t("devices.title")}</h2>
           </div>
           <div className="account-card devices-card">
             {problem ? <div className="error-box" role="alert">{problem}</div>
-              : <div className="waiting"><span className="spinner" />Loading…</div>}
+              : <div className="waiting"><span className="spinner" />{t("common.loading")}</div>}
           </div>
         </section>
       ))}

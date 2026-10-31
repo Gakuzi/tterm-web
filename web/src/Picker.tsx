@@ -3,6 +3,7 @@
 // the list, and what was typed can be taken as it is.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useT } from "./i18n";
 import { Search } from "./icons";
 
 export interface PickerItem {
@@ -43,6 +44,7 @@ function matches(all: PickerItem[], query: string): PickerItem[] {
 }
 
 export function Picker(props: Props) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const box = useRef<HTMLDivElement>(null);
@@ -111,7 +113,7 @@ export function Picker(props: Props) {
         <p className="picker-note">{props.error}</p>
       ) : props.items === null ? (
         <p className="picker-note"><span className="spinner" aria-hidden="true" />
-          Asking the machine…</p>
+          {t("picker.asking")}</p>
       ) : (
         <ul ref={list} role="listbox" aria-label={props.label}>
           {shown.map((item, i) => (
@@ -140,7 +142,7 @@ export function Picker(props: Props) {
             </li>
           )}
           {count === 0 && (
-            <li className="picker-empty" aria-disabled="true">Nothing here</li>
+            <li className="picker-empty" aria-disabled="true">{t("picker.nothing")}</li>
           )}
         </ul>
       )}

@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { appLinkState, cancelAppLink, signInApp } from "./api";
+import { useT } from "./i18n";
 import { Logo } from "./icons";
 
 const SUPPORT = "support@tterm.net";
@@ -14,8 +15,9 @@ const SUPPORT = "support@tterm.net";
 const ASK_MS = 1000;
 
 export function AppWelcome(props: { onSignIn: () => void; onLater: () => void }) {
+  const t = useT();
   return (
-    <main className="signin app-welcome" aria-label="Welcome">
+    <main className="signin app-welcome" aria-label={t("app_signin.welcome_label")}>
       <header className="signin-brand">
         <Logo size={36} />
         <span aria-hidden="true">tTerm</span>
@@ -23,23 +25,20 @@ export function AppWelcome(props: { onSignIn: () => void; onLater: () => void })
       <div className="signin-middle">
         <section className="signin-card">
           <div className="signin-form">
-            <h1>Welcome to tTerm</h1>
+            <h1>{t("app_signin.welcome_title")}</h1>
             <p className="signin-lead">
-              The terminals of this computer work right away, no account
-              needed.
+              {t("app_signin.welcome_lead")}
             </p>
             <button type="button" className="button-accent big wide app-welcome-in"
               onClick={props.onSignIn}>
-              Sign in with your browser
+              {t("app_signin.browser")}
             </button>
             <button type="button" className="button-plain big wide app-welcome-later"
               onClick={props.onLater}>
-              Later
+              {t("app_signin.later")}
             </button>
             <p className="app-welcome-note">
-              Signing in brings your servers, projects, notes and team into
-              this window. You can do it any time, from the bottom of the
-              sidebar.
+              {t("app_signin.welcome_note")}
             </p>
           </div>
         </section>
@@ -60,6 +59,7 @@ interface LinkProps {
 }
 
 export function AppLinkWindow(props: LinkProps) {
+  const t = useT();
   const box = useRef<HTMLElement>(null);
   const over = useRef(props.onOver);
   over.current = props.onOver;
@@ -96,7 +96,7 @@ export function AppLinkWindow(props: LinkProps) {
           } else {
             stopped = true;
             over.current(now.state === "cancelled"
-              ? "Signing in was cancelled in the browser."
+              ? t("app_signin.cancelled")
               : now.error ?? null);
           }
         })
@@ -122,23 +122,22 @@ export function AppLinkWindow(props: LinkProps) {
       <section ref={box} className="dialog app-link" role="dialog"
         aria-modal="true" aria-labelledby="al-title" aria-describedby="al-note"
         tabIndex={-1}>
-        <h2 id="al-title">Sign in with your browser</h2>
+        <h2 id="al-title">{t("app_signin.link_title")}</h2>
         <p id="al-note">
-          tTerm opened app.tterm.net in your browser. Sign in there, and allow
-          this computer when the page asks. The page shows this code too:
+          {t("app_signin.link_note", { host: "app.tterm.net" })}
         </p>
         <span className="app-link-code">{props.code}</span>
         <span className="app-link-small">
-          Until then, this computer works as before.
+          {t("app_signin.until_then")}
         </span>
         {problem && <div className="error-box" role="alert">{problem}</div>}
         <div className="app-link-buttons">
           <button type="button" className="button-plain" onClick={again}>
-            Open the page again
+            {t("app_signin.open_again")}
           </button>
           <button type="button" className="button-plain app-link-cancel"
             onClick={cancel}>
-            Cancel
+            {t("common.cancel")}
           </button>
         </div>
       </section>

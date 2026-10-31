@@ -12,12 +12,13 @@ import {
   type ProjectFields,
 } from "./api";
 import {
-  COLOR_NAMES, colorClass, freeColor, freeName, suggestCode, validCode,
+  COLOR_KEY, colorClass, freeColor, freeName, suggestCode, validCode,
 } from "./colors";
+import { list, useT } from "./i18n";
 import {
   Check, Close, Folder as FolderIcon, FolderPlus, People, Server,
 } from "./icons";
-import { alone, listed, many } from "./rights";
+import { alone } from "./rights";
 
 /** Esc closes the window, whatever has the keys inside it. */
 function useEscape(onClose: () => void) {
@@ -68,6 +69,7 @@ function Window(props: {
   onClose: () => void;
   children: ReactNode;
 }) {
+  const t = useT();
   return (
     <div className="scrim">
       <section className={`dialog ${props.className ?? ""}`} role={props.role ?? "dialog"}
@@ -77,8 +79,8 @@ function Window(props: {
             <h2 id={props.id}>{props.title}</h2>
             {props.sub && <p className="dialog-note">{props.sub}</p>}
           </div>
-          <button type="button" className="icon-button small" aria-label="Close"
-            onClick={props.onClose}>
+          <button type="button" className="icon-button small"
+            aria-label={t("common.close")} onClick={props.onClose}>
             <Close size={16} />
           </button>
         </div>
@@ -98,6 +100,7 @@ export function ProjectDialog(props: {
   onCancel: () => void;
 }) {
   const { project } = props;
+  const t = useT();
   const editing = !!project;
   const own = props.projects.filter((p) => p.own && p.id !== project?.id);
   const taken = own.map((p) => p.code);
@@ -126,7 +129,7 @@ export function ProjectDialog(props: {
     event.preventDefault();
     if (!ready) {
       if (clean && !validCode(shownCode)) {
-        setProblem("The code is 1 to 4 letters or digits.");
+        setProblem(t("project_dialog.code_invalid"));
       }
       return;
     }
@@ -135,28 +138,28 @@ export function ProjectDialog(props: {
     try {
       await props.onSave({ name: clean, code: shownCode, color });
     } catch (e) {
-      setProblem((e as Error).message || "tTerm Web did not answer.");
+      setProblem((e as Error).message || t("project_dialog.no_answer"));
       setBusy(false);
     }
   };
 
   return (
     <Window id="pd-title" className="project-dialog"
-      title={editing ? "Edit project" : "New project"}
-      sub={editing ? (alone ? undefined : "The owner and admins change these.")
-        : "A project keeps its own machines and notes, apart from your other projects."}
+      title={editing ? t("project_dialog.edit_title") : t("project_dialog.new_title")}
+      sub={editing ? (alone ? undefined : t("project_dialog.edit_sub"))
+        : t("project_dialog.new_sub")}
       onClose={props.onCancel}>
       <form className="project-form" onSubmit={(e) => void submit(e)}>
         <div className="pd-fields">
           <div className="pd-field">
-            <label htmlFor="pd-name">Name</label>
+            <label htmlFor="pd-name">{t("project_dialog.name")}</label>
             <input id="pd-name" ref={nameInput} className="text-input" value={name}
               maxLength={80} autoComplete="off" spellCheck={false}
-              placeholder="For example, Client X"
+              placeholder={t("project_dialog.name_example")}
               onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="pd-field code">
-            <label htmlFor="pd-code">Short code</label>
+            <label htmlFor="pd-code">{t("project_dialog.code")}</label>
             <input id="pd-code" className="text-input" value={shownCode}
               maxLength={4} autoComplete="off" spellCheck={false}
               onChange={(e) => {
@@ -167,61 +170,56 @@ export function ProjectDialog(props: {
         </div>
         <p className="pd-help">
           {editing
-            ? `1 to 4 letters or digits. The code marks the project in tabs and in the sidebar${alone ? "." : ", for everyone in it at once."}`
-            : "The code is made from the name, and you can change it: 1 to 4 " +
-              "letters or digits. It marks the project in tabs and in the sidebar."}
+            ? (alone ? t("project_dialog.code_help_alone")
+              : t("project_dialog.code_help_shared"))
+            : t("project_dialog.code_help_new")}
         </p>
         <div className="pd-colors">
-          <span className="pd-label" id="pd-color">Color</span>
+          <span className="pd-label" id="pd-color">{t("project_dialog.color")}</span>
           <div className="swatches" role="radiogroup" aria-labelledby="pd-color"
             onKeyDown={radioKeys(PROJECT_COLORS, color, setColor)}>
             {PROJECT_COLORS.map((c) => (
               <button key={c} type="button" role="radio" aria-checked={c === color}
                 tabIndex={c === color ? 0 : -1}
-                className={`swatch ${colorClass(c)}`} aria-label={COLOR_NAMES[c]}
-                title={COLOR_NAMES[c]} onClick={() => setColor(c)}>
+                className={`swatch ${colorClass(c)}`} aria-label={t(COLOR_KEY[c])}
+                title={t(COLOR_KEY[c])} onClick={() => setColor(c)}>
                 {c === color && <Check size={15} />}
               </button>
             ))}
           </div>
           <p className="pd-help">
             {!editing
-              ? "The color is picked to differ from your other projects, and you " +
-                "can change it. It fills the code badge, and the whole project " +
-                "in the sidebar if you choose Whole project in Settings."
+              ? t("project_dialog.color_help_new")
               : alone
-              ? "The color fills the code badge, and the whole project in the " +
-                "sidebar if you choose Whole project in Settings."
-              : "The color fills the code badge for everyone in it, and the whole " +
-                "project in the sidebar for those who choose Whole project in " +
-                "their Settings."}
+              ? t("project_dialog.color_help_alone")
+              : t("project_dialog.color_help_shared")}
           </p>
         </div>
         <div className={`pd-preview ${colorClass(color)}`} aria-hidden="true">
-          <span className="pd-preview-label">Preview</span>
+          <span className="pd-preview-label">{t("project_dialog.preview")}</span>
           <span className="pd-preview-project">
             <span className="code-badge">{shownCode || "?"}</span>
-            {clean || "Project"}
+            {clean || t("project_dialog.preview_name")}
           </span>
           <span className="pd-preview-tab">
             <span className="dot open" />
+            {/* i18n-ignore */}
             <span><span className="tab-code">{shownCode || "?"}/</span>web-01</span>
           </span>
         </div>
         {!editing && (
           <div className="pd-note">
             <Server size={16} />
-            <span>You own it. Next you add a machine or move one in from another
-              project, and write notes.</span>
+            <span>{t("project_dialog.new_next")}</span>
           </div>
         )}
         {problem && <div className="error-box" role="alert">{problem}</div>}
         <div className="button-row end">
           <button type="button" className="button-plain" onClick={props.onCancel}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button type="submit" className="button-accent big" disabled={!ready}>
-            {editing ? "Save" : "Create project"}
+            {editing ? t("common.save") : t("project_dialog.create")}
           </button>
         </div>
       </form>
@@ -238,6 +236,7 @@ export function MoveDialog(props: {
   onCancel: () => void;
 }) {
   const { machine, targets } = props;
+  const t = useT();
   const [to, setTo] = useState(targets[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -257,14 +256,15 @@ export function MoveDialog(props: {
     try {
       await props.onMove(target.id);
     } catch (e) {
-      setProblem((e as Error).message || "tTerm Web did not answer.");
+      setProblem((e as Error).message || t("project_dialog.no_answer"));
       setBusy(false);
     }
   };
 
   return (
     <Window id="mv-title" className="confirm-dialog move-dialog"
-      title={`Move ${machine.name}`} sub="To another project you own."
+      title={t("project_dialog.move_title", { machine: machine.name })}
+      sub={t("project_dialog.move_sub")}
       onClose={props.onCancel}>
       <div className="move-targets" role="radiogroup" aria-labelledby="mv-title"
         ref={group} onKeyDown={radioKeys(targets.map((p) => p.id), to, setTo)}>
@@ -275,28 +275,30 @@ export function MoveDialog(props: {
             <span className="move-radio" aria-hidden="true" />
             <span className="code-badge" aria-hidden="true">{p.code}</span>
             <span className="move-name">{p.name}</span>
-            <span className="move-sub">{p.alone || p.personal ? "only you"
-              : "with others"}</span>
+            <span className="move-sub">{p.alone || p.personal
+              ? t("project_dialog.only_you") : t("project_dialog.with_others")}</span>
           </button>
         ))}
       </div>
       {target && (
         <div className="pd-note">
           <Server size={16} />
-          <span>In {target.name} it becomes {target.code}/{name}
-            {name !== machine.name ? `: the name ${machine.name} is taken there` : ""}.
-            Its terminals keep running, and nothing changes on the machine
-            itself.</span>
+          <span>{name === machine.name
+            ? t("project_dialog.move_becomes", { project: target.name,
+              code: target.code, name })
+            : t("project_dialog.move_becomes_taken", { project: target.name,
+              code: target.code, name, machine: machine.name })}</span>
         </div>
       )}
       {problem && <div className="error-box" role="alert">{problem}</div>}
       <div className="button-row end">
         <button type="button" className="button-plain" onClick={props.onCancel}>
-          Cancel
+          {t("common.cancel")}
         </button>
         <button type="button" className="button-accent big" disabled={!target || busy}
           onClick={() => void move()}>
-          {target ? `Move to ${target.name}` : "Move"}
+          {target ? t("project_dialog.move_to", { project: target.name })
+            : t("project_dialog.move")}
         </button>
       </div>
     </Window>
@@ -322,15 +324,17 @@ export function MoveNoteDialog(props: {
   onCancel: () => void;
 }) {
   const { project, folder, targets } = props;
+  const t = useT();
   const choices = targets.flatMap((p) => (p.folders.length
     ? p.folders.map((f) => ({
       key: f.id, project: p, name: f.name, made: false,
-      sub: f.notes.length ? many(f.notes.length, "note", "notes") : "empty",
+      sub: f.notes.length ? t("count.notes", { n: f.notes.length })
+        : t("project_dialog.folder_empty"),
       to: { folderId: f.id } as NoteTarget,
     }))
     : [{
       key: `new:${p.id}`, project: p, name: folder.name, made: true,
-      sub: "a new folder, made there for it", to: { projectId: p.id } as NoteTarget,
+      sub: t("project_dialog.folder_new"), to: { projectId: p.id } as NoteTarget,
     }]));
   const [pick, setPick] = useState(choices[0]?.key ?? "");
   const [busy, setBusy] = useState(false);
@@ -351,15 +355,16 @@ export function MoveNoteDialog(props: {
     try {
       await props.onMove(chosen.to);
     } catch (e) {
-      setProblem((e as Error).message || "tTerm Web did not answer.");
+      setProblem((e as Error).message || t("project_dialog.no_answer"));
       setBusy(false);
     }
   };
 
   return (
     <Window id="mn-title" className="confirm-dialog move-note-dialog"
-      title={`Move ${props.title}`}
-      sub={`Now in ${project.name}, folder ${folder.name}. Pick a folder in another project.`}
+      title={t("project_dialog.move_note_title", { note: props.title })}
+      sub={t("project_dialog.move_note_sub", { project: project.name,
+        folder: folder.name })}
       onClose={props.onCancel}>
       <div className="mn-groups" role="radiogroup" aria-labelledby="mn-title"
         ref={group}
@@ -369,7 +374,8 @@ export function MoveNoteDialog(props: {
             <div className="mn-group-head">
               <span className="code-badge" aria-hidden="true">{p.code}</span>
               <span className="mn-group-name">{p.name}</span>
-              <span className="mn-group-sub">{alone(p) ? "only you" : "with others"}</span>
+              <span className="mn-group-sub">{alone(p) ? t("project_dialog.only_you")
+                : t("project_dialog.with_others")}</span>
             </div>
             {choices.filter((c) => c.project.id === p.id).map((c) => (
               <button key={c.key} type="button" role="radio"
@@ -389,28 +395,28 @@ export function MoveNoteDialog(props: {
         <div className="pd-note">
           <People size={16} />
           <span className="mn-who">
-            <span>{alone(chosen.project) ? `In ${chosen.project.name} only you see it.`
-              : `Everyone in ${chosen.project.name} sees and edits it.`}</span>
+            <span>{alone(chosen.project)
+              ? t("project_dialog.note_alone", { project: chosen.project.name })
+              : t("project_dialog.note_shared", { project: chosen.project.name })}</span>
             {!alone(project) && (
-              <span>Everyone else in {project.name} loses it. The journal
-                of {project.name} keeps a line: who moved it out, and when.</span>
+              <span>{t("project_dialog.note_leaves", { project: project.name })}</span>
             )}
           </span>
         </div>
       )}
       <p className="mn-keeps">
-        Its title, text and history go with it, and so do the ticks with who
-        made them.
+        {t("project_dialog.note_keeps")}
       </p>
       {problem && <div className="error-box" role="alert">{problem}</div>}
       <div className="button-row end">
         <button type="button" className="button-plain" onClick={props.onCancel}>
-          Cancel
+          {t("common.cancel")}
         </button>
         <button type="button" className="button-accent big" disabled={!chosen || busy}
           onClick={() => void move()}>
-          {!chosen ? "Move" : chosen.made ? `Move to a new folder ${chosen.name}`
-            : `Move to ${chosen.name}`}
+          {!chosen ? t("project_dialog.move") : chosen.made
+            ? t("project_dialog.move_to_new_folder", { folder: chosen.name })
+            : t("project_dialog.move_to_folder", { folder: chosen.name })}
         </button>
       </div>
     </Window>
@@ -425,6 +431,7 @@ export function DeleteProjectDialog(props: {
   onCancel: () => void;
 }) {
   const { project } = props;
+  const t = useT();
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -443,7 +450,7 @@ export function DeleteProjectDialog(props: {
     try {
       await props.onDelete();
     } catch (e) {
-      setProblem((e as Error).message || "tTerm Web did not answer.");
+      setProblem((e as Error).message || t("project_dialog.no_answer"));
       setBusy(false);
     }
   };
@@ -451,20 +458,23 @@ export function DeleteProjectDialog(props: {
   if (machines.length) {
     return (
       <Window id="dp-title" className="confirm-dialog" role="alertdialog"
-        title={`Delete ${project.name}?`} onClose={props.onCancel}>
+        title={t("project_dialog.delete_title", { project: project.name })}
+        onClose={props.onCancel}>
         <div className="confirm-body">
           <p className="ink">
-            Move or remove its {machines.length === 1 ? "machine" : "machines"} first: {listed(machines)}.
+            {machines.length === 1
+              ? t("project_dialog.delete_machine_first", { machine: machines[0] })
+              : t("project_dialog.delete_machines_first",
+                { machines: list(machines, t.lang) })}
           </p>
           <p>
-            On the project's page, ⋯ next to a machine: Move to another project,
-            or Remove machine. Then the project can go.
+            {t("project_dialog.delete_how")}
           </p>
         </div>
         <div className="button-row">
           <button type="button" className="button-plain" ref={close}
             onClick={props.onCancel}>
-            Close
+            {t("common.close")}
           </button>
         </div>
       </Window>
@@ -473,15 +483,19 @@ export function DeleteProjectDialog(props: {
 
   return (
     <Window id="dp-title" className="confirm-dialog" role="alertdialog"
-      title={`Delete ${project.name}?`} onClose={props.onCancel}>
+      title={t("project_dialog.delete_title", { project: project.name })}
+      onClose={props.onCancel}>
       <div className="confirm-body">
-        <p className="ink">This can't be undone.</p>
+        <p className="ink">{t("project_dialog.cant_undo")}</p>
         <p>
           {project.folders.length
-            ? `${many(project.folders.length, "folder", "folders")} with ${many(notes, "note", "notes")} ${project.folders.length === 1 ? "is" : "are"} deleted with it.`
-            : "It has no notes."}
+            ? t("project_dialog.delete_folders", { n: project.folders.length,
+              notes: t("project_dialog.delete_notes", { n: notes }) })
+            : t("project_dialog.delete_no_notes")}
         </p>
-        <label htmlFor="dp-name">Type {project.name} to confirm</label>
+        <label htmlFor="dp-name">
+          {t("project_dialog.delete_type", { project: project.name })}
+        </label>
         <input id="dp-name" ref={input} className="text-input" value={typed}
           autoComplete="off" spellCheck={false} placeholder={project.name}
           onChange={(e) => setTyped(e.target.value)}
@@ -493,10 +507,10 @@ export function DeleteProjectDialog(props: {
       <div className="button-row">
         <button type="button" className="button-danger big" disabled={!matches || busy}
           onClick={() => void go()}>
-          Delete {project.name}
+          {t("project_dialog.delete_button", { project: project.name })}
         </button>
         <button type="button" className="button-plain" onClick={props.onCancel}>
-          Cancel
+          {t("common.cancel")}
         </button>
       </div>
     </Window>

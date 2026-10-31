@@ -33,6 +33,12 @@ class Danger:
 
 #: Ordered by how bad it is, because the first match wins and the worst
 #: description should be the one shown.
+#:
+#: The page says `what` and `lost` in the language shown (0.1.16): it knows
+#: each by these exact English words (web/src/danger.ts) and has them as
+#: strings of its own, danger.* of web/src/i18n. A new rule or other words
+#: here need both (tests: the page says every held-back command). tTerm for
+#: Mac's engine has the same rules (engine/src/danger.rs).
 RULES: list[Danger] = [
     Danger(
         re.compile(r"\brm\b(?=[^|;&]*\s(?:-\w*[rR]\w*|--recursive)\b)"

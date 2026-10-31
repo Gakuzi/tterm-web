@@ -5,6 +5,7 @@
 // Sign in, the same as in the account's menu.
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { useT } from "./i18n";
 import { Close, Computer, People, Person, Server } from "./icons";
 
 /** What was asked for: a machine, or a project. */
@@ -24,34 +25,28 @@ interface Card {
 
 const WHAT: Record<Need, { title: string; note: string; cards: Card[]; plan: string; stays: string }> = {
   machine: {
-    title: "Add a machine",
-    note: "Servers and other computers come with a tTerm account. Signing in "
-      + "makes one, if you have none yet.",
+    title: "need_account.machine_title",
+    note: "need_account.machine_note",
     cards: [
-      { icon: <Server size={16} />, title: "Server",
-        text: "A VPS or cloud server you reach over SSH. Run one command on it, "
-          + "and it appears here." },
-      { icon: <Computer size={16} />, title: "Computer",
-        text: "A Mac or Linux machine at home or in the office, even behind NAT." },
+      { icon: <Server size={16} />, title: "need_account.server",
+        text: "need_account.server_text" },
+      { icon: <Computer size={16} />, title: "need_account.computer",
+        text: "need_account.computer_text" },
     ],
-    plan: `Up to ${FREE.machines} machines and ${FREE.terminals} open terminals.`,
-    stays: "This computer stays as it is, with its terminals.",
+    plan: "need_account.machine_plan",
+    stays: "need_account.machine_stays",
   },
   project: {
-    title: "New project",
-    note: "More projects come with a tTerm account. Signing in makes one, if "
-      + "you have none yet.",
+    title: "need_account.project_title",
+    note: "need_account.project_note",
     cards: [
-      { icon: <Person size={16} />, title: "Personal projects",
-        text: "Only you. Its machines, terminals and notes are yours alone." },
-      { icon: <People size={16} />, title: "Shared projects", pill: "Soon",
-        text: "With your team. You invite people: they open terminals on its "
-          + "machines and edit its notes." },
+      { icon: <Person size={16} />, title: "need_account.personal",
+        text: "need_account.personal_text" },
+      { icon: <People size={16} />, title: "need_account.shared", pill: "need_account.soon",
+        text: "need_account.shared_text" },
     ],
-    plan: "Projects of your own, each with its machines, terminals and notes. "
-      + "Shared projects with a team come soon.",
-    stays: "Personal stays as it is, with this computer, its terminals and "
-      + "notes.",
+    plan: "need_account.project_plan",
+    stays: "need_account.project_stays",
   },
 };
 
@@ -60,6 +55,7 @@ export function NeedAccount(props: {
   onSignIn: () => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const box = useRef<HTMLElement>(null);
   const close = useRef(props.onClose);
   close.current = props.onClose;
@@ -85,11 +81,11 @@ export function NeedAccount(props: {
         tabIndex={-1}>
         <div className="dialog-head">
           <div className="dialog-title">
-            <h2 id="na-title">{what.title}</h2>
-            <p className="dialog-note" id="na-note">{what.note}</p>
+            <h2 id="na-title">{t(what.title)}</h2>
+            <p className="dialog-note" id="na-note">{t(what.note)}</p>
           </div>
-          <button type="button" className="icon-button small" aria-label="Close"
-            onClick={props.onClose}>
+          <button type="button" className="icon-button small"
+            aria-label={t("common.close")} onClick={props.onClose}>
             <Close size={16} />
           </button>
         </div>
@@ -98,26 +94,29 @@ export function NeedAccount(props: {
             <li key={card.title} className="need-card">
               <span className="need-card-head">
                 <span className="need-icon" aria-hidden="true">{card.icon}</span>
-                <strong>{card.title}</strong>
-                {card.pill && <span className="need-pill">{card.pill}</span>}
+                <strong>{t(card.title)}</strong>
+                {card.pill && <span className="need-pill">{t(card.pill)}</span>}
               </span>
-              <span>{card.text}</span>
+              <span>{t(card.text)}</span>
             </li>
           ))}
         </ul>
         <div className="need-plan">
           <span className="plan-badge">Free</span>
           <span className="need-plan-text">
-            <strong>{what.plan}</strong>
-            <span>{what.stays}</span>
+            <strong>{t(what.plan, {
+              machines: t("need_account.plan_machines", { n: FREE.machines }),
+              terminals: t("need_account.plan_terminals", { n: FREE.terminals }),
+            })}</strong>
+            <span>{t(what.stays)}</span>
           </span>
         </div>
         <div className="button-row need-buttons">
           <button type="button" className="button-plain" onClick={props.onClose}>
-            Not now
+            {t("need_account.not_now")}
           </button>
           <button type="button" className="button-accent" onClick={props.onSignIn}>
-            Sign in
+            {t("common.sign_in")}
           </button>
         </div>
       </section>

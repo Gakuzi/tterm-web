@@ -12,6 +12,7 @@ import {
   type MachineKind, type Project,
 } from "./api";
 import { useBriefly } from "./briefly";
+import { useT } from "./i18n";
 import { Check, Close, Computer, Copy, Server } from "./icons";
 
 const POLL_MS = 1500;
@@ -32,6 +33,7 @@ function minutesLeft(expiresAt: string, now: number): number {
 
 export function AddMachine(props: Props) {
   const { projects, onClose, onConnected, notYet } = props;
+  const t = useT();
   const addable = projects.filter((p) => p.role === "owner" || p.role === "admin");
   const [projectId, setProjectId] = useState(props.projectId);
   const [kind, setKind] = useState<MachineKind>(props.kind);
@@ -124,12 +126,13 @@ export function AddMachine(props: Props) {
       await navigator.clipboard.writeText(text);
       done();
     } catch {
-      notYet("Could not copy: select the command and copy it by hand.");
+      notYet(t("add_machine.copy_failed"));
     }
   };
 
   const state = status?.state ?? "waiting";
   const left = install ? minutesLeft(install.expiresAt, now) : 10;
+  const works = t("add_machine.works_once", { n: left });
 
   return (
     <div className="scrim">
@@ -137,9 +140,9 @@ export function AddMachine(props: Props) {
         aria-labelledby="am-title" tabIndex={-1}>
         <div className="dialog-head">
           <div className="dialog-title">
-            <h2 id="am-title">Add a machine</h2>
+            <h2 id="am-title">{t("add_machine.title")}</h2>
             <div className="dialog-sub">
-              <label htmlFor="am-project">To project</label>
+              <label htmlFor="am-project">{t("add_machine.to_project")}</label>
               <select id="am-project" value={projectId} disabled={done}
                 onChange={(e) => setProjectId(e.target.value)}>
                 {addable.map((p) => (
@@ -148,21 +151,21 @@ export function AddMachine(props: Props) {
               </select>
             </div>
           </div>
-          <button type="button" className="icon-button small" aria-label="Close"
-            onClick={onClose}>
+          <button type="button" className="icon-button small"
+            aria-label={t("common.close")} onClick={onClose}>
             <Close size={16} />
           </button>
         </div>
 
         {!done && (
-          <div className="segmented" role="group" aria-label="Kind of machine">
+          <div className="segmented" role="group" aria-label={t("add_machine.kind")}>
             <button type="button" aria-pressed={kind === "server"}
               onClick={() => setKind("server")}>
-              <Server size={15} /> Server
+              <Server size={15} /> {t("add_machine.server")}
             </button>
             <button type="button" aria-pressed={kind === "computer"}
               onClick={() => setKind("computer")}>
-              <Computer size={15} /> Computer
+              <Computer size={15} /> {t("add_machine.computer")}
             </button>
           </div>
         )}
@@ -173,7 +176,7 @@ export function AddMachine(props: Props) {
               <li>
                 <span className="step-number" aria-hidden="true">1</span>
                 <div className="dialog-step">
-                  <strong>Run this on the computer</strong>
+                  <strong>{t("add_machine.run_computer")}</strong>
                   <div className="command-box">
                     <code>{install ? install.command : "…"}</code>
                     <button type="button" className="button-accent"
@@ -181,25 +184,17 @@ export function AddMachine(props: Props) {
                       disabled={!install}>
                       {copied ? <Check size={14} className="pressed-mark" />
                         : <Copy size={14} />}
-                      {copied ? "Copied" : "Copy"}
+                      {copied ? t("common.copied") : t("common.copy")}
                     </button>
                   </div>
                   <span className="hint">
-                    In a terminal on that computer, as yourself, not with sudo.
-                    Works once, for the next{" "}
-                    {left} minute{left === 1 ? "" : "s"}. The agent then updates
-                    itself. A new command run later puts it in again: the
-                    computer stays as it is, its open terminals end.
+                    {t("add_machine.hint_computer", { works })}
                   </span>
                   {install?.byHand && (
                     <details className="by-hand">
-                      <summary>Or start the agent by hand</summary>
+                      <summary>{t("add_machine.by_hand")}</summary>
                       <span className="hint">
-                        From a copy of tterm-agent 0.11.0 or newer, with Python
-                        that has the websockets package. For trying an agent
-                        that is not released yet: it runs while its terminal
-                        window is open, and the token becomes the computer's
-                        key.
+                        {t("add_machine.by_hand_hint", { version: "0.11.0" })}
                       </span>
                       <div className="command-box">
                         <code>{install.byHand}</code>
@@ -208,7 +203,7 @@ export function AddMachine(props: Props) {
                             () => showCopiedHand(true))}>
                           {copiedHand ? <Check size={14} className="pressed-mark" />
                             : <Copy size={14} />}
-                          {copiedHand ? "Copied" : "Copy"}
+                          {copiedHand ? t("common.copied") : t("common.copy")}
                         </button>
                       </div>
                     </details>
@@ -218,32 +213,23 @@ export function AddMachine(props: Props) {
               <li>
                 <span className="step-number" aria-hidden="true">2</span>
                 <div className="dialog-step">
-                  <strong>Keep this window open</strong>
+                  <strong>{t("add_machine.keep_open")}</strong>
                   <Progress state={state} problem={problem}
                     error={status?.error ?? null} onAgain={fresh}
-                    project={project?.name ?? "the project"} kind="computer" />
+                    project={project?.name ?? null} kind="computer" />
                 </div>
               </li>
             </ol>
             <details className="explain">
-              <summary>What the command does</summary>
+              <summary>{t("add_machine.what_command")}</summary>
               <ul>
-                <li>Puts tTerm's agent in ~/.tterm-web, one file for this
-                  system from tTerm's releases, checked against the checksum
-                  in the command's script before it runs, and starts it
-                  whenever you log in (launchd on macOS, systemd on Linux).
-                  The tTerm bot's agent in ~/.tterm, if there is one, stays as
-                  it is.</li>
-                <li>The agent updates itself, only to versions signed by
-                  tTerm's release build, and only while no terminal is open
-                  on this computer.</li>
-                <li>Makes this computer a key of its own and keeps it there,
-                  readable by you only. The token in the command only lets it
-                  join, once.</li>
-                <li>The agent runs as you, never as root, and opens no ports:
-                  it connects out to tTerm Web and keeps that one
-                  connection. Each terminal here is a shell of yours there.</li>
-                <li>~/.tterm-web/uninstall.sh removes it all.</li>
+                <li>{t("add_machine.what_command_puts",
+                  { folder: "~/.tterm-web", bot_folder: "~/.tterm" })}</li>
+                <li>{t("add_machine.what_command_updates")}</li>
+                <li>{t("add_machine.what_command_key")}</li>
+                <li>{t("add_machine.what_command_runs")}</li>
+                <li>{t("add_machine.what_command_uninstall",
+                  { command: "~/.tterm-web/uninstall.sh" })}</li>
               </ul>
             </details>
           </>
@@ -255,7 +241,7 @@ export function AddMachine(props: Props) {
               <li>
                 <span className="step-number" aria-hidden="true">1</span>
                 <div className="dialog-step">
-                  <strong>Run this on the server</strong>
+                  <strong>{t("add_machine.run_server")}</strong>
                   <div className="command-box">
                     <code>{install ? install.command : "…"}</code>
                     <button type="button" className="button-accent"
@@ -263,37 +249,31 @@ export function AddMachine(props: Props) {
                       disabled={!install}>
                       {copied ? <Check size={14} className="pressed-mark" />
                         : <Copy size={14} />}
-                      {copied ? "Copied" : "Copy"}
+                      {copied ? t("common.copied") : t("common.copy")}
                     </button>
                   </div>
                   <span className="hint">
-                    Works once, for the next {left} minute{left === 1 ? "" : "s"}.
-                    Run it as root or as any user with sudo.
+                    {t("add_machine.hint_server", { works })}
                   </span>
                 </div>
               </li>
               <li>
                 <span className="step-number" aria-hidden="true">2</span>
                 <div className="dialog-step">
-                  <strong>Keep this window open</strong>
+                  <strong>{t("add_machine.keep_open")}</strong>
                   <Progress state={state} problem={problem}
                     error={status?.error ?? null} onAgain={fresh}
-                    project={project?.name ?? "the project"} kind="server" />
+                    project={project?.name ?? null} kind="server" />
                 </div>
               </li>
             </ol>
             <details className="explain">
-              <summary>What the script does</summary>
+              <summary>{t("add_machine.what_script")}</summary>
               <ul>
-                <li>Creates the user tterm, with no password. If the tTerm
-                  bot already made it, it is reused.</li>
-                <li>Lets tTerm Web sign in as tterm with certificates that live
-                  two minutes and are made for this server alone. No keys stay
-                  on the server.</li>
-                <li>Gives tterm sudo, so you can manage the server. One command
-                  takes it back.</li>
-                <li>Never touches sshd_config and opens no ports. Running it
-                  twice is safe.</li>
+                <li>{t("add_machine.what_script_user")}</li>
+                <li>{t("add_machine.what_script_certificates")}</li>
+                <li>{t("add_machine.what_script_sudo")}</li>
+                <li>{t("add_machine.what_script_safe")}</li>
               </ul>
             </details>
           </>
@@ -304,10 +284,10 @@ export function AddMachine(props: Props) {
             <div className="connected-head">
               <span className="big-check" aria-hidden="true"><Check size={22} /></span>
               <div role="status" className="connected-text">
-                <strong>{status.machine.name} is connected</strong>
+                <strong>{t("add_machine.connected", { name: status.machine.name })}</strong>
                 <span>
                   {[status.machine.os, status.machine.host,
-                    `in tabs it reads ${status.machine.label}`]
+                    t("add_machine.tabs_label", { label: status.machine.label })]
                     .filter(Boolean).join(" · ")}
                 </span>
               </div>
@@ -316,10 +296,10 @@ export function AddMachine(props: Props) {
               <button type="button" className="button-accent big"
                 onClick={() => status.machine &&
                   props.onOpenTerminal(status.machine.id)}>
-                Open a terminal
+                {t("add_machine.open_terminal")}
               </button>
               <button type="button" className="button-plain" onClick={fresh}>
-                Add another machine
+                {t("add_machine.add_another")}
               </button>
             </div>
           </div>
@@ -334,16 +314,17 @@ function Progress({ state, problem, error, onAgain, project, kind }: {
   problem: string | null;
   error: string | null;
   onAgain: () => void;
-  project: string;
+  project: string | null;
   kind: MachineKind;
 }) {
+  const t = useT();
   const computer = kind === "computer";
   if (problem) {
     return (
       <div className="error-box" role="alert">
-        Could not make a command: {problem}
+        {t("add_machine.no_command", { why: problem })}
         <button type="button" className="button-plain" onClick={onAgain}>
-          Try again
+          {t("common.try_again")}
         </button>
       </div>
     );
@@ -351,10 +332,9 @@ function Progress({ state, problem, error, onAgain, project, kind }: {
   if (state === "expired") {
     return (
       <div className="error-box" role="alert">
-        This {computer ? "token" : "command"} has expired: it works for 10
-        minutes.
+        {computer ? t("add_machine.expired_token") : t("add_machine.expired_command")}
         <button type="button" className="button-plain" onClick={onAgain}>
-          Get a new command
+          {t("add_machine.new_command")}
         </button>
       </div>
     );
@@ -362,10 +342,9 @@ function Progress({ state, problem, error, onAgain, project, kind }: {
   if (state === "failed") {
     return (
       <div className="error-box" role="alert">
-        <span>{error ?? (computer ? "The computer could not be added."
-          : "The server could not be checked.")}</span>
-        <span className="hint">The same command still works: fix this and
-          run it again.</span>
+        <span>{error ?? (computer ? t("add_machine.failed_computer")
+          : t("add_machine.failed_server"))}</span>
+        <span className="hint">{t("add_machine.still_works")}</span>
       </div>
     );
   }
@@ -374,15 +353,15 @@ function Progress({ state, problem, error, onAgain, project, kind }: {
       <span role="status" className="waiting">
         <span className="spinner" aria-hidden="true" />
         {state === "connecting"
-          ? computer ? "The agent is in. Reading the computer's details…"
-            : "The server reported in. Signing in to check it…"
-          : computer ? "Waiting for the agent…" : "Waiting for the server…"}
+          ? computer ? t("add_machine.agent_in") : t("add_machine.server_in")
+          : computer ? t("add_machine.waiting_agent") : t("add_machine.waiting_server")}
       </span>
       <span className="hint">
         {computer
-          ? `It appears in ${project} a few seconds after the command finishes.`
-          : `It appears in ${project} as soon as the script finishes, usually
-            within a minute.`}
+          ? project === null ? t("add_machine.appears_computer_unnamed")
+            : t("add_machine.appears_computer", { project })
+          : project === null ? t("add_machine.appears_server_unnamed")
+            : t("add_machine.appears_server", { project })}
       </span>
     </>
   );

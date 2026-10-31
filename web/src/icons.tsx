@@ -101,6 +101,23 @@ export const ChevronDown = (p: Props) => (
   <Stroke {...p} width={2.2}><path d="M6 9l6 6 6-6" /></Stroke>
 );
 
+export const ChevronLeft = (p: Props) => (
+  <Stroke {...p} width={2.2}><path d="M15 6l-6 6 6 6" /></Stroke>
+);
+
+/** A Latin letter and a Chinese one, as the canvas has it for Language
+ * (0.1.16). */
+export const Languages = (p: Props) => (
+  <Stroke {...p}>
+    <path d="M5 8l6 6" />
+    <path d="M4 14l6-6 2-3" />
+    <path d="M2 5h12" />
+    <path d="M7 2h1" />
+    <path d="M22 22l-5-10-5 10" />
+    <path d="M14 18h6" />
+  </Stroke>
+);
+
 export const ArrowRight = (p: Props) => (
   <Stroke {...p}><path d="M5 12h14M13 6l6 6-6 6" /></Stroke>
 );

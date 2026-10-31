@@ -587,6 +587,59 @@ code {
   left: 8px;
   right: 8px;
   width: auto;
+  max-height: calc(100dvh - 90px);
+  overflow-y: auto;
+}
+
+/* Language (0.1.16), after Settings, as on the canvas of 30.10 (version
+ * 90): the languages beside the menu, their bottom at the menu's, the one
+ * shown on top with a check; or, where there is no room beside or no mouse
+ * to point, in the menu's place under Language with an arrow back. */
+.lang-item .menu-more {
+  color: var(--faint);
+}
+
+.lang-item.open {
+  background: var(--raised);
+}
+
+.menu.lang-list {
+  top: auto;
+  bottom: calc(100% + 6px);
+  left: calc(100% + 4px);
+  right: auto;
+  width: 220px;
+}
+
+/* The way from Language to the list, for the mouse: no gap to fall into
+ * (and so the list does not scroll: that would cut it off). */
+.menu.lang-list::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 100%;
+  width: 16px;
+}
+
+.lang-choice {
+  min-height: 34px;
+  font-weight: 500;
+}
+
+.lang-choice.shown {
+  min-height: 36px;
+  font-weight: 600;
+}
+
+.lang-choice svg {
+  color: var(--ink);
+}
+
+.lang-back {
+  gap: 8px;
+  padding-left: 6px;
+  font-weight: 700;
 }
 
 .menu-head {

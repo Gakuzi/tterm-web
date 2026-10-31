@@ -12,20 +12,17 @@
 import { useEffect, useState } from "react";
 import { loadThisComputer, openFromWeb, type ThisComputer } from "./api";
 import { Confirm } from "./Confirm";
+import { useT } from "./i18n";
 import { Computer } from "./icons";
-import { hereWord } from "./local";
+import { onMac } from "./local";
 
 interface Props {
   /** This computer's machine in tTerm, and its project. */
   here: { name: string; project: string };
 }
 
-/** "1 terminal", "2 terminals". */
-function terminals(n: number): string {
-  return n === 1 ? "1 terminal" : `${n} terminals`;
-}
-
 export function ThisComputerSection(props: Props) {
+  const t = useT();
   const [info, setInfo] = useState<ThisComputer | null>(null);
   /** Why the switch did not move: until it is moved again. */
   const [problem, setProblem] = useState<string | null>(null);
@@ -34,8 +31,7 @@ export function ThisComputerSection(props: Props) {
   const [busy, setBusy] = useState(false);
   /** Off asked for while terminals of tTerm Web run here: asked first. */
   const [asking, setAsking] = useState<number | null>(null);
-  const mac = hereWord();
-  const Mac = mac.charAt(0).toUpperCase() + mac.slice(1);
+  const mac = onMac();
 
   useEffect(() => {
     let live = true;
@@ -85,23 +81,24 @@ export function ThisComputerSection(props: Props) {
     case "online":
       line = {
         dot: "on",
-        text: `Online in tTerm Web as ${info.name ?? props.here.name}` +
-          (info.terminals > 0 ? ` · ${terminals(info.terminals)} opened from there` : ""),
+        text: info.terminals > 0
+          ? t("this_computer.online_terminals", { name: info.name ?? props.here.name, n: info.terminals })
+          : t("this_computer.online", { name: info.name ?? props.here.name }),
       };
       break;
     case "connecting":
-      line = { text: "Connecting to tTerm Web…", detail: info.problem };
+      line = { text: t("this_computer.connecting"), detail: info.problem };
       break;
     case "waiting":
-      line = { dot: "off", text: "Not connected to tTerm Web yet.", detail: info.problem };
+      line = { dot: "off", text: t("this_computer.waiting"), detail: info.problem };
       break;
     case "no-network":
-      line = { dot: "off", text: "No network. tTerm tries again by itself." };
+      line = { dot: "off", text: t("this_computer.no_network") };
       break;
     case "removed":
       line = {
         dot: "off",
-        text: `${Mac} was removed from tTerm Web, so it is not opened from there. Turn this on to add it again.`,
+        text: t(mac ? "this_computer.removed.mac" : "this_computer.removed.computer"),
       };
       break;
     case "closed":
@@ -109,7 +106,7 @@ export function ThisComputerSection(props: Props) {
       // account's computer.
       line = {
         dot: "off",
-        text: `${Mac} is not opened from tTerm Web now.`,
+        text: t(mac ? "this_computer.closed.mac" : "this_computer.closed.computer"),
         detail: info.problem,
       };
       break;
@@ -120,22 +117,18 @@ export function ThisComputerSection(props: Props) {
       <div className="account-section-head">
         <h2 id="st-here" className="here-head">
           <span className="here-mark big" aria-hidden="true"><Computer size={15} /></span>
-          This computer
+          {t("this_computer.title")}
         </h2>
         <p>
-          {props.here.name}, in {props.here.project}. Its terminals run here,
-          also without the internet.
+          {t("this_computer.about", { name: props.here.name, project: props.here.project })}
         </p>
       </div>
       <div className="account-card switch-card">
         <div className="switch-row">
           <span className="switch-text">
-            <label htmlFor="st-open">Open from tTerm Web and your phone</label>
+            <label htmlFor="st-open">{t("this_computer.open")}</label>
             <span>
-              tTerm Web and your phone open terminals on {mac} while tTerm
-              runs here: with its window closed it stays in the menu bar, and
-              it starts when you log in. Off: there {mac} is offline; here
-              everything works as before.
+              {t(mac ? "this_computer.open_text.mac" : "this_computer.open_text.computer")}
             </span>
           </span>
           <button id="st-open" type="button" role="switch" aria-checked={on}
@@ -155,16 +148,15 @@ export function ThisComputerSection(props: Props) {
       </div>
       {(problem ?? unheard) && <div className="error-box" role="alert">{problem ?? unheard}</div>}
       {asking !== null && (
-        <Confirm title={`Close ${mac} to tTerm Web?`}
-          confirm="Turn off"
+        <Confirm title={t(mac ? "this_computer.ask_title.mac" : "this_computer.ask_title.computer")}
+          confirm={t("this_computer.turn_off")}
           onConfirm={async () => {
             setAsking(null);
             await set(false);
           }}
           onCancel={() => setAsking(null)}>
           <p>
-            {terminals(asking)} opened from tTerm Web on {mac} will end, and
-            there {mac} goes offline.
+            {t(mac ? "this_computer.ask_text.mac" : "this_computer.ask_text.computer", { n: asking })}
           </p>
         </Confirm>
       )}

@@ -5,6 +5,7 @@ import asyncio
 import base64
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -55,6 +56,29 @@ def test_dangerous_commands_are_held_back():
 def _ctx(line: str) -> complete.Context:
     words, word = complete.split(line)
     return complete.context(words, word)
+
+
+def test_the_page_says_every_held_back_command_in_its_languages():
+    """0.1.16: the page finds each rule by its English words
+    (web/src/danger.ts) and says it in the language shown; a rule changed
+    or added here must be there too, with the same English."""
+    root = Path(__file__).resolve().parents[2]
+    keys = (root / "web" / "src" / "danger.ts").read_text(encoding="utf-8")
+    listed = dict(re.findall(r'^  "([^"]+)": \{ what: "([a-z_.]+)", lost: "[a-z_.]+" \}',
+                             keys, re.M))
+    lost_keys = dict(re.findall(r'^  "([^"]+)": \{ what: "[a-z_.]+", lost: "([a-z_.]+)" \}',
+                                keys, re.M))
+    english = {}
+    for line in (root / "web" / "src" / "i18n" / "en.txt").read_text(
+            encoding="utf-8").splitlines():
+        if " = " in line and not line.startswith("#"):
+            key, _, text = line.partition(" = ")
+            english[key] = text
+    assert set(listed) == {rule.what for rule in danger.RULES}, set(listed) ^ {
+        rule.what for rule in danger.RULES}
+    for rule in danger.RULES:
+        assert english[listed[rule.what]] == rule.what, rule.what
+        assert english[lost_keys[rule.what]] == rule.lost, rule.lost
 
 
 def test_the_line_is_read_like_the_shell_reads_it():

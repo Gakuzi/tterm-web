@@ -9,6 +9,8 @@
 // way. It proves nothing by itself; what keeps someone else's link from
 // connecting their computer is that the code goes only to 127.0.0.1 here.
 
+import { t as say, type Translate } from "./i18n";
+
 export interface AppLink {
   app: "mac" | "windows" | "linux";
   name: string;
@@ -17,13 +19,14 @@ export interface AppLink {
   state: string;
 }
 
+/** "tTerm for Mac", as the site names the apps in each language. */
 const APPS: Record<AppLink["app"], string> = {
-  mac: "Mac", windows: "Windows", linux: "Linux",
+  mac: "app_link.mac", windows: "app_link.windows", linux: "app_link.linux",
 };
 
 /** "tTerm for Mac", as the device is called in Devices. */
-export function appTitle(link: AppLink): string {
-  return `tTerm for ${APPS[link.app]}`;
+export function appTitle(link: AppLink, t: Translate = say): string {
+  return t(APPS[link.app]);
 }
 
 const CHALLENGE = /^[A-Za-z0-9_-]{43}$/;

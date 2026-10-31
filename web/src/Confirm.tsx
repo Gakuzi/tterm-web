@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useBriefly } from "./briefly";
+import { useT } from "./i18n";
 import { Check, Close, Copy } from "./icons";
 
 interface Props {
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function Confirm(props: Props) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const box = useRef<HTMLElement>(null);
@@ -42,7 +44,7 @@ export function Confirm(props: Props) {
     try {
       await props.onConfirm();
     } catch (e) {
-      setProblem((e as Error).message || "tTerm Web did not answer.");
+      setProblem((e as Error).message || t("confirm.no_answer"));
       setBusy(false);
     }
   };
@@ -56,7 +58,7 @@ export function Confirm(props: Props) {
             <h2 id="cf-title">{props.title}</h2>
             {props.sub && <p className="dialog-note">{props.sub}</p>}
           </div>
-          <button type="button" className="icon-button small" aria-label="Close"
+          <button type="button" className="icon-button small" aria-label={t("common.close")}
             onClick={props.onCancel}>
             <Close size={16} />
           </button>
@@ -70,7 +72,7 @@ export function Confirm(props: Props) {
           </button>
           <button type="button" className="button-plain confirm-cancel"
             onClick={props.onCancel}>
-            Cancel
+            {t("common.cancel")}
           </button>
         </div>
       </section>
@@ -86,6 +88,7 @@ export function Removed(props: {
   onClose: () => void;
   notify: (text: string) => void;
 }) {
+  const t = useT();
   const box = useRef<HTMLElement>(null);
   const close = useRef(props.onClose);
   close.current = props.onClose;
@@ -109,7 +112,7 @@ export function Removed(props: {
       await navigator.clipboard.writeText(props.cleanup);
       showCopied(true);
     } catch {
-      props.notify("Could not copy: select the command and copy it by hand.");
+      props.notify(t("confirm.copy_failed"));
     }
   };
 
@@ -119,35 +122,32 @@ export function Removed(props: {
         aria-modal="true" aria-labelledby="rm-title" tabIndex={-1}>
         <div className="dialog-head">
           <div className="dialog-title">
-            <h2 id="rm-title">{props.name} is removed</h2>
+            <h2 id="rm-title">{t("confirm.removed", { name: props.name })}</h2>
           </div>
-          <button type="button" className="icon-button small" aria-label="Close"
+          <button type="button" className="icon-button small" aria-label={t("common.close")}
             onClick={props.onClose}>
             <Close size={16} />
           </button>
         </div>
         <div className="confirm-body">
           <p>
-            tTerm Web no longer lists it or signs in to it. The server did not
-            answer, so tTerm Web's access on it stays until you take it back
-            there:
+            {t("confirm.removed_text")}
           </p>
           <div className="command-box">
             <code>{props.cleanup}</code>
             <button type="button" className="button-accent" onClick={copy}>
               {copied ? <Check size={14} className="pressed-mark" /> : <Copy size={14} />}
-              {copied ? "Copied" : "Copy"}
+              {copied ? t("common.copied") : t("common.copy")}
             </button>
           </div>
           <p className="hint">
-            The user tterm and its sudo rule stay, for the tTerm bot if you use
-            it. To remove them too: sudo userdel -r tterm && sudo rm -f
-            /etc/sudoers.d/tterm
+            {t("confirm.user_stays", { user: "tterm",
+              command: "sudo userdel -r tterm && sudo rm -f /etc/sudoers.d/tterm" })}
           </p>
         </div>
         <div className="button-row">
           <button type="button" className="button-plain" onClick={props.onClose}>
-            Done
+            {t("common.done")}
           </button>
         </div>
       </section>

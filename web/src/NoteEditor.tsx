@@ -11,6 +11,7 @@ import {
 } from "react";
 import type { Block, BlockType, Who } from "./api";
 import { toClipboard, useBriefly } from "./briefly";
+import { t as say, useT, type Translate } from "./i18n";
 import {
   Bullet, Check, CodeIcon, Heading, ListCheck, Minus, Paragraph,
 } from "./icons";
@@ -21,8 +22,8 @@ import { stamp } from "./time";
 type Spot = number | "start" | "end";
 
 const LABELS: Record<BlockType, string> = {
-  p: "Text", h: "Heading", li: "List item", todo: "Checklist item",
-  code: "Code", hr: "Divider",
+  p: "note_editor.text", h: "note_editor.heading", li: "note_editor.list_item",
+  todo: "note_editor.checklist_item", code: "note_editor.code", hr: "note_editor.divider",
 };
 
 interface Choice {
@@ -34,25 +35,27 @@ interface Choice {
 }
 
 const CHOICES: Choice[] = [
-  { type: "todo", label: "Checklist", md: "[ ]", icon: <ListCheck size={15} /> },
-  { type: "h", label: "Heading", md: "#", icon: <Heading size={15} /> },
-  { type: "li", label: "List", md: "-", icon: <Bullet size={15} /> },
-  { type: "code", label: "Code", md: "```", icon: <CodeIcon size={15} /> },
-  { type: "hr", label: "Divider", md: "---", icon: <Minus size={15} /> },
-  { type: "p", label: "Text", md: "", icon: <Paragraph size={15} /> },
+  { type: "todo", label: "note_editor.checklist", md: "[ ]", icon: <ListCheck size={15} /> },
+  { type: "h", label: "note_editor.heading", md: "#", icon: <Heading size={15} /> },
+  { type: "li", label: "note_editor.list", md: "-", icon: <Bullet size={15} /> },
+  { type: "code", label: "note_editor.code", md: "```", icon: <CodeIcon size={15} /> },
+  { type: "hr", label: "note_editor.divider", md: "---", icon: <Minus size={15} /> },
+  { type: "p", label: "note_editor.text", md: "", icon: <Paragraph size={15} /> },
 ];
 
-function choicesFor(text: string): Choice[] {
+function choicesFor(text: string, t: Translate): Choice[] {
   const query = text.slice(1).toLowerCase();
-  return CHOICES.filter((c) => c.label.toLowerCase().startsWith(query) ||
-    (query.length > 1 && c.label.toLowerCase().includes(query)));
+  return CHOICES.filter((c) => t(c.label).toLowerCase().startsWith(query) ||
+    (query.length > 1 && t(c.label).toLowerCase().includes(query)));
 }
 
 /** "Denis · 10:02" for today, "Denis · 12 Oct" before. */
-function tickedBy(b: Block, people: Record<string, Who>, meId: string): string {
+function tickedBy(b: Block, people: Record<string, Who>, meId: string,
+  t: Translate): string {
   if (!b.done || !b.by) return "";
-  const who = b.by === meId ? "You" : people[b.by]?.firstName ?? "Someone";
-  return b.at ? `${who} · ${stamp(b.at)}` : who;
+  const who = b.by === meId ? t("note_editor.you")
+    : people[b.by]?.firstName ?? t("note_editor.someone");
+  return b.at ? `${who} · ${stamp(b.at, t)}` : who;
 }
 
 /** Whether the textarea shows one line only, so that an arrow leaves it. */
@@ -84,6 +87,7 @@ interface RowProps {
 
 const Row = memo(function Row(props: RowProps) {
   const { b } = props;
+  const t = useT();
   const area = useRef<HTMLTextAreaElement | null>(null);
   useLayoutEffect(() => fit(area.current), [b.text, b.type]);
   // Copied, with a check, for a moment after Copy on code (0.1.13).
@@ -92,7 +96,7 @@ const Row = memo(function Row(props: RowProps) {
   if (b.type === "hr") {
     return (
       <div className="nb-hr" tabIndex={props.readOnly ? -1 : 0} role="separator"
-        aria-label="Divider" ref={(node) => props.register(b.id, node)}
+        aria-label={t("note_editor.divider")} ref={(node) => props.register(b.id, node)}
         onKeyDown={(e) => props.onKey(b.id, e)}>
         <hr />
       </div>
@@ -106,10 +110,10 @@ const Row = memo(function Row(props: RowProps) {
       }}
       className={`nb-text nb-${b.type}${props.lonely ? " lonely" : ""}`}
       value={b.text} rows={1} readOnly={props.readOnly}
-      spellCheck={b.type !== "code"} aria-label={LABELS[b.type]}
+      spellCheck={b.type !== "code"} aria-label={t(LABELS[b.type])}
       placeholder={props.lonely
-        ? "Start writing. Markdown works as you type: # heading, - [ ] checklist, ``` code. Type / for the rest."
-        : b.type === "p" ? "Type / for a checklist, a heading, code" : LABELS[b.type]}
+        ? t("note_editor.start_writing")
+        : b.type === "p" ? t("note_editor.type_slash") : t(LABELS[b.type])}
       onChange={(e) => props.onText(b.id, e.target.value)}
       onKeyDown={(e) => props.onKey(b.id, e)}
       onPaste={(e) => props.onPaste(b.id, e)} />
@@ -118,7 +122,7 @@ const Row = memo(function Row(props: RowProps) {
     return (
       <div className={b.done ? "nb-row nb-todo-row done" : "nb-row nb-todo-row"}>
         <button type="button" role="checkbox" aria-checked={!!b.done}
-          aria-label={b.done ? "Done: untick" : "Tick as done"}
+          aria-label={b.done ? t("note_editor.untick") : t("note_editor.tick")}
           className="nb-check" disabled={props.readOnly}
           onClick={() => props.onTick(b.id, !b.done)}>
           {b.done && <Check size={12} />}
@@ -143,7 +147,7 @@ const Row = memo(function Row(props: RowProps) {
         <button type="button" className="nb-copy"
           onClick={() => void props.onCopy(b.text).then((ok) => ok && showCopied(true))}>
           {copied && <Check size={13} className="pressed-mark" />}
-          {copied ? "Copied" : "Copy"}
+          {copied ? t("common.copied") : t("common.copy")}
         </button>
       </div>
     );
@@ -170,6 +174,7 @@ interface Props {
 
 export function NoteEditor(props: Props) {
   const { onChange: change, readOnly } = props;
+  const t = useT();
   const nodes = useRef(new Map<string, HTMLElement>());
   const want = useRef<{ id: string; at: Spot } | null>(null);
   const blocksRef = useRef(props.blocks);
@@ -259,7 +264,7 @@ export function NoteEditor(props: Props) {
     }
     setBlock(id, { text });
     if (current.type === "p" && /^\/[^\s/]*$/.test(text) &&
-      choicesFor(text).length) {
+      choicesFor(text, say).length) {
       setSlash((was) => (was?.id === id ? was : { id, at: 0 }));
     } else if (slashRef.current?.id === id) {
       setSlash(null);
@@ -340,7 +345,7 @@ export function NoteEditor(props: Props) {
     // The "/" list: the arrows pick, Enter or Tab takes, Esc leaves it.
     const open = slashRef.current;
     if (open?.id === id) {
-      const choices = choicesFor(b.text);
+      const choices = choicesFor(b.text, say);
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
         const step = event.key === "ArrowDown" ? 1 : -1;
@@ -508,14 +513,14 @@ export function NoteEditor(props: Props) {
   const onTick = props.onTick;
   const onCopy = useCallback(async (text: string) => {
     const ok = await toClipboard(text);
-    if (!ok) notify.current("Could not copy: select the text and copy it by hand.");
+    if (!ok) notify.current(say("note_editor.no_copy"));
     return ok;
   }, []);
 
   const lonely = props.blocks.length === 1 && props.blocks[0].type === "p" &&
     !props.blocks[0].text;
   const open = slash && props.blocks.find((b) => b.id === slash.id);
-  const choices = open ? choicesFor(open.text) : [];
+  const choices = open ? choicesFor(open.text, t) : [];
 
   return (
     <div className="note-blocks">
@@ -523,11 +528,11 @@ export function NoteEditor(props: Props) {
         <div key={b.id} className={props.found === b.id ? "nb-wrap found" : "nb-wrap"}
           data-block={b.id}>
           <Row b={b} lonely={lonely} readOnly={readOnly}
-            who={b.type === "todo" ? tickedBy(b, props.people, props.meId) : ""}
+            who={b.type === "todo" ? tickedBy(b, props.people, props.meId, t) : ""}
             register={register} onText={onText} onKey={onKey} onPaste={onPaste}
             onTick={onTick} onCopy={onCopy} />
           {open && open.id === b.id && choices.length > 0 && (
-            <div className="slash-menu" role="listbox" aria-label="Turn into">
+            <div className="slash-menu" role="listbox" aria-label={t("note_editor.turn_into")}>
               {choices.map((c, n) => (
                 <button key={c.type} type="button" role="option" tabIndex={-1}
                   aria-selected={n === Math.min(slash.at, choices.length - 1)}
@@ -537,7 +542,7 @@ export function NoteEditor(props: Props) {
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => choose(b.id, c.type)}>
                   {c.icon}
-                  <span className="slash-label">{c.label}</span>
+                  <span className="slash-label">{t(c.label)}</span>
                   <span className="slash-md">{c.md}</span>
                 </button>
               ))}

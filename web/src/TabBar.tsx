@@ -18,6 +18,7 @@
 import { useRef, type ReactNode } from "react";
 import type { ProjectColor } from "./api";
 import { colorClass } from "./colors";
+import { useT } from "./i18n";
 import { Check, Close, CloudOff, Computer, Doc, ListCheck, Plus, Search } from "./icons";
 import { NameInput } from "./NameInput";
 import { JUMP_KEYS, type TabKind } from "./tabs";
@@ -99,11 +100,12 @@ function Lead({ tab }: { tab: TabView }) {
 }
 
 export function TabBar(props: Props) {
+  const t = useT();
   const plus = useRef<HTMLDivElement>(null);
   return (
     <header className="topbar tab-bar">
       {props.sidebarButton}
-      <nav className="tabs" aria-label="Open tabs">
+      <nav className="tabs" aria-label={t("tabs.label")}>
         {props.tabs.map((tab) => {
           const current = tab.id === props.current;
           const renaming = props.renaming === tab.id && !!tab.canRename;
@@ -145,13 +147,13 @@ export function TabBar(props: Props) {
               )}
               {renaming && (
                 <div className="tab-tip" role="tooltip" id={`${tab.id}-tip`}>
-                  <strong>Name this terminal</strong>
-                  <span>Enter saves, Esc cancels. The name shows in the sidebar,
-                    in tabs and on the project's page.</span>
+                  <strong>{t("tabs.rename_title")}</strong>
+                  <span>{t("tabs.rename_hint")}</span>
                 </div>
               )}
               <button type="button" className="tab-close"
-                aria-label={`Close the tab ${tab.code ? `${tab.code}/` : ""}${tab.label}`}
+                aria-label={t("tabs.close",
+                  { name: `${tab.code ? `${tab.code}/` : ""}${tab.label}` })}
                 title={tab.closeTitle}
                 onClick={() => props.onClose(tab.id)}>
                 <Close size={13} />
@@ -161,9 +163,10 @@ export function TabBar(props: Props) {
         })}
         <div className="plus-wrap" ref={plus}>
           <button type="button" className="icon-button small"
-            aria-label="New terminal" aria-haspopup="dialog"
+            data-action="new-terminal"
+            aria-label={t("tabs.new_terminal")} aria-haspopup="dialog"
             aria-expanded={props.picking}
-            title="A new terminal on any machine" onClick={props.onPlus}>
+            title={t("tabs.new_terminal_title")} onClick={props.onPlus}>
             <Plus size={16} />
           </button>
           {props.picking && props.renderPicker(plus)}
@@ -178,9 +181,9 @@ export function TabBar(props: Props) {
         )}
         {props.update}
         <button type="button" className="jump" onClick={props.onJump}
-          title="Search commands, their output, notes, terminals, machines, and what there is to do">
+          title={t("tabs.search_title")}>
           <Search size={14} />
-          <span className="jump-text">Search</span>
+          <span className="jump-text">{t("tabs.search")}</span>
           <kbd>{JUMP_KEYS}</kbd>
         </button>
       </div>

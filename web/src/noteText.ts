@@ -4,6 +4,7 @@
 // Markdown. Plus the same merge as the core's (core/notes.py), for what was
 // typed while a save was on its way.
 
+import type { Translate } from "./i18n";
 import type { Block, BlockType } from "./api";
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -47,8 +48,8 @@ export function cleanTitle(title: string): string {
 }
 
 /** A title to show: "Untitled" for one not given yet. */
-export function titled(title: string): string {
-  return title.trim() || "Untitled";
+export function titled(title: string, t: Translate): string {
+  return title.trim() || t("note.untitled");
 }
 
 /** A block whose start was just typed as Markdown, as what it means, or

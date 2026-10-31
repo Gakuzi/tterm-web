@@ -7,8 +7,9 @@
 
 import { useState } from "react";
 import { forgetAllDevices, forgetDevice, type Device } from "./api";
+import { useT } from "./i18n";
 import { Computer, Phone } from "./icons";
-import { since } from "./time";
+import { agoLong } from "./time";
 
 interface Props {
   devices: Device[];
@@ -17,17 +18,13 @@ interface Props {
   notify: (text: string) => void;
 }
 
-function when(ms: number): string {
-  const ago = since(ms);
-  return ago === "less than a minute" ? "just now" : `${ago} ago`;
-}
-
 /** Phones and tablets by their label, as device_label() writes it. */
 function handheld(label: string): boolean {
   return /iPhone|iPad|Android/.test(label);
 }
 
 export function DevicesSection(props: Props) {
+  const t = useT();
   const [devices, setDevices] = useState<Device[]>(props.devices);
   const [problem, setProblem] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
@@ -38,14 +35,13 @@ export function DevicesSection(props: Props) {
     try {
       const result = await forgetDevice(device.id);
       if (result.current) {
-        props.onSignedOut("This device is forgotten. Sign in with a code " +
-          "from email.");
+        props.onSignedOut(t("devices.this_forgotten"));
         return;
       }
       setDevices((all) => all.filter((d) => d.id !== device.id));
       props.notify(device.kind === "app"
-        ? `${device.label} is signed out: there it is this computer only now.`
-        : `${device.label} is forgotten: there it is email again.`);
+        ? t("devices.app_signed_out", { device: device.label })
+        : t("devices.forgotten", { device: device.label }));
     } catch (error) {
       setProblem((error as Error).message);
     }
@@ -56,8 +52,7 @@ export function DevicesSection(props: Props) {
     setProblem(null);
     try {
       await forgetAllDevices();
-      props.onSignedOut("All devices are forgotten. Each one signs in with " +
-        "a code from email now.");
+      props.onSignedOut(t("devices.all_forgotten"));
     } catch (error) {
       setProblem((error as Error).message);
       setBusy(false);
@@ -67,21 +62,18 @@ export function DevicesSection(props: Props) {
   return (
     <section className="account-section" aria-labelledby="ac-devices">
       <div className="account-section-head">
-        <h2 id="ac-devices">Devices</h2>
+        <h2 id="ac-devices">{t("devices.title")}</h2>
         <p>
-          Browsers where you sign in with your quick code, and tTerm on your
-          computers, signed in with the browser. Anywhere else, it takes a
-          code from email.
+          {t("devices.about")}
         </p>
         <p>
-          After 8 hours without anything done, tTerm asks for the quick code
-          again. Your terminals keep running.
+          {t("devices.idle")}
         </p>
       </div>
       <div className="account-card devices-card">
         {devices.length === 0 ? (
           <p className="devices-none">
-            No browser is remembered. Each sign-in takes a code from email.
+            {t("devices.none")}
           </p>
         ) : (
           <ul className="device-list">
@@ -94,17 +86,19 @@ export function DevicesSection(props: Props) {
                 <span className="device-text">
                   <strong>
                     {device.label}
-                    {device.current && <span className="chip">This device</span>}
+                    {device.current && <span className="chip">{t("devices.this_device")}</span>}
                   </strong>
                   <span>
                     {device.kind === "app"
-                      ? `Signed in ${when(device.createdAt)}, last used ${when(device.lastUsed)}`
-                      : `Trusted ${when(device.createdAt)}, last sign-in ${when(device.lastUsed)}`}
+                      ? t("devices.app_times", { created: agoLong(device.createdAt, t),
+                        used: agoLong(device.lastUsed, t) })
+                      : t("devices.browser_times", { created: agoLong(device.createdAt, t),
+                        used: agoLong(device.lastUsed, t) })}
                   </span>
                 </span>
                 <button type="button" className="button-plain small"
                   onClick={() => void forget(device)}>
-                  Forget
+                  {t("devices.forget")}
                 </button>
               </li>
             ))}
@@ -112,28 +106,26 @@ export function DevicesSection(props: Props) {
         )}
         <div className="forget-all">
           <span className="forget-all-text">
-            <strong>Forget all devices</strong>
+            <strong>{t("devices.forget_all")}</strong>
             <span>
-              Every device is forgotten and every session ends, this one too.
-              Each browser then asks for a code from email. Your terminals keep
-              running.
+              {t("devices.forget_all_text")}
             </span>
           </span>
           {asking ? (
             <span className="button-row">
               <button type="button" className="button-danger big"
                 disabled={busy} onClick={() => void forgetAll()}>
-                Forget all devices
+                {t("devices.forget_all")}
               </button>
               <button type="button" className="button-plain"
                 onClick={() => setAsking(false)}>
-                Cancel
+                {t("common.cancel")}
               </button>
             </span>
           ) : (
             <button type="button" className="button-plain"
               onClick={() => setAsking(true)}>
-              Forget all devices…
+              {t("devices.forget_all_ask")}
             </button>
           )}
         </div>

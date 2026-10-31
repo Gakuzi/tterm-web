@@ -117,6 +117,28 @@
     SFMono-Regular, Menlo, monospace;
 }
 
+/* Chinese, Japanese and Korean (0.1.16): Manrope has none of their
+ * letters, and a web font for them weighs megabytes, so the rest comes from
+ * the system's fonts, chosen by the page's language (Han characters differ
+ * between Japanese and Chinese), as on the site. */
+:lang(ja) {
+  --font-ui: "Manrope Variable", Manrope, "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic UI", "Yu Gothic", Meiryo, "Noto Sans JP", "Noto Sans CJK JP",
+    -apple-system, sans-serif;
+}
+
+:lang(ko) {
+  --font-ui: "Manrope Variable", Manrope, "Apple SD Gothic Neo", "Malgun Gothic",
+    "Noto Sans KR", "Noto Sans CJK KR", -apple-system, sans-serif;
+  /* Korean breaks lines between words, like English. */
+  word-break: keep-all;
+}
+
+:lang(zh) {
+  --font-ui: "Manrope Variable", Manrope, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC", -apple-system, sans-serif;
+}
+
 /* Projects' colors (0.1.1), as approved on the canvas on 19.10: the solid
  * fill of a project's code badge (--pc-solid) with its code on it
  * (--pc-on); text and icons in the project's color (--pc-ink); and the

@@ -1,13 +1,13 @@
 {
   "name": "tterm-web-page",
   "private": true,
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "The page of tTerm Web: the terminal in the browser.",
   "license": "AGPL-3.0-only",
   "type": "module",
   "scripts": {
-    "build": "tsc --noEmit && vite build",
-    "check": "tsc --noEmit"
+    "build": "node scripts/strings.mjs && tsc --noEmit && vite build",
+    "check": "node scripts/strings.mjs && tsc --noEmit"
   },
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "5.3.0",

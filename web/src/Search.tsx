@@ -17,6 +17,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { searchAll, type Found, type FoundBlock, type FoundNote } from "./api";
 import { shortPath } from "./BlockView";
+import { useT, type Translate } from "./i18n";
 import { Doc, ListCheck, Output, Search as SearchIcon } from "./icons";
 import { marked } from "./marks";
 import { titled } from "./noteText";
@@ -31,12 +32,22 @@ type Filter = "all" | SearchKind;
 const KINDS: SearchKind[] = ["commands", "output", "notes", "terminals",
   "machines", "projects", "actions"];
 const TITLES: Record<SearchKind, string> = {
-  commands: "Commands", output: "Output", notes: "Notes", terminals: "Terminals",
-  machines: "Machines", projects: "Projects", actions: "Actions",
+  commands: "search.kind_commands", output: "search.kind_output",
+  notes: "search.kind_notes", terminals: "search.kind_terminals",
+  machines: "search.kind_machines", projects: "search.kind_projects",
+  actions: "search.kind_actions",
 };
 const LABELS: Record<SearchKind, string> = {
-  commands: "Command", output: "Output", notes: "Note", terminals: "Terminal",
-  machines: "Machine", projects: "Project", actions: "Action",
+  commands: "search.label_command", output: "search.label_output",
+  notes: "search.label_note", terminals: "search.label_terminal",
+  machines: "search.label_machine", projects: "search.label_project",
+  actions: "search.label_action",
+};
+const NOTHING_IN: Record<SearchKind, string> = {
+  commands: "search.nothing_in_commands", output: "search.nothing_in_output",
+  notes: "search.nothing_in_notes", terminals: "search.nothing_in_terminals",
+  machines: "search.nothing_in_machines", projects: "search.nothing_in_projects",
+  actions: "search.nothing_in_actions",
 };
 /** A word in front keeps to one kind. */
 const PREFIXES: [string, SearchKind][] = [["c:", "commands"], ["o:", "output"],
@@ -162,8 +173,9 @@ function score(title: string, extra: string, words: string[], fuzzy: boolean): n
   return 0;
 }
 
-function status(b: FoundBlock): string {
-  return b.exitCode === null ? "stopped" : `exit ${b.exitCode}`;
+function status(b: FoundBlock, t: Translate): string {
+  return b.exitCode === null ? t("search.stopped")
+    : t("search.exit", { code: String(b.exitCode) });
 }
 
 function dotOf(b: FoundBlock): "ok" | "fail" | "none" {
@@ -177,7 +189,11 @@ function Dot({ kind }: { kind: "ok" | "fail" | "none" }) {
 const EMPTY: Found = { words: [], commands: [], output: [], notes: [], recent: [],
   more: {} };
 
+const kbd = (inner: ReactNode) => <kbd>{inner}</kbd>;
+const code = (inner: ReactNode) => <code>{inner}</code>;
+
 export function Search(props: Props) {
+  const t = useT();
   const [raw, setRaw] = useState("");
   const [chosen, setChosen] = useState<Filter>("all");
   const [selected, setSelected] = useState(0);
@@ -236,7 +252,7 @@ export function Search(props: Props) {
   // The core's answer, while it is for other words (typing on), narrowed to
   // these here: typing more never needs what it had not found.
   const fresh = found.words.join(" ") === words.join(" ");
-  const stale = (t: string) => fresh || words.every((w) => t.toLowerCase().includes(w));
+  const stale = (x: string) => fresh || words.every((w) => x.toLowerCase().includes(w));
 
   const close = props.onClose;
   const blockRows = (blocks: FoundBlock[], kind: "commands" | "output"): Row[] =>
@@ -245,9 +261,11 @@ export function Search(props: Props) {
         const where = `${b.code}/${b.machine}`;
         const place = shortPath(b.cwd, b.home);
         const sub = kind === "commands"
-          ? [where, place, b.branch, status(b), when(b.startedAt),
-            (b.runs ?? 1) > 1 ? `${b.runs} runs` : ""].filter(Boolean).join(" · ")
-          : [`in ${b.command}`, where, when(b.startedAt)].filter(Boolean).join(" · ");
+          ? [where, place, b.branch, status(b, t), when(b.startedAt, t),
+            (b.runs ?? 1) > 1 ? t("search.runs", { n: b.runs ?? 1 }) : ""]
+            .filter(Boolean).join(" · ")
+          : [t("search.in_command", { command: b.command }), where,
+            when(b.startedAt, t)].filter(Boolean).join(" · ");
         const near_ = near && b.machineId === near.id ? 0.25 : 0;
         const open = () => {
           close();
@@ -266,16 +284,20 @@ export function Search(props: Props) {
           at: b.startedAt ?? 0,
           open, paste,
           preview: () => ({
-            label: LABELS[kind], title: b.command, mono: true, dot: dotOf(b),
+            label: t(LABELS[kind]), title: b.command, mono: true, dot: dotOf(b),
             rows: ([
-              ["Machine", b.removed ? `${where}, removed from tTerm` : where],
-              ["Folder", place], ["Branch", b.branch], ["Status", status(b)],
-              ["When", when(b.startedAt)],
-              ["Terminal", b.ended ? `${b.terminal}, ended ${when(b.endedAt)}` : b.terminal],
+              [t("search.row_machine"), b.removed
+                ? t("search.machine_removed", { machine: where }) : where],
+              [t("search.row_folder"), place], [t("search.row_branch"), b.branch],
+              [t("search.row_status"), status(b, t)],
+              [t("search.row_when"), when(b.startedAt, t)],
+              [t("search.row_terminal"), b.ended ? t("search.terminal_ended",
+                { terminal: b.terminal, when: when(b.endedAt, t) }) : b.terminal],
             ] as [string, string][]).filter((r) => r[1]),
             lines: b.lines.map((l, i) => ({ text: l, hit: i === b.hit })),
-            acts: [{ label: "Open in its terminal", keys: "Enter", run: open, primary: true },
-              { label: "Into the line", keys: PASTE_KEYS, run: paste, primary: false }],
+            acts: [{ label: t("search.open_in_terminal"), keys: "Enter", run: open,
+              primary: true },
+              { label: t("search.into_line"), keys: PASTE_KEYS, run: paste, primary: false }],
           }),
         };
       });
@@ -289,13 +311,14 @@ export function Search(props: Props) {
         };
         const sub = `${n.project} / ${n.folder}${n.text ? ` · ${n.text}` : ""}`;
         return {
-          key: `note:${n.noteId}`, kind: "notes", title: titled(n.title), mono: false,
+          key: `note:${n.noteId}`, kind: "notes", title: titled(n.title, t), mono: false,
           sub, icon: n.lines.some((l) => l.type === "todo") ? <ListCheck size={15} /> : <Doc size={15} />,
           score: n.inTitle ? (n.title.toLowerCase().startsWith(words[0] ?? "") ? 3 : 2) : 1.5,
           at: n.editedAt ?? 0, open,
           preview: () => ({
-            label: LABELS.notes, title: titled(n.title), mono: false,
-            rows: [["In", `${n.project} / ${n.folder}`], ["Edited", when(n.editedAt)]],
+            label: t(LABELS.notes), title: titled(n.title, t), mono: false,
+            rows: [[t("search.row_in"), `${n.project} / ${n.folder}`],
+              [t("search.row_edited"), when(n.editedAt, t)]],
             // The core counts the note's lines as they are, empty ones too.
             lines: n.lines.map((l, i) => ({ l, hit: i === n.hit }))
               .filter(({ l }) => l.text.trim() || l.type === "todo")
@@ -303,7 +326,7 @@ export function Search(props: Props) {
                 text: l.text, hit,
                 box: l.type === "todo" ? (l.done ? "☑" : "☐") : undefined,
               })),
-            acts: [{ label: "Open the note", keys: "Enter", run: open, primary: true }],
+            acts: [{ label: t("search.open_note"), keys: "Enter", run: open, primary: true }],
           }),
         };
       });
@@ -328,7 +351,7 @@ export function Search(props: Props) {
       score: s + (near && e.machineId === near.id ? 0.25 : 0), at: e.at ?? 0,
       muted: e.muted, open,
       preview: () => ({
-        label: LABELS[e.kind], title: e.title, mono: false, rows: e.rows, lines: [],
+        label: t(LABELS[e.kind]), title: e.title, mono: false, rows: e.rows, lines: [],
         acts: [{ label: e.act, keys: "Enter", run: open, primary: true }],
       }),
     };
@@ -359,20 +382,20 @@ export function Search(props: Props) {
   const groups: Group[] = [];
   if (!words.length) {
     if (filter === "all") {
-      groups.push({ kind: "recent", title: "Recent",
+      groups.push({ kind: "recent", title: t("search.recent"),
         rows: props.recent.slice(0, 4).map((e) => localRow(e, 1)) });
       if (near) {
-        groups.push({ kind: "here", title: `Your commands on ${near.name}`,
+        groups.push({ kind: "here", title: t("search.yours_on", { machine: near.name }),
           rows: blockRows(found.recent, "commands").slice(0, IN_ALL) });
       }
-      groups.push({ kind: "todo", title: "Actions",
+      groups.push({ kind: "todo", title: t("search.kind_actions"),
         rows: props.entries.filter((e) => e.kind === "actions").slice(0, 3)
           .map((e) => localRow(e, 1)) });
     } else if (filter === "commands" && near) {
-      groups.push({ kind: "here", title: `Your commands on ${near.name}`,
+      groups.push({ kind: "here", title: t("search.yours_on", { machine: near.name }),
         rows: blockRows(found.recent, "commands") });
     } else if (filter !== "commands" && filter !== "output" && filter !== "notes") {
-      groups.push({ kind: filter, title: TITLES[filter],
+      groups.push({ kind: filter, title: t(TITLES[filter]),
         rows: props.entries.filter((e) => e.kind === filter).map((e) => localRow(e, 1)) });
     }
   } else if (filter === "all") {
@@ -382,12 +405,13 @@ export function Search(props: Props) {
     for (const k of order) {
       const rows = byKind[k];
       if (!rows.length) continue;
-      groups.push({ kind: k, title: TITLES[k], rows: rows.slice(0, IN_ALL),
-        more: rows.length > IN_ALL ? `All ${rows.length}${moreOf(k) ? "+" : ""}` : undefined,
+      groups.push({ kind: k, title: t(TITLES[k]), rows: rows.slice(0, IN_ALL),
+        more: rows.length > IN_ALL ? (moreOf(k) ? t("search.all_more", { n: rows.length })
+          : t("search.all", { n: rows.length })) : undefined,
         goMore: k });
     }
   } else {
-    groups.push({ kind: filter, title: TITLES[filter], rows: byKind[filter] });
+    groups.push({ kind: filter, title: t(TITLES[filter]), rows: byKind[filter] });
   }
   const shown = groups.filter((g) => g.rows.length);
   const flat = shown.flatMap((g) => g.rows);
@@ -443,7 +467,7 @@ export function Search(props: Props) {
     <div className="palette-backdrop" onMouseDown={(event) => {
       if (event.target === event.currentTarget) props.onClose();
     }}>
-      <section className="search-palette" role="dialog" aria-label="Search"
+      <section className="search-palette" role="dialog" aria-label={t("search.label")}
         onKeyDown={key}
         onClick={(event) => {
           // A click on the preview or between the lines: the keys back in
@@ -454,31 +478,31 @@ export function Search(props: Props) {
         <label className="sr-field">
           <SearchIcon size={18} />
           <input ref={field} autoFocus value={raw} spellCheck={false}
-            autoComplete="off" aria-label="Search" aria-controls="sr-list"
-            placeholder="Commands, output, notes, terminals, machines…"
+            autoComplete="off" aria-label={t("search.label")} aria-controls="sr-list"
+            placeholder={t("search.placeholder")}
             onChange={(event) => setRaw(event.target.value)} />
           {asking && words.length > 0 && <span className="spinner" aria-hidden="true" />}
           <button type="button" className="sr-esc" onClick={props.onClose}
-            aria-label="Close" title="Close (Esc)">
+            aria-label={t("common.close")} title={t("search.close_title")}>
             <kbd>Esc</kbd>
           </button>
         </label>
-        <div className="sr-filters" role="group" aria-label="What to search">
+        <div className="sr-filters" role="group" aria-label={t("search.filters")}>
           {FILTERS.map((f) => (
             <button key={f} type="button" aria-pressed={filter === f}
               className={`sr-chip${filter === f ? " on" : ""}${words.length && f !== "all" && !counts[f as SearchKind] && filter !== f ? " none" : ""}`}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => pick(f)}>
-              {f === "all" ? "All" : TITLES[f]}
+              {f === "all" ? t("search.kind_all") : t(TITLES[f])}
               {f !== "all" && counts[f] && <span className="sr-count">{counts[f]}</span>}
             </button>
           ))}
         </div>
         <div className="sr-body">
-          <div className="sr-list" ref={list} id="sr-list" role="listbox" aria-label="Found">
+          <div className="sr-list" ref={list} id="sr-list" role="listbox"
+            aria-label={t("search.found")}>
             {!words.length && filter === "all" && (
-              <p className="sr-note">Nothing typed yet: what you had open, and
-                what you run most here.</p>
+              <p className="sr-note">{t("search.nothing_typed")}</p>
             )}
             {shown.map((g) => (
               <div key={g.kind + g.title} className="sr-group" role="presentation">
@@ -520,22 +544,22 @@ export function Search(props: Props) {
             ))}
             {words.length > 0 && !flat.length && !asking && (
               <div className="sr-empty">
-                <strong>Nothing for “{text}”{filter !== "all" ? ` in ${TITLES[filter]}` : ""}.</strong>
-                <span>Search looks in every command of every terminal of yours, in
-                  what they printed, in notes, terminals, machines and projects.</span>
+                <strong>{filter !== "all" ? t(NOTHING_IN[filter], { text })
+                  : t("search.nothing_for", { text })}</strong>
+                <span>{t("search.looks_in")}</span>
                 {filter !== "all" && (
                   <button type="button" className="button-plain small"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => pick("all")}>
-                    Search everything
+                    {t("search.everything")}
                   </button>
                 )}
               </div>
             )}
             {!words.length && (filter === "output" || filter === "notes" ||
               (filter === "commands" && !near)) && (
-              <p className="sr-note">Type a word to look for in {filter === "output"
-                ? "what commands printed" : TITLES[filter].toLowerCase()}.</p>
+              <p className="sr-note">{filter === "output" ? t("search.type_output")
+                : filter === "notes" ? t("search.type_notes") : t("search.type_commands")}</p>
             )}
           </div>
           <div className="sr-preview" aria-live="polite">
@@ -578,34 +602,34 @@ export function Search(props: Props) {
               </>
             ) : (
               <div className="sr-tips">
-                <span className="sr-kind">A word in front keeps to one kind</span>
+                <span className="sr-kind">{t("search.tips")}</span>
                 <dl className="sr-rows">
-                  {([["c: nginx", "commands"], ["o: timed out", "what commands printed"],
-                    ["n: rollback", "notes"], ["t: deploy", "terminals"],
-                    ["m: web-01", "machines"], ["p: personal", "projects"],
-                    ["> theme", "things to do"]] as [string, string][]).map(([k, v]) => [
+                  {/* i18n-ignore */}
+                  {([["c: nginx", "search.tip_commands"], ["o: timed out", "search.tip_output"],
+                    ["n: rollback", "search.tip_notes"], ["t: deploy", "search.tip_terminals"],
+                    ["m: web-01", "search.tip_machines"], ["p: personal", "search.tip_projects"],
+                    ["> theme", "search.tip_actions"]] as [string, string][]).map(([k, v]) => [
                     <dt key={`k${k}`}><code>{k}</code></dt>,
-                    <dd key={`v${k}`}>{v}</dd>,
+                    <dd key={`v${k}`}>{t(v)}</dd>,
                   ])}
                 </dl>
-                <p className="hint">Or pick one of the buttons above the list. Tab
-                  goes to the next one.</p>
+                <p className="hint">{t("search.tips_buttons")}</p>
               </div>
             )}
           </div>
         </div>
         <footer className="sr-foot">
           <span className="sr-keys">
-            <span><kbd>↑</kbd><kbd>↓</kbd> move</span>
-            <span><kbd>Enter</kbd> open</span>
-            <span><kbd>{PASTE_KEYS}</kbd> into the line</span>
-            <span><kbd>Tab</kbd> next kind</span>
+            <span>{t.rich("search.keys_move", { kbd })}</span>
+            <span>{t.rich("search.keys_open", { kbd })}</span>
+            <span>{t.rich("search.keys_paste", { keys: PASTE_KEYS, kbd })}</span>
+            <span>{t.rich("search.keys_next", { kbd })}</span>
           </span>
-          <span className="sr-prefixes" title="t: terminals, m: machines, p: projects">
-            <span><code>c:</code> commands</span>
-            <span><code>o:</code> output</span>
-            <span><code>n:</code> notes</span>
-            <span><code>&gt;</code> actions</span>
+          <span className="sr-prefixes" title={t("search.prefixes_title")}>
+            <span>{t.rich("search.prefix_commands", { code })}</span>
+            <span>{t.rich("search.prefix_output", { code })}</span>
+            <span>{t.rich("search.prefix_notes", { code })}</span>
+            <span>{t.rich("search.prefix_actions", { code })}</span>
           </span>
         </footer>
       </section>

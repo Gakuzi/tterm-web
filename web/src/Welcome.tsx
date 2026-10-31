@@ -3,6 +3,7 @@
 // the invitations line: sign-in and teams come in later stages.
 
 import type { MachineKind, Me, Project } from "./api";
+import { useT } from "./i18n";
 import { ArrowRight, Computer, Logo, Server } from "./icons";
 
 interface Props {
@@ -12,20 +13,19 @@ interface Props {
 }
 
 export function Welcome({ me, personal, onAdd }: Props) {
+  const t = useT();
   return (
     <main className="welcome">
       <div className="welcome-head">
         <Logo size={40} />
-        <h1>Welcome to tTerm, {me.firstName}</h1>
+        <h1>{t("welcome.title", { name: me.firstName })}</h1>
         <p className="lead">
-          A terminal to your servers and computers, right in the browser.
-          Nothing to install on this computer, no keys to copy, no ports to
-          open.
+          {t("welcome.lead")}
         </p>
       </div>
 
       <section className="connect" aria-labelledby="w-connect">
-        <h2 id="w-connect">Connect your first machine</h2>
+        <h2 id="w-connect">{t("welcome.connect")}</h2>
         <div className="connect-cards">
           <button type="button" className="connect-card"
             onClick={() => onAdd("server")}>
@@ -34,15 +34,14 @@ export function Welcome({ me, personal, onAdd }: Props) {
               <span className="arrow"><ArrowRight /></span>
             </span>
             <span className="card-text">
-              <span className="card-title">Server</span>
+              <span className="card-title">{t("welcome.server")}</span>
               <span className="card-note">
-                A VPS or cloud server you reach over SSH. Run one command on
-                it, and it appears here.
+                {t("welcome.server_note")}
               </span>
             </span>
             <span className="chips">
               <span className="chip">Linux</span>
-              <span className="chip">One command</span>
+              <span className="chip">{t("welcome.one_command")}</span>
             </span>
           </button>
           <button type="button" className="connect-card"
@@ -54,51 +53,47 @@ export function Welcome({ me, personal, onAdd }: Props) {
               <span className="arrow"><ArrowRight /></span>
             </span>
             <span className="card-text">
-              <span className="card-title">Computer</span>
+              <span className="card-title">{t("welcome.computer")}</span>
               <span className="card-note">
-                A Mac or Linux machine at home or in the office, even behind
-                NAT. A small agent keeps it connected.
+                {t("welcome.computer_note")}
               </span>
             </span>
             <span className="chips">
               <span className="chip">macOS</span>
               <span className="chip">Linux</span>
-              <span className="chip">No open ports</span>
+              <span className="chip">{t("welcome.no_ports")}</span>
             </span>
           </button>
         </div>
       </section>
 
-      <ol className="steps" aria-label="How it works">
+      <ol className="steps" aria-label={t("welcome.how")}>
         <li>
           <span className="step-number" aria-hidden="true">1</span>
           <span className="step-text">
-            <strong>Add a machine</strong>
-            <span>Run one command on it. It works once, for 10 minutes.</span>
+            <strong>{t("welcome.step_add")}</strong>
+            <span>{t("welcome.step_add_text")}</span>
           </span>
         </li>
         <li>
           <span className="step-number" aria-hidden="true">2</span>
           <span className="step-text">
-            <strong>Open a terminal</strong>
-            <span>Each command becomes a block: copy it, run it again, share
-              a link.</span>
+            <strong>{t("welcome.step_open")}</strong>
+            <span>{t("welcome.step_open_text")}</span>
           </span>
         </li>
         <li>
           <span className="step-number" aria-hidden="true">3</span>
           <span className="step-text">
-            <strong>Bring your team</strong>
-            <span>Roles, a shared journal, and you always see who is
-              watching.</span>
+            <strong>{t("welcome.step_team")}</strong>
+            <span>{t("welcome.step_team_text")}</span>
           </span>
         </li>
       </ol>
 
       {personal && (
         <p className="footnote">
-          Your first project, {personal.name}, is ready, with the code{" "}
-          {personal.code}: its machines show up in tabs as {personal.code}/name.
+          {t("welcome.footnote", { project: personal.name, code: personal.code })}
         </p>
       )}
     </main>

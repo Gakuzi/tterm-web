@@ -1,0 +1,1354 @@
+# Strings of tTerm Web's page in English: one a line, `key = text`.
+# Every language has the same keys; the build stops when one is missing
+# (scripts/strings.mjs). {name} is a value the page puts in; a counting
+# string has a form for each plural of the language, "one: … | other: …",
+# and {n} is the count; <b>…</b> wraps a part the page makes a link, bold
+# or code. Names of machines, projects, notes and terminals, commands and
+# their output, tTerm, tTerm Web and Free are not translated.
+
+# ------------------------------------------------------------ common: words used in many places
+common.close = 閉じる
+common.cancel = キャンセル
+common.save = 保存
+common.loading = 読み込み中…
+common.try_again = 再試行
+common.copy = コピー
+common.copied = コピーしました
+common.back = 戻る
+common.done = 完了
+common.more = その他
+common.sign_in = サインイン
+
+# ------------------------------------------------------------ time: how long ago (time.ts)
+# A duration after "for": Away for 3 minutes, running for an hour.
+time.for_less = 1 分未満
+time.for_minutes = other: {n} 分
+time.for_hours = other: {n} 時間
+time.for_days = other: {n} 日
+# How long ago, in full words: Signed in 3 minutes ago.
+time.ago_now = たった今
+time.ago_minutes = other: {n} 分前
+time.ago_hours = other: {n} 時間前
+time.ago_days = other: {n} 日前
+# A machine that is offline: {ago} is one of the four above.
+time.last_seen = 最終接続：{ago}
+# How long ago, short, in lists of notes and in Updates: Looked 5 min ago.
+time.short_minutes = other: {n} 分前
+time.short_hours = other: {n} 時間前
+time.yesterday = 昨日
+time.today = 今日
+time.days_ago = other: {n} 日前
+time.last_week = 先週
+time.weeks_ago = other: {n} 週間前
+# {day} is a date as the language writes it: 12 Oct, 12. Okt.
+time.on_day = {day}
+# In search: yesterday 17:38, 2 Oct 09:12.
+time.yesterday_at = 昨日 {time}
+time.day_at = {day} {time}
+
+# ------------------------------------------------------------ here: the computer tTerm for Mac runs on
+# Alone, as a label (the sidebar, tabs). Sentences that name it have a
+# string of their own for each: .mac and .computer.
+here.mac = この Mac
+here.computer = このコンピューター
+
+# ------------------------------------------------------------ role: one's role in a project
+role.owner = オーナー
+role.admin = 管理者
+role.member = メンバー
+role.observer = 閲覧者
+
+# ------------------------------------------------------------ color: projects' colors (colors.ts)
+color.violet = バイオレット
+color.sky = スカイブルー
+color.teal = ティール
+color.pink = ピンク
+color.orange = オレンジ
+color.lime = ライム
+color.indigo = インディゴ
+color.slate = スレートグレー
+
+# ------------------------------------------------------------ count: how many, in lists and lines
+count.machines = other: マシン {n} 台
+count.notes = other: ノート {n} 件
+count.terminals_open = other: 開いているターミナル {n} 個
+# The end of a list cut short: web-01, web-02, web-03, web-04 and 3 more.
+count.more = other: ほか {n} 件
+
+# A terminal that has only its number, in lists: terminal 2.
+terminal.numbered = ターミナル {number}
+# A note without a title.
+note.untitled = 無題
+
+# ------------------------------------------------------------ sidebar (Sidebar.tsx)
+sidebar.label = サイドバー
+sidebar.all_machines = すべてのマシン
+sidebar.keep_open = サイドバーを固定
+sidebar.keep_open_title = サイドバーを開いたままにする
+sidebar.let_slide = サイドバーを自動で隠す
+sidebar.close = サイドバーを閉じる
+sidebar.projects = プロジェクト
+sidebar.fold = {name} を折りたたむ
+sidebar.unfold = {name} を展開
+sidebar.open_project = {name} を開く：マシンとノート
+sidebar.machines = マシン
+sidebar.add_machine = マシンを追加
+sidebar.no_machines = マシンはまだありません
+sidebar.notes = ノート
+sidebar.new_folder = 新規フォルダー
+sidebar.no_notes = ノートはまだありません
+sidebar.no_notes_writes = ノートはまだありません。+ でノート用のフォルダーを作成できます
+sidebar.new_project = 新規プロジェクト
+sidebar.waits = {name} は tTerm への接続が戻ると使えるようになります
+sidebar.offline = {name} はオフラインです。スリープ中か、エージェントが動いていません
+# {seen} is time.last_seen: last seen 14 minutes ago.
+sidebar.offline_seen = {name} はオフラインです。スリープ中か、エージェントが動いていません（{seen}）
+sidebar.here.mac = {name}（この Mac）：ターミナルはこの場で動き、インターネットがなくても使えます
+sidebar.here.computer = {name}（このコンピューター）：ターミナルはこの場で動き、インターネットがなくても使えます
+sidebar.new_terminal = 新規ターミナル
+sidebar.new_terminal_on = {name} で新規ターミナル
+sidebar.rename_hint = Enter で保存、Esc でキャンセル
+sidebar.go_to = {label} に移動
+sidebar.go_to_away = {label} に移動：{machine} の復帰を待っています
+sidebar.double_click = ダブルクリックして名前を変更
+sidebar.end = {label} を終了
+sidebar.end_title = {label} を終了：シェルも終了します
+sidebar.new_note_in = 「{name}」に新規ノート
+sidebar.empty_folder = 空
+sidebar.empty_folder_writes = 空です。+ でノートを作成できます
+sidebar.signin_title = サーバーとプロジェクト
+sidebar.signin_text = サインインすると、サーバーでターミナルを開いたり、プロジェクトにノートを残したり、チームで作業したりできます。このコンピューターはそのまま使えます。
+sidebar.theme_dark = ダークテーマに切り替え
+sidebar.theme_light = ライトテーマに切り替え
+
+# ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
+# "Free" is the plan's name: it stays as it is.
+account_menu.free_plan = Free プラン
+account_menu.title = 設定、言語、アカウント、サインアウト
+account_menu.title_local = 設定、言語、サインイン
+account_menu.not_signed_in = サインインしていません
+account_menu.only_here = このコンピューターのみ
+account_menu.offline = オフライン、再試行中
+account_menu.local_note = tTerm はこのコンピューターで使えます。サインインすると、サーバー、プロジェクト、チームも使えます。
+account_menu.sign_out = サインアウト
+# The item after Settings, and the title of the list of languages.
+language.item = 言語
+
+# ------------------------------------------------------------ settings (Settings.tsx)
+# The page, and the item of the account's menu that opens it.
+settings.title = 設定
+settings.appearance = 外観
+settings.appearance_local = このコンピューターに保存されます。「システム」を選ぶと、このコンピューターの設定に従います。プロジェクトの色は、コードバッジだけに付けるか、サイドバーのプロジェクト全体に付けるかを選べます。
+settings.appearance_account = アカウントに保存されます。「システム」を選ぶと、使っているそれぞれのコンピューターの設定に従います。プロジェクトの色は、コードバッジだけに付けるか、サイドバーのプロジェクト全体に付けるかを選べます。
+settings.theme = テーマ
+settings.theme_system = システム
+settings.theme_light = ライト
+settings.theme_dark = ダーク
+settings.tints = プロジェクトの色
+settings.tint_badge = コードバッジ
+settings.tint_block = プロジェクト全体
+
+# ------------------------------------------------------------ devices (Devices.tsx)
+devices.title = デバイス
+
+# ------------------------------------------------------------ account (Account.tsx)
+# The page, and the item of the account's menu that opens it.
+account.title = アカウント
+
+# ------------------------------------------------------------ app: the page's frame, toasts and dialogs (App.tsx)
+app.session_ended = セッションが終了しました。もう一度サインインしてください。ターミナルは動き続けています。
+# How saving goes in the note in front, on the line of tabs.
+app.saved = 保存済み
+app.saving = 保存中…
+app.not_saved_offline = 未保存：接続がありません
+app.not_saved = 未保存
+app.no_connection = 接続がありません
+app.not_answering_local = tTerm Web が応答しません。ターミナルのウィンドウで python -m tterm.dev が動いていますか？
+app.not_answering = tTerm Web が応答しません。接続を確認してから、もう一度お試しください。
+# {why} is the reason tTerm Web gave, as it gave it.
+app.no_terminal = ターミナルを開けませんでした：{why}
+app.offline = {name} はオフラインです。エージェントが接続すると戻ります。
+# {seen} is time.last_seen: last seen 14 minutes ago.
+app.offline_seen = {name} はオフラインです（{seen}）。エージェントが接続すると戻ります。
+app.removed_shared = {name} を tTerm Web から削除しました。同じサーバーがほかのプロジェクトにもあるため、サーバー上の tTerm Web のアクセス権は残ります。
+app.removed_access = {name} を tTerm Web から削除し、サーバー上の tTerm Web のアクセス権も取り消しました。
+app.removed = {name} を tTerm Web から削除しました。
+app.no_note = ノートを作成できませんでした：{why}
+app.note_deleted = ノート「{title}」を「{folder}」から削除しました。
+app.note_deleted_journal = ノート「{title}」を「{folder}」から削除しました。ログに記録されています。
+app.folder_deleted = フォルダー「{name}」を削除しました。
+app.folder_deleted_journal = フォルダー「{name}」を削除しました。ログに記録されています。
+app.folder_notes_deleted = other: フォルダー「{name}」と、その中のノート {n} 件を削除しました。
+app.folder_notes_deleted_journal = other: フォルダー「{name}」と、その中のノート {n} 件を削除しました。ログに記録されています。
+app.moved_to = 「{folder}」に移動しました。
+app.no_move = 移動できませんでした：{why}
+app.moved_here = {project} からここに移動しました。
+app.moved_here_journal = {project} からここに移動しました。{project} のログに記録されています。
+app.moved_to_project = {project} のフォルダー「{folder}」に移動しました。
+app.moved_to_other = 別のプロジェクトのフォルダー「{folder}」に移動しました。
+app.copied_markdown = Markdown としてコピーしました。
+app.note_gone = このノートは削除されています。
+app.no_copy = コピーできませんでした：{why}
+app.no_copy_browser = コピーできませんでした：ブラウザーが許可しませんでした。
+app.project_deleted = {name} を削除しました。
+app.project_deleted_notes = other: {name} を、その中のノート {n} 件とともに削除しました。
+# {label} is where it is now: P/web-01.
+app.machine_moved = {name} は {project} に移動し、{label} になりました。ターミナルは動き続けています。
+app.no_rename = 名前を変更できませんでした：{why}
+app.signed_out = サインアウトしました。ターミナルは動き続けています。
+app.no_sign_out = サインアウトできませんでした：tTerm Web が応答しませんでした。もう一度お試しください。
+app.no_theme = テーマを保存できませんでした：tTerm Web が応答しませんでした。
+app.no_language = 言語を保存できませんでした：tTerm Web が応答しませんでした。
+app.no_tints = プロジェクトの色を保存できませんでした：tTerm Web が応答しませんでした。
+app.go_on_in_browser = ブラウザーで続けてください：そこでサインインし、このコンピューターを許可してください。
+app.open_sidebar = サイドバーを開く
+app.no_project = プロジェクトが見つかりません
+app.no_project_text = このプロジェクトは、もうあなたのプロジェクトの一覧にありません。
+app.close_the_tab = タブを閉じる
+app.connection_lost = 接続が切れました。再接続しています。ターミナルは動き続けています。
+app.cut_off.mac = <b>tTerm に接続できません。</b>この Mac はいつもどおり使えます。サーバーのターミナルはサーバー上で動き続け、接続が戻るとここにも戻ってきます。
+app.cut_off.computer = <b>tTerm に接続できません。</b>このコンピューターはいつもどおり使えます。サーバーのターミナルはサーバー上で動き続け、接続が戻るとここにも戻ってきます。
+app.paste_busy = このターミナルではコマンドが実行中のため、入力行が空いていません。終わってからもう一度お試しください。
+app.paste_gone = {machine} はもう tTerm Web にありません。別の場所でターミナルを開き、そこからコマンドを入力行に入れてください。
+app.picker.placeholder = 任意のプロジェクトのマシン
+# Tabs: their labels and the tips under the mouse. {label} is a terminal's: P/web-01 · 2.
+app.tab.note = ノート
+app.tab.note_in = 「{folder}」のノート
+app.tab.close_note = ノートを閉じます。ノートはフォルダーに残ります。
+app.tab.project = プロジェクト
+app.tab.project_title = {name}：マシンとノート
+app.tab.close_page = ページを閉じる
+app.tab.terminal = ターミナル
+app.tab.away = {label}：{machine} はスリープ中かオフラインです。ターミナルは復帰を待っています
+app.tab.away_unknown = {label}：マシンがスリープ中かオフラインです。ターミナルは復帰を待っています
+app.tab.ended = {label}：終了済み
+app.tab.running = {label}：コマンドを実行中
+app.tab.close_terminal = タブを閉じます。ターミナルは動き続け、サイドバーのマシンの下に残ります。
+# A machine's state, small, after its name in lists.
+app.machine.no_connection = 接続なし
+app.machine.offline = オフライン
+app.machine.offline_seen = オフライン（{seen}）
+app.machine.online = オンライン
+# Search and the palette (⌘K): what it finds on the page, the lines under each, and the details beside.
+app.search.state_away = コンピューターの復帰待ち
+app.search.state_ended = 終了済み
+app.search.state_busy = コマンドを実行中
+app.search.state_prompt = プロンプトで待機中
+app.search.this_tab = このタブ
+app.search.tab = タブ
+app.search.no_tab = 実行中、タブなし
+app.search.row_machine = マシン
+app.search.row_folder = ディレクトリ
+app.search.row_now = 現在
+app.search.row_in = 場所
+app.search.row_edited = 最終編集
+app.search.row_project = プロジェクト
+app.search.row_system = システム
+app.search.row_address = アドレス
+app.search.row_status = 状態
+app.search.row_terminals = ターミナル
+app.search.row_code = コード
+app.search.row_does = 説明
+app.search.open_count = other: {n} 個が開いています
+# The button that does what was found.
+app.search.open = 開く
+app.search.open_note = ノートを開く
+app.search.open_page = ページを開く
+app.search.do_it = 実行
+# Search words: keep the English words, add the language's own after them.
+app.search.terminal_words = terminal ターミナル 端末
+app.search.note_words = note ノート メモ
+app.search.project_words = project page folders プロジェクト ページ フォルダー
+# Things to do, in the palette: each with what it does, small, and its search words.
+app.action.add_machine = マシンを追加
+app.action.add_machine_hint = サーバーまたはコンピューター
+app.action.new_project_hint = 専用のマシンとノート
+app.action.edit_project = {name} を編集
+app.action.edit_project_hint = 名前、コード、色
+app.action.new_folder_in = {name} に新規フォルダー
+app.action.new_folder_hint = ノート用
+app.action.close_tab = このタブを閉じる
+app.action.close_tab_terminal = ターミナルは動き続けます
+app.action.close_tab_note = ノートはフォルダーに残ります
+app.action.rename_terminal = このターミナルに名前を付ける
+app.action.rename_terminal_hint = 番号の代わりに
+app.action.end_terminal = このターミナルを終了
+app.action.end_terminal_hint = シェルも終了します
+app.action.delete_note = このノートを削除
+app.action.delete_note_hint = 「{folder}」から
+app.action.theme_dark = ダークテーマに切り替え
+app.action.theme_light = ライトテーマに切り替え
+app.action.settings_hint_local = テーマ、プロジェクトの色
+app.action.settings_hint = テーマ、プロジェクトの色、デバイス
+app.action.sign_in_hint = サーバー、プロジェクト、チーム
+app.action.account_hint = 名前、写真、プラン
+app.action.sign_out_hint = このブラウザーでのサインインを解除
+# Search words: keep the English words, add the language's own after them.
+app.action.add_machine_words = new server computer connect 新規 追加 マシン サーバー コンピューター 接続
+app.action.new_project_words = project new create make プロジェクト 新規 作成
+app.action.edit_project_words = project rename edit code color colour プロジェクト 名前 変更 編集 コード 色
+app.action.new_folder_words = notes folder new create ノート フォルダー 新規 作成
+app.action.machines_words = machines home overview マシン ホーム 一覧
+app.action.close_tab_words = tab close タブ 閉じる
+app.action.rename_terminal_words = terminal rename name label ターミナル 名前 変更 ラベル
+app.action.end_terminal_words = terminal end stop kill exit shell ターミナル 終了 停止 シェル
+app.action.delete_note_words = note delete remove ノート 削除
+app.action.theme_words = theme dark light colours colors テーマ ダーク ライト 色 外観
+app.action.pin_words = sidebar panel pin サイドバー パネル 固定 ピン
+app.action.settings_words_local = settings preferences theme dark light colors colours support 設定 環境設定 テーマ ダーク ライト 色 サポート
+app.action.settings_words = settings preferences theme dark light colors colours devices quick code forget browsers support 設定 環境設定 テーマ ダーク ライト 色 デバイス クイックコード 登録解除 ブラウザー サポート
+app.action.sign_in_words = sign in log in login account cloud servers サインイン ログイン アカウント クラウド サーバー
+app.action.account_words = account profile name photo picture avatar plan limits delete アカウント プロフィール 名前 写真 アバター プラン 上限 削除
+app.action.sign_out_words = sign out log out logout leave switch account サインアウト ログアウト 切り替え アカウント
+# A folder: made, or named again.
+app.folder.new_title = {name} に新規フォルダー
+app.folder.rename_title = フォルダー名を変更
+app.folder.create = フォルダーを作成
+app.folder.new_help_alone = 表示されるのはあなただけです。作成後、フォルダーの横の + で最初のノートを作成できます。
+app.folder.new_help = {name} の全員に表示され、全員がここにノートを書けます。作成後、フォルダーの横の + で最初のノートを作成できます。
+app.folder.rename_help_alone = 表示されるのはあなただけです。
+app.folder.rename_help = 新しい名前は {name} の全員にすぐ表示されます。中のノートはそのままです。
+# Asked before it is done.
+app.remove.title = {name} を削除しますか？
+app.remove.confirm = {name} を削除
+app.remove.text = tTerm Web から消え、ターミナルも終了します。そこで入力したコマンドは履歴に残ります。
+app.remove.computer = エージェントは削除の通知を受けて停止します。コンピューターをもう一度接続するには、「マシンを追加」で「コンピューター」を選びます。
+app.remove.server = tTerm Web はこのサーバーへのログインをやめ、サーバー上のアクセス権も取り消します。サーバーが応答しない場合は、次にそのためのコマンドが表示されます。
+app.end.title = {label} を終了しますか？
+app.end.confirm = ターミナルを終了
+app.end.text = シェルが終了し、その中で動いているものも停止します。ターミナルのウィンドウを閉じたときと同じです。実行した内容はタブと履歴に残ります。
+app.delete_note.title = ノート「{title}」を削除しますか？
+app.delete_note.sub = フォルダー「{folder}」内
+app.delete_note.confirm = ノートを削除
+app.delete_note.alone = 完全に削除され、元に戻せません。
+app.delete_note.shared = {project} の全員がこのノートを見られなくなります。いま開いている人も同じです。ログには、誰がいつ削除したかが残ります。
+app.delete_folder.title = フォルダー「{name}」を削除しますか？
+app.delete_folder.confirm = フォルダーを削除
+app.delete_folder.confirm_notes = other: フォルダーとノート {n} 件を削除
+app.delete_folder.empty = フォルダーは空です。
+# {names} is the notes' titles, listed: Plan, Ideas and 3 more.
+app.delete_folder.notes_go = other: 中のノート {n} 件も一緒に削除されます：{names}。
+app.delete_folder.shared = {project} の全員がこれらのノートを見られなくなります。いずれかを開いている人も同じです。ログには、誰がいつフォルダーを削除したかが残ります。
+app.delete_folder.keep = 残したいノートは、先に移動してください：ノートの横の ⋯ から、別のフォルダーを選びます。
+
+# ------------------------------------------------------------ api: what the page says when tTerm Web gives no reason (api.ts)
+api.note_changed = その間に、ノートがほかの場所で変更されました。
+api.sign_in = 続けるにはサインインしてください。
+# {status} is the HTTP status: 502.
+api.answered = tTerm Web の応答：{status}
+api.confirm_first = 先に本人確認をしてください。
+api.account_changed = 現在、別のアカウントでサインインしています。
+
+# ------------------------------------------------------------ app_link: the apps for computers, as the site names them (appLink.ts)
+app_link.mac = Mac 版 tTerm
+app_link.windows = Windows 版 tTerm
+app_link.linux = Linux 版 tTerm
+
+# ------------------------------------------------------------ add_machine: the window that adds a server or a computer to a project (AddMachine.tsx)
+# When the browser does not let the page copy the command.
+add_machine.copy_failed = コピーできませんでした：コマンドを選択して手動でコピーしてください。
+# How long the command works, inside add_machine.hint_computer and add_machine.hint_server as {works}.
+add_machine.works_once = other: 1 回限り、あと {n} 分間有効です。
+add_machine.title = マシンを追加
+# Before the list of the projects the machine can go to.
+add_machine.to_project = 追加先のプロジェクト
+# The two buttons Server and Computer, for screen readers.
+add_machine.kind = マシンの種類
+add_machine.server = サーバー
+add_machine.computer = コンピューター
+# Step 1 for a computer, above the command.
+add_machine.run_computer = コンピューターでこのコマンドを実行
+# Under the command. {works} is add_machine.works_once; sudo stays as it is.
+add_machine.hint_computer = そのコンピューターのターミナルで、sudo を付けずに自分のユーザーとして実行してください。{works}その後は、エージェントが自動でアップデートされます。あとで新しいコマンドを実行するとエージェントが入れ直されます。コンピューターはそのままですが、開いているターミナルは終了します。
+# A fold under the command, for trying an agent that is not released yet.
+add_machine.by_hand = または、エージェントを手動で起動
+# {version} is the agent's version: 0.11.0. tterm-agent, Python and websockets are names: they stay as they are.
+add_machine.by_hand_hint = tterm-agent {version} 以降のコピーから、websockets パッケージの入った Python で起動します。まだリリースされていないエージェントを試すためのものです。ターミナルのウィンドウを開いているあいだだけ動き、トークンがそのコンピューターの鍵になります。
+# Step 2, while the window waits for the machine.
+add_machine.keep_open = このウィンドウを開いたままにする
+# A fold: what the command for a computer does, point by point.
+add_machine.what_command = コマンドが行うこと
+# {folder} is ~/.tterm-web, {bot_folder} ~/.tterm; launchd and systemd are names: they stay as they are.
+add_machine.what_command_puts = tTerm のエージェントを {folder} に置きます。エージェントは tTerm のリリースにあるこのシステム用のファイル 1 つで、実行前に、コマンドのスクリプトに書かれたチェックサムと照合されます。エージェントはログインのたびに起動します（macOS では launchd、Linux では systemd）。{bot_folder} に tTerm ボットのエージェントがある場合、そちらはそのままです。
+add_machine.what_command_updates = エージェントは自動でアップデートされます。対象は tTerm のリリースビルドで署名されたバージョンだけで、このコンピューターでターミナルが 1 つも開いていないときに限ります。
+add_machine.what_command_key = このコンピューター専用の鍵を作成し、あなただけが読める形でコンピューター上に保管します。コマンド内のトークンは、参加のために 1 回使えるだけです。
+# root is the name of the system's administrator: it stays as it is.
+add_machine.what_command_runs = エージェントは root ではなく、常にあなたのユーザーとして動き、ポートも開けません。自分から tTerm Web に接続し、その 1 本の接続を保ちます。ここで開く各ターミナルは、そのコンピューター上のあなたのシェルです。
+# {command} is ~/.tterm-web/uninstall.sh.
+add_machine.what_command_uninstall = {command} ですべて削除できます。
+# Step 1 for a server, above the command.
+add_machine.run_server = サーバーでこのコマンドを実行
+# Under the command. {works} is add_machine.works_once; root and sudo stay as they are.
+add_machine.hint_server = {works}root か、sudo を使える任意のユーザーで実行してください。
+# A fold: what the script for a server does, point by point.
+add_machine.what_script = スクリプトが行うこと
+# Here and in the next two, tterm in small letters is the name of the user the script makes on the server: it stays as it is, as sudo and sshd_config do.
+add_machine.what_script_user = パスワードなしのユーザー tterm を作成します。tTerm ボットがすでに作成している場合は、それを再利用します。
+add_machine.what_script_certificates = 有効期間 2 分で、このサーバー専用の証明書を使って、tTerm Web が tterm としてログインできるようにします。サーバーに鍵は残りません。
+add_machine.what_script_sudo = サーバーを管理できるよう、tterm に sudo 権限を与えます。コマンド 1 つで取り消せます。
+add_machine.what_script_safe = sshd_config には一切触れず、ポートも開けません。2 回実行しても問題ありません。
+# {name} is the machine's name.
+add_machine.connected = {name} を接続しました
+# After the machine's system and host: Ubuntu 24.04 · web-01 · in tabs it reads P/web-01.
+add_machine.tabs_label = タブでの表示：{label}
+add_machine.open_terminal = ターミナルを開く
+add_machine.add_another = 別のマシンを追加
+# {why} is what went wrong, as tTerm Web said it.
+add_machine.no_command = コマンドを作成できませんでした：{why}
+add_machine.expired_token = このトークンは期限切れです。有効期間は 10 分です。
+add_machine.expired_command = このコマンドは期限切れです。有効期間は 10 分です。
+add_machine.new_command = 新しいコマンドを取得
+add_machine.failed_computer = コンピューターを追加できませんでした。
+add_machine.failed_server = サーバーを確認できませんでした。
+add_machine.still_works = 同じコマンドはまだ使えます。問題を解決してから、もう一度実行してください。
+# While the window waits: the agent or the server has called in, or not yet.
+add_machine.agent_in = エージェントが接続しました。コンピューターの情報を読み込んでいます…
+add_machine.server_in = サーバーから応答がありました。確認のためログインしています…
+add_machine.waiting_agent = エージェントを待っています…
+add_machine.waiting_server = サーバーを待っています…
+# {project} is the project's name; the _unnamed ones are for when it is not known.
+add_machine.appears_computer = コマンドが終わると、数秒後に {project} に表示されます。
+add_machine.appears_computer_unnamed = コマンドが終わると、数秒後にプロジェクトに表示されます。
+add_machine.appears_server = スクリプトが終わるとすぐに {project} に表示されます。通常は 1 分以内です。
+add_machine.appears_server_unnamed = スクリプトが終わるとすぐにプロジェクトに表示されます。通常は 1 分以内です。
+
+# ------------------------------------------------------------ signin: signing in with a code from email, and the quick code (SignIn.tsx)
+# When the server does not answer at all.
+signin.no_answer = サーバーが応答しません。接続を確認して、もう一度お試しください。
+signin.email_lead = メールアドレスを入力してください。コードをお送りします
+# The field for the address, for screen readers.
+signin.email = メールアドレス
+# The button, while the code is being sent.
+signin.sending = 送信中…
+signin.get_code = コードを受け取る
+signin.new_here = 初めての方は、コードの入力後にアカウントを作成します。
+signin.code_resent = 新しいコードを送信しました。前のコードは使えなくなりました。
+signin.code_title = コードを入力
+# {email} is the address the code went to.
+signin.code_sent = <b>{email}</b> 宛てに送信しました
+# The field for the code, for screen readers.
+signin.code_label = メールに届いたコード
+# A link that counts the seconds down until another code may be sent: New code in 42 s.
+signin.resend_in = other: 再送信まで {n} 秒
+signin.resend = 新しいコードを送信
+signin.change_email = メールアドレスを変更
+signin.no_email = メールが届きませんか？迷惑メールフォルダーを確認してください。
+signin.signup_title = アカウントを作成
+# The field for one's name, and the words in it while it is empty.
+signin.your_name = お名前
+# The one tick of signing up. <terms> and <privacy> are links to the site's two documents: their names as the site has them in the language.
+signin.agree = <terms>利用規約</terms>と<privacy>プライバシーポリシー</privacy>に同意します
+# The button, while the account is being made.
+signin.creating = 作成中…
+signin.create = アカウントを作成
+signin.another_email = 別のメールアドレスを使う
+# A quick code is four digits that sign one in on this device.
+signin.pin_easy = 推測されやすいコードです。すべて同じ数字や、連続した数字は避けてください。
+signin.pin_mismatch = コードが一致しませんでした。もう一度作成してください。
+# {name} is the person's first name: Welcome for an account made just now, Hello for one there before.
+signin.welcome = ようこそ、{name} さん！
+signin.hello = こんにちは、{name} さん！
+# The quick code, typed a second time.
+signin.pin_repeat = コードをもう一度入力
+signin.pin_repeat_lead = 同じ 4 桁の数字をもう一度入力してください
+signin.pin_offer_lead = このデバイス用のクイックコードを作成してください
+# The field for the quick code, for screen readers: the second time, the first time.
+signin.pin_repeat_label = クイックコード（確認用）
+signin.pin_offer_label = クイックコード
+# The link that goes on without a quick code.
+signin.not_now = 今はしない
+# {name} is the person's first name.
+signin.welcome_back = おかえりなさい、{name} さん！
+signin.pin_lead = クイックコードを入力してください
+# The field for the quick code, for screen readers.
+signin.pin_label = クイックコード
+signin.forgot = コードをお忘れですか？
+signin.switch = アカウントを切り替え
+
+# ------------------------------------------------------------ connect: in the browser, allowing tTerm for the computer to sign in (Connect.tsx)
+connect.no_answer = tTerm が応答しません。接続を確認してから、このページを再読み込みしてください。
+# {app} is app_link.*: tTerm for Mac. Also the page's title in the browser.
+connect.allow_title = {app} を許可しますか？
+# The address the app opened is cut short.
+connect.incomplete = このリンクは不完全です
+# Sign in with your browser is the app's button: the words of app_signin.browser.
+connect.start_again = コンピューターの tTerm で、もう一度「ブラウザーでサインイン」からやり直してください。
+# Above signing in, after Allow. {app} is app_link.*: tTerm for Mac.
+connect.confirm = {app} を許可するには、本人確認をしてください。
+connect.signin_other = もう一方のアカウントでサインインしてから、{app} を許可してください。
+connect.signin_then = サインインしてから、{app} を許可してください。
+connect.no_connection = 接続がありません
+# {computer} is the name of the computer the app runs on, {email} the account's address.
+connect.asks = <b>{computer}</b> のアプリが、あなたのアカウント（{email}）へのサインインを求めています。
+# Above the code that both this page and the app show.
+connect.check = アプリに同じコードが表示されていることを確認してください
+# The button.
+connect.allow = 許可
+connect.another = ご本人でない場合は、別のアカウントを使う
+# Personal is the name of one's own project: it stays as it is. Settings and Devices are the page and its section, in the words of settings.title and devices.title.
+connect.small = コンピューターは Personal のマシンになります。アプリは「設定」の「デバイス」に表示され、そこで登録を解除できます。
+# While the browser goes back to the app. {app} is app_link.*: tTerm for Mac.
+connect.back = {app} に戻っています…
+connect.takes_over = ここから先は、このコンピューターのアプリが引き継ぎます。
+
+# ------------------------------------------------------------ app_signin: in tTerm for the computer, signing in with the browser (AppSignIn.tsx)
+# The app's first screen, for screen readers.
+app_signin.welcome_label = ようこそ
+app_signin.welcome_title = tTerm へようこそ
+app_signin.welcome_lead = このコンピューターのターミナルはすぐに使えます。アカウントは必要ありません。
+# The button: the app opens the browser, to sign in there.
+app_signin.browser = ブラウザーでサインイン
+# The button: not now, sign in later.
+app_signin.later = あとで
+app_signin.welcome_note = サインインすると、サーバー、プロジェクト、ノート、チームがこのウィンドウに加わります。サインインは、サイドバーの下からいつでもできます。
+app_signin.cancelled = ブラウザーでサインインがキャンセルされました。
+# The title of the window that waits while one signs in in the browser.
+app_signin.link_title = ブラウザーでサインイン
+# {host} is app.tterm.net. The code comes under it.
+app_signin.link_note = tTerm がブラウザーで {host} を開きました。そこでサインインし、ページに求められたらこのコンピューターを許可してください。ページにも同じコードが表示されます：
+app_signin.until_then = それまでのあいだも、このコンピューターはこれまでどおり使えます。
+app_signin.open_again = ページをもう一度開く
+
+# ------------------------------------------------------------ welcome: the first screen, while nothing is connected yet (Welcome.tsx)
+# {name} is the person's first name.
+welcome.title = tTerm へようこそ、{name} さん
+welcome.lead = サーバーとコンピューターのターミナルを、ブラウザーでそのまま。このコンピューターには何もインストールする必要がなく、鍵のコピーもポートの開放も不要です。
+welcome.connect = 最初のマシンを接続
+# The two cards: the kinds of machine to connect.
+welcome.server = サーバー
+welcome.server_note = SSH で接続する VPS やクラウドサーバー。コマンドを 1 つ実行すると、ここに表示されます。
+# Small labels under the cards: Linux, One command; macOS, Linux, No open ports.
+welcome.one_command = コマンド 1 つ
+welcome.computer = コンピューター
+welcome.computer_note = 自宅やオフィスにある Mac や Linux マシン。NAT の内側でも使えます。小さなエージェントが接続を保ちます。
+welcome.no_ports = ポート開放不要
+# The three steps below, for screen readers.
+welcome.how = 使い方
+welcome.step_add = マシンを追加
+welcome.step_add_text = コマンドを 1 つ実行します。コマンドは 1 回限り、10 分間有効です。
+welcome.step_open = ターミナルを開く
+welcome.step_open_text = コマンドはそれぞれブロックになります。コピーも、再実行も、リンクの共有もできます。
+welcome.step_team = チームを招待
+welcome.step_team_text = 役割と共有ログ。誰が見ているかは常に表示されます。
+# {project} is the project's name and {code} its code: P. In {code}/name, name stands for a machine's name, as in P/web-01.
+welcome.footnote = 最初のプロジェクト {project} の準備ができています。コードは {code} で、マシンはタブに {code}/マシン名 と表示されます。
+
+# ------------------------------------------------------------ need_account: New project and Add machine in the app before signing in (NeedAccount.tsx)
+need_account.machine_title = マシンを追加
+need_account.machine_note = サーバーやほかのコンピューターを使うには tTerm のアカウントが必要です。まだお持ちでなければ、サインイン時に作成されます。
+need_account.server = サーバー
+need_account.server_text = SSH で接続する VPS やクラウドサーバー。コマンドを 1 つ実行すると、ここに表示されます。
+need_account.computer = コンピューター
+need_account.computer_text = 自宅やオフィスにある Mac や Linux マシン。NAT の内側でも使えます。
+# What the Free plan gives. {machines} is need_account.plan_machines, {terminals} need_account.plan_terminals.
+need_account.machine_plan = マシンは {machines}まで、同時に開けるターミナルは {terminals}まで。
+# In need_account.machine_plan, after "Up to": in the form the words take there.
+need_account.plan_machines = other: {n} 台
+need_account.plan_terminals = other: {n} 個
+need_account.machine_stays = このコンピューターは、ターミナルも含めてそのままです。
+need_account.project_title = 新規プロジェクト
+need_account.project_note = プロジェクトを増やすには tTerm のアカウントが必要です。まだお持ちでなければ、サインイン時に作成されます。
+need_account.personal = 個人のプロジェクト
+need_account.personal_text = あなた専用です。マシン、ターミナル、ノートはあなただけのものです。
+need_account.shared = 共有プロジェクト
+# A small label on Shared projects: they are not there yet.
+need_account.soon = 近日公開
+need_account.shared_text = チームで使います。招待したメンバーが、マシンでターミナルを開いたり、ノートを編集したりできます。
+need_account.project_plan = 自分専用のプロジェクトを作成でき、それぞれにマシン、ターミナル、ノートを持てます。チームで使う共有プロジェクトは近日公開です。
+# Personal is the name of one's own project: it stays as it is.
+need_account.project_stays = Personal は、このコンピューターとそのターミナル、ノートも含めてそのままです。
+# The button that closes the window.
+need_account.not_now = 今はしない
+
+# ------------------------------------------------------------ updates: tTerm for Mac updating itself, only in the app (Updates.tsx)
+# The title of Restart to update in the top bar. {version} is the new version: 0.5.1.
+updates.pill_title.mac = tTerm {version} の準備ができました。再起動は数秒で終わります。この Mac でターミナルが動いている場合は、tTerm が先に確認します。
+updates.pill_title.computer = tTerm {version} の準備ができました。再起動は数秒で終わります。このコンピューターでターミナルが動いている場合は、tTerm が先に確認します。
+updates.restarting = 再起動中…
+# A button, in the top bar and in Settings: tTerm restarts and the new version goes in.
+updates.restart_to_update = 再起動してアップデート
+# The card above the account in the sidebar, and Settings. {version} is the new version.
+updates.ready = tTerm {version} の準備ができました
+updates.restart_takes = 再起動は数秒で終わります。
+# The card's button.
+updates.restart = 再起動
+# A link to the notes of the new version.
+updates.whats_new = 最新情報
+# Once, after the restart. {version} is the version now: 0.5.1.
+updates.updated = tTerm を {version} にアップデートしました
+# Settings, Updates: the two ways tTerm takes a new version.
+updates.auto = 自動でアップデート
+updates.auto_text.mac = 新しいバージョンは tTerm の終了時にインストールされます。また、tTerm がメニューバーにあってウィンドウが閉じている場合は、この Mac で何も動いていなければすぐにインストールされます。
+updates.auto_text.computer = 新しいバージョンは tTerm の終了時にインストールされます。また、tTerm がメニューバーにあってウィンドウが閉じている場合は、このコンピューターで何も動いていなければすぐにインストールされます。
+updates.ask = 先に確認する
+# "Restart to update" is the button (updates.restart_to_update): the same words.
+updates.ask_text = 新しいバージョンは、「再起動してアップデート」を押すまで待機します。
+# The section of Settings.
+updates.title = アップデート
+updates.about = Mac 版 tTerm は、tTerm のリリースから自動でアップデートされます。インストールされるのは、tTerm が署名したバージョンだけです。
+# For screen readers: the two ways above.
+updates.how = tTerm のアップデート方法
+# Beside Update by itself.
+updates.recommended = 推奨
+updates.checking = 新しいバージョンを確認しています…
+# {version} is the new version.
+updates.downloading = tTerm {version} をダウンロードしています…
+# {version} is the version this app is; {day} is today, yesterday or on 12 Oct (time.today, time.yesterday, time.on_day); {time} is 10:02.
+updates.you_have_downloaded = 現在のバージョンは {version} です。{day} {time} にダウンロードしました。
+updates.you_have = 現在のバージョンは {version} です。
+# {version} is the new version; why it failed comes under it, as tTerm says it.
+updates.failed = {version} にアップデートできませんでした
+# {site} is tterm.net. Applications is the folder of the Mac: as macOS names it in the language.
+updates.download = または、<link>{site}</link> から tTerm をダウンロードして、「アプリケーション」フォルダーにドラッグしてください。
+# A button: tTerm moves itself from the disk image to Applications.
+updates.move = 「アプリケーション」に移動
+# {ago} is when tTerm last looked: just now, 5 min ago, 2 h ago, yesterday, on 12 Oct (time.*).
+updates.looked = tTerm {version} は最新です。最終確認：{ago}。
+updates.this_is = このアプリは tTerm {version} です。
+# A button: look for a new version now.
+updates.check_now = 今すぐ確認
+
+# ------------------------------------------------------------ account: the name, the photo and the plan (Account.tsx)
+# The file chosen for one's photo is none.
+account.not_a_photo = このファイルは tTerm で使える写真ではありません。5 MB までの JPEG、PNG、WebP を選んでください。
+# What the plan allows, after "Up to" (account.up_to): Up to 50 machines and 24 open terminals.
+account.limit_machines = other: マシン {n} 台
+account.limit_terminals = other: 同時に開けるターミナル {n} 個
+# {limits} is one or both of the two above, as a list.
+account.up_to = 上限：{limits}
+account.no_limits = 上限なし
+# A meter of the plan, beside its label (Machines, Open terminals): 3 of 50.
+account.used_of = {used} / {limit}
+account.used_no_limit = {used}（上限なし）
+# The title of Close at the top of Account and Settings.
+account.close_title = 元の画面に戻る
+account.photo_removed = 写真を削除しました。イニシャルの表示に戻ります。
+# For screen readers: the card with one's name and photo.
+account.profile = プロフィール
+account.change_photo = 写真を変更
+account.add_photo = 写真を追加
+account.your_name = お名前
+account.saving = 保存中…
+account.edit_name = 名前を編集
+account.remove_photo = 写真を削除
+# Under the photo's buttons: what the photo is for.
+account.photo_hint = 名前の横に、イニシャルの代わりに表示されます。
+# For screen readers: the file chooser for the photo.
+account.choose_photo = 写真を選択
+# Under one's email address. {email} is support's address.
+account.address_note = このメールアドレスでサインインします。変更するには、<link>{email}</link> までご連絡ください。
+# The section of the plan; its name (Free) stays as it is.
+account.plan = プラン
+account.plan_note = 開発期間中、tTerm は無料です。ほかのプランはここに表示される予定で、何かが変わる前にお知らせします。
+# The labels of the plan's two meters.
+account.machines = マシン
+account.open_terminals = 開いているターミナル
+account.photo_saved = 写真を設定しました。サイドバーの下とそのメニューに表示されます。
+# {email} is support's address.
+account.delete_note = アカウントを削除するには、サインインに使っているメールアドレスから {email} までご連絡ください。
+
+# ------------------------------------------------------------ devices: where one is signed in, in Settings (Devices.tsx)
+# On the sign-in screen, after this very device was forgotten.
+devices.this_forgotten = このデバイスの登録を解除しました。メールのコードでサインインしてください。
+# {device} is a device's label: tTerm for Mac on MacBook-Pro. tTerm there now works with that computer only, as before signing in.
+devices.app_signed_out = {device} からサインアウトしました。そのアプリは、サインイン前と同じく、そのコンピューターだけで使えます。
+# {device} is a device's label: Chrome on macOS.
+devices.forgotten = {device} の登録を解除しました。そちらでは、次回からメールのコードでサインインします。
+# On the sign-in screen.
+devices.all_forgotten = すべてのデバイスの登録を解除しました。今後は、どのデバイスもメールのコードでサインインします。
+devices.about = ここに表示されるのは、クイックコードでサインインするブラウザーと、ブラウザーでサインインしたコンピューターの tTerm です。それ以外の場所では、メールのコードが必要です。
+devices.idle = 8 時間何も操作しないと、tTerm はもう一度クイックコードを求めます。ターミナルは動き続けます。
+devices.none = 記憶されているブラウザーはありません。サインインのたびにメールのコードが必要です。
+# A mark beside the device one uses now.
+devices.this_device = このデバイス
+# Under a device's label. {created} and {used} are how long ago: just now, 3 minutes ago, 2 days ago (time.ago_*).
+devices.app_times = サインイン：{created}、最終使用：{used}
+devices.browser_times = 登録：{created}、最終サインイン：{used}
+# A button beside each device.
+devices.forget = 登録解除
+# The heading, and the red button that does it.
+devices.forget_all = すべてのデバイスの登録を解除
+devices.forget_all_text = すべてのデバイスの登録が解除され、このデバイスを含むすべてのセッションが終了します。その後は、どのブラウザーでもメールのコードが求められます。ターミナルは動き続けます。
+# The button that asks first.
+devices.forget_all_ask = すべてのデバイスの登録を解除…
+
+# ------------------------------------------------------------ this_computer: the computer the app runs on, in Settings (ThisComputer.tsx)
+# How the link to tTerm Web is, under the switch. {name} is the name tTerm Web knows this computer by.
+this_computer.online_terminals = other: tTerm Web で {name} としてオンライン · そこから開いたターミナル {n} 個
+this_computer.online = tTerm Web で {name} としてオンライン
+this_computer.connecting = tTerm Web に接続しています…
+this_computer.waiting = まだ tTerm Web に接続していません。
+this_computer.no_network = ネットワークに接続されていません。tTerm が自動で再試行します。
+# "Turn this on": the switch above.
+this_computer.removed.mac = この Mac は tTerm Web から削除されたため、tTerm Web からは開けません。もう一度追加するには、これをオンにしてください。
+this_computer.removed.computer = このコンピューターは tTerm Web から削除されたため、tTerm Web からは開けません。もう一度追加するには、これをオンにしてください。
+this_computer.closed.mac = 現在、この Mac は tTerm Web から開けない設定です。
+this_computer.closed.computer = 現在、このコンピューターは tTerm Web から開けない設定です。
+# The section's title, on a Mac too.
+this_computer.title = このコンピューター
+# {name} is this computer's machine in tTerm, {project} its project.
+this_computer.about = {project} の {name}。ターミナルはここで動き、インターネットがなくても使えます。
+# The switch.
+this_computer.open = tTerm Web とスマートフォンから開けるようにする
+this_computer.open_text.mac = tTerm がここで動いているあいだ、tTerm Web やスマートフォンからこの Mac のターミナルを開けます。ウィンドウを閉じても tTerm はメニューバーに残り、ログイン時に起動します。オフにすると、tTerm Web ではこの Mac がオフラインになり、ここではすべてこれまでどおりに使えます。
+this_computer.open_text.computer = tTerm がここで動いているあいだ、tTerm Web やスマートフォンからこのコンピューターのターミナルを開けます。ウィンドウを閉じても tTerm はメニューバーに残り、ログイン時に起動します。オフにすると、tTerm Web ではこのコンピューターがオフラインになり、ここではすべてこれまでどおりに使えます。
+# Asked before the switch goes off while terminals opened from tTerm Web run here.
+this_computer.ask_title.mac = この Mac を tTerm Web から開けないようにしますか？
+this_computer.ask_title.computer = このコンピューターを tTerm Web から開けないようにしますか？
+# The red button.
+this_computer.turn_off = オフにする
+this_computer.ask_text.mac = other: tTerm Web からこの Mac で開いたターミナル {n} 個が終了し、tTerm Web ではこの Mac がオフラインになります。
+this_computer.ask_text.computer = other: tTerm Web からこのコンピューターで開いたターミナル {n} 個が終了し、tTerm Web ではこのコンピューターがオフラインになります。
+
+# ------------------------------------------------------------ photo: one's photo, cut to a circle (PhotoDialog.tsx)
+# The photo could not be made here, in the browser.
+photo.browser_failed = ブラウザーで写真を作成できませんでした。
+photo.no_answer = tTerm が応答しませんでした。もう一度お試しください。
+# The dialog's title.
+photo.title = 写真
+# For screen readers: the photo in its frame, which the arrow keys move and + and - zoom.
+photo.frame = 円の中の写真。ドラッグするか矢印キーで動かし、+ と - で拡大・縮小します。
+# The slider that makes the photo bigger in the circle.
+photo.zoom = ズーム
+photo.drag = 写真をドラッグして、円の中の位置を合わせます。
+# Beside the photo in three small sizes.
+photo.preview = ほかの人からの見え方
+photo.note = 5 MB までの JPEG、PNG、WebP。tTerm は 256 ピクセルのコピーを保存し、撮影場所など写真自体に含まれる情報は残しません。
+photo.saving = 保存中…
+photo.save = 写真を保存
+
+# ------------------------------------------------------------ confirm: asking before what cannot be undone (Confirm.tsx)
+confirm.no_answer = tTerm Web が応答しませんでした。
+confirm.copy_failed = コピーできませんでした：コマンドを選択して手動でコピーしてください。
+# After a server is removed. {name} is the server's name.
+confirm.removed = {name} を削除しました
+# The command that takes the access back comes after it.
+confirm.removed_text = tTerm Web の一覧から消え、tTerm Web がログインすることもなくなりました。ただしサーバーが応答しなかったため、サーバー上の tTerm Web のアクセス権は、サーバーで取り消すまで残ります：
+# {user} is the server's user tterm; {command} is the command that removes it and its sudo rule.
+confirm.user_stays = ユーザー {user} とその sudo ルールは、tTerm ボットを使う場合に備えて残ります。これらも削除するには：{command}
+
+# ------------------------------------------------------------ project_dialog: the windows of projects of one's own (ProjectDialog.tsx)
+project_dialog.code_invalid = コードは文字か数字で 1〜4 文字です。
+# When saving or moving failed and tTerm Web gave no reason.
+project_dialog.no_answer = tTerm Web が応答しませんでした。
+project_dialog.edit_title = プロジェクトを編集
+project_dialog.new_title = 新規プロジェクト
+# Under the title, editing a project others are in: its name, code and color.
+project_dialog.edit_sub = これらを変更できるのは、オーナーと管理者です。
+project_dialog.new_sub = プロジェクトには専用のマシンとノートがあり、ほかのプロジェクトとは分かれています。
+# The label of the project's name.
+project_dialog.name = 名前
+# In the empty name field: an example of a project's name.
+project_dialog.name_example = 例：Client X
+# The label of the project's code: the 1 to 4 letters or digits on its badge.
+project_dialog.code = 短縮コード
+project_dialog.code_help_alone = 文字か数字で 1〜4 文字。コードはタブとサイドバーでプロジェクトを示します。
+project_dialog.code_help_shared = 文字か数字で 1〜4 文字。コードはタブとサイドバーでプロジェクトを示し、変更はプロジェクトの全員にすぐ反映されます。
+project_dialog.code_help_new = コードは名前から作られますが、変更もできます：文字か数字で 1〜4 文字。コードはタブとサイドバーでプロジェクトを示します。
+# The label of the project's colors.
+project_dialog.color = 色
+# "Whole project" and "Settings" are named as the choice and the page are (settings.tint_block, settings.title).
+project_dialog.color_help_new = 色はほかのプロジェクトと重ならないように選ばれますが、変更もできます。色はコードバッジに付き、「設定」で「プロジェクト全体」を選ぶと、サイドバーのプロジェクト全体にも付きます。
+project_dialog.color_help_alone = 色はコードバッジに付き、「設定」で「プロジェクト全体」を選ぶと、サイドバーのプロジェクト全体にも付きます。
+project_dialog.color_help_shared = 色はプロジェクトの全員のコードバッジに付きます。「設定」で「プロジェクト全体」を選んだ人には、サイドバーのプロジェクト全体にも付きます。
+# Above how the project will look in the sidebar and on a tab (a noun).
+project_dialog.preview = プレビュー
+# In the preview, in place of the project's name while none is typed.
+project_dialog.preview_name = プロジェクト
+project_dialog.new_next = あなたがオーナーになります。次に、マシンを追加するか、ほかのプロジェクトから移動して、ノートを書きましょう。
+project_dialog.create = プロジェクトを作成
+# The title of the window that moves a machine to another project: {machine} is its name.
+project_dialog.move_title = {machine} を移動
+project_dialog.move_sub = 移動先は、あなたがオーナーのほかのプロジェクトです。
+# Next to each project one may move to: whether others are in it.
+project_dialog.only_you = あなたのみ
+project_dialog.with_others = ほかのメンバーと共有
+# {project} is the project it goes to, {code} that project's code, {name} the machine's name there: CX/web-01.
+project_dialog.move_becomes = {project} では {code}/{name} になります。ターミナルは動き続け、マシン自体には何も変更が加わりません。
+# The same, when its name is taken there: {machine} is its name now, {name} the one it gets (web-01-2).
+project_dialog.move_becomes_taken = {project} では {code}/{name} になります（{machine} という名前はすでに使われています）。ターミナルは動き続け、マシン自体には何も変更が加わりません。
+# The button: {project} is the project's name.
+project_dialog.move_to = {project} に移動
+# The button while there is nothing to pick (a verb).
+project_dialog.move = 移動
+# Next to a folder one may move a note to: it has no notes.
+project_dialog.folder_empty = 空
+# Next to a project without folders: the note goes to a new folder there, named as its own.
+project_dialog.folder_new = 移動先に新しく作成されるフォルダー
+# The title of the window that moves a note to another project: {note} is its title.
+project_dialog.move_note_title = 「{note}」を移動
+project_dialog.move_note_sub = 現在の場所：{project} のフォルダー「{folder}」。別のプロジェクトのフォルダーを選んでください。
+# Who sees the note in the project it goes to.
+project_dialog.note_alone = {project} では、このノートが表示されるのはあなただけです。
+project_dialog.note_shared = {project} の全員がこのノートを閲覧・編集できます。
+# {project} is the project the note leaves.
+project_dialog.note_leaves = {project} のほかのメンバーは、このノートを見られなくなります。{project} のログには、誰がいつ移動したかが残ります。
+# The ticks: the items of a checklist ticked off, each with who ticked it.
+project_dialog.note_keeps = タイトル、本文、履歴はそのまま移り、チェックとそれを入れた人の記録も一緒に移ります。
+# The button: {folder} is the name of the folder made there, the note's own folder's name.
+project_dialog.move_to_new_folder = 新しいフォルダー「{folder}」に移動
+project_dialog.move_to_folder = 「{folder}」に移動
+project_dialog.delete_title = {project} を削除しますか？
+# A project with machines in it cannot be deleted yet: {machine} is its machine's name.
+project_dialog.delete_machine_first = 先にマシンを移動または削除してください：{machine}。
+# {machines} is their names, listed: web-01, web-02 and db.
+project_dialog.delete_machines_first = 先にマシンを移動または削除してください：{machines}。
+# "Move to another project" and "Remove machine" are the items of a machine's ⋯ menu (projectpage.move_machine, projectpage.remove_machine).
+project_dialog.delete_how = プロジェクトのページで、マシンの横の ⋯ から「別のプロジェクトに移動」か「マシンを削除」を選びます。そのあとでプロジェクトを削除できます。
+project_dialog.cant_undo = この操作は元に戻せません。
+# {n} is how many folders the project has; {notes} is project_dialog.delete_notes.
+project_dialog.delete_folders = other: フォルダー {n} 個と、その中の{notes}も一緒に削除されます。
+# How many notes are in those folders, inside project_dialog.delete_folders: 2 folders with 5 notes are deleted with it.
+project_dialog.delete_notes = other: ノート {n} 件
+project_dialog.delete_no_notes = ノートはありません。
+# Above the field the project's name is typed in.
+project_dialog.delete_type = 確認のため「{project}」と入力してください
+# The button.
+project_dialog.delete_button = {project} を削除
+
+# ------------------------------------------------------------ projectpage: a project's page (ProjectPage.tsx)
+# The end of the line under the project's name: 2 machines · 1 terminal open · you are the owner.
+projectpage.role_owner = あなたはオーナーです
+projectpage.role_admin = あなたは管理者です
+projectpage.role_member = あなたはメンバーです
+projectpage.role_observer = あなたは閲覧者です
+# A terminal busy with a command whose line is not known.
+projectpage.command_running = コマンドを実行中
+# {duration} is how long the command has run: less than a minute, 3 minutes, an hour (time.for_*).
+projectpage.running_for = 実行中（{duration}）
+# The same, while it is not known how long.
+projectpage.running = 実行中
+# A terminal whose machine is away: {machine} is its name.
+projectpage.waits_for = {machine} の復帰待ち
+# Under a terminal's name being typed. Enter and Esc are the keys.
+projectpage.rename_hint = Enter で保存、Esc でキャンセル。
+# On a terminal's name.
+projectpage.double_click = ダブルクリックして名前を変更
+# The button next to a terminal: go to it (a verb).
+projectpage.open = 開く
+# An offline computer's state, next to its name: {ago} is how long ago (time.ago_*): Last seen 14 minutes ago.
+projectpage.last_seen = 最終接続：{ago}
+# A computer's state, next to its name.
+projectpage.offline = オフライン
+projectpage.online = オンライン
+# On New terminal: {machine} is the machine's name.
+projectpage.offline_title = {machine} はオフラインです。スリープ中か、エージェントが動いていません
+projectpage.new_terminal_title = {machine} で新しいターミナルを開く
+# Said when New terminal is pressed on an offline computer: {seen} is time.last_seen: last seen 14 minutes ago.
+projectpage.offline_wait_seen = {machine} はオフラインです（{seen}）。エージェントが接続すると戻ります。
+projectpage.offline_wait = {machine} はオフラインです。エージェントが接続すると戻ります。
+projectpage.new_terminal = 新規ターミナル
+# The ⋯ button next to a machine, for screen readers: {machine} is its name.
+projectpage.machine_menu = {machine}：マシンのメニュー
+# The tip on that button: the items of its menu (projectpage.move_machine, projectpage.remove_machine).
+projectpage.machine_menu_title = 別のプロジェクトに移動、マシンを削除
+# An item of a machine's menu, and the tip on its ⋯ button when it is the only item.
+projectpage.remove_machine = マシンを削除
+# An item of a machine's menu.
+projectpage.move_machine = 別のプロジェクトに移動
+projectpage.no_terminals = 開いているターミナルはありません
+# Who changed a note last, and when: {ago} is just now, 5 min ago, yesterday, on 12 Oct (time.*).
+projectpage.edited_you = あなた、{ago}
+# The same, someone else: {name} is their first name.
+projectpage.edited_by = {name}、{ago}
+# A note's author when it is oneself, in the note's menu: You, the owner and admins can delete it.
+projectpage.you = あなた
+# A checklist's progress, in place of its first line: {n} items ticked of {total}.
+projectpage.done = other: {total} 件中 {n} 件完了
+# A note without text yet, in place of its first line.
+projectpage.note_empty = 空
+# The ⋯ button next to a note, for screen readers: {note} is its title.
+projectpage.note_menu = {note}：ノートのメニュー
+# The tip on that button: what its menu has.
+projectpage.note_menu_title_move = フォルダー、別のプロジェクトに移動、Markdown としてコピー、ノートを削除
+projectpage.note_menu_title = フォルダー、Markdown としてコピー、ノートを削除
+# The end of the line under the project's name when nobody else is in it: 1 machine · 2 terminals open · only you.
+projectpage.only_you = あなたのみ
+# The tip on the project's code, next to its name.
+projectpage.short_code = 短縮コード
+# The pencil next to the project's name.
+projectpage.edit = 名前、コード、色を編集
+# A heading.
+projectpage.machines = マシン
+# Next to the heading Machines.
+projectpage.machines_alone = ターミナルを開けるのはあなただけです
+projectpage.machines_shared = 表示されるのはあなたのターミナルです
+projectpage.add_machine = マシンを追加
+# The two kinds of machine one can add, in a project without machines.
+projectpage.server = サーバー
+projectpage.server_text = SSH で接続する VPS やクラウドサーバー。コマンドを 1 つ実行すると、ここに表示されます。
+projectpage.computer = コンピューター
+projectpage.computer_text = 自宅やオフィスにある Mac や Linux マシン。NAT の内側でも使えます。小さなエージェントが接続を保ちます。
+# "Move to another project" is the item of a machine's ⋯ menu (projectpage.move_machine).
+projectpage.move_hint = そのマシンはすでに別のプロジェクトにありますか？そのプロジェクトのページで、マシンの横の ⋯ から「別のプロジェクトに移動」を選びます。
+# On the page of Personal, the project each person has for themselves: {project} is its name.
+projectpage.personal_title = {project} はあなた専用です
+projectpage.personal_text = ここには誰も招待できません。ほかのマシンを分けておきたいときや、あとでほかの人と作業するときは、プロジェクトを作成してマシンを移動します。
+projectpage.new_project = 新規プロジェクト
+# A heading.
+projectpage.notes = ノート
+# Next to the heading Notes.
+projectpage.notes_alone = {project} のノートを見られるのはあなただけです。フォルダーで整理できます
+projectpage.notes_shared = {project} の全員がノートを閲覧・編集できます。フォルダーで整理できます
+projectpage.new_folder = 新規フォルダー
+projectpage.no_notes = ノートはまだありません
+# Runbooks, Access, Checklists: examples of folders' names.
+projectpage.no_notes_text = ターミナルがマシン上にあるように、ノートはフォルダーの中にあります。まずは 1 つ作ってみましょう。例：手順書、アクセス情報、チェックリスト。
+# A folder without notes, next to its name.
+projectpage.folder_empty = 空
+# Who made a folder: {name} is their first name.
+projectpage.made_by_you = 作成者：あなた
+projectpage.made_by = 作成者：{name}
+projectpage.new_note = 新規ノート
+# The ⋯ button next to a folder, for screen readers: {folder} is its name.
+projectpage.folder_menu = {folder}：フォルダーのメニュー
+# The tip on that button: what its menu has.
+projectpage.folder_menu_title = フォルダー名を変更、フォルダーを削除
+# "New note" is the button next to the folder's name (projectpage.new_note).
+projectpage.folder_no_notes_writes = ノートはまだありません。「新規ノート」で最初のノートをここに作成できます
+# A heading at the end of the page: {project} is the project's name.
+projectpage.delete_title = {project} を削除
+projectpage.delete_text = フォルダーとノートも一緒に削除されます。マシンは、先に別のプロジェクトへ移動するか削除してください。
+projectpage.delete_project = プロジェクトを削除
+
+# ------------------------------------------------------------ machines: the machines page (Machines.tsx)
+# What sudo does on the machine, after "sudo" in what tTerm Web learned about it.
+machines.sudo_works = 使用可
+machines.sudo_password = パスワードが必要
+machines.sudo_missing = 利用不可
+# What tTerm Web learned about a machine when it connected: the labels, each with its value.
+machines.system = システム
+machines.kernel = カーネル
+machines.cpu = CPU
+machines.cores = other: {n} コア
+machines.memory = メモリ
+machines.disk = ディスク
+# {free} and {total} are sizes: 7.8 GB free of 50 GB.
+machines.disk_free = {total} 中 {free} が空き
+# The package manager: apt, brew.
+machines.packages = パッケージ
+machines.shell = シェル
+# {shell} is the shell its terminals start, {shells} all the shells it has: zsh (has bash, zsh).
+machines.shell_has = {shell}（利用可能：{shells}）
+machines.commands = コマンド
+# How many commands tTerm Web knows there.
+machines.commands_known = other: {n} 個を認識
+# The version of the agent, or of tTerm for the computer.
+machines.agent = エージェント
+# The account on the machine the terminals run as: root, deploy.
+machines.account = ユーザー
+# A computer's state on its card: {seen} is time.last_seen: offline, last seen 14 minutes ago.
+machines.offline_seen = オフライン（{seen}）
+machines.offline = オフライン
+machines.online = オンライン
+machines.offline_note = コンピューターがスリープ中かオフラインであるか、エージェントが動いていません。エージェントが接続できるようになると自動で戻り、このページには 10 秒以内に反映されます。
+# On Open a terminal while the computer is offline.
+machines.offline_title = オフラインです。スリープ中か、エージェントが動いていません
+machines.open_terminal = ターミナルを開く
+# A terminal running on the machine: {label} is as its tab shows it (P/web-01 · 2).
+machines.back_to = {label} に戻る（実行中）
+# The tip on Remove: {machine} is the machine's name.
+machines.remove_title = {machine} を tTerm Web から削除
+# The button: take the machine out (a verb).
+machines.remove = 削除
+# The page's heading.
+machines.title = マシン
+machines.add = マシンを追加
+machines.lead = タブを閉じてもターミナルは動き続け、シェルが終了するまで、こことサイドバーで待っています。
+# A size: {size} is a number as the language writes it, 16 or 7.5.
+machines.gb = {size} GB
+
+# ------------------------------------------------------------ note_view: a note in its tab (NoteView.tsx)
+# Said for a moment at the bottom of the page. {why} is the reason tTerm
+# Web gave, as it gave it.
+note_view.not_saved = 保存されませんでした：{why}
+note_view.draft_back = このノートに入力して保存されていなかった内容を復元しました。
+# When tTerm Web gives no reason.
+note_view.no_answer = tTerm Web が応答しませんでした。
+# Ticking a checklist item did not get through.
+note_view.no_tick = チェックできませんでした：{why}
+# The note's tab was closed with what was typed in it not saved. {title} is
+# the note's title, or note.untitled.
+note_view.kept_draft = 「{title}」：入力した内容はまだ保存されていません。このブラウザーに保管され、次にノートを開いたときに戻ります。
+note_view.copied_markdown = Markdown としてコピーしました。
+note_view.no_copy = コピーできませんでした：ブラウザーが許可しませんでした。
+note_view.no_move = 移動できませんでした：{why}
+# Under the note's title, the parts of one line with dots between: who
+# started it and when; or who edited it last and when · who wrote it and
+# on which day; then who sees it. Someone is a person no longer known.
+# {name} is a person's first name; {ago} is how long ago, short: just now,
+# 5 min ago, yesterday, on 12 Oct; {folder} is a folder's name.
+note_view.someone_started = {ago}、不明なユーザーが「{folder}」に作成
+note_view.you_started = {ago}、あなたが「{folder}」に作成
+note_view.started = {ago}、{name} が「{folder}」に作成
+note_view.someone_edited = {ago}、不明なユーザーが編集
+note_view.you_edited = {ago}、あなたが編集
+note_view.edited = {ago}、{name} が編集
+# {day} is today, yesterday or on 12 Oct.
+note_view.someone_wrote = {day}、不明なユーザーが作成
+note_view.you_wrote = {day}、あなたが作成
+note_view.wrote = {day}、{name} が作成
+# The end of the same line, after a dot. {project} is a project's name.
+note_view.only_you = あなただけが閲覧可能
+note_view.everyone_edits = {project} の全員が編集可能
+# The note was deleted while it was open here.
+note_view.gone_title = このノートは削除されています
+note_view.gone_text = このノートか、ノートがあったフォルダーが、別のタブかデバイスで削除されました。
+note_view.close_tab = タブを閉じる
+note_view.copy_what_was_here = ここにあった内容を Markdown としてコピー
+note_view.no_open = ノートを開けませんでした：{why}
+# The ⋯ beside where the note is: what screen readers say, and the tip
+# under the mouse, which lists what is in its menu.
+note_view.menu = ノートのメニュー
+note_view.menu_title_move = フォルダー、別のプロジェクトに移動、Markdown としてコピー、ノートを削除
+note_view.menu_title = フォルダー、Markdown としてコピー、ノートを削除
+# The field of the note's title, for screen readers.
+note_view.title = タイトル
+# The note was saved meanwhile from elsewhere, changed in the same places.
+note_view.conflict = 入力中に、ほかの場所でこのノートの同じ箇所が変更されました。その箇所は、自分の内容ともう一方の内容のどちらを残しますか？ほかの部分は、両方の変更が残ります。
+note_view.keep_mine = 自分の内容を残す
+note_view.keep_theirs = もう一方の内容を残す
+
+# ------------------------------------------------------------ note_editor: a note's blocks, written in place (NoteEditor.tsx)
+# The kinds of block: what screen readers say of one, and what an empty one
+# shows. Heading, Code, Divider and Text are also in the list that / opens.
+note_editor.text = テキスト
+note_editor.heading = 見出し
+note_editor.list_item = リスト項目
+note_editor.checklist_item = チェックリスト項目
+note_editor.code = コード
+note_editor.divider = 区切り線
+# In the list that / opens: what a block can become. What is typed after
+# the / picks from these names.
+note_editor.checklist = チェックリスト
+note_editor.list = リスト
+# Who ticked a checklist item, beside it: You · 10:02, Denis · 12 Oct.
+note_editor.you = あなた
+# The same, for a person no longer known.
+note_editor.someone = 不明なユーザー
+# What an empty note shows. The marks # - [ ] ``` and / are typed as they
+# are; the words after them are the language's own.
+note_editor.start_writing = 書き始めましょう。Markdown は入力するそばから反映されます：# 見出し、- [ ] チェックリスト、``` コード。そのほかは / を入力します。
+# What an empty line of text shows.
+note_editor.type_slash = / を入力して、チェックリスト、見出し、コードなどを追加
+# A checklist item's box, for screen readers.
+note_editor.untick = 完了：チェックを外す
+note_editor.tick = 完了としてチェック
+note_editor.no_copy = コピーできませんでした：テキストを選択して手動でコピーしてください。
+# The list that / opens, for screen readers.
+note_editor.turn_into = ブロックの種類を変更
+
+# ------------------------------------------------------------ menus: the menus behind ⋯, and the window that names a folder (Menus.tsx)
+# A note's menu: over the project's folders, the one the note is in
+# checked; a click moves it to another.
+menus.folder = フォルダー
+menus.move_out = 別のプロジェクトに移動…
+menus.copy_markdown = Markdown としてコピー
+menus.delete_note = ノートを削除
+# Instead of Delete note, for one who may not: who may. {name} is the first
+# name of the note's author.
+menus.note_rights_move = このノートを別のプロジェクトに移動または削除できるのは、{name}、オーナー、管理者です
+menus.note_rights_delete = このノートを削除できるのは、{name}、オーナー、管理者です
+# The same, when the note's author is no longer known.
+menus.note_rights_move_someone = このノートを別のプロジェクトに移動または削除できるのは、作成者、オーナー、管理者です
+menus.note_rights_delete_someone = このノートを削除できるのは、作成者、オーナー、管理者です
+# A folder's menu.
+menus.rename_folder = フォルダー名を変更
+menus.delete_folder = フォルダーを削除
+# Instead of Delete folder, for one who may not.
+menus.folder_rights = ノートが入っているフォルダーを削除できるのは、オーナーと管理者です
+# The window that names a folder, a new one or one renamed. First what it
+# says when tTerm Web gives no reason.
+menus.no_answer = tTerm Web が応答しませんでした。
+# The field of the folder's name, and an example of one in it.
+menus.name = 名前
+menus.name_example = 例：手順書
+
+# ------------------------------------------------------------ search: search over everything, by ⌘K or Search on the right of the tabs (Search.tsx)
+# The kinds of what is found: the buttons above the list, and the heads of
+# its groups.
+search.kind_commands = コマンド
+search.kind_output = 出力
+search.kind_notes = ノート
+search.kind_terminals = ターミナル
+search.kind_machines = マシン
+search.kind_projects = プロジェクト
+search.kind_actions = アクション
+# The kind of the line chosen, on top of the preview beside the list.
+search.label_command = コマンド
+search.label_output = 出力
+search.label_note = ノート
+search.label_terminal = ターミナル
+search.label_machine = マシン
+search.label_project = プロジェクト
+search.label_action = アクション
+# Nothing found. {text} is what was typed; Commands, Output… are the button
+# chosen above the list (search.kind_*).
+search.nothing_for = 「{text}」に一致するものはありません。
+search.nothing_in_commands = 「{text}」に一致するコマンドはありません。
+search.nothing_in_output = 「{text}」に一致する出力はありません。
+search.nothing_in_notes = 「{text}」に一致するノートはありません。
+search.nothing_in_terminals = 「{text}」に一致するターミナルはありません。
+search.nothing_in_machines = 「{text}」に一致するマシンはありません。
+search.nothing_in_projects = 「{text}」に一致するプロジェクトはありません。
+search.nothing_in_actions = 「{text}」に一致するアクションはありません。
+# How a command found ended: stopped (it has no exit code), or exit 1.
+# {code} is its exit code.
+search.stopped = 停止
+search.exit = 終了コード {code}
+# How often it ran, at the end of the line under a command:
+# P/web-01 · ~/app · main · exit 0 · 10:46 · 3 runs.
+search.runs = other: {n} 回実行
+# Under a line of output found: the command that printed it, in npm test.
+search.in_command = {command} の出力
+# Beside the list: what the line chosen is, a row each.
+search.row_machine = マシン
+# {machine} is the project's code and the machine's name: P/web-01.
+search.machine_removed = {machine}（tTerm から削除済み）
+search.row_folder = ディレクトリ
+search.row_branch = ブランチ
+search.row_status = 状態
+search.row_when = 日時
+search.row_terminal = ターミナル
+# {terminal} is the terminal as its tab names it, P/web-01 · deploy; {when}
+# is when it ended: 10:46, yesterday 17:38, 2 Oct 09:12.
+search.terminal_ended = {terminal}、{when} に終了
+# The buttons under the preview: the command opened at its block, or put
+# into the line of the terminal in front, not run.
+search.open_in_terminal = ターミナルで開く
+search.into_line = 入力行に入れる
+# A note found: where it is (its project and folder), when it was edited.
+search.row_in = 場所
+search.row_edited = 最終編集
+search.open_note = ノートを開く
+# Before anything is typed: what was open last, and the commands run most
+# on the machine in front; {machine} is its name.
+search.recent = 最近開いたもの
+search.yours_on = {machine} でのあなたのコマンド
+# Beside a group's head in All: all of its kind; + when there are more
+# than were sent.
+search.all = other: すべて {n} 件
+search.all_more = other: すべて {n} 件以上
+# The window, and its field.
+search.label = 検索
+search.placeholder = コマンド、出力、ノート、ターミナル、マシン…
+search.close_title = 閉じる（Esc）
+# The buttons above the list; All is the first of them.
+search.filters = 検索対象
+search.kind_all = すべて
+# The list of what was found, for screen readers.
+search.found = 検索結果
+search.nothing_typed = まだ何も入力されていません。最近開いたものと、ここでよく実行するコマンドを表示しています。
+search.looks_in = あなたのすべてのターミナルの、すべてのコマンドとその出力、ノート、ターミナル、マシン、プロジェクトを検索します。
+search.everything = すべてを検索
+# With Output, Notes or Commands chosen and nothing typed yet.
+search.type_output = コマンドの出力から探す語句を入力してください。
+search.type_notes = ノートから探す語句を入力してください。
+search.type_commands = コマンドから探す語句を入力してください。
+# Beside the list while nothing is chosen: what to type (c: nginx,
+# o: timed out…), and what each keeps to.
+search.tips = 先頭に付けると、種類を絞り込めます
+search.tip_commands = コマンド
+search.tip_output = コマンドの出力
+search.tip_notes = ノート
+search.tip_terminals = ターミナル
+search.tip_machines = マシン
+search.tip_projects = プロジェクト
+search.tip_actions = 実行できる操作
+# Tab is the key.
+search.tips_buttons = または、リストの上のボタンから選びます。Tab で次のボタンに移ります。
+# At the bottom: a key, and what it does (move, open: verbs). {keys} is
+# ⌘ Enter or Ctrl+Enter.
+search.keys_move = <kbd>↑</kbd><kbd>↓</kbd> 移動
+search.keys_open = <kbd>Enter</kbd> 開く
+search.keys_paste = <kbd>{keys}</kbd> 入力行に入れる
+search.keys_next = <kbd>Tab</kbd> 次の種類
+# The words in front, and what each keeps to. c:, o:, n:, >, t:, m: and p:
+# are typed as they are: keep them.
+search.prefixes_title = t: ターミナル、m: マシン、p: プロジェクト
+search.prefix_commands = <code>c:</code> コマンド
+search.prefix_output = <code>o:</code> 出力
+search.prefix_notes = <code>n:</code> ノート
+search.prefix_actions = <code>></code> アクション
+
+# ------------------------------------------------------------ input: tTerm's own input line, under a terminal's feed (InputLine.tsx)
+# Said for a moment at the bottom of the page.
+input.still_running = コマンドがまだ実行中です。終わるまで待つか、ブロック内で Ctrl+C を押して停止してください。
+# Faint, after a name in the lists over the line: .. goes up a level; the
+# branch checked out now; a branch of the remote.
+input.up_level = 1 つ上の階層
+input.branch_current = 現在
+input.branch_remote = リモート
+# {error} is what went wrong, as the browser or tTerm Web said it.
+input.no_answer = マシンが応答しませんでした：{error}
+# Faint in the line while it cannot take a command.
+input.starting = シェルを起動しています…
+input.keys_go = キー入力は実行中のコマンドに送られます。次のコマンドを入力するには、ここをクリックします。
+# The directory and the branch above the line are buttons: each opens a
+# list, to cd into or to switch to. Ctrl+R lists the history.
+input.change_dir = ディレクトリを変更
+input.switch_branch = ブランチを切り替え
+input.history = 履歴
+# The search field over those lists.
+input.find_dir = ディレクトリを検索、またはパスを入力
+input.find_branch = ブランチを検索
+input.find_command = コマンドを検索
+# Tab's list of what the word could be.
+input.completions = 補完候補
+input.more_not_shown = ほかにも候補があります：もう数文字入力してください
+# The line itself, for screen readers.
+input.command = コマンド
+# Under the line, while it holds a command search put there.
+input.from_search = 検索から入力（未実行）
+input.enter_runs = <kbd>Enter</kbd> ここで実行
+input.esc_clears = <kbd>Esc</kbd> 入力行をクリア
+# Under the line: a key, and what it does. ⇧↵ is Shift+Enter.
+input.tab_complete = <kbd>Tab</kbd> 補完、または候補を確定
+input.history_local = <kbd>↑</kbd> このコンピューターの履歴
+input.history_devices = <kbd>↑</kbd> 全デバイス共通の履歴
+input.new_line = <kbd>⇧↵</kbd> 改行
+input.while_running = コマンドの実行中は、入力した内容がそのコマンドに送られます
+# A terminal's two modes, beside the line: Line, with this line and the
+# commands as blocks; Classic, every key straight to the shell.
+input.mode = 入力モード
+input.mode_line = 入力行
+input.mode_classic = クラシック
+
+# ------------------------------------------------------------ block: one command of the feed, with its output (BlockView.tsx)
+# The block, for screen readers. {command} is the command as typed, {code}
+# its exit code.
+block.state_input = {command}、シェルでまだ開始されていません
+block.state_running = {command}、実行中
+block.state_failed = {command}、終了コード {code} で失敗
+block.state_finished = {command}、完了
+block.state_ended = {command}、終了
+# On a block search opened: the words found are marked in it.
+block.found = 検索結果
+# A command the shell has not started; Stop is the button (block.stop).
+block.not_started_title = シェルが続きを待っているか（閉じていない引用符やヒアドキュメント）、コマンドを受け付けませんでした。ブロックに入力するか、「停止」を押してください。
+block.not_started = 未開始
+block.running = 実行中
+# A command that failed: exit 1.
+block.exit = 終了コード {code}
+block.stop_title = コマンドを停止（Ctrl+C）
+# The button that stops the command running: a verb.
+block.stop = 停止
+# The buttons of a finished block, with their tips.
+block.actions = ブロックの操作
+block.copy_block = コマンドと出力をコピー
+block.copy_output = 出力をコピー
+block.copy_output_title = 出力のみコピー
+block.run_again = 再実行
+block.copy_link = このブロックへのリンクをコピー
+block.expand = ブロックを展開
+block.collapse = ブロックを折りたたむ
+# For screen readers: the browser did not let the page copy.
+block.not_copied = コピーされませんでした
+# A folded block, in its place; a click unfolds it.
+block.lines_hidden = other: {n} 行が非表示
+# Above a long output, of which the last 400 lines show.
+block.show_earlier = other: 前の {n} 行を表示
+block.show_whole = 出力全体を表示
+
+# ------------------------------------------------------------ feed: a terminal's commands as blocks, in the Line mode (FeedTerminal.tsx)
+# Said for a moment at the bottom of the page.
+feed.not_connected = 現在 tTerm Web に接続していません：コマンドは送信されませんでした。
+feed.still_running = コマンドがまだ実行中です。Ctrl+C で停止できます。
+feed.copy_refused = ブラウザーがコピーを許可しませんでした。
+feed.output_gone = 出力全体はもう残っていません。
+feed.show_earlier = 前のコマンドを表示
+# After clear or Ctrl+L, on top: what came before is out of view; a click
+# shows it again.
+feed.cleared = other: ブロック {n} 個を画面から消去しました：表示する
+feed.empty = 下にコマンドを入力してください。コマンドはそれぞれここでブロックになり、出力、所要時間、終了状態が表示されます。
+# Asked before a dangerous command runs. {what} is what it would do and
+# {lost} what does not come back, as tTerm Web says them: delete a
+# directory and everything inside it; There is no undo and no bin to look
+# in. {machine} is the machine's name; the second is for while it is not
+# known.
+feed.confirm_label = このコマンドを実行しますか？
+feed.confirm = このコマンドを実行すると、<strong>{machine}</strong> で次の操作が行われます：<strong>{what}</strong>。{lost}
+feed.confirm_unknown = このコマンドを実行すると、<strong>そのマシン</strong>で次の操作が行われます：<strong>{what}</strong>。{lost}
+# What a command held back would do ({what} of feed.confirm, so in the form
+# that fits there) and what does not come back ({lost}): the nine of the
+# core and the app (danger.ts).
+danger.delete_tree = ディレクトリとその中身をすべて削除
+danger.delete_tree_lost = 元に戻す方法はなく、ゴミ箱にも残りません。
+danger.disk = ディスクのファイルシステムを上書き
+danger.disk_lost = ファイルだけでなく、そのディスク上のすべてが失われます。
+danger.device = デバイスに直接書き込み
+danger.device_lost = 実行が始まった瞬間に、デバイス上にあったものはすべて失われます。
+danger.database = データベースまたはテーブルを削除
+danger.database_lost = バックアップからしか復元できません。
+danger.power_off = マシンをシャットダウン
+danger.power_off_lost = ここからは電源を入れ直せません。プロバイダーの管理画面での操作が必要です。
+danger.reboot = マシンを再起動
+danger.reboot_lost = セッションが切れ、実行中のものも一緒に停止します。
+danger.ssh = SSH サービスを停止
+danger.ssh_lost = SSH はマシンへの入り口です。止めると、内側から鍵をかけたのと同じで、外からは入れなくなります。
+danger.firewall = ファイアウォールを変更
+danger.firewall_lost = ルールを誤ると、マシンへの接続が断たれ、入り直せなくなることがあります。
+danger.user = ユーザーアカウントを削除
+danger.user_lost = そのユーザーのファイルとアクセス権も一緒に失われます。
+# Under it, for rm -rf aimed at / or ~.
+feed.everything = <strong>このコマンドはマシン全体を対象にしています。</strong>マシン上のものは何も残りません。
+feed.run_it = 実行する
+
+# ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
+# A terminal's tab while its own name is not known yet.
+terminal_view.terminal = ターミナル
+# The tip of Line (input.mode_line) when it cannot be chosen.
+terminal_view.no_blocks = このシェルはコマンドの開始位置を示さないため、クラシックモードでのみ動作します。
+terminal_view.end_failed = ターミナルを終了できませんでした：tTerm Web が応答しませんでした。
+# Under a terminal in the Classic mode (input.mode_classic). Tab is the key.
+terminal_view.classic_hint = クラシック：すべてのキーがそのままシェルに送られ、Tab と履歴もシェル自身のものが使われます。
+terminal_view.classic_warning = このモードでは、危険なコマンドの実行前に確認が行われません。
+# {machine} is the machine's name; the second is for while it is not known.
+terminal_view.connecting = {machine} に接続しています…
+terminal_view.connecting_unknown = マシンに接続しています…
+# A terminal whose computer sleeps, or is offline. {since} is how long:
+# 3 minutes, an hour (time.for_*).
+terminal_view.away = {machine} はスリープ中かオフラインです
+terminal_view.away_since = このターミナルはマシンの復帰を待っていて、戻ると中断したところから続きます。オフラインの時間：{since}。
+terminal_view.away_text = このターミナルはマシンの復帰を待っていて、戻ると中断したところから続きます。
+terminal_view.end = このターミナルを終了
+# A terminal that ended. Under it, how it ended as tTerm Web says it, or
+# not_running.
+terminal_view.no_such = ターミナルが見つかりません
+terminal_view.ended = このターミナルは終了しました
+terminal_view.not_running = もう実行されていません。
+terminal_view.open_new = {machine} で新しいターミナルを開く
+terminal_view.close_tab = タブを閉じる
+
+# ------------------------------------------------------------ classic: the Classic mode, every key straight to the shell (ClassicTerminal.tsx)
+# A command search put here. Line is the mode (input.mode_line).
+classic.several_lines = このコマンドは複数行あり、クラシックモードでは入力された行から順に実行されてしまいます。ターミナルの下で「入力行」に切り替えてください。
+
+# ------------------------------------------------------------ tabs: the line of tabs on top (TabBar.tsx)
+# The tabs that are open, for screen readers.
+tabs.label = 開いているタブ
+# Naming a terminal in its tab, after a double click.
+tabs.rename_title = このターミナルに名前を付ける
+tabs.rename_hint = Enter で保存、Esc でキャンセル。名前はサイドバー、タブ、プロジェクトのページに表示されます。
+# {name} is the tab as it reads: P/web-01 · 2, a note's title, a project's
+# name.
+tabs.close = {name} のタブを閉じる
+# The + after the tabs.
+tabs.new_terminal = 新規ターミナル
+tabs.new_terminal_title = 任意のマシンで新しいターミナルを開く
+# The button on the right that opens search.
+tabs.search_title = コマンドとその出力、ノート、ターミナル、マシン、実行できる操作を検索
+tabs.search = 検索
+
+# ------------------------------------------------------------ finder: a list with a search field, as the + after the tabs opens it (Finder.tsx)
+finder.nothing = 見つかりませんでした
+
+# ------------------------------------------------------------ picker: the lists over the input line: directories, branches, history (Picker.tsx)
+# While the machine is asked for its directories or branches.
+picker.asking = マシンに問い合わせています…
+picker.nothing = ここには何もありません
+
+# ------------------------------------------------------------ name_input: the field that names a terminal (NameInput.tsx)
+# For screen readers. While the terminal has only its number,
+# terminal.numbered shows faint in it.
+name_input.label = ターミナル名

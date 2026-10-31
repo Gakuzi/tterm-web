@@ -1,0 +1,1355 @@
+var e=`# Strings of tTerm Web's page in English: one a line, \`key = text\`.
+# Every language has the same keys; the build stops when one is missing
+# (scripts/strings.mjs). {name} is a value the page puts in; a counting
+# string has a form for each plural of the language, "one: … | other: …",
+# and {n} is the count; <b>…</b> wraps a part the page makes a link, bold
+# or code. Names of machines, projects, notes and terminals, commands and
+# their output, tTerm, tTerm Web and Free are not translated.
+
+# ------------------------------------------------------------ common: words used in many places
+common.close = Chiudi
+common.cancel = Annulla
+common.save = Salva
+common.loading = Caricamento…
+common.try_again = Riprova
+common.copy = Copia
+common.copied = Copiato
+common.back = Indietro
+common.done = Fine
+common.more = Altro
+common.sign_in = Accedi
+
+# ------------------------------------------------------------ time: how long ago (time.ts)
+# A duration after "for": Away for 3 minutes, running for an hour.
+time.for_less = meno di un minuto
+time.for_minutes = one: un minuto | other: {n} minuti
+time.for_hours = one: un'ora | other: {n} ore
+time.for_days = one: un giorno | other: {n} giorni
+# How long ago, in full words: Signed in 3 minutes ago.
+time.ago_now = poco fa
+time.ago_minutes = one: un minuto fa | other: {n} minuti fa
+time.ago_hours = one: un'ora fa | other: {n} ore fa
+time.ago_days = one: un giorno fa | other: {n} giorni fa
+# A machine that is offline: {ago} is one of the four above.
+time.last_seen = ultima connessione {ago}
+# How long ago, short, in lists of notes and in Updates: Looked 5 min ago.
+time.short_minutes = one: {n} min fa | other: {n} min fa
+time.short_hours = one: {n} h fa | other: {n} h fa
+time.yesterday = ieri
+time.today = oggi
+time.days_ago = one: {n} giorno fa | other: {n} giorni fa
+time.last_week = la settimana scorsa
+time.weeks_ago = one: {n} settimana fa | other: {n} settimane fa
+# {day} is a date as the language writes it: 12 Oct, 12. Okt.
+time.on_day = {day}
+# In search: yesterday 17:38, 2 Oct 09:12.
+time.yesterday_at = ieri alle {time}
+time.day_at = {day} alle {time}
+
+# ------------------------------------------------------------ here: the computer tTerm for Mac runs on
+# Alone, as a label (the sidebar, tabs). Sentences that name it have a
+# string of their own for each: .mac and .computer.
+here.mac = questo Mac
+here.computer = questo computer
+
+# ------------------------------------------------------------ role: one's role in a project
+role.owner = Proprietario
+role.admin = Amministratore
+role.member = Membro
+role.observer = Osservatore
+
+# ------------------------------------------------------------ color: projects' colors (colors.ts)
+color.violet = Viola
+color.sky = Azzurro
+color.teal = Verde acqua
+color.pink = Rosa
+color.orange = Arancione
+color.lime = Lime
+color.indigo = Indaco
+color.slate = Ardesia
+
+# ------------------------------------------------------------ count: how many, in lists and lines
+count.machines = one: {n} macchina | other: {n} macchine
+count.notes = one: {n} nota | other: {n} note
+count.terminals_open = one: {n} terminale aperto | other: {n} terminali aperti
+# The end of a list cut short: web-01, web-02, web-03, web-04 and 3 more.
+count.more = one: {n} altra | other: altre {n}
+
+# A terminal that has only its number, in lists: terminal 2.
+terminal.numbered = terminale {number}
+# A note without a title.
+note.untitled = Senza titolo
+
+# ------------------------------------------------------------ sidebar (Sidebar.tsx)
+sidebar.label = Barra laterale
+sidebar.all_machines = Tutte le macchine
+sidebar.keep_open = Tieni aperta la barra laterale
+sidebar.keep_open_title = Tieni sempre aperta la barra laterale
+sidebar.let_slide = Lascia che la barra laterale si nasconda
+sidebar.close = Chiudi la barra laterale
+sidebar.projects = Progetti
+sidebar.fold = Comprimi {name}
+sidebar.unfold = Espandi {name}
+sidebar.open_project = Apri {name}: le sue macchine e note
+sidebar.machines = Macchine
+sidebar.add_machine = Aggiungi macchina
+sidebar.no_machines = Ancora nessuna macchina
+sidebar.notes = Note
+sidebar.new_folder = Nuova cartella
+sidebar.no_notes = Ancora nessuna nota
+sidebar.no_notes_writes = Ancora nessuna nota. + crea una cartella per le note
+sidebar.new_project = Nuovo progetto
+sidebar.waits = {name} ricompare quando torna la connessione a tTerm
+sidebar.offline = {name} è offline: in sospensione, o il suo agente non è in esecuzione
+# {seen} is time.last_seen: last seen 14 minutes ago.
+sidebar.offline_seen = {name} è offline: in sospensione, o il suo agente non è in esecuzione ({seen})
+sidebar.here.mac = {name}, questo Mac: i suoi terminali girano qui, anche senza internet
+sidebar.here.computer = {name}, questo computer: i suoi terminali girano qui, anche senza internet
+sidebar.new_terminal = Nuovo terminale
+sidebar.new_terminal_on = Nuovo terminale su {name}
+sidebar.rename_hint = Enter salva, Esc annulla
+sidebar.go_to = Vai a {label}
+sidebar.go_to_away = Vai a {label}: aspetta che {machine} torni online
+sidebar.double_click = Fai doppio clic per rinominare
+sidebar.end = Termina {label}
+sidebar.end_title = Termina {label}: la sua shell si chiude
+sidebar.new_note_in = Nuova nota in {name}
+sidebar.empty_folder = Vuota
+sidebar.empty_folder_writes = Vuota. + crea una nota
+sidebar.signin_title = Server e progetti
+sidebar.signin_text = Accedi per aprire terminali sui tuoi server, tenere note nei progetti e lavorare con il tuo team. Questo computer resta com'è.
+sidebar.theme_dark = Passa al tema scuro
+sidebar.theme_light = Passa al tema chiaro
+
+# ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
+# "Free" is the plan's name: it stays as it is.
+account_menu.free_plan = Piano Free
+account_menu.title = Impostazioni, lingua, account, esci
+account_menu.title_local = Impostazioni, lingua, accedi
+account_menu.not_signed_in = Accesso non effettuato
+account_menu.only_here = Solo questo computer
+account_menu.offline = Offline, nuovo tentativo in corso
+account_menu.local_note = tTerm funziona con questo computer. Accedi per i tuoi server, progetti e team.
+account_menu.sign_out = Esci
+# The item after Settings, and the title of the list of languages.
+language.item = Lingua
+
+# ------------------------------------------------------------ settings (Settings.tsx)
+# The page, and the item of the account's menu that opens it.
+settings.title = Impostazioni
+settings.appearance = Aspetto
+settings.appearance_local = Salvato su questo computer. Con Sistema, il tema segue l'impostazione di questo computer. Il colore di un progetto riempie il badge del codice, o colora l'intero progetto nella barra laterale.
+settings.appearance_account = Salvato nel tuo account. Con Sistema, il tema segue l'impostazione di ogni computer che usi. Il colore di un progetto riempie il badge del codice, o colora l'intero progetto nella barra laterale.
+settings.theme = Tema
+settings.theme_system = Sistema
+settings.theme_light = Chiaro
+settings.theme_dark = Scuro
+settings.tints = Colori dei progetti
+settings.tint_badge = Badge del codice
+settings.tint_block = Intero progetto
+
+# ------------------------------------------------------------ devices (Devices.tsx)
+devices.title = Dispositivi
+
+# ------------------------------------------------------------ account (Account.tsx)
+# The page, and the item of the account's menu that opens it.
+account.title = Account
+
+# ------------------------------------------------------------ app: the page's frame, toasts and dialogs (App.tsx)
+app.session_ended = La tua sessione è terminata. Accedi di nuovo: i tuoi terminali sono rimasti in esecuzione.
+# How saving goes in the note in front, on the line of tabs.
+app.saved = Salvato
+app.saving = Salvataggio…
+app.not_saved_offline = Non salvato: nessuna connessione
+app.not_saved = Non salvato
+app.no_connection = Nessuna connessione
+app.not_answering_local = tTerm Web non risponde. python -m tterm.dev è in esecuzione in una finestra di terminale?
+app.not_answering = tTerm Web non risponde. Controlla la connessione e riprova.
+# {why} is the reason tTerm Web gave, as it gave it.
+app.no_terminal = Impossibile aprire un terminale: {why}
+app.offline = {name} è offline: torna quando il suo agente si collega.
+# {seen} is time.last_seen: last seen 14 minutes ago.
+app.offline_seen = {name} è offline, {seen}: torna quando il suo agente si collega.
+app.removed_shared = Hai rimosso {name} da tTerm Web. Lo stesso server è anche in un altro progetto, quindi l'accesso di tTerm Web al server resta attivo.
+app.removed_access = Hai rimosso {name} da tTerm Web, e l'accesso di tTerm Web al server è stato revocato.
+app.removed = Hai rimosso {name} da tTerm Web.
+app.no_note = Impossibile creare una nota: {why}
+app.note_deleted = La nota {title} è stata eliminata dalla cartella {folder}.
+app.note_deleted_journal = La nota {title} è stata eliminata dalla cartella {folder}. Nel registro ne resta traccia.
+app.folder_deleted = La cartella {name} è stata eliminata.
+app.folder_deleted_journal = La cartella {name} è stata eliminata. Nel registro ne resta traccia.
+app.folder_notes_deleted = one: La cartella {name} e la sua nota sono state eliminate. | other: La cartella {name} e le sue {n} note sono state eliminate.
+app.folder_notes_deleted_journal = one: La cartella {name} e la sua nota sono state eliminate. Nel registro ne resta traccia. | other: La cartella {name} e le sue {n} note sono state eliminate. Nel registro ne resta traccia.
+app.moved_to = Spostata nella cartella {folder}.
+app.no_move = Impossibile completare lo spostamento: {why}
+app.moved_here = Spostata qui da {project}.
+app.moved_here_journal = Spostata qui da {project}. Il registro di quel progetto ne tiene traccia.
+app.moved_to_project = Spostata in {project}, cartella {folder}.
+app.moved_to_other = Spostata nell'altro progetto, cartella {folder}.
+app.copied_markdown = Copiata come Markdown.
+app.note_gone = La nota è stata eliminata.
+app.no_copy = Impossibile copiare: {why}
+app.no_copy_browser = Impossibile copiare: il browser non l'ha permesso.
+app.project_deleted = Il progetto {name} è stato eliminato.
+app.project_deleted_notes = one: Il progetto {name} è stato eliminato, insieme alla sua nota. | other: Il progetto {name} è stato eliminato, insieme alle sue {n} note.
+# {label} is where it is now: P/web-01.
+app.machine_moved = {name} ora è in {project}, come {label}. I suoi terminali restano in esecuzione.
+app.no_rename = Impossibile rinominare: {why}
+app.signed_out = Disconnessione effettuata. I tuoi terminali restano in esecuzione.
+app.no_sign_out = Impossibile uscire: tTerm Web non ha risposto. Riprova.
+app.no_theme = Impossibile salvare il tema: tTerm Web non ha risposto.
+app.no_language = Impossibile salvare la lingua: tTerm Web non ha risposto.
+app.no_tints = Impossibile salvare i colori dei progetti: tTerm Web non ha risposto.
+app.go_on_in_browser = Continua nel browser: accedi lì e consenti l'accesso a questo computer.
+app.open_sidebar = Apri la barra laterale
+app.no_project = Progetto non trovato
+app.no_project_text = Non è più tra i tuoi progetti.
+app.close_the_tab = Chiudi la scheda
+app.connection_lost = Connessione persa. Riconnessione in corso; i tuoi terminali restano in esecuzione.
+app.cut_off.mac = <b>Nessuna connessione a tTerm.</b> Questo Mac funziona come sempre. I terminali sui server continuano lì e ricompaiono qui quando torna la connessione.
+app.cut_off.computer = <b>Nessuna connessione a tTerm.</b> Questo computer funziona come sempre. I terminali sui server continuano lì e ricompaiono qui quando torna la connessione.
+app.paste_busy = In questo terminale è in esecuzione un comando, quindi la sua riga non è libera. Riprova quando finisce.
+app.paste_gone = {machine} non è più in tTerm Web. Apri un terminale altrove e inserisci lì il comando, nella sua riga.
+app.picker.placeholder = Una macchina in qualsiasi progetto
+# Tabs: their labels and the tips under the mouse. {label} is a terminal's: P/web-01 · 2.
+app.tab.note = Nota
+app.tab.note_in = Nota in {folder}
+app.tab.close_note = Chiudi la nota. Resta nella sua cartella.
+app.tab.project = Progetto
+app.tab.project_title = {name}: le sue macchine e note
+app.tab.close_page = Chiudi la pagina
+app.tab.terminal = Terminale
+app.tab.away = {label}: {machine} è in sospensione o offline, il terminale resta in attesa
+app.tab.away_unknown = {label}: la sua macchina è in sospensione o offline, il terminale resta in attesa
+app.tab.ended = {label}: terminato
+app.tab.running = {label}: comando in esecuzione
+app.tab.close_terminal = Chiudi la scheda. Il terminale resta in esecuzione, nella barra laterale sotto la sua macchina.
+# A machine's state, small, after its name in lists.
+app.machine.no_connection = nessuna connessione
+app.machine.offline = offline
+app.machine.offline_seen = offline, {seen}
+app.machine.online = online
+# Search and the palette (⌘K): what it finds on the page, the lines under each, and the details beside.
+app.search.state_away = in attesa del suo computer
+app.search.state_ended = terminato
+app.search.state_busy = comando in esecuzione
+app.search.state_prompt = al prompt
+app.search.this_tab = questa scheda
+app.search.tab = scheda
+app.search.no_tab = in esecuzione, senza scheda
+app.search.row_machine = Macchina
+app.search.row_folder = Cartella
+app.search.row_now = Adesso
+app.search.row_in = Posizione
+app.search.row_edited = Ultima modifica
+app.search.row_project = Progetto
+app.search.row_system = Sistema
+app.search.row_address = Indirizzo
+app.search.row_status = Stato
+app.search.row_terminals = Terminali
+app.search.row_code = Codice
+app.search.row_does = Cosa fa
+app.search.open_count = one: {n} aperto | other: {n} aperti
+# The button that does what was found.
+app.search.open = Apri
+app.search.open_note = Apri la nota
+app.search.open_page = Apri la sua pagina
+app.search.do_it = Esegui
+# Search words: keep the English words, add the language's own after them.
+app.search.terminal_words = terminal terminale
+app.search.note_words = note nota
+app.search.project_words = project page folders progetto pagina cartelle
+# Things to do, in the palette: each with what it does, small, and its search words.
+app.action.add_machine = Aggiungi una macchina
+app.action.add_machine_hint = un server o un computer
+app.action.new_project_hint = con macchine e note proprie
+app.action.edit_project = Modifica {name}
+app.action.edit_project_hint = nome, codice e colore
+app.action.new_folder_in = Nuova cartella in {name}
+app.action.new_folder_hint = per le note
+app.action.close_tab = Chiudi questa scheda
+app.action.close_tab_terminal = il terminale resta in esecuzione
+app.action.close_tab_note = la nota resta nella sua cartella
+app.action.rename_terminal = Dai un nome a questo terminale
+app.action.rename_terminal_hint = al posto del suo numero
+app.action.end_terminal = Termina questo terminale
+app.action.end_terminal_hint = la sua shell si chiude
+app.action.delete_note = Elimina questa nota
+app.action.delete_note_hint = dalla cartella {folder}
+app.action.theme_dark = Passa al tema scuro
+app.action.theme_light = Passa al tema chiaro
+app.action.settings_hint_local = tema, colori dei progetti
+app.action.settings_hint = tema, colori dei progetti, dispositivi
+app.action.sign_in_hint = i tuoi server, progetti e team
+app.action.account_hint = nome, foto e piano
+app.action.sign_out_hint = questo browser non ti ricorderà più
+# Search words: keep the English words, add the language's own after them.
+app.action.add_machine_words = new server computer connect nuovo nuova aggiungi collega connetti macchina
+app.action.new_project_words = project new create make progetto nuovo crea
+app.action.edit_project_words = project rename edit code color colour progetto rinomina modifica codice colore
+app.action.new_folder_words = notes folder new create note cartella nuova crea
+app.action.machines_words = machines home overview macchine panoramica
+app.action.close_tab_words = tab close scheda chiudi
+app.action.rename_terminal_words = terminal rename name label terminale rinomina nome etichetta
+app.action.end_terminal_words = terminal end stop kill exit shell terminale termina chiudi ferma interrompi esci
+app.action.delete_note_words = note delete remove nota elimina cancella rimuovi
+app.action.theme_words = theme dark light colours colors tema scuro chiaro colori
+app.action.pin_words = sidebar panel pin barra laterale pannello fissa blocca
+app.action.settings_words_local = settings preferences theme dark light colors colours support impostazioni preferenze tema scuro chiaro colori assistenza supporto
+app.action.settings_words = settings preferences theme dark light colors colours devices quick code forget browsers support impostazioni preferenze tema scuro chiaro colori dispositivi codice rapido dimentica browser assistenza supporto
+app.action.sign_in_words = sign in log in login account cloud servers accedi accesso entra server
+app.action.account_words = account profile name photo picture avatar plan limits delete profilo nome foto immagine piano limiti elimina
+app.action.sign_out_words = sign out log out logout leave switch account esci disconnetti cambia
+# A folder: made, or named again.
+app.folder.new_title = Nuova cartella in {name}
+app.folder.rename_title = Rinomina la cartella
+app.folder.create = Crea cartella
+app.folder.new_help_alone = La vedi solo tu. Poi il + accanto alla cartella crea la prima nota.
+app.folder.new_help = Tutti in {name} la vedono e possono scriverci note. Poi il + accanto alla cartella crea la prima nota.
+app.folder.rename_help_alone = La vedi solo tu.
+app.folder.rename_help = Tutti in {name} vedono subito il nuovo nome. Le note al suo interno restano come sono.
+# Asked before it is done.
+app.remove.title = Rimuovere {name}?
+app.remove.confirm = Rimuovi {name}
+app.remove.text = Scompare da tTerm Web e i suoi terminali vengono terminati. I comandi digitati lì restano nella cronologia.
+app.remove.computer = Il suo agente viene avvisato della rimozione e si ferma. Per collegare di nuovo il computer: Aggiungi una macchina, poi Computer.
+app.remove.server = tTerm Web smette di accedervi e revoca il proprio accesso sul server stesso. Se il server non risponde, subito dopo ti mostra il comando per farlo.
+app.end.title = Terminare {label}?
+app.end.confirm = Termina il terminale
+app.end.text = La sua shell si chiude e tutto ciò che vi gira si ferma, come quando chiudi una finestra di terminale. Quello che ha eseguito resta nella sua scheda e nella cronologia.
+app.delete_note.title = Eliminare la nota {title}?
+app.delete_note.sub = Nella cartella {folder}.
+app.delete_note.confirm = Elimina nota
+app.delete_note.alone = Verrà eliminata per sempre.
+app.delete_note.shared = Tutti in {project} la perdono, anche chi ce l'ha aperta in questo momento. Il registro annota chi l'ha eliminata e quando.
+app.delete_folder.title = Eliminare la cartella {name}?
+app.delete_folder.confirm = Elimina cartella
+app.delete_folder.confirm_notes = one: Elimina la cartella e {n} nota | other: Elimina la cartella e {n} note
+app.delete_folder.empty = La cartella è vuota.
+# {names} is the notes' titles, listed: Plan, Ideas and 3 more.
+app.delete_folder.notes_go = one: Con la cartella viene eliminata anche la sua nota: {names}. | other: Con la cartella vengono eliminate anche le sue {n} note: {names}.
+app.delete_folder.shared = Tutti in {project} le perdono, anche chi ne ha una aperta in questo momento. Il registro annota chi ha eliminato la cartella e quando.
+app.delete_folder.keep = Per tenere una nota, prima spostala: ⋯ accanto alla nota, poi un'altra cartella.
+
+# ------------------------------------------------------------ api: what the page says when tTerm Web gives no reason (api.ts)
+api.note_changed = Nel frattempo la nota è stata modificata altrove.
+api.sign_in = Accedi per continuare.
+# {status} is the HTTP status: 502.
+api.answered = tTerm Web ha risposto con {status}
+api.confirm_first = Prima conferma la tua identità.
+api.account_changed = Ora hai effettuato l'accesso con un altro account.
+
+# ------------------------------------------------------------ app_link: the apps for computers, as the site names them (appLink.ts)
+app_link.mac = tTerm per Mac
+app_link.windows = tTerm per Windows
+app_link.linux = tTerm per Linux
+
+# ------------------------------------------------------------ add_machine: the window that adds a server or a computer to a project (AddMachine.tsx)
+# When the browser does not let the page copy the command.
+add_machine.copy_failed = Impossibile copiare: seleziona il comando e copialo a mano.
+# How long the command works, inside add_machine.hint_computer and add_machine.hint_server as {works}.
+add_machine.works_once = one: Funziona una sola volta, entro {n} minuto. | other: Funziona una sola volta, entro {n} minuti.
+add_machine.title = Aggiungi una macchina
+# Before the list of the projects the machine can go to.
+add_machine.to_project = Nel progetto
+# The two buttons Server and Computer, for screen readers.
+add_machine.kind = Tipo di macchina
+add_machine.server = Server
+add_machine.computer = Computer
+# Step 1 for a computer, above the command.
+add_machine.run_computer = Esegui questo comando sul computer
+# Under the command. {works} is add_machine.works_once; sudo stays as it is.
+add_machine.hint_computer = In un terminale su quel computer, con il tuo utente, non con sudo. {works} Poi l'agente si aggiorna da solo. Un nuovo comando eseguito più avanti lo reinstalla: il computer resta com'è, i suoi terminali aperti vengono terminati.
+# A fold under the command, for trying an agent that is not released yet.
+add_machine.by_hand = Oppure avvia l'agente a mano
+# {version} is the agent's version: 0.11.0. tterm-agent, Python and websockets are names: they stay as they are.
+add_machine.by_hand_hint = Da una copia di tterm-agent {version} o più recente, con un Python che abbia il pacchetto websockets. Serve per provare un agente non ancora rilasciato: gira finché la sua finestra di terminale resta aperta, e il token diventa la chiave del computer.
+# Step 2, while the window waits for the machine.
+add_machine.keep_open = Tieni aperta questa finestra
+# A fold: what the command for a computer does, point by point.
+add_machine.what_command = Cosa fa il comando
+# {folder} is ~/.tterm-web, {bot_folder} ~/.tterm; launchd and systemd are names: they stay as they are.
+add_machine.what_command_puts = Mette l'agente di tTerm in {folder}: un solo file per questo sistema, preso dalle release di tTerm e verificato con il checksum dello script del comando prima di essere eseguito. Poi lo avvia a ogni login (launchd su macOS, systemd su Linux). L'agente del bot di tTerm in {bot_folder}, se c'è, resta com'è.
+add_machine.what_command_updates = L'agente si aggiorna in automatico, soltanto a versioni firmate dalla build di release di tTerm e soltanto quando su questo computer non c'è nessun terminale aperto.
+add_machine.what_command_key = Crea per questo computer una chiave tutta sua e la conserva lì, leggibile solo da te. Il token nel comando serve solo per collegarlo, una sola volta.
+# root is the name of the system's administrator: it stays as it is.
+add_machine.what_command_runs = L'agente gira con il tuo utente, mai come root, e non apre porte: si collega verso l'esterno a tTerm Web e mantiene quell'unica connessione. Ogni terminale qui è una tua shell su quel computer.
+# {command} is ~/.tterm-web/uninstall.sh.
+add_machine.what_command_uninstall = {command} rimuove tutto.
+# Step 1 for a server, above the command.
+add_machine.run_server = Esegui questo comando sul server
+# Under the command. {works} is add_machine.works_once; root and sudo stay as they are.
+add_machine.hint_server = {works} Eseguilo come root o come un qualsiasi utente con sudo.
+# A fold: what the script for a server does, point by point.
+add_machine.what_script = Cosa fa lo script
+# Here and in the next two, tterm in small letters is the name of the user the script makes on the server: it stays as it is, as sudo and sshd_config do.
+add_machine.what_script_user = Crea l'utente tterm, senza password. Se l'ha già creato il bot di tTerm, lo riutilizza.
+add_machine.what_script_certificates = Permette a tTerm Web di accedere come tterm con certificati che durano due minuti e valgono solo per questo server. Sul server non resta nessuna chiave.
+add_machine.what_script_sudo = Dà a tterm i permessi sudo, così puoi gestire il server. Basta un comando per revocarli.
+add_machine.what_script_safe = Non tocca mai sshd_config e non apre porte. Si può eseguire due volte senza problemi.
+# {name} is the machine's name.
+add_machine.connected = {name} è online
+# After the machine's system and host: Ubuntu 24.04 · web-01 · in tabs it reads P/web-01.
+add_machine.tabs_label = nelle schede appare come {label}
+add_machine.open_terminal = Apri un terminale
+add_machine.add_another = Aggiungi un'altra macchina
+# {why} is what went wrong, as tTerm Web said it.
+add_machine.no_command = Impossibile creare il comando: {why}
+add_machine.expired_token = Questo token è scaduto: vale 10 minuti.
+add_machine.expired_command = Questo comando è scaduto: vale 10 minuti.
+add_machine.new_command = Genera un nuovo comando
+add_machine.failed_computer = Impossibile aggiungere il computer.
+add_machine.failed_server = Impossibile verificare il server.
+add_machine.still_works = Lo stesso comando funziona ancora: correggi il problema ed eseguilo di nuovo.
+# While the window waits: the agent or the server has called in, or not yet.
+add_machine.agent_in = L'agente si è collegato. Lettura dei dati del computer…
+add_machine.server_in = Il server ha risposto. Accesso in corso per verificarlo…
+add_machine.waiting_agent = In attesa dell'agente…
+add_machine.waiting_server = In attesa del server…
+# {project} is the project's name; the _unnamed ones are for when it is not known.
+add_machine.appears_computer = Compare in {project} pochi secondi dopo la fine del comando.
+add_machine.appears_computer_unnamed = Compare nel progetto pochi secondi dopo la fine del comando.
+add_machine.appears_server = Compare in {project} appena lo script finisce, di solito entro un minuto.
+add_machine.appears_server_unnamed = Compare nel progetto appena lo script finisce, di solito entro un minuto.
+
+# ------------------------------------------------------------ signin: signing in with a code from email, and the quick code (SignIn.tsx)
+# When the server does not answer at all.
+signin.no_answer = Il server non risponde. Controlla la connessione e riprova.
+signin.email_lead = Inserisci la tua email e ti invieremo un codice
+# The field for the address, for screen readers.
+signin.email = Email
+# The button, while the code is being sent.
+signin.sending = Invio…
+signin.get_code = Ricevi un codice
+signin.new_here = Prima volta qui? Dopo il codice crei l'account.
+signin.code_resent = È in arrivo un nuovo codice. Quello precedente non funziona più.
+signin.code_title = Inserisci il codice
+# {email} is the address the code went to.
+signin.code_sent = L'abbiamo inviato a <b>{email}</b>
+# The field for the code, for screen readers.
+signin.code_label = Codice ricevuto via email
+# A link that counts the seconds down until another code may be sent: New code in 42 s.
+signin.resend_in = one: Nuovo codice tra {n} s | other: Nuovo codice tra {n} s
+signin.resend = Invia un nuovo codice
+signin.change_email = Cambia email
+signin.no_email = L'email non arriva? Controlla nella cartella spam.
+signin.signup_title = Crea il tuo account
+# The field for one's name, and the words in it while it is empty.
+signin.your_name = Il tuo nome
+# The one tick of signing up. <terms> and <privacy> are links to the site's two documents: their names as the site has them in the language.
+signin.agree = Accetto i <terms>Termini di servizio</terms> e l'<privacy>Informativa sulla privacy</privacy>
+# The button, while the account is being made.
+signin.creating = Creazione…
+signin.create = Crea account
+signin.another_email = Usa un'altra email
+# A quick code is four digits that sign one in on this device.
+signin.pin_easy = Troppo facile da indovinare: scegli cifre che non siano tutte uguali né in sequenza.
+signin.pin_mismatch = I codici non coincidono. Crealo di nuovo.
+# {name} is the person's first name: Welcome for an account made just now, Hello for one there before.
+signin.welcome = Ti diamo il benvenuto, {name}!
+signin.hello = Ciao, {name}!
+# The quick code, typed a second time.
+signin.pin_repeat = Ripeti il codice
+signin.pin_repeat_lead = Inserisci di nuovo le stesse quattro cifre
+signin.pin_offer_lead = Crea un codice rapido per questo dispositivo
+# The field for the quick code, for screen readers: the second time, the first time.
+signin.pin_repeat_label = Il codice rapido, di nuovo
+signin.pin_offer_label = Un codice rapido
+# The link that goes on without a quick code.
+signin.not_now = Non ora
+# {name} is the person's first name.
+signin.welcome_back = Rieccoti, {name}!
+signin.pin_lead = Inserisci il tuo codice rapido
+# The field for the quick code, for screen readers.
+signin.pin_label = Codice rapido
+signin.forgot = Hai dimenticato il codice?
+signin.switch = Cambia account
+
+# ------------------------------------------------------------ connect: in the browser, allowing tTerm for the computer to sign in (Connect.tsx)
+connect.no_answer = tTerm non risponde. Controlla la connessione, poi ricarica questa pagina.
+# {app} is app_link.*: tTerm for Mac. Also the page's title in the browser.
+connect.allow_title = Consentire l'accesso a {app}?
+# The address the app opened is cut short.
+connect.incomplete = Questo link è incompleto
+# Sign in with your browser is the app's button: the words of app_signin.browser.
+connect.start_again = Ricomincia da tTerm sul tuo computer: Accedi con il browser.
+# Above signing in, after Allow. {app} is app_link.*: tTerm for Mac.
+connect.confirm = Per consentire l'accesso a {app}, conferma la tua identità.
+connect.signin_other = Accedi con l'altro account, poi consenti l'accesso a {app}.
+connect.signin_then = Accedi, poi consenti l'accesso a {app}.
+connect.no_connection = Nessuna connessione
+# {computer} is the name of the computer the app runs on, {email} the account's address.
+connect.asks = L'app su <b>{computer}</b> chiede di accedere al tuo account, {email}.
+# Above the code that both this page and the app show.
+connect.check = Controlla che l'app mostri lo stesso codice
+# The button.
+connect.allow = Consenti
+connect.another = Non sei tu? Usa un altro account
+# Personal is the name of one's own project: it stays as it is. Settings and Devices are the page and its section, in the words of settings.title and devices.title.
+connect.small = Il computer diventa una macchina in Personal. L'app compare in Impostazioni, sotto Dispositivi, dove puoi dimenticarla.
+# While the browser goes back to the app. {app} is app_link.*: tTerm for Mac.
+connect.back = Ritorno a {app}…
+connect.takes_over = Da qui prosegue l'app, su questo computer.
+
+# ------------------------------------------------------------ app_signin: in tTerm for the computer, signing in with the browser (AppSignIn.tsx)
+# The app's first screen, for screen readers.
+app_signin.welcome_label = Schermata di benvenuto
+app_signin.welcome_title = Ti diamo il benvenuto in tTerm
+app_signin.welcome_lead = I terminali di questo computer funzionano subito, senza bisogno di un account.
+# The button: the app opens the browser, to sign in there.
+app_signin.browser = Accedi con il browser
+# The button: not now, sign in later.
+app_signin.later = Più tardi
+app_signin.welcome_note = Con l'accesso, i tuoi server, progetti, note e team arrivano in questa finestra. Puoi farlo quando vuoi, dal fondo della barra laterale.
+app_signin.cancelled = L'accesso è stato annullato nel browser.
+# The title of the window that waits while one signs in in the browser.
+app_signin.link_title = Accedi con il browser
+# {host} is app.tterm.net. The code comes under it.
+app_signin.link_note = tTerm ha aperto {host} nel browser. Accedi lì e, quando la pagina lo chiede, consenti l'accesso a questo computer. Anche la pagina mostra questo codice:
+app_signin.until_then = Nel frattempo, questo computer funziona come prima.
+app_signin.open_again = Riapri la pagina
+
+# ------------------------------------------------------------ welcome: the first screen, while nothing is connected yet (Welcome.tsx)
+# {name} is the person's first name.
+welcome.title = Ti diamo il benvenuto in tTerm, {name}
+welcome.lead = Un terminale per i tuoi server e computer, direttamente nel browser. Niente da installare su questo computer, nessuna chiave da copiare, nessuna porta da aprire.
+welcome.connect = Collega la tua prima macchina
+# The two cards: the kinds of machine to connect.
+welcome.server = Server
+welcome.server_note = Un VPS o un server cloud che raggiungi via SSH. Esegui un solo comando e comparirà qui.
+# Small labels under the cards: Linux, One command; macOS, Linux, No open ports.
+welcome.one_command = Un solo comando
+welcome.computer = Computer
+welcome.computer_note = Un Mac o una macchina Linux a casa o in ufficio, anche dietro NAT. Un piccolo agente ne mantiene la connessione.
+welcome.no_ports = Nessuna porta aperta
+# The three steps below, for screen readers.
+welcome.how = Come funziona
+welcome.step_add = Aggiungi una macchina
+welcome.step_add_text = Esegui un solo comando sulla macchina. Funziona una volta, entro 10 minuti.
+welcome.step_open = Apri un terminale
+welcome.step_open_text = Ogni comando diventa un blocco: copialo, eseguilo di nuovo, condividine il link.
+welcome.step_team = Coinvolgi il tuo team
+welcome.step_team_text = Ruoli, un registro condiviso, e vedi sempre chi sta guardando.
+# {project} is the project's name and {code} its code: P. In {code}/name, name stands for a machine's name, as in P/web-01.
+welcome.footnote = Il tuo primo progetto, {project}, è pronto, con il codice {code}: le sue macchine compaiono nelle schede come {code}/nome.
+
+# ------------------------------------------------------------ need_account: New project and Add machine in the app before signing in (NeedAccount.tsx)
+need_account.machine_title = Aggiungi una macchina
+need_account.machine_note = Per server e altri computer serve un account tTerm. Accedendo ne crei uno, se non l'hai ancora.
+need_account.server = Server
+need_account.server_text = Un VPS o un server cloud che raggiungi via SSH. Esegui un solo comando e comparirà qui.
+need_account.computer = Computer
+need_account.computer_text = Un Mac o una macchina Linux a casa o in ufficio, anche dietro NAT.
+# What the Free plan gives. {machines} is need_account.plan_machines, {terminals} need_account.plan_terminals.
+need_account.machine_plan = Fino a {machines} e {terminals}.
+# In need_account.machine_plan, after "Up to": in the form the words take there.
+need_account.plan_machines = one: {n} macchina | other: {n} macchine
+need_account.plan_terminals = one: {n} terminale aperto | other: {n} terminali aperti
+need_account.machine_stays = Questo computer resta com'è, con i suoi terminali.
+need_account.project_title = Nuovo progetto
+need_account.project_note = Per avere altri progetti serve un account tTerm. Accedendo ne crei uno, se non l'hai ancora.
+need_account.personal = Progetti personali
+need_account.personal_text = Solo tu. Macchine, terminali e note sono soltanto tuoi.
+need_account.shared = Progetti condivisi
+# A small label on Shared projects: they are not there yet.
+need_account.soon = In arrivo
+need_account.shared_text = Con il tuo team. Inviti delle persone, che aprono terminali sulle macchine del progetto e ne modificano le note.
+need_account.project_plan = Progetti tuoi, ognuno con le sue macchine, i suoi terminali e le sue note. I progetti condivisi con un team arriveranno presto.
+# Personal is the name of one's own project: it stays as it is.
+need_account.project_stays = Personal resta com'è, con questo computer, i suoi terminali e le sue note.
+# The button that closes the window.
+need_account.not_now = Non ora
+
+# ------------------------------------------------------------ updates: tTerm for Mac updating itself, only in the app (Updates.tsx)
+# The title of Restart to update in the top bar. {version} is the new version: 0.5.1.
+updates.pill_title.mac = tTerm {version} è pronto. Il riavvio richiede pochi secondi; se su questo Mac ci sono terminali in esecuzione, tTerm prima chiede conferma.
+updates.pill_title.computer = tTerm {version} è pronto. Il riavvio richiede pochi secondi; se su questo computer ci sono terminali in esecuzione, tTerm prima chiede conferma.
+updates.restarting = Riavvio…
+# A button, in the top bar and in Settings: tTerm restarts and the new version goes in.
+updates.restart_to_update = Riavvia per aggiornare
+# The card above the account in the sidebar, and Settings. {version} is the new version.
+updates.ready = tTerm {version} è pronto
+updates.restart_takes = Il riavvio richiede pochi secondi.
+# The card's button.
+updates.restart = Riavvia
+# A link to the notes of the new version.
+updates.whats_new = Novità
+# Once, after the restart. {version} is the version now: 0.5.1.
+updates.updated = tTerm è stato aggiornato alla versione {version}
+# Settings, Updates: the two ways tTerm takes a new version.
+updates.auto = Aggiornamento automatico
+updates.auto_text.mac = Una nuova versione si installa quando esci da tTerm e, se tTerm è nella barra dei menu con la finestra chiusa, appena su questo Mac non è in esecuzione nulla.
+updates.auto_text.computer = Una nuova versione si installa quando esci da tTerm e, se tTerm è nella barra dei menu con la finestra chiusa, appena su questo computer non è in esecuzione nulla.
+updates.ask = Chiedimi prima
+# "Restart to update" is the button (updates.restart_to_update): the same words.
+updates.ask_text = Una nuova versione resta in attesa finché non premi Riavvia per aggiornare.
+# The section of Settings.
+updates.title = Aggiornamenti
+updates.about = tTerm per Mac si aggiorna da solo dalle release di tTerm. Si installa solo una versione firmata da tTerm.
+# For screen readers: the two ways above.
+updates.how = Come si aggiorna tTerm
+# Beside Update by itself.
+updates.recommended = Consigliato
+updates.checking = Ricerca di una nuova versione…
+# {version} is the new version.
+updates.downloading = Download di tTerm {version}…
+# {version} is the version this app is; {day} is today, yesterday or on 12 Oct (time.today, time.yesterday, time.on_day); {time} is 10:02.
+updates.you_have_downloaded = Hai la versione {version}. Download: {day} alle {time}.
+updates.you_have = Hai la versione {version}.
+# {version} is the new version; why it failed comes under it, as tTerm says it.
+updates.failed = Impossibile aggiornare alla versione {version}
+# {site} is tterm.net. Applications is the folder of the Mac: as macOS names it in the language.
+updates.download = Oppure scarica tTerm da <link>{site}</link> e trascinalo in Applicazioni.
+# A button: tTerm moves itself from the disk image to Applications.
+updates.move = Sposta in Applicazioni
+# {ago} is when tTerm last looked: just now, 5 min ago, 2 h ago, yesterday, on 12 Oct (time.*).
+updates.looked = tTerm {version} è aggiornato. Ultimo controllo: {ago}.
+updates.this_is = Questo è tTerm {version}.
+# A button: look for a new version now.
+updates.check_now = Controlla ora
+
+# ------------------------------------------------------------ account: the name, the photo and the plan (Account.tsx)
+# The file chosen for one's photo is none.
+account.not_a_photo = Questo file non è una foto che tTerm accetta. Scegli un file JPEG, PNG o WebP fino a 5 MB.
+# What the plan allows, after "Up to" (account.up_to): Up to 50 machines and 24 open terminals.
+account.limit_machines = one: {n} macchina | other: {n} macchine
+account.limit_terminals = one: {n} terminale aperto | other: {n} terminali aperti
+# {limits} is one or both of the two above, as a list.
+account.up_to = Fino a {limits}
+account.no_limits = Nessun limite
+# A meter of the plan, beside its label (Machines, Open terminals): 3 of 50.
+account.used_of = {used} su {limit}
+account.used_no_limit = {used}, senza limiti
+# The title of Close at the top of Account and Settings.
+account.close_title = Torna dove eri
+account.photo_removed = Foto rimossa: sono tornate le tue iniziali.
+# For screen readers: the card with one's name and photo.
+account.profile = Profilo
+account.change_photo = Cambia foto
+account.add_photo = Aggiungi una foto
+account.your_name = Il tuo nome
+account.saving = Salvataggio…
+account.edit_name = Modifica il nome
+account.remove_photo = Rimuovi la foto
+# Under the photo's buttons: what the photo is for.
+account.photo_hint = Compare accanto al tuo nome, al posto delle tue iniziali.
+# For screen readers: the file chooser for the photo.
+account.choose_photo = Scegli una foto
+# Under one's email address. {email} is support's address.
+account.address_note = Accedi con questo indirizzo. Per cambiarlo, scrivi a <link>{email}</link>.
+# The section of the plan; its name (Free) stays as it is.
+account.plan = Piano
+account.plan_note = tTerm è gratis mentre lo costruiamo. Qui compariranno altri piani, e te ne parleremo prima che cambi qualcosa.
+# The labels of the plan's two meters.
+account.machines = Macchine
+account.open_terminals = Terminali aperti
+account.photo_saved = Ecco la tua foto: in fondo alla barra laterale e nel suo menu.
+# {email} is support's address.
+account.delete_note = Per eliminare il tuo account, scrivi a {email} dall'indirizzo con cui accedi.
+
+# ------------------------------------------------------------ devices: where one is signed in, in Settings (Devices.tsx)
+# On the sign-in screen, after this very device was forgotten.
+devices.this_forgotten = Questo dispositivo è stato dimenticato. Accedi con un codice via email.
+# {device} is a device's label: tTerm for Mac on MacBook-Pro. tTerm there now works with that computer only, as before signing in.
+devices.app_signed_out = Disconnessione effettuata su {device}: lì ora tTerm funziona solo con quel computer.
+# {device} is a device's label: Chrome on macOS.
+devices.forgotten = Dispositivo dimenticato: {device}. Lì servirà di nuovo il codice via email.
+# On the sign-in screen.
+devices.all_forgotten = Tutti i dispositivi sono stati dimenticati. Ora ognuno accede con un codice via email.
+devices.about = I browser in cui accedi con il codice rapido e tTerm sui tuoi computer, collegato tramite il browser. Altrove serve un codice via email.
+devices.idle = Dopo 8 ore di inattività, tTerm chiede di nuovo il codice rapido. I tuoi terminali restano in esecuzione.
+devices.none = Nessun browser memorizzato. Ogni accesso richiede un codice via email.
+# A mark beside the device one uses now.
+devices.this_device = Questo dispositivo
+# Under a device's label. {created} and {used} are how long ago: just now, 3 minutes ago, 2 days ago (time.ago_*).
+devices.app_times = Accesso {created}, ultimo uso {used}
+devices.browser_times = Memorizzato {created}, ultimo accesso {used}
+# A button beside each device.
+devices.forget = Dimentica
+# The heading, and the red button that does it.
+devices.forget_all = Dimentica tutti i dispositivi
+devices.forget_all_text = Tutti i dispositivi vengono dimenticati e tutte le sessioni terminano, anche questa. Poi ogni browser chiederà un codice via email. I tuoi terminali restano in esecuzione.
+# The button that asks first.
+devices.forget_all_ask = Dimentica tutti i dispositivi…
+
+# ------------------------------------------------------------ this_computer: the computer the app runs on, in Settings (ThisComputer.tsx)
+# How the link to tTerm Web is, under the switch. {name} is the name tTerm Web knows this computer by.
+this_computer.online_terminals = one: Online in tTerm Web come {name} · {n} terminale aperto da lì | other: Online in tTerm Web come {name} · {n} terminali aperti da lì
+this_computer.online = Online in tTerm Web come {name}
+this_computer.connecting = Connessione a tTerm Web…
+this_computer.waiting = Non ancora collegato a tTerm Web.
+this_computer.no_network = Nessuna rete. tTerm riprova da solo.
+# "Turn this on": the switch above.
+this_computer.removed.mac = Questo Mac è stato rimosso da tTerm Web, quindi non è accessibile da lì. Attiva l'opzione per aggiungerlo di nuovo.
+this_computer.removed.computer = Questo computer è stato rimosso da tTerm Web, quindi non è accessibile da lì. Attiva l'opzione per aggiungerlo di nuovo.
+this_computer.closed.mac = Ora questo Mac non è accessibile da tTerm Web.
+this_computer.closed.computer = Ora questo computer non è accessibile da tTerm Web.
+# The section's title, on a Mac too.
+this_computer.title = Questo computer
+# {name} is this computer's machine in tTerm, {project} its project.
+this_computer.about = {name}, in {project}. I suoi terminali girano qui, anche senza internet.
+# The switch.
+this_computer.open = Accesso da tTerm Web e dal telefono
+this_computer.open_text.mac = tTerm Web e il tuo telefono aprono terminali su questo Mac finché tTerm è in esecuzione qui: con la finestra chiusa resta nella barra dei menu, e si avvia al login. Disattivato: lì questo Mac risulta offline; qui tutto funziona come prima.
+this_computer.open_text.computer = tTerm Web e il tuo telefono aprono terminali su questo computer finché tTerm è in esecuzione qui: con la finestra chiusa resta nella barra dei menu, e si avvia al login. Disattivato: lì questo computer risulta offline; qui tutto funziona come prima.
+# Asked before the switch goes off while terminals opened from tTerm Web run here.
+this_computer.ask_title.mac = Chiudere l'accesso a questo Mac da tTerm Web?
+this_computer.ask_title.computer = Chiudere l'accesso a questo computer da tTerm Web?
+# The red button.
+this_computer.turn_off = Disattiva
+this_computer.ask_text.mac = one: {n} terminale aperto da tTerm Web su questo Mac verrà terminato, e lì questo Mac risulterà offline. | other: {n} terminali aperti da tTerm Web su questo Mac verranno terminati, e lì questo Mac risulterà offline.
+this_computer.ask_text.computer = one: {n} terminale aperto da tTerm Web su questo computer verrà terminato, e lì questo computer risulterà offline. | other: {n} terminali aperti da tTerm Web su questo computer verranno terminati, e lì questo computer risulterà offline.
+
+# ------------------------------------------------------------ photo: one's photo, cut to a circle (PhotoDialog.tsx)
+# The photo could not be made here, in the browser.
+photo.browser_failed = Il browser non è riuscito a creare la foto.
+photo.no_answer = tTerm non ha risposto. Riprova.
+# The dialog's title.
+photo.title = La tua foto
+# For screen readers: the photo in its frame, which the arrow keys move and + and - zoom.
+photo.frame = La tua foto in un cerchio. Trascinala o spostala con le frecce; + e - per lo zoom.
+# The slider that makes the photo bigger in the circle.
+photo.zoom = Zoom
+photo.drag = Trascina la foto per posizionarla nel cerchio.
+# Beside the photo in three small sizes.
+photo.preview = Come la vedono gli altri
+photo.note = JPEG, PNG o WebP fino a 5 MB. tTerm conserva una copia da 256 pixel, senza i dati che la foto contiene su se stessa, come il luogo dello scatto.
+photo.saving = Salvataggio…
+photo.save = Salva foto
+
+# ------------------------------------------------------------ confirm: asking before what cannot be undone (Confirm.tsx)
+confirm.no_answer = tTerm Web non ha risposto.
+confirm.copy_failed = Impossibile copiare: seleziona il comando e copialo a mano.
+# After a server is removed. {name} is the server's name.
+confirm.removed = Hai rimosso {name}
+# The command that takes the access back comes after it.
+confirm.removed_text = tTerm Web non lo mostra più e non vi accede più. Il server non ha risposto, quindi l'accesso di tTerm Web resta finché non lo revochi lì:
+# {user} is the server's user tterm; {command} is the command that removes it and its sudo rule.
+confirm.user_stays = L'utente {user} e la sua regola sudo restano, per il bot di tTerm se lo usi. Per rimuovere anche questi: {command}
+
+# ------------------------------------------------------------ project_dialog: the windows of projects of one's own (ProjectDialog.tsx)
+project_dialog.code_invalid = Il codice deve avere da 1 a 4 lettere o cifre.
+# When saving or moving failed and tTerm Web gave no reason.
+project_dialog.no_answer = tTerm Web non ha risposto.
+project_dialog.edit_title = Modifica progetto
+project_dialog.new_title = Nuovo progetto
+# Under the title, editing a project others are in: its name, code and color.
+project_dialog.edit_sub = Possono modificarli il proprietario e gli amministratori.
+project_dialog.new_sub = Un progetto ha le sue macchine e le sue note, separate dagli altri tuoi progetti.
+# The label of the project's name.
+project_dialog.name = Nome
+# In the empty name field: an example of a project's name.
+project_dialog.name_example = Ad esempio, Cliente X
+# The label of the project's code: the 1 to 4 letters or digits on its badge.
+project_dialog.code = Codice breve
+project_dialog.code_help_alone = Da 1 a 4 lettere o cifre. Il codice contrassegna il progetto nelle schede e nella barra laterale.
+project_dialog.code_help_shared = Da 1 a 4 lettere o cifre. Il codice contrassegna il progetto nelle schede e nella barra laterale, e cambia subito per tutti quelli che ne fanno parte.
+project_dialog.code_help_new = Il codice è ricavato dal nome e puoi cambiarlo: da 1 a 4 lettere o cifre. Contrassegna il progetto nelle schede e nella barra laterale.
+# The label of the project's colors.
+project_dialog.color = Colore
+# "Whole project" and "Settings" are named as the choice and the page are (settings.tint_block, settings.title).
+project_dialog.color_help_new = Il colore è scelto in modo da distinguersi dagli altri tuoi progetti, e puoi cambiarlo. Riempie il badge del codice, e anche l'intero progetto nella barra laterale se in Impostazioni scegli Intero progetto.
+project_dialog.color_help_alone = Il colore riempie il badge del codice, e anche l'intero progetto nella barra laterale se in Impostazioni scegli Intero progetto.
+project_dialog.color_help_shared = Il colore riempie il badge del codice per tutti quelli che fanno parte del progetto, e anche l'intero progetto nella barra laterale per chi sceglie Intero progetto nelle proprie Impostazioni.
+# Above how the project will look in the sidebar and on a tab (a noun).
+project_dialog.preview = Anteprima
+# In the preview, in place of the project's name while none is typed.
+project_dialog.preview_name = Progetto
+project_dialog.new_next = Il progetto è tuo. Poi aggiungi una macchina o spostane una da un altro progetto, e scrivi le note.
+project_dialog.create = Crea progetto
+# The title of the window that moves a machine to another project: {machine} is its name.
+project_dialog.move_title = Sposta {machine}
+project_dialog.move_sub = In un altro progetto di tua proprietà.
+# Next to each project one may move to: whether others are in it.
+project_dialog.only_you = solo tu
+project_dialog.with_others = con altri
+# {project} is the project it goes to, {code} that project's code, {name} the machine's name there: CX/web-01.
+project_dialog.move_becomes = In {project} diventa {code}/{name}. I suoi terminali restano in esecuzione e sulla macchina stessa non cambia nulla.
+# The same, when its name is taken there: {machine} is its name now, {name} the one it gets (web-01-2).
+project_dialog.move_becomes_taken = In {project} diventa {code}/{name}: lì il nome {machine} è già in uso. I suoi terminali restano in esecuzione e sulla macchina stessa non cambia nulla.
+# The button: {project} is the project's name.
+project_dialog.move_to = Sposta in {project}
+# The button while there is nothing to pick (a verb).
+project_dialog.move = Sposta
+# Next to a folder one may move a note to: it has no notes.
+project_dialog.folder_empty = vuota
+# Next to a project without folders: the note goes to a new folder there, named as its own.
+project_dialog.folder_new = una nuova cartella, creata lì apposta
+# The title of the window that moves a note to another project: {note} is its title.
+project_dialog.move_note_title = Sposta {note}
+project_dialog.move_note_sub = Ora in {project}, cartella {folder}. Scegli una cartella in un altro progetto.
+# Who sees the note in the project it goes to.
+project_dialog.note_alone = In {project} la vedi solo tu.
+project_dialog.note_shared = Tutti in {project} la vedono e possono modificarla.
+# {project} is the project the note leaves.
+project_dialog.note_leaves = Tutti gli altri in {project} la perdono. Il registro di {project} annota chi l'ha spostata e quando.
+# The ticks: the items of a checklist ticked off, each with who ticked it.
+project_dialog.note_keeps = Titolo, testo e cronologia la seguono, e anche le spunte, con chi le ha messe.
+# The button: {folder} is the name of the folder made there, the note's own folder's name.
+project_dialog.move_to_new_folder = Sposta in una nuova cartella {folder}
+project_dialog.move_to_folder = Sposta in {folder}
+project_dialog.delete_title = Eliminare {project}?
+# A project with machines in it cannot be deleted yet: {machine} is its machine's name.
+project_dialog.delete_machine_first = Prima sposta o rimuovi la sua macchina: {machine}.
+# {machines} is their names, listed: web-01, web-02 and db.
+project_dialog.delete_machines_first = Prima sposta o rimuovi le sue macchine: {machines}.
+# "Move to another project" and "Remove machine" are the items of a machine's ⋯ menu (projectpage.move_machine, projectpage.remove_machine).
+project_dialog.delete_how = Nella pagina del progetto, ⋯ accanto a una macchina: Sposta in un altro progetto, oppure Rimuovi macchina. Poi il progetto si potrà eliminare.
+project_dialog.cant_undo = Questa azione non può essere annullata.
+# {n} is how many folders the project has; {notes} is project_dialog.delete_notes.
+project_dialog.delete_folders = one: Insieme al progetto viene eliminata {n} cartella con {notes}. | other: Insieme al progetto vengono eliminate {n} cartelle con {notes}.
+# How many notes are in those folders, inside project_dialog.delete_folders: 2 folders with 5 notes are deleted with it.
+project_dialog.delete_notes = one: {n} nota | other: {n} note
+project_dialog.delete_no_notes = Non contiene note.
+# Above the field the project's name is typed in.
+project_dialog.delete_type = Digita {project} per confermare
+# The button.
+project_dialog.delete_button = Elimina {project}
+
+# ------------------------------------------------------------ projectpage: a project's page (ProjectPage.tsx)
+# The end of the line under the project's name: 2 machines · 1 terminal open · you are the owner.
+projectpage.role_owner = il tuo ruolo: proprietario
+projectpage.role_admin = il tuo ruolo: amministratore
+projectpage.role_member = il tuo ruolo: membro
+projectpage.role_observer = il tuo ruolo: osservatore
+# A terminal busy with a command whose line is not known.
+projectpage.command_running = Comando in esecuzione
+# {duration} is how long the command has run: less than a minute, 3 minutes, an hour (time.for_*).
+projectpage.running_for = in esecuzione da {duration}
+# The same, while it is not known how long.
+projectpage.running = in esecuzione
+# A terminal whose machine is away: {machine} is its name.
+projectpage.waits_for = in attesa di {machine}
+# Under a terminal's name being typed. Enter and Esc are the keys.
+projectpage.rename_hint = Enter salva, Esc annulla.
+# On a terminal's name.
+projectpage.double_click = Fai doppio clic per rinominare
+# The button next to a terminal: go to it (a verb).
+projectpage.open = Apri
+# An offline computer's state, next to its name: {ago} is how long ago (time.ago_*): Last seen 14 minutes ago.
+projectpage.last_seen = Ultima connessione {ago}
+# A computer's state, next to its name.
+projectpage.offline = Offline
+projectpage.online = Online
+# On New terminal: {machine} is the machine's name.
+projectpage.offline_title = {machine} è offline: in sospensione, o il suo agente non è in esecuzione
+projectpage.new_terminal_title = Un nuovo terminale su {machine}
+# Said when New terminal is pressed on an offline computer: {seen} is time.last_seen: last seen 14 minutes ago.
+projectpage.offline_wait_seen = {machine} è offline, {seen}: torna quando il suo agente si collega.
+projectpage.offline_wait = {machine} è offline: torna quando il suo agente si collega.
+projectpage.new_terminal = Nuovo terminale
+# The ⋯ button next to a machine, for screen readers: {machine} is its name.
+projectpage.machine_menu = {machine}: menu della macchina
+# The tip on that button: the items of its menu (projectpage.move_machine, projectpage.remove_machine).
+projectpage.machine_menu_title = Sposta in un altro progetto, Rimuovi macchina
+# An item of a machine's menu, and the tip on its ⋯ button when it is the only item.
+projectpage.remove_machine = Rimuovi macchina
+# An item of a machine's menu.
+projectpage.move_machine = Sposta in un altro progetto
+projectpage.no_terminals = Nessun terminale aperto
+# Who changed a note last, and when: {ago} is just now, 5 min ago, yesterday, on 12 Oct (time.*).
+projectpage.edited_you = Tu, {ago}
+# The same, someone else: {name} is their first name.
+projectpage.edited_by = {name}, {ago}
+# A note's author when it is oneself, in the note's menu: You, the owner and admins can delete it.
+projectpage.you = Tu
+# A checklist's progress, in place of its first line: {n} items ticked of {total}.
+projectpage.done = one: {n} su {total} completata | other: {n} su {total} completate
+# A note without text yet, in place of its first line.
+projectpage.note_empty = Vuota
+# The ⋯ button next to a note, for screen readers: {note} is its title.
+projectpage.note_menu = {note}: menu della nota
+# The tip on that button: what its menu has.
+projectpage.note_menu_title_move = Cartella, Sposta in un altro progetto, Copia come Markdown, Elimina nota
+projectpage.note_menu_title = Cartella, Copia come Markdown, Elimina nota
+# The end of the line under the project's name when nobody else is in it: 1 machine · 2 terminals open · only you.
+projectpage.only_you = solo tu
+# The tip on the project's code, next to its name.
+projectpage.short_code = Codice breve
+# The pencil next to the project's name.
+projectpage.edit = Modifica nome, codice e colore
+# A heading.
+projectpage.machines = Macchine
+# Next to the heading Machines.
+projectpage.machines_alone = Solo tu ci apri terminali
+projectpage.machines_shared = I tuoi terminali su queste macchine
+projectpage.add_machine = Aggiungi macchina
+# The two kinds of machine one can add, in a project without machines.
+projectpage.server = Server
+projectpage.server_text = Un VPS o un server cloud che raggiungi via SSH. Esegui un solo comando e comparirà qui.
+projectpage.computer = Computer
+projectpage.computer_text = Un Mac o una macchina Linux a casa o in ufficio, anche dietro NAT. Un piccolo agente ne mantiene la connessione.
+# "Move to another project" is the item of a machine's ⋯ menu (projectpage.move_machine).
+projectpage.move_hint = Hai già la macchina in un altro progetto? Nella pagina di quel progetto, ⋯ accanto alla macchina, poi Sposta in un altro progetto.
+# On the page of Personal, the project each person has for themselves: {project} is its name.
+projectpage.personal_title = {project} è solo tuo
+projectpage.personal_text = Qui non puoi invitare nessuno. Per tenere separate altre macchine, o in futuro per lavorare con altri, crea un progetto e spostaci le macchine.
+projectpage.new_project = Nuovo progetto
+# A heading.
+projectpage.notes = Note
+# Next to the heading Notes.
+projectpage.notes_alone = Solo tu vedi le note in {project}. Le cartelle le tengono in ordine
+projectpage.notes_shared = Tutti in {project} le leggono e le modificano. Le cartelle le tengono in ordine
+projectpage.new_folder = Nuova cartella
+projectpage.no_notes = Ancora nessuna nota
+# Runbooks, Access, Checklists: examples of folders' names.
+projectpage.no_notes_text = Le note stanno nelle cartelle, come i terminali stanno sulle macchine. Inizia con una: Runbook, Accessi, Checklist.
+# A folder without notes, next to its name.
+projectpage.folder_empty = Vuota
+# Who made a folder: {name} is their first name.
+projectpage.made_by_you = creata da te
+projectpage.made_by = creata da {name}
+projectpage.new_note = Nuova nota
+# The ⋯ button next to a folder, for screen readers: {folder} is its name.
+projectpage.folder_menu = {folder}: menu della cartella
+# The tip on that button: what its menu has.
+projectpage.folder_menu_title = Rinomina cartella, Elimina cartella
+# "New note" is the button next to the folder's name (projectpage.new_note).
+projectpage.folder_no_notes_writes = Ancora nessuna nota. Con Nuova nota crei qui la prima
+# A heading at the end of the page: {project} is the project's name.
+projectpage.delete_title = Elimina {project}
+projectpage.delete_text = Con il progetto vengono eliminate anche le sue cartelle e note. Prima le macchine vanno spostate in un altro progetto o rimosse.
+projectpage.delete_project = Elimina progetto
+
+# ------------------------------------------------------------ machines: the machines page (Machines.tsx)
+# What sudo does on the machine, after "sudo" in what tTerm Web learned about it.
+machines.sudo_works = funziona
+machines.sudo_password = chiede una password
+machines.sudo_missing = non disponibile
+# What tTerm Web learned about a machine when it connected: the labels, each with its value.
+machines.system = Sistema
+machines.kernel = Kernel
+machines.cpu = CPU
+machines.cores = one: {n} core | other: {n} core
+machines.memory = Memoria
+machines.disk = Disco
+# {free} and {total} are sizes: 7.8 GB free of 50 GB.
+machines.disk_free = {free} liberi su {total}
+# The package manager: apt, brew.
+machines.packages = Pacchetti
+machines.shell = Shell
+# {shell} is the shell its terminals start, {shells} all the shells it has: zsh (has bash, zsh).
+machines.shell_has = {shell} (disponibili: {shells})
+machines.commands = Comandi
+# How many commands tTerm Web knows there.
+machines.commands_known = one: {n} noto | other: {n} noti
+# The version of the agent, or of tTerm for the computer.
+machines.agent = Agente
+# The account on the machine the terminals run as: root, deploy.
+machines.account = Utente
+# A computer's state on its card: {seen} is time.last_seen: offline, last seen 14 minutes ago.
+machines.offline_seen = offline, {seen}
+machines.offline = offline
+machines.online = online
+machines.offline_note = Il computer è in sospensione o offline, oppure il suo agente non è in esecuzione. Torna da solo quando il suo agente riesce a collegarsi; questa pagina se ne accorge entro dieci secondi.
+# On Open a terminal while the computer is offline.
+machines.offline_title = È offline: in sospensione, o il suo agente non è in esecuzione
+machines.open_terminal = Apri un terminale
+# A terminal running on the machine: {label} is as its tab shows it (P/web-01 · 2).
+machines.back_to = Torna a {label}, ancora in esecuzione
+# The tip on Remove: {machine} is the machine's name.
+machines.remove_title = Rimuovi {machine} da tTerm Web
+# The button: take the machine out (a verb).
+machines.remove = Rimuovi
+# The page's heading.
+machines.title = Macchine
+machines.add = Aggiungi una macchina
+machines.lead = Un terminale resta in esecuzione quando chiudi la sua scheda: aspetta qui e nella barra laterale finché la sua shell non si chiude.
+# A size: {size} is a number as the language writes it, 16 or 7.5.
+machines.gb = {size} GB
+
+# ------------------------------------------------------------ note_view: a note in its tab (NoteView.tsx)
+# Said for a moment at the bottom of the page. {why} is the reason tTerm
+# Web gave, as it gave it.
+note_view.not_saved = Non salvato: {why}
+note_view.draft_back = È tornato il testo non salvato di questa nota.
+# When tTerm Web gives no reason.
+note_view.no_answer = tTerm Web non ha risposto.
+# Ticking a checklist item did not get through.
+note_view.no_tick = Impossibile spuntare la voce: {why}
+# The note's tab was closed with what was typed in it not saved. {title} is
+# the note's title, or note.untitled.
+note_view.kept_draft = {title}: il testo scritto non è ancora salvato. Resta in questo browser e ricompare quando riapri la nota.
+note_view.copied_markdown = Copiata come Markdown.
+note_view.no_copy = Impossibile copiare: il browser non l'ha permesso.
+note_view.no_move = Impossibile completare lo spostamento: {why}
+# Under the note's title, the parts of one line with dots between: who
+# started it and when; or who edited it last and when · who wrote it and
+# on which day; then who sees it. Someone is a person no longer known.
+# {name} is a person's first name; {ago} is how long ago, short: just now,
+# 5 min ago, yesterday, on 12 Oct; {folder} is a folder's name.
+note_view.someone_started = Creata da qualcuno in {folder}, {ago}
+note_view.you_started = Creata da te in {folder}, {ago}
+note_view.started = Creata da {name} in {folder}, {ago}
+note_view.someone_edited = Modificata da qualcuno, {ago}
+note_view.you_edited = Modificata da te, {ago}
+note_view.edited = Modificata da {name}, {ago}
+# {day} is today, yesterday or on 12 Oct.
+note_view.someone_wrote = Scritta da qualcuno, {day}
+note_view.you_wrote = Scritta da te, {day}
+note_view.wrote = Scritta da {name}, {day}
+# The end of the same line, after a dot. {project} is a project's name.
+note_view.only_you = la vedi solo tu
+note_view.everyone_edits = tutti in {project} possono modificarla
+# The note was deleted while it was open here.
+note_view.gone_title = Questa nota è stata eliminata
+note_view.gone_text = La nota, o la cartella che la conteneva, è stata eliminata da un'altra scheda o da un altro dispositivo.
+note_view.close_tab = Chiudi la scheda
+note_view.copy_what_was_here = Copia come Markdown quello che c'era qui
+note_view.no_open = Impossibile aprire la nota: {why}
+# The ⋯ beside where the note is: what screen readers say, and the tip
+# under the mouse, which lists what is in its menu.
+note_view.menu = Menu della nota
+note_view.menu_title_move = Cartella, Sposta in un altro progetto, Copia come Markdown, Elimina nota
+note_view.menu_title = Cartella, Copia come Markdown, Elimina nota
+# The field of the note's title, for screen readers.
+note_view.title = Titolo
+# The note was saved meanwhile from elsewhere, changed in the same places.
+note_view.conflict = Mentre scrivevi, questa nota è stata modificata altrove, negli stessi punti. In quei punti vuoi tenere la tua versione o l'altra? Tutte le altre modifiche, di entrambe le versioni, restano.
+note_view.keep_mine = Tieni la mia
+note_view.keep_theirs = Tieni l'altra versione
+
+# ------------------------------------------------------------ note_editor: a note's blocks, written in place (NoteEditor.tsx)
+# The kinds of block: what screen readers say of one, and what an empty one
+# shows. Heading, Code, Divider and Text are also in the list that / opens.
+note_editor.text = Testo
+note_editor.heading = Titolo
+note_editor.list_item = Voce di elenco
+note_editor.checklist_item = Voce di checklist
+note_editor.code = Codice
+note_editor.divider = Separatore
+# In the list that / opens: what a block can become. What is typed after
+# the / picks from these names.
+note_editor.checklist = Checklist
+note_editor.list = Elenco
+# Who ticked a checklist item, beside it: You · 10:02, Denis · 12 Oct.
+note_editor.you = Tu
+# The same, for a person no longer known.
+note_editor.someone = Qualcuno
+# What an empty note shows. The marks # - [ ] \`\`\` and / are typed as they
+# are; the words after them are the language's own.
+note_editor.start_writing = Inizia a scrivere. Il Markdown funziona mentre scrivi: # titolo, - [ ] checklist, \`\`\` codice. Digita / per il resto.
+# What an empty line of text shows.
+note_editor.type_slash = Digita / per una checklist, un titolo, del codice
+# A checklist item's box, for screen readers.
+note_editor.untick = Completata: togli la spunta
+note_editor.tick = Segna come completata
+note_editor.no_copy = Impossibile copiare: seleziona il testo e copialo a mano.
+# The list that / opens, for screen readers.
+note_editor.turn_into = Trasforma in
+
+# ------------------------------------------------------------ menus: the menus behind ⋯, and the window that names a folder (Menus.tsx)
+# A note's menu: over the project's folders, the one the note is in
+# checked; a click moves it to another.
+menus.folder = Cartella
+menus.move_out = Sposta in un altro progetto…
+menus.copy_markdown = Copia come Markdown
+menus.delete_note = Elimina nota
+# Instead of Delete note, for one who may not: who may. {name} is the first
+# name of the note's author.
+menus.note_rights_move = {name}, il proprietario e gli amministratori possono spostarla in un altro progetto o eliminarla
+menus.note_rights_delete = {name}, il proprietario e gli amministratori possono eliminarla
+# The same, when the note's author is no longer known.
+menus.note_rights_move_someone = Chi l'ha creata, il proprietario e gli amministratori possono spostarla in un altro progetto o eliminarla
+menus.note_rights_delete_someone = Chi l'ha creata, il proprietario e gli amministratori possono eliminarla
+# A folder's menu.
+menus.rename_folder = Rinomina cartella
+menus.delete_folder = Elimina cartella
+# Instead of Delete folder, for one who may not.
+menus.folder_rights = Solo il proprietario e gli amministratori possono eliminare una cartella con note
+# The window that names a folder, a new one or one renamed. First what it
+# says when tTerm Web gives no reason.
+menus.no_answer = tTerm Web non ha risposto.
+# The field of the folder's name, and an example of one in it.
+menus.name = Nome
+menus.name_example = Ad esempio, Runbook
+
+# ------------------------------------------------------------ search: search over everything, by ⌘K or Search on the right of the tabs (Search.tsx)
+# The kinds of what is found: the buttons above the list, and the heads of
+# its groups.
+search.kind_commands = Comandi
+search.kind_output = Output
+search.kind_notes = Note
+search.kind_terminals = Terminali
+search.kind_machines = Macchine
+search.kind_projects = Progetti
+search.kind_actions = Azioni
+# The kind of the line chosen, on top of the preview beside the list.
+search.label_command = Comando
+search.label_output = Output
+search.label_note = Nota
+search.label_terminal = Terminale
+search.label_machine = Macchina
+search.label_project = Progetto
+search.label_action = Azione
+# Nothing found. {text} is what was typed; Commands, Output… are the button
+# chosen above the list (search.kind_*).
+search.nothing_for = Nessun risultato per “{text}”.
+search.nothing_in_commands = Nessun risultato per “{text}” in Comandi.
+search.nothing_in_output = Nessun risultato per “{text}” in Output.
+search.nothing_in_notes = Nessun risultato per “{text}” in Note.
+search.nothing_in_terminals = Nessun risultato per “{text}” in Terminali.
+search.nothing_in_machines = Nessun risultato per “{text}” in Macchine.
+search.nothing_in_projects = Nessun risultato per “{text}” in Progetti.
+search.nothing_in_actions = Nessun risultato per “{text}” in Azioni.
+# How a command found ended: stopped (it has no exit code), or exit 1.
+# {code} is its exit code.
+search.stopped = interrotto
+search.exit = uscita {code}
+# How often it ran, at the end of the line under a command:
+# P/web-01 · ~/app · main · exit 0 · 10:46 · 3 runs.
+search.runs = one: {n} esecuzione | other: {n} esecuzioni
+# Under a line of output found: the command that printed it, in npm test.
+search.in_command = in {command}
+# Beside the list: what the line chosen is, a row each.
+search.row_machine = Macchina
+# {machine} is the project's code and the machine's name: P/web-01.
+search.machine_removed = {machine}, rimossa da tTerm
+search.row_folder = Cartella
+search.row_branch = Branch
+search.row_status = Stato
+search.row_when = Quando
+search.row_terminal = Terminale
+# {terminal} is the terminal as its tab names it, P/web-01 · deploy; {when}
+# is when it ended: 10:46, yesterday 17:38, 2 Oct 09:12.
+search.terminal_ended = {terminal}, terminato: {when}
+# The buttons under the preview: the command opened at its block, or put
+# into the line of the terminal in front, not run.
+search.open_in_terminal = Apri nel suo terminale
+search.into_line = Inserisci nella riga
+# A note found: where it is (its project and folder), when it was edited.
+search.row_in = Posizione
+search.row_edited = Ultima modifica
+search.open_note = Apri la nota
+# Before anything is typed: what was open last, and the commands run most
+# on the machine in front; {machine} is its name.
+search.recent = Recenti
+search.yours_on = I tuoi comandi su {machine}
+# Beside a group's head in All: all of its kind; + when there are more
+# than were sent.
+search.all = one: {n} risultato | other: {n} risultati
+search.all_more = one: {n}+ risultati | other: {n}+ risultati
+# The window, and its field.
+search.label = Cerca
+search.placeholder = Comandi, output, note, terminali, macchine…
+search.close_title = Chiudi (Esc)
+# The buttons above the list; All is the first of them.
+search.filters = Cosa cercare
+search.kind_all = Tutti
+# The list of what was found, for screen readers.
+search.found = Risultati
+search.nothing_typed = Non hai ancora scritto nulla: ecco cosa avevi aperto e cosa esegui più spesso qui.
+search.looks_in = La ricerca guarda in tutti i comandi di tutti i tuoi terminali e nel loro output, nelle note, nei terminali, nelle macchine e nei progetti.
+search.everything = Cerca in tutto
+# With Output, Notes or Commands chosen and nothing typed yet.
+search.type_output = Digita una parola da cercare nell'output dei comandi.
+search.type_notes = Digita una parola da cercare nelle note.
+search.type_commands = Digita una parola da cercare nei comandi.
+# Beside the list while nothing is chosen: what to type (c: nginx,
+# o: timed out…), and what each keeps to.
+search.tips = Un prefisso limita la ricerca a un tipo
+search.tip_commands = comandi
+search.tip_output = output dei comandi
+search.tip_notes = note
+search.tip_terminals = terminali
+search.tip_machines = macchine
+search.tip_projects = progetti
+search.tip_actions = azioni
+# Tab is the key.
+search.tips_buttons = Oppure scegli uno dei pulsanti sopra l'elenco. Tab passa al successivo.
+# At the bottom: a key, and what it does (move, open: verbs). {keys} is
+# ⌘ Enter or Ctrl+Enter.
+search.keys_move = <kbd>↑</kbd><kbd>↓</kbd> naviga
+search.keys_open = <kbd>Enter</kbd> apri
+search.keys_paste = <kbd>{keys}</kbd> nella riga
+search.keys_next = <kbd>Tab</kbd> tipo successivo
+# The words in front, and what each keeps to. c:, o:, n:, >, t:, m: and p:
+# are typed as they are: keep them.
+search.prefixes_title = t: terminali, m: macchine, p: progetti
+search.prefix_commands = <code>c:</code> comandi
+search.prefix_output = <code>o:</code> output
+search.prefix_notes = <code>n:</code> note
+search.prefix_actions = <code>></code> azioni
+
+# ------------------------------------------------------------ input: tTerm's own input line, under a terminal's feed (InputLine.tsx)
+# Said for a moment at the bottom of the page.
+input.still_running = Un comando è ancora in esecuzione. Aspetta che finisca, o interrompilo con Ctrl+C nel suo blocco.
+# Faint, after a name in the lists over the line: .. goes up a level; the
+# branch checked out now; a branch of the remote.
+input.up_level = su di un livello
+input.branch_current = attuale
+input.branch_remote = remoto
+# {error} is what went wrong, as the browser or tTerm Web said it.
+input.no_answer = La macchina non ha risposto: {error}
+# Faint in the line while it cannot take a command.
+input.starting = Avvio della shell…
+input.keys_go = I tasti vanno al comando in esecuzione. Fai clic qui per scrivere il prossimo.
+# The directory and the branch above the line are buttons: each opens a
+# list, to cd into or to switch to. Ctrl+R lists the history.
+input.change_dir = Cambia directory
+input.switch_branch = Cambia branch
+input.history = Cronologia
+# The search field over those lists.
+input.find_dir = Cerca una directory o digita un percorso
+input.find_branch = Cerca un branch
+input.find_command = Cerca un comando
+# Tab's list of what the word could be.
+input.completions = Completamenti
+input.more_not_shown = Altri risultati non mostrati: digita qualche lettera in più
+# The line itself, for screen readers.
+input.command = Comando
+# Under the line, while it holds a command search put there.
+input.from_search = Dalla ricerca, non ancora eseguito
+input.enter_runs = <kbd>Enter</kbd> lo esegue qui
+input.esc_clears = <kbd>Esc</kbd> svuota la riga
+# Under the line: a key, and what it does. ⇧↵ is Shift+Enter.
+input.tab_complete = <kbd>Tab</kbd> completa o accetta il suggerimento
+input.history_local = <kbd>↑</kbd> cronologia di questo computer
+input.history_devices = <kbd>↑</kbd> cronologia di tutti i tuoi dispositivi
+input.new_line = <kbd>⇧↵</kbd> a capo
+input.while_running = Mentre un comando è in esecuzione, riceve quello che digiti
+# A terminal's two modes, beside the line: Line, with this line and the
+# commands as blocks; Classic, every key straight to the shell.
+input.mode = Modalità di input
+input.mode_line = Riga
+input.mode_classic = Classica
+
+# ------------------------------------------------------------ block: one command of the feed, with its output (BlockView.tsx)
+# The block, for screen readers. {command} is the command as typed, {code}
+# its exit code.
+block.state_input = {command}, non avviato dalla shell
+block.state_running = {command}, in esecuzione
+block.state_failed = {command}, non riuscito con codice di uscita {code}
+block.state_finished = {command}, completato
+block.state_ended = {command}, terminato
+# On a block search opened: the words found are marked in it.
+block.found = Trovato
+# A command the shell has not started; Stop is the button (block.stop).
+block.not_started_title = La shell aspetta il resto del comando (una virgoletta o un heredoc aperti), oppure non l'ha accettato. Scrivi nel blocco, o premi Interrompi.
+block.not_started = non avviato
+block.running = in esecuzione
+# A command that failed: exit 1.
+block.exit = uscita {code}
+block.stop_title = Interrompi il comando (Ctrl+C)
+# The button that stops the command running: a verb.
+block.stop = Interrompi
+# The buttons of a finished block, with their tips.
+block.actions = Azioni del blocco
+block.copy_block = Copia il comando e il suo output
+block.copy_output = Copia output
+block.copy_output_title = Copia solo l'output
+block.run_again = Esegui di nuovo
+block.copy_link = Copia il link a questo blocco
+block.expand = Espandi il blocco
+block.collapse = Comprimi il blocco
+# For screen readers: the browser did not let the page copy.
+block.not_copied = Non copiato
+# A folded block, in its place; a click unfolds it.
+block.lines_hidden = one: {n} riga nascosta | other: {n} righe nascoste
+# Above a long output, of which the last 400 lines show.
+block.show_earlier = one: Mostra {n} riga precedente | other: Mostra {n} righe precedenti
+block.show_whole = Mostra tutto l'output
+
+# ------------------------------------------------------------ feed: a terminal's commands as blocks, in the Line mode (FeedTerminal.tsx)
+# Said for a moment at the bottom of the page.
+feed.not_connected = Al momento non c'è connessione a tTerm Web: il comando non è stato inviato.
+feed.still_running = Un comando è ancora in esecuzione. Puoi interromperlo con Ctrl+C.
+feed.copy_refused = Il browser non ha permesso di copiare.
+feed.output_gone = L'output completo non è più disponibile.
+feed.show_earlier = Mostra i comandi precedenti
+# After clear or Ctrl+L, on top: what came before is out of view; a click
+# shows it again.
+feed.cleared = one: {n} blocco nascosto: mostra | other: {n} blocchi nascosti: mostra
+feed.empty = Digita un comando qui sotto. Ognuno diventa qui un blocco, con il suo output, la durata e l'esito.
+# Asked before a dangerous command runs. {what} is what it would do and
+# {lost} what does not come back, as tTerm Web says them: delete a
+# directory and everything inside it; There is no undo and no bin to look
+# in. {machine} is the machine's name; the second is for while it is not
+# known.
+feed.confirm_label = Eseguire questo comando?
+feed.confirm = Il comando sta per <strong>{what}</strong> su <strong>{machine}</strong>. {lost}
+feed.confirm_unknown = Il comando sta per <strong>{what}</strong> sulla <strong>macchina</strong>. {lost}
+# What a command held back would do ({what} of feed.confirm, so in the form
+# that fits there) and what does not come back ({lost}): the nine of the
+# core and the app (danger.ts).
+danger.delete_tree = eliminare una directory con tutto il suo contenuto
+danger.delete_tree_lost = Non si può annullare e non c'è un cestino in cui ritrovarla.
+danger.disk = riscrivere il file system di un disco
+danger.disk_lost = Va perso tutto ciò che c'è sul disco, non solo i file.
+danger.device = sovrascrivere direttamente un dispositivo
+danger.device_lost = Tutto ciò che c'è sul dispositivo va perso dal primo istante.
+danger.database = eliminare un database o una tabella
+danger.database_lost = Si può recuperare solo da un backup.
+danger.power_off = spegnere il sistema
+danger.power_off_lost = Da qui non c'è modo di riaccenderlo: serve il pannello del provider.
+danger.reboot = riavviare il sistema
+danger.reboot_lost = La sessione cade e con lei si ferma tutto ciò che era in esecuzione.
+danger.ssh = arrestare il servizio SSH
+danger.ssh_lost = È da lì che si entra. Arrestarlo è come chiudere la porta a chiave dall'interno.
+danger.firewall = modificare il firewall
+danger.firewall_lost = Una regola sbagliata può isolare la macchina, senza più modo di rientrare.
+danger.user = eliminare un account utente
+danger.user_lost = Con l'account spariscono anche i suoi file e i suoi accessi.
+# Under it, for rm -rf aimed at / or ~.
+feed.everything = <strong>Questo comando colpisce l'intera macchina.</strong> Non si salverebbe nulla.
+feed.run_it = Eseguilo
+
+# ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
+# A terminal's tab while its own name is not known yet.
+terminal_view.terminal = Terminale
+# The tip of Line (input.mode_line) when it cannot be chosen.
+terminal_view.no_blocks = Questa shell non segnala dove iniziano i comandi, quindi funziona solo in modalità classica.
+terminal_view.end_failed = Impossibile terminare il terminale: tTerm Web non ha risposto.
+# Under a terminal in the Classic mode (input.mode_classic). Tab is the key.
+terminal_view.classic_hint = Classica: ogni tasto va direttamente alla shell, con il suo Tab e la sua cronologia.
+terminal_view.classic_warning = In questa modalità non c'è conferma per i comandi pericolosi.
+# {machine} is the machine's name; the second is for while it is not known.
+terminal_view.connecting = Connessione a {machine}…
+terminal_view.connecting_unknown = Connessione alla macchina…
+# A terminal whose computer sleeps, or is offline. {since} is how long:
+# 3 minutes, an hour (time.for_*).
+terminal_view.away = {machine} è in sospensione o offline
+terminal_view.away_since = Questo terminale resta in attesa e riprende da dove era rimasto quando la macchina torna online. Offline da {since}.
+terminal_view.away_text = Questo terminale resta in attesa e riprende da dove era rimasto quando la macchina torna online.
+terminal_view.end = Termina questo terminale
+# A terminal that ended. Under it, how it ended as tTerm Web says it, or
+# not_running.
+terminal_view.no_such = Terminale non trovato
+terminal_view.ended = Questo terminale è terminato
+terminal_view.not_running = Non è più in esecuzione.
+terminal_view.open_new = Apri un nuovo terminale su {machine}
+terminal_view.close_tab = Chiudi la scheda
+
+# ------------------------------------------------------------ classic: the Classic mode, every key straight to the shell (ClassicTerminal.tsx)
+# A command search put here. Line is the mode (input.mode_line).
+classic.several_lines = Questo comando ha più righe, e la modalità classica le eseguirebbe una a una man mano che arrivano. Passa alla modalità Riga, sotto il terminale.
+
+# ------------------------------------------------------------ tabs: the line of tabs on top (TabBar.tsx)
+# The tabs that are open, for screen readers.
+tabs.label = Schede aperte
+# Naming a terminal in its tab, after a double click.
+tabs.rename_title = Dai un nome a questo terminale
+tabs.rename_hint = Enter salva, Esc annulla. Il nome compare nella barra laterale, nelle schede e nella pagina del progetto.
+# {name} is the tab as it reads: P/web-01 · 2, a note's title, a project's
+# name.
+tabs.close = Chiudi la scheda {name}
+# The + after the tabs.
+tabs.new_terminal = Nuovo terminale
+tabs.new_terminal_title = Un nuovo terminale su qualsiasi macchina
+# The button on the right that opens search.
+tabs.search_title = Cerca comandi, il loro output, note, terminali, macchine e azioni
+tabs.search = Cerca
+
+# ------------------------------------------------------------ finder: a list with a search field, as the + after the tabs opens it (Finder.tsx)
+finder.nothing = Nessun risultato
+
+# ------------------------------------------------------------ picker: the lists over the input line: directories, branches, history (Picker.tsx)
+# While the machine is asked for its directories or branches.
+picker.asking = Richiesta alla macchina…
+picker.nothing = Qui non c'è niente
+
+# ------------------------------------------------------------ name_input: the field that names a terminal (NameInput.tsx)
+# For screen readers. While the terminal has only its number,
+# terminal.numbered shows faint in it.
+name_input.label = Nome del terminale
+`;export{e as default};

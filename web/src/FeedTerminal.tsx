@@ -18,15 +18,17 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import {
-  useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState,
+  useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode,
 } from "react";
 import {
   blockOutput, loadFeed, loadHistory, type StoredBlock, type TerminalInfo,
 } from "./api";
 import { BlockView, shortPath, type FeedBlock } from "./BlockView";
+import { DANGER_KEYS } from "./danger";
 import { PRESSED_MS, toClipboard } from "./briefly";
 import { FONT, FONT_SIZE, HIGH, LOW, type ViewEvents } from "./ClassicTerminal";
 import { goneThere, takePaste, useFoundBlock, wentThere } from "./found";
+import { useT } from "./i18n";
 import { Warning } from "./icons";
 import { InputLine, type Phase, type Prompt } from "./InputLine";
 import { keepKeys, typingElsewhere, type Home } from "./keys";
@@ -145,7 +147,8 @@ interface Props {
   ended: boolean;
   /** Its tab is in front: only then does it take the keys. */
   active: boolean;
-  machine: string;
+  /** Its machine's name, once it is known. */
+  machine?: string;
   /** The home directory as tTerm Web knows it, for a terminal whose shell
    * has not said it here (one that ended in an earlier run). */
   home: string;
@@ -192,8 +195,11 @@ function join(chunks: Uint8Array[], size: number): Uint8Array {
   return out;
 }
 
+const strong = (inner: ReactNode) => <strong>{inner}</strong>;
+
 export function FeedTerminal(props: Props) {
   const { terminalId, shownTheme } = props;
+  const t = useT();
   const [blocks, setBlocks] = useState<FeedBlock[]>([]);
   const [more, setMore] = useState(false);
   const [liveKey, setLiveKey] = useState<string | null>(null);
@@ -272,12 +278,12 @@ export function FeedTerminal(props: Props) {
 
     const start = async () => {
       try {
-        await document.fonts.load(`${FONT_SIZE}px "JetBrains Mono Variable"`);
+        await document.fonts.load(`${FONT_SIZE}px "JetBrains Mono Variable"`); // i18n-ignore
       } catch {
         // A fallback font is measured instead.
       }
       if (disposed) return;
-      const t = new Terminal({
+      const xterm = new Terminal({
         fontFamily: FONT,
         fontSize: FONT_SIZE,
         lineHeight: LINE_HEIGHT,
@@ -287,17 +293,17 @@ export function FeedTerminal(props: Props) {
         theme: liveTheme(document.documentElement.classList.contains("tt-light")
           ? "light" : "dark"),
       });
-      term.current = t;
+      term.current = xterm;
       const fit = new FitAddon();
-      t.loadAddon(fit);
-      t.loadAddon(new Unicode11Addon());
-      t.unicode.activeVersion = "11";
+      xterm.loadAddon(fit);
+      xterm.loadAddon(new Unicode11Addon());
+      xterm.unicode.activeVersion = "11";
       parkRef.current?.appendChild(holder);
-      t.open(holder);
+      xterm.open(holder);
       try {
         const webgl = new WebglAddon();
         webgl.onContextLoss(() => webgl.dispose());
-        t.loadAddon(webgl);
+        xterm.loadAddon(webgl);
       } catch {
         // No WebGL here: xterm.js draws with the DOM instead.
       }
@@ -316,8 +322,8 @@ export function FeedTerminal(props: Props) {
         holder.style.height = `${Math.max(60, height)}px`;
         fit.fit();
         const screen = holder.querySelector<HTMLElement>(".xterm-screen");
-        if (screen && t.rows) {
-          setCellHeight(screen.getBoundingClientRect().height / t.rows);
+        if (screen && xterm.rows) {
+          setCellHeight(screen.getBoundingClientRect().height / xterm.rows);
         }
       };
       layoutRef.current = layout;
@@ -337,11 +343,11 @@ export function FeedTerminal(props: Props) {
         if (measuring) return;
         measuring = requestAnimationFrame(() => {
           measuring = 0;
-          const b = t.buffer.active;
-          let used = b.baseY > 0 || b.type === "alternate" ? t.rows
+          const b = xterm.buffer.active;
+          let used = b.baseY > 0 || b.type === "alternate" ? xterm.rows
             : b.cursorY + 1;
-          if (used < t.rows) {
-            for (let y = t.rows - 1; y >= used; y--) {
+          if (used < xterm.rows) {
+            for (let y = xterm.rows - 1; y >= used; y--) {
               if (b.getLine(y)?.translateToString(true)) {
                 used = y + 1;
                 break;
@@ -357,7 +363,7 @@ export function FeedTerminal(props: Props) {
       const writeLive = (data: Uint8Array) => {
         st.unwritten += data.length;
         if (st.unwritten > HIGH) chan.current?.pause();
-        t.write(data, () => {
+        xterm.write(data, () => {
           st.unwritten -= data.length;
           if (st.unwritten < LOW) chan.current?.resume();
           measure();
@@ -384,8 +390,8 @@ export function FeedTerminal(props: Props) {
         st.live = { key: block.key, cols: block.cols, chunks: [], size: 0,
           dropped: false, command: block.command, alt: false };
         // A clean screen for it, after whatever is still queued before it.
-        t.write(EMPTY, () => {
-          t.reset();
+        xterm.write(EMPTY, () => {
+          xterm.reset();
           measure();
         });
         setBlocks((bs) => [...bs.filter((b) => b.state !== "input"), block]);
@@ -412,13 +418,13 @@ export function FeedTerminal(props: Props) {
         const raw = trim > 0 && !live.dropped ? join(live.chunks, live.size)
           : null;
         // Read its screen back once everything before the end is drawn.
-        t.write(EMPTY, () => {
-          const buffer = t.buffer.normal;
+        xterm.write(EMPTY, () => {
+          const buffer = xterm.buffer.normal;
           const rendered = { ...readBuffer(buffer,
-            buffer.length >= KEEP_LINES + t.rows), alt: live.alt };
+            buffer.length >= KEEP_LINES + xterm.rows), alt: live.alt };
           // A full-screen program that never switched back (killed, or its
           // ssh connection gone) must not keep the screen.
-          if (t.buffer.active.type === "alternate") t.reset();
+          if (xterm.buffer.active.type === "alternate") xterm.reset();
           setBlocks((bs) => bs.map((b) => b.key === key
             ? { ...b, rendered, partial: b.partial || live.dropped } : b));
           setLiveKey((k) => (k === key ? null : k));
@@ -436,7 +442,7 @@ export function FeedTerminal(props: Props) {
       // line editor's echo of the command itself.
       const notRun = async (p: Pending, code: number | null, at: number) => {
         const size = p.chunks.reduce((n, c) => n + c.length, 0);
-        const rendered = await renderOutput(join(p.chunks, size), t.cols);
+        const rendered = await renderOutput(join(p.chunks, size), xterm.cols);
         const own = p.command.split("\n").map((l) => l.trim()).filter(Boolean);
         const lines = [...rendered.lines];
         while (lines.length && (!lines[0].text.trim() ||
@@ -447,7 +453,7 @@ export function FeedTerminal(props: Props) {
         setBlocks((bs) => [...bs, {
           key: `r${at}`, seqStart: -1, seqEnd: null, command: p.command,
           cwd: st.prompt.cwd, branch: st.prompt.branch, startedAt: at,
-          finishedAt: at, exitCode: code, state: "done", cols: t.cols,
+          finishedAt: at, exitCode: code, state: "done", cols: xterm.cols,
           rendered: { lines, limited: false }, partial: false, cut: false,
           stored: false, expanded: false, collapsed: false,
         }]);
@@ -459,10 +465,10 @@ export function FeedTerminal(props: Props) {
         if (st.live) finishLive(null, 0, Date.now(), st.knownSeq);
         dropInput();
         clearPending();
-        t.options.disableStdin = true;
-        t.options.cursorBlink = false;
-        t.write("\x1b[?25l");
-        t.blur();
+        xterm.options.disableStdin = true;
+        xterm.options.cursorBlink = false;
+        xterm.write("\x1b[?25l");
+        xterm.blur();
       };
 
       // The finished blocks from the database, newest drawn first.
@@ -477,7 +483,7 @@ export function FeedTerminal(props: Props) {
       st.knownSeq = stored.reduce((m, b) => Math.max(m, b.seqEnd ?? b.seqStart),
         -1);
       const folded = foldedBlocks();
-      setBlocks(stored.map((b) => fromStored(b, t.cols,
+      setBlocks(stored.map((b) => fromStored(b, xterm.cols,
         folded.has(`${terminalId}:${b.seqStart}`))));
       // Cleared from view as it was: the last `clear` that worked, or
       // Ctrl+L, whichever came later, unless that cut was opened again.
@@ -493,7 +499,7 @@ export function FeedTerminal(props: Props) {
         for (const b of [...stored].reverse()) {
           if (disposed) return;
           const rendered = await renderOutput(fromBase64(b.output),
-            b.cols ?? t.cols);
+            b.cols ?? xterm.cols);
           setBlocks((bs) => bs.map((x) => x.key === `s${b.seqStart}`
             ? { ...x, rendered } : x));
         }
@@ -504,7 +510,7 @@ export function FeedTerminal(props: Props) {
         })
         .catch(() => {});
 
-      const channel = socket.attach(terminalId, t.cols, t.rows, {
+      const channel = socket.attach(terminalId, xterm.cols, xterm.rows, {
         attached: (info, resumed) => {
           st.info = info;
           // Going on from the last block of the database, or back after a
@@ -523,7 +529,7 @@ export function FeedTerminal(props: Props) {
           dropInput();
           clearPending();
           // After whatever was still on its way to the screen.
-          t.write(EMPTY, () => t.reset());
+          xterm.write(EMPTY, () => xterm.reset());
           st.unwritten = 0;
           setLiveKey(null);
           setPhaseBoth("start");
@@ -534,14 +540,14 @@ export function FeedTerminal(props: Props) {
               key: `s${r.seqStart}`, seqStart: r.seqStart, seqEnd: null,
               command: r.command, cwd: r.cwd, branch: r.branch,
               startedAt: r.at, finishedAt: null, exitCode: null,
-              state: "running", cols: r.cols || t.cols, rendered: null,
+              state: "running", cols: r.cols || xterm.cols, rendered: null,
               partial: true, cut: false, stored: false, expanded: false,
               collapsed: false,
             });
           }
         },
         replayed: () => {
-          t.write(EMPTY, () => {
+          xterm.write(EMPTY, () => {
             st.replaying = false;
           });
         },
@@ -582,7 +588,7 @@ export function FeedTerminal(props: Props) {
             startLive({
               key: `s${seq}`, seqStart: seq, seqEnd: null, command: ev.command,
               cwd: st.prompt.cwd, branch: st.prompt.branch, startedAt: ev.at,
-              finishedAt: null, exitCode: null, state: "running", cols: t.cols,
+              finishedAt: null, exitCode: null, state: "running", cols: xterm.cols,
               rendered: null, partial: false, cut: false, stored: false,
               expanded: false, collapsed: false,
             });
@@ -602,7 +608,7 @@ export function FeedTerminal(props: Props) {
             // A prompt with no start before it: the shell did not run what
             // was typed (a syntax error, say). What it said goes in a block.
             const refused = !st.inputKey ? st.pending : null;
-            if (st.inputKey) t.write(EMPTY, () => t.reset());
+            if (st.inputKey) xterm.write(EMPTY, () => xterm.reset());
             dropInput();
             clearPending();
             if (refused && refused.chunks.length) {
@@ -633,15 +639,15 @@ export function FeedTerminal(props: Props) {
       }, st.knownSeq >= 0 ? st.knownSeq : null);
       chan.current = channel;
 
-      t.onData((data) => {
+      xterm.onData((data) => {
         if (!st.replaying && (st.live || st.inputKey)) channel.input(data);
       });
-      t.onBinary((data) => {
+      xterm.onBinary((data) => {
         if (!st.replaying && (st.live || st.inputKey)) channel.inputBinary(data);
       });
-      t.textarea?.addEventListener("focus", () => channel.focus());
-      t.onResize(({ cols, rows }) => channel.resize(cols, rows));
-      t.buffer.onBufferChange((buffer) => {
+      xterm.textarea?.addEventListener("focus", () => channel.focus());
+      xterm.onResize(({ cols, rows }) => channel.resize(cols, rows));
+      xterm.buffer.onBufferChange((buffer) => {
         const full = buffer.type === "alternate";
         if (full && st.live) st.live.alt = true;
         if (full === isFull.current) return;
@@ -652,7 +658,7 @@ export function FeedTerminal(props: Props) {
       cleanups.push(keepKeys(() => {
         if (disposed || ended.current || !active.current) return null;
         const p = phaseRef.current;
-        const live = { element: t.textarea ?? null, type: (d: string) => t.input(d) };
+        const live = { element: xterm.textarea ?? null, type: (d: string) => xterm.input(d) };
         if (isFull.current || p === "input") return live;
         if (p === "prompt") return homeRef.current;
         if (p === "running") {
@@ -691,12 +697,12 @@ export function FeedTerminal(props: Props) {
   });
 
   useLayoutEffect(() => {
-    const t = term.current;
-    if (t) t.options.theme = fullscreen ? terminalTheme(shownTheme)
+    const xterm = term.current;
+    if (xterm) xterm.options.theme = fullscreen ? terminalTheme(shownTheme)
       : liveTheme(shownTheme);
     layoutRef.current();
     if (fullscreen && !typingElsewhere(feedRef.current?.closest(".terminal-view"))) {
-      t?.focus();
+      xterm?.focus();
     }
   }, [fullscreen, shownTheme]);
 
@@ -705,8 +711,8 @@ export function FeedTerminal(props: Props) {
   // on gets them (a password, a y, an answer), unless the next command is
   // being typed in the line already. Back at the prompt, back to the line.
   useEffect(() => {
-    const t = term.current;
-    if (!t || props.ended || !props.active) return;
+    const xterm = term.current;
+    if (!xterm || props.ended || !props.active) return;
     const line = homeRef.current?.element;
     // A window or the search over the terminal keeps the keys (0.1.7).
     const elsewhere = () => typingElsewhere(feedRef.current?.closest(".terminal-view"));
@@ -715,19 +721,19 @@ export function FeedTerminal(props: Props) {
       return (!active || active === document.body || active === line) && !elsewhere();
     };
     if (phase === "input") {
-      if (!elsewhere()) t.focus();
+      if (!elsewhere()) xterm.focus();
       return;
     }
     if (phase === "running") {
       const timer = window.setTimeout(() => {
         const field = homeRef.current?.element as HTMLTextAreaElement | undefined;
-        if (phaseRef.current === "running" && !field?.value && here()) t.focus();
+        if (phaseRef.current === "running" && !field?.value && here()) xterm.focus();
       }, FOCUS_DELAY_MS);
       return () => window.clearTimeout(timer);
     }
     if (phase === "prompt" && !fullscreen) {
       const active = document.activeElement;
-      if ((active === t.textarea || !active || active === document.body) &&
+      if ((active === xterm.textarea || !active || active === document.body) &&
           !elsewhere()) {
         line?.focus();
       }
@@ -737,13 +743,13 @@ export function FeedTerminal(props: Props) {
   // Its tab brought to the front: the keys come here, where they belong.
   // Sent behind: it no longer claims them.
   useEffect(() => {
-    const t = term.current;
+    const xterm = term.current;
     if (!props.active) chan.current?.unfocus();
-    if (!props.active || props.ended || !t) return;
+    if (!props.active || props.ended || !xterm) return;
     const p = phaseRef.current;
     const line = homeRef.current?.element as HTMLTextAreaElement | undefined;
     if (isFull.current || p === "input" || (p === "running" && !line?.value)) {
-      t.focus();
+      xterm.focus();
     } else if (p === "prompt" || p === "running") {
       line?.focus();
     }
@@ -786,13 +792,12 @@ export function FeedTerminal(props: Props) {
     const channel = chan.current;
     if (!channel) return false;
     if (!socket.connected) {
-      notify.current("Not connected to tTerm Web right now: the command " +
-        "was not sent.");
+      notify.current(t("feed.not_connected"));
       putBack(command);
       return false;
     }
     if (phaseRef.current !== "prompt" || st.pending) {
-      notify.current("A command is still running. It can be stopped with Ctrl+C.");
+      notify.current(t("feed.still_running"));
       putBack(command);
       return false;
     }
@@ -805,7 +810,7 @@ export function FeedTerminal(props: Props) {
     st.pending = pending;
     channel.run(command, confirmed);
     return true;
-  }, [putBack]);
+  }, [putBack, t]);
 
   // The function that shows a command waiting for more of itself lives in
   // the terminal's effect; this reaches it.
@@ -813,24 +818,24 @@ export function FeedTerminal(props: Props) {
   useEffect(() => {
     waitInput.current = () => {
       const st = s.current;
-      const t = term.current;
+      const xterm = term.current;
       const p = st.pending;
-      if (!p || st.live || !t) return;
+      if (!p || st.live || !xterm) return;
       const key = `i${Date.now()}`;
       st.inputKey = key;
-      t.write(EMPTY, () => t.reset());
-      for (const chunk of p.chunks) t.write(chunk);
-      t.write(EMPTY, () => measureRef.current());
+      xterm.write(EMPTY, () => xterm.reset());
+      for (const chunk of p.chunks) xterm.write(chunk);
+      xterm.write(EMPTY, () => measureRef.current());
       setBlocks((bs) => [...bs, {
         key, seqStart: -1, seqEnd: null, command: p.command,
         cwd: st.prompt.cwd, branch: st.prompt.branch, startedAt: Date.now(),
-        finishedAt: null, exitCode: null, state: "input", cols: t.cols,
+        finishedAt: null, exitCode: null, state: "input", cols: xterm.cols,
         rendered: null, partial: false, cut: false, stored: false,
         expanded: false, collapsed: false,
       }]);
       setLiveKey(key);
       setPhaseBoth("input");
-      if (!typingElsewhere(feedRef.current?.closest(".terminal-view"))) t.focus();
+      if (!typingElsewhere(feedRef.current?.closest(".terminal-view"))) xterm.focus();
     };
   }, [setPhaseBoth]);
 
@@ -839,7 +844,7 @@ export function FeedTerminal(props: Props) {
 
   const copy = async (text: string): Promise<boolean> => {
     const ok = await toClipboard(text);
-    if (!ok) props.notify("The browser did not let the page copy.");
+    if (!ok) props.notify(t("feed.copy_refused"));
     return ok;
   };
 
@@ -859,7 +864,7 @@ export function FeedTerminal(props: Props) {
       if (!data) await new Promise((r) => window.setTimeout(r, 400));
     }
     if (!data) {
-      props.notify("The whole output is not there any more.");
+      props.notify(t("feed.output_gone"));
       update(b.key, { expanded: true });
       return;
     }
@@ -1012,20 +1017,18 @@ export function FeedTerminal(props: Props) {
         <div className="feed-col" ref={colRef}>
           {more && hiddenCount === 0 && (
             <button type="button" className="feed-earlier" onClick={loadEarlier}>
-              Show earlier commands
+              {t("feed.show_earlier")}
             </button>
           )}
           {hiddenCount > 0 && (
             <button type="button" className="feed-earlier"
               onClick={showCleared}>
-              {hiddenCount === 1 ? "1 block" : `${hiddenCount} blocks`} cleared
-              from view: show
+              {t("feed.cleared", { n: hiddenCount })}
             </button>
           )}
           {loaded && blocks.length === 0 && phase !== "start" && (
             <p className="feed-empty">
-              Type a command below. Each one becomes a block here, with its
-              output, how long it took and how it ended.
+              {t("feed.empty")}
             </p>
           )}
           {shown.map((b) => (
@@ -1051,30 +1054,38 @@ export function FeedTerminal(props: Props) {
           ))}
         </div>
       </div>
-      {ask && !props.ended && (
+      {ask && !props.ended && (() => {
+        // What the command would do, in the language shown; one the page
+        // does not know yet, as it came.
+        const known = DANGER_KEYS[ask.what];
+        const danger = known ? { what: t(known.what), lost: t(known.lost) }
+          : { what: ask.what, lost: ask.lost };
+        return (
         <div className="confirm-bar" role="alertdialog"
-          aria-label="Run this command?">
+          aria-label={t("feed.confirm_label")}>
           <Warning size={18} className="confirm-icon" />
           <div className="confirm-text">
-            <p>This would <strong>{ask.what}</strong> on <strong>
-              {props.machine}</strong>. {ask.lost}</p>
+            <p>{props.machine === undefined
+              ? t.rich("feed.confirm_unknown", { what: danger.what, lost: danger.lost, strong })
+              : t.rich("feed.confirm", { what: danger.what, machine: props.machine,
+                lost: danger.lost, strong })}</p>
             {ask.everything && (
-              <p className="red"><strong>This points at the whole machine.
-              </strong> Nothing on it would survive.</p>
+              <p className="red">{t.rich("feed.everything", { strong })}</p>
             )}
             <code>{ask.command}</code>
           </div>
           <div className="button-row">
             <button type="button" className="button-danger"
-              onClick={() => run(ask.command, true)}>Run it</button>
+              onClick={() => run(ask.command, true)}>{t("feed.run_it")}</button>
             <button type="button" className="button-plain" autoFocus
               onClick={() => {
                 putBack(ask.command);
                 setAsk(null);
-              }}>Cancel</button>
+              }}>{t("common.cancel")}</button>
           </div>
         </div>
-      )}
+        );
+      })()}
       {!props.ended && (
         <InputLine terminalId={terminalId} phase={fullscreen ? "full" : phase}
           prompt={prompt} history={history} restore={restore} homeRef={homeRef}

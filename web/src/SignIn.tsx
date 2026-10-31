@@ -17,6 +17,7 @@ import {
   askCode, authState, quickSignIn, Refused, setQuickCode, signUp, verifyCode,
   type KnownDevice, type Legal, type SignedInNow,
 } from "./api";
+import { useT, type Translate } from "./i18n";
 import { Logo } from "./icons";
 
 const CODE_DIGITS = 6;
@@ -63,9 +64,9 @@ function keepAtEnd(input: HTMLInputElement): void {
   }
 }
 
-function textOf(error: unknown): string {
+function textOf(error: unknown, t: Translate): string {
   if (error instanceof Error && error.message) return error.message;
-  return "The server is not answering. Check the connection and try again.";
+  return t("signin.no_answer");
 }
 
 /** A quick code anyone would try first, as the core judges it: one digit
@@ -78,6 +79,7 @@ function tooEasy(pin: string): boolean {
 
 export function SignIn(props: Props) {
   const { onSignedIn, another } = props;
+  const t = useT();
   const [step, setStep] = useState<Step>({ kind: "loading" });
   const [email, setEmail] = useState(props.email ?? "");
   const [note, setNote] = useState<string | null>(props.note ?? null);
@@ -104,8 +106,7 @@ export function SignIn(props: Props) {
       })
       .catch(() => {
         if (stopped) return;
-        setNote("The server is not answering. Check the connection and try " +
-          "again.");
+        setNote(t("signin.no_answer"));
         setStep({ kind: "email" });
       });
     return () => {
@@ -249,6 +250,7 @@ function EmailStep(props: {
   setEmail: (email: string) => void;
   onSent: (email: string) => void;
 }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -260,25 +262,25 @@ function EmailStep(props: {
       const sent = await askCode(props.email);
       props.onSent(sent.email);
     } catch (error) {
-      setProblem(textOf(error));
+      setProblem(textOf(error, t));
       setBusy(false);
     }
   };
 
   return (
     <form className="signin-form" onSubmit={(e) => void submit(e)}>
-      <h1>Sign in</h1>
-      <p className="signin-lead">Enter your email, and we will send you a code</p>
+      <h1>{t("common.sign_in")}</h1>
+      <p className="signin-lead">{t("signin.email_lead")}</p>
       <input className="text-input signin-input" type="email" name="email"
         autoComplete="email" autoFocus required spellCheck={false}
-        aria-label="Email" placeholder="you@example.com" value={props.email}
+        aria-label={t("signin.email")} placeholder="you@example.com" value={props.email}
         onChange={(e) => props.setEmail(e.target.value)} />
       {problem && <p className="signin-error" role="alert">{problem}</p>}
       <button type="submit" className="button-accent big wide"
         disabled={busy || !props.email.trim()}>
-        {busy ? "Sending…" : "Get a code"}
+        {busy ? t("signin.sending") : t("signin.get_code")}
       </button>
-      <p className="signin-small">New here? You create an account after the code.</p>
+      <p className="signin-small">{t("signin.new_here")}</p>
     </form>
   );
 }
@@ -289,6 +291,7 @@ function CodeStep(props: {
   onIn: (result: SignedInNow) => void;
   onSignUp: (email: string) => void;
 }) {
+  const t = useT();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -319,7 +322,7 @@ function CodeStep(props: {
       else props.onIn(result);
     } catch (error) {
       setCode("");
-      setProblem(textOf(error));
+      setProblem(textOf(error, t));
       setWrong((n) => n + 1);
       if (error instanceof Refused && error.left === 0) setSpent(true);
       setBusy(false);
@@ -342,10 +345,10 @@ function CodeStep(props: {
       setNow(Date.now());
       setSpent(false);
       setCode("");
-      setSent("A new code is on its way. The one before no longer works.");
+      setSent(t("signin.code_resent"));
       window.setTimeout(() => input.current?.focus(), 0);
     } catch (error) {
-      setProblem(textOf(error));
+      setProblem(textOf(error, t));
       if (error instanceof Refused && error.wait && error.wait < RESEND_S) {
         setSentAt(Date.now() - (RESEND_S - error.wait) * 1000);
       }
@@ -357,11 +360,14 @@ function CodeStep(props: {
       e.preventDefault();
       if (code.length === CODE_DIGITS && !spent) void check(code);
     }}>
-      <h1>Enter the code</h1>
+      <h1>{t("signin.code_title")}</h1>
       <p className="signin-lead">
-        We sent it to <strong className="ink">{props.email}</strong>
+        {t.rich("signin.code_sent", {
+          email: props.email,
+          b: (s) => <strong className="ink">{s}</strong>,
+        })}
       </p>
-      <Slots ref={input} count={CODE_DIGITS} value={code} label="Code from the email"
+      <Slots ref={input} count={CODE_DIGITS} value={code} label={t("signin.code_label")}
         name="code" autoComplete="one-time-code" busy={busy} disabled={spent}
         wrong={wrong} onChange={typed} />
       {problem && <p className="signin-error" role="alert">{problem}</p>}
@@ -369,14 +375,14 @@ function CodeStep(props: {
       <div className="signin-links">
         <button type="button" className="link-button" disabled={wait > 0}
           onClick={() => void resend()}>
-          {wait > 0 ? `New code in ${wait} s` : "Send a new code"}
+          {wait > 0 ? t("signin.resend_in", { n: wait }) : t("signin.resend")}
         </button>
         <button type="button" className="link-button" onClick={props.onBack}>
-          Change email
+          {t("signin.change_email")}
         </button>
       </div>
       {wait === 0 && !sent && (
-        <p className="signin-small">No email? Look in the spam folder.</p>
+        <p className="signin-small">{t("signin.no_email")}</p>
       )}
     </form>
   );
@@ -388,6 +394,7 @@ function SignUpStep(props: {
   onIn: (result: SignedInNow) => void;
   onBack: (why: string | null) => void;
 }) {
+  const t = useT();
   const [name, setName] = useState("");
   /** The one tick: the Terms of Service and the Privacy Policy. */
   const [agree, setAgree] = useState(false);
@@ -405,31 +412,31 @@ function SignUpStep(props: {
         props.onBack(error.message);
         return;
       }
-      setProblem(textOf(error));
+      setProblem(textOf(error, t));
       setBusy(false);
     }
   };
 
   return (
     <form className="signin-form" onSubmit={(e) => void submit(e)}>
-      <h1>Create your account</h1>
+      <h1>{t("signin.signup_title")}</h1>
       <p className="signin-lead">{props.email}</p>
       <input className="text-input signin-input" name="name" autoComplete="name"
-        autoFocus required maxLength={100} aria-label="Your name"
-        placeholder="Your name" value={name}
+        autoFocus required maxLength={100} aria-label={t("signin.your_name")}
+        placeholder={t("signin.your_name")} value={name}
         onChange={(e) => setName(e.target.value)} />
       <label className="signin-check">
         <input type="checkbox" name="agree" checked={agree}
           onChange={(e) => setAgree(e.target.checked)} />
         <span>
-          I agree to the{" "}
-          <a href={props.legal.terms} target="_blank" rel="noreferrer">
-            Terms of Service
-          </a>{" "}
-          and{" "}
-          <a href={props.legal.privacy} target="_blank" rel="noreferrer">
-            Privacy Policy
-          </a>
+          {t.rich("signin.agree", {
+            terms: (s) => (
+              <a href={props.legal.terms} target="_blank" rel="noreferrer">{s}</a>
+            ),
+            privacy: (s) => (
+              <a href={props.legal.privacy} target="_blank" rel="noreferrer">{s}</a>
+            ),
+          })}
         </span>
       </label>
       {problem && <p className="signin-error" role="alert">{problem}</p>}
@@ -437,12 +444,12 @@ function SignUpStep(props: {
           in the name: a form whose button is disabled is not sent. */}
       <button type="submit" className="button-accent big wide"
         disabled={busy || !name.trim() || !agree}>
-        {busy ? "Creating…" : "Create account"}
+        {busy ? t("signin.creating") : t("signin.create")}
       </button>
       <div className="signin-links single">
         <button type="button" className="link-button" disabled={busy}
           onClick={() => props.onBack(null)}>
-          Use another email
+          {t("signin.another_email")}
         </button>
       </div>
     </form>
@@ -452,6 +459,7 @@ function SignUpStep(props: {
 /** A quick code for this device: typed once, then once more on the next
  * screen. */
 function OfferStep(props: { name: string; fresh: boolean; onDone: () => void }) {
+  const t = useT();
   /** The code typed the first time, while it is typed again. */
   const [first, setFirst] = useState<string | null>(null);
   const [pin, setPin] = useState("");
@@ -471,8 +479,7 @@ function OfferStep(props: { name: string; fresh: boolean; onDone: () => void }) 
     if (value.length < PIN_DIGITS) return;
     if (first === null) {
       if (tooEasy(value)) {
-        startOver("Too easy to guess: choose digits that are not all the " +
-          "same and not in a row.");
+        startOver(t("signin.pin_easy"));
         return;
       }
       setProblem(null);
@@ -481,7 +488,7 @@ function OfferStep(props: { name: string; fresh: boolean; onDone: () => void }) 
       return;
     }
     if (value !== first) {
-      startOver("The codes did not match. Create it again.");
+      startOver(t("signin.pin_mismatch"));
       return;
     }
     setBusy(true);
@@ -491,30 +498,30 @@ function OfferStep(props: { name: string; fresh: boolean; onDone: () => void }) 
       props.onDone();
     } catch (error) {
       setBusy(false);
-      startOver(textOf(error));
+      startOver(textOf(error, t));
     }
   };
 
   const again = first !== null;
-  const greeting = props.fresh ? `Welcome, ${props.name}!` : `Hello, ${props.name}!`;
+  const greeting = props.fresh ? t("signin.welcome", { name: props.name })
+    : t("signin.hello", { name: props.name });
   return (
     <form className="signin-form" onSubmit={(e) => e.preventDefault()}>
       {/* A new screen for the second time, the same input under it: the
           keyboard of a phone stays open. */}
-      <h1 key={again ? "again" : "first"}>{again ? "Repeat the code" : greeting}</h1>
+      <h1 key={again ? "again" : "first"}>{again ? t("signin.pin_repeat") : greeting}</h1>
       <p className="signin-lead" aria-live="polite">
-        {again ? "Enter the same four digits once more"
-          : "Create a quick code for this device"}
+        {again ? t("signin.pin_repeat_lead") : t("signin.pin_offer_lead")}
       </p>
       <Slots count={PIN_DIGITS} secret value={pin}
-        label={again ? "The quick code, once more" : "A quick code"}
+        label={again ? t("signin.pin_repeat_label") : t("signin.pin_offer_label")}
         name={again ? "pin-again" : "pin"} autoComplete="off" busy={busy}
         wrong={wrong} onChange={(value) => void typed(value)} />
       {problem && <p className="signin-error" role="alert">{problem}</p>}
       <div className="signin-links single">
         <button type="button" className="link-button quiet" disabled={busy}
           onClick={props.onDone}>
-          Not now
+          {t("signin.not_now")}
         </button>
       </div>
     </form>
@@ -528,6 +535,7 @@ function PinStep(props: {
   onEmail: (why: string | null) => void;
   onSwitch: () => void;
 }) {
+  const t = useT();
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -550,7 +558,7 @@ function PinStep(props: {
         return;
       }
       setPin("");
-      setProblem(textOf(error));
+      setProblem(textOf(error, t));
       setWrong((n) => n + 1);
       setBusy(false);
       checking.current = false;
@@ -565,7 +573,7 @@ function PinStep(props: {
       const sent = await askCode(props.device.email);
       props.onCode(sent.email);
     } catch (error) {
-      setProblem(textOf(error));
+      setProblem(textOf(error, t));
       setAsking(false);
     }
   };
@@ -575,9 +583,9 @@ function PinStep(props: {
       e.preventDefault();
       if (pin.length === PIN_DIGITS) void check(pin);
     }}>
-      <h1>Welcome back, {first}!</h1>
-      <p className="signin-lead">Enter your quick code</p>
-      <Slots count={PIN_DIGITS} secret value={pin} label="Quick code" name="pin"
+      <h1>{t("signin.welcome_back", { name: first })}</h1>
+      <p className="signin-lead">{t("signin.pin_lead")}</p>
+      <Slots count={PIN_DIGITS} secret value={pin} label={t("signin.pin_label")} name="pin"
         autoComplete="off" busy={busy} wrong={wrong}
         onChange={(value) => {
           setPin(value);
@@ -587,11 +595,11 @@ function PinStep(props: {
       <div className="signin-links">
         <button type="button" className="link-button" disabled={asking || busy}
           onClick={() => void forgot()}>
-          Forgot the code?
+          {t("signin.forgot")}
         </button>
         <button type="button" className="link-button" disabled={busy}
           onClick={props.onSwitch}>
-          Switch account
+          {t("signin.switch")}
         </button>
       </div>
     </form>

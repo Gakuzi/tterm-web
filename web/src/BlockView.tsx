@@ -6,6 +6,7 @@ import {
   useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject,
 } from "react";
 import { useBriefly } from "./briefly";
+import { useT } from "./i18n";
 import {
   Branch, Check, Close, Collapse, Copy, CopyText, Cross, Expand, Link, Rerun, Stop,
 } from "./icons";
@@ -108,6 +109,7 @@ function Ticking({ since }: { since: number }) {
 
 export function BlockView(props: Props) {
   const { block, home, live } = props;
+  const t = useT();
   const running = block.state !== "done";
   const failed = block.state === "done" && block.exitCode !== null &&
     block.exitCode !== 0;
@@ -152,10 +154,12 @@ export function BlockView(props: Props) {
   const failedHere = (what: Copied) =>
     copied?.what === what && !copied.ok ? "copy-failed" : undefined;
 
-  const what = block.state === "input" ? "not started by the shell"
-    : running ? "running"
-    : failed ? `failed with exit code ${block.exitCode}`
-    : block.exitCode === 0 ? "finished" : "ended";
+  const command = block.command;
+  const what = block.state === "input" ? t("block.state_input", { command })
+    : running ? t("block.state_running", { command })
+    : failed ? t("block.state_failed", { command, code: String(block.exitCode) })
+    : block.exitCode === 0 ? t("block.state_finished", { command })
+    : t("block.state_ended", { command });
 
   let mark;
   if (running) {
@@ -171,21 +175,23 @@ export function BlockView(props: Props) {
     <section id={`b${block.seqStart}`}
       className={"block" + (running ? " live" : "") + (failed ? " failed" : "") +
         (props.flash ? " flash" : "") + (found ? " found" : "")}
-      aria-label={`${block.command}, ${what}`}>
+      aria-label={what}>
       <div className="block-head">
         {mark}
         <code className="block-command">
           {found ? marked(block.command, found, "found-mark") : block.command}
         </code>
         <span className="block-meta">
-          {found && <span className="found-pill">Found</span>}
+          {found && <span className="found-pill">{t("block.found")}</span>}
           {block.state === "input" && (
-            <span className="amber" title="The shell is waiting for the rest of it (an open quote or heredoc), or did not take it. Type into the block, or Stop.">
-              not started
+            <span className="amber" title={t("block.not_started_title")}>
+              {t("block.not_started")}
             </span>
           )}
-          {block.state === "running" && <span className="amber">running</span>}
-          {failed && <span className="red">exit {block.exitCode}</span>}
+          {block.state === "running" && <span className="amber">{t("block.running")}</span>}
+          {failed && (
+            <span className="red">{t("block.exit", { code: String(block.exitCode) })}</span>
+          )}
           {running && block.startedAt ? <Ticking since={block.startedAt} />
             : block.startedAt && block.finishedAt
               ? <span>{duration(block.finishedAt - block.startedAt)}</span>
@@ -198,25 +204,27 @@ export function BlockView(props: Props) {
         </span>
         {running ? (
           <button type="button" className="block-stop" onClick={props.onStop}
-            title="Stop the command (Ctrl+C)">
+            title={t("block.stop_title")}>
             <Stop size={11} />
-            Stop
+            {t("block.stop")}
+            {/* i18n-ignore */}
             <kbd>⌃C</kbd>
           </button>
         ) : (
-          <div role="group" aria-label="Block actions"
+          <div role="group" aria-label={t("block.actions")}
             className={"block-actions" + (copied || turned !== null ? " acted" : "")}>
-            <button type="button" aria-label="Copy the command and its output"
-              title="Copy the command and its output" className={failedHere("block")}
+            <button type="button" aria-label={t("block.copy_block")}
+              title={t("block.copy_block")} className={failedHere("block")}
               onClick={() => copy("block", props.onCopyBlock(block))}>
               {icon("block", <Copy size={15} />)}
             </button>
-            <button type="button" aria-label="Copy output" title="Copy output only"
+            <button type="button" aria-label={t("block.copy_output")}
+              title={t("block.copy_output_title")}
               className={failedHere("output")}
               onClick={() => copy("output", props.onCopyOutput(block))}>
               {icon("output", <CopyText size={15} />)}
             </button>
-            <button type="button" aria-label="Run again" title="Run again"
+            <button type="button" aria-label={t("block.run_again")} title={t("block.run_again")}
               className={turned !== null ? "turn" : undefined}
               onClick={() => {
                 if (props.onRunAgain(block)) showTurn(++turns.current);
@@ -224,19 +232,19 @@ export function BlockView(props: Props) {
               {/* A new key each time: the turn plays again. */}
               <Rerun key={turned ?? 0} size={15} />
             </button>
-            <button type="button" aria-label="Copy link to this block"
-              title="Copy link to this block" className={failedHere("link")}
+            <button type="button" aria-label={t("block.copy_link")}
+              title={t("block.copy_link")} className={failedHere("link")}
               onClick={() => copy("link", props.onCopyLink(block))}>
               {icon("link", <Link size={15} />)}
             </button>
             <button type="button"
-              aria-label={block.collapsed ? "Expand block" : "Collapse block"}
-              title={block.collapsed ? "Expand block" : "Collapse block"}
+              aria-label={block.collapsed ? t("block.expand") : t("block.collapse")}
+              title={block.collapsed ? t("block.expand") : t("block.collapse")}
               onClick={() => props.onToggle(block)}>
               {block.collapsed ? <Expand size={15} /> : <Collapse size={15} />}
             </button>
             <span className="visually-hidden" role="status">
-              {copied ? (copied.ok ? "Copied" : "Not copied") : ""}
+              {copied ? (copied.ok ? t("common.copied") : t("block.not_copied")) : ""}
             </span>
           </div>
         )}
@@ -248,7 +256,7 @@ export function BlockView(props: Props) {
         lines.length > 0 && (
           <button type="button" className="block-folded"
             onClick={() => props.onToggle(block)}>
-            {lines.length === 1 ? "1 line" : `${lines.length} lines`} hidden
+            {t("block.lines_hidden", { n: lines.length })}
           </button>
         )
       ) : (
@@ -256,8 +264,8 @@ export function BlockView(props: Props) {
           {more && (
             <button type="button" className="block-more"
               onClick={() => props.onShowAll(block)}>
-              {hidden > 0 ? `Show ${hidden} earlier lines`
-                : "Show the whole output"}
+              {hidden > 0 ? t("block.show_earlier", { n: hidden })
+                : t("block.show_whole")}
             </button>
           )}
           {shown.length > 0 && (

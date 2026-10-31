@@ -1,0 +1,1355 @@
+var e=`# Strings of tTerm Web's page in English: one a line, \`key = text\`.
+# Every language has the same keys; the build stops when one is missing
+# (scripts/strings.mjs). {name} is a value the page puts in; a counting
+# string has a form for each plural of the language, "one: … | other: …",
+# and {n} is the count; <b>…</b> wraps a part the page makes a link, bold
+# or code. Names of machines, projects, notes and terminals, commands and
+# their output, tTerm, tTerm Web and Free are not translated.
+
+# ------------------------------------------------------------ common: words used in many places
+common.close = Закрыть
+common.cancel = Отменить
+common.save = Сохранить
+common.loading = Загрузка…
+common.try_again = Повторить
+common.copy = Копировать
+common.copied = Скопировано
+common.back = Назад
+common.done = Готово
+common.more = Ещё
+common.sign_in = Войти
+
+# ------------------------------------------------------------ time: how long ago (time.ts)
+# A duration after "for": Away for 3 minutes, running for an hour.
+time.for_less = меньше минуты
+time.for_minutes = one: {n} минуту | few: {n} минуты | many: {n} минут
+time.for_hours = one: {n} час | few: {n} часа | many: {n} часов
+time.for_days = one: {n} день | few: {n} дня | many: {n} дней
+# How long ago, in full words: Signed in 3 minutes ago.
+time.ago_now = только что
+time.ago_minutes = one: {n} минуту назад | few: {n} минуты назад | many: {n} минут назад
+time.ago_hours = one: {n} час назад | few: {n} часа назад | many: {n} часов назад
+time.ago_days = one: {n} день назад | few: {n} дня назад | many: {n} дней назад
+# A machine that is offline: {ago} is one of the four above.
+time.last_seen = последний раз на связи {ago}
+# How long ago, short, in lists of notes and in Updates: Looked 5 min ago.
+time.short_minutes = one: {n} мин назад | few: {n} мин назад | many: {n} мин назад
+time.short_hours = one: {n} ч назад | few: {n} ч назад | many: {n} ч назад
+time.yesterday = вчера
+time.today = сегодня
+time.days_ago = one: {n} день назад | few: {n} дня назад | many: {n} дней назад
+time.last_week = на прошлой неделе
+time.weeks_ago = one: {n} неделю назад | few: {n} недели назад | many: {n} недель назад
+# {day} is a date as the language writes it: 12 Oct, 12. Okt.
+time.on_day = {day}
+# In search: yesterday 17:38, 2 Oct 09:12.
+time.yesterday_at = вчера в {time}
+time.day_at = {day} в {time}
+
+# ------------------------------------------------------------ here: the computer tTerm for Mac runs on
+# Alone, as a label (the sidebar, tabs). Sentences that name it have a
+# string of their own for each: .mac and .computer.
+here.mac = этот Mac
+here.computer = этот компьютер
+
+# ------------------------------------------------------------ role: one's role in a project
+role.owner = Владелец
+role.admin = Админ
+role.member = Участник
+role.observer = Наблюдатель
+
+# ------------------------------------------------------------ color: projects' colors (colors.ts)
+color.violet = Фиолетовый
+color.sky = Голубой
+color.teal = Бирюзовый
+color.pink = Розовый
+color.orange = Оранжевый
+color.lime = Салатовый
+color.indigo = Индиго
+color.slate = Графитовый
+
+# ------------------------------------------------------------ count: how many, in lists and lines
+count.machines = one: {n} машина | few: {n} машины | many: {n} машин
+count.notes = one: {n} заметка | few: {n} заметки | many: {n} заметок
+count.terminals_open = one: {n} открытый терминал | few: {n} открытых терминала | many: {n} открытых терминалов
+# The end of a list cut short: web-01, web-02, web-03, web-04 and 3 more.
+count.more = one: ещё {n} | few: ещё {n} | many: ещё {n}
+
+# A terminal that has only its number, in lists: terminal 2.
+terminal.numbered = терминал {number}
+# A note without a title.
+note.untitled = Без названия
+
+# ------------------------------------------------------------ sidebar (Sidebar.tsx)
+sidebar.label = Боковая панель
+sidebar.all_machines = Все машины
+sidebar.keep_open = Закрепить панель
+sidebar.keep_open_title = Закрепить боковую панель
+sidebar.let_slide = Открепить боковую панель
+sidebar.close = Закрыть боковую панель
+sidebar.projects = Проекты
+sidebar.fold = Свернуть {name}
+sidebar.unfold = Развернуть {name}
+sidebar.open_project = Открыть {name}: машины и заметки
+sidebar.machines = Машины
+sidebar.add_machine = Добавить машину
+sidebar.no_machines = Машин пока нет
+sidebar.notes = Заметки
+sidebar.new_folder = Новая папка
+sidebar.no_notes = Заметок пока нет
+sidebar.no_notes_writes = Заметок пока нет. + создаст для них папку
+sidebar.new_project = Новый проект
+sidebar.waits = {name} вернётся, когда восстановится связь с tTerm
+sidebar.offline = {name} не в сети: спит или не запущен агент
+# {seen} is time.last_seen: last seen 14 minutes ago.
+sidebar.offline_seen = {name} не в сети: спит или не запущен агент ({seen})
+sidebar.here.mac = {name}, этот Mac: его терминалы работают прямо здесь, даже без интернета
+sidebar.here.computer = {name}, этот компьютер: его терминалы работают прямо здесь, даже без интернета
+sidebar.new_terminal = Новый терминал
+sidebar.new_terminal_on = Новый терминал на {name}
+sidebar.rename_hint = Enter сохраняет, Esc отменяет
+sidebar.go_to = Перейти к {label}
+sidebar.go_to_away = Перейти к {label}: терминал ждёт, когда вернётся {machine}
+sidebar.double_click = Дважды щёлкни, чтобы переименовать
+sidebar.end = Завершить {label}
+sidebar.end_title = Завершить {label}: его шелл закроется
+sidebar.new_note_in = Новая заметка в папке {name}
+sidebar.empty_folder = Пусто
+sidebar.empty_folder_writes = Пусто. + начнёт заметку
+sidebar.signin_title = Серверы и проекты
+sidebar.signin_text = Войди, чтобы открывать терминалы на своих серверах, вести заметки в проектах и работать с командой. Этот компьютер останется как есть.
+sidebar.theme_dark = Включить тёмную тему
+sidebar.theme_light = Включить светлую тему
+
+# ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
+# "Free" is the plan's name: it stays as it is.
+account_menu.free_plan = Тариф Free
+account_menu.title = Настройки, язык, аккаунт, выход
+account_menu.title_local = Настройки, язык, вход
+account_menu.not_signed_in = Вход не выполнен
+account_menu.only_here = Только этот компьютер
+account_menu.offline = Нет связи, пробуем снова
+account_menu.local_note = tTerm работает с этим компьютером. Войди, и появятся твои серверы, проекты и команда.
+account_menu.sign_out = Выйти
+# The item after Settings, and the title of the list of languages.
+language.item = Язык
+
+# ------------------------------------------------------------ settings (Settings.tsx)
+# The page, and the item of the account's menu that opens it.
+settings.title = Настройки
+settings.appearance = Оформление
+settings.appearance_local = Сохраняется на этом компьютере. Системная тема берётся из настроек этого компьютера. Цвет проекта заливает значок с его кодом или подкрашивает весь проект в боковой панели.
+settings.appearance_account = Сохраняется в аккаунте. Системная тема берётся из настроек каждого компьютера, за которым ты работаешь. Цвет проекта заливает значок с его кодом или подкрашивает весь проект в боковой панели.
+settings.theme = Тема
+settings.theme_system = Системная
+settings.theme_light = Светлая
+settings.theme_dark = Тёмная
+settings.tints = Цвета проектов
+settings.tint_badge = Значок с кодом
+settings.tint_block = Весь проект
+
+# ------------------------------------------------------------ devices (Devices.tsx)
+devices.title = Устройства
+
+# ------------------------------------------------------------ account (Account.tsx)
+# The page, and the item of the account's menu that opens it.
+account.title = Аккаунт
+
+# ------------------------------------------------------------ app: the page's frame, toasts and dialogs (App.tsx)
+app.session_ended = Сеанс завершён. Войди снова: терминалы всё это время работали.
+# How saving goes in the note in front, on the line of tabs.
+app.saved = Сохранено
+app.saving = Сохранение…
+app.not_saved_offline = Не сохранено: нет связи
+app.not_saved = Не сохранено
+app.no_connection = Нет связи
+app.not_answering_local = tTerm Web не отвечает. Запущен ли python -m tterm.dev в окне терминала?
+app.not_answering = tTerm Web не отвечает. Проверь подключение и попробуй снова.
+# {why} is the reason tTerm Web gave, as it gave it.
+app.no_terminal = Не удалось открыть терминал: {why}
+app.offline = {name} не в сети: появится снова, когда подключится агент.
+# {seen} is time.last_seen: last seen 14 minutes ago.
+app.offline_seen = {name} не в сети, {seen}: появится снова, когда подключится агент.
+app.removed_shared = Машина {name} удалена из tTerm Web. Этот же сервер есть и в другом проекте, поэтому доступ tTerm Web на нём остаётся.
+app.removed_access = Машина {name} удалена из tTerm Web, и доступ tTerm Web с сервера убран.
+app.removed = Машина {name} удалена из tTerm Web.
+app.no_note = Не удалось начать заметку: {why}
+app.note_deleted = Заметка {title} удалена из папки {folder}.
+app.note_deleted_journal = Заметка {title} удалена из папки {folder}. В журнале есть запись об этом.
+app.folder_deleted = Папка {name} удалена.
+app.folder_deleted_journal = Папка {name} удалена. В журнале есть запись об этом.
+app.folder_notes_deleted = one: Папка {name} и {n} заметка в ней удалены. | few: Папка {name} и {n} заметки в ней удалены. | many: Папка {name} и {n} заметок в ней удалены.
+app.folder_notes_deleted_journal = one: Папка {name} и {n} заметка в ней удалены. В журнале есть запись об этом. | few: Папка {name} и {n} заметки в ней удалены. В журнале есть запись об этом. | many: Папка {name} и {n} заметок в ней удалены. В журнале есть запись об этом.
+app.moved_to = Заметка перенесена в папку {folder}.
+app.no_move = Не удалось перенести: {why}
+app.moved_here = Перенесена сюда из проекта {project}.
+app.moved_here_journal = Перенесена сюда из проекта {project}. В его журнале есть запись об этом.
+app.moved_to_project = Заметка перенесена в проект {project}, в папку {folder}.
+app.moved_to_other = Заметка перенесена в другой проект, в папку {folder}.
+app.copied_markdown = Скопировано как Markdown.
+app.note_gone = Заметка удалена.
+app.no_copy = Не удалось скопировать: {why}
+app.no_copy_browser = Не удалось скопировать: браузер не разрешил странице.
+app.project_deleted = Проект {name} удалён.
+app.project_deleted_notes = one: Проект {name} удалён вместе с {n} заметкой. | few: Проект {name} удалён вместе с {n} заметками. | many: Проект {name} удалён вместе с {n} заметками.
+# {label} is where it is now: P/web-01.
+app.machine_moved = Машина {name} теперь в проекте {project}, под именем {label}. Её терминалы продолжают работать.
+app.no_rename = Не удалось переименовать: {why}
+app.signed_out = Выход выполнен. Твои терминалы продолжают работать.
+app.no_sign_out = Не удалось выйти: tTerm Web не ответил. Попробуй снова.
+app.no_theme = Не удалось сохранить тему: tTerm Web не ответил.
+app.no_language = Не удалось сохранить язык: tTerm Web не ответил.
+app.no_tints = Не удалось сохранить цвета проектов: tTerm Web не ответил.
+app.go_on_in_browser = Продолжи в браузере: войди там и разреши вход этому компьютеру.
+app.open_sidebar = Открыть боковую панель
+app.no_project = Такого проекта нет
+app.no_project_text = Его больше нет среди твоих проектов.
+app.close_the_tab = Закрыть вкладку
+app.connection_lost = Связь потеряна. Переподключаемся, терминалы продолжают работать.
+app.cut_off.mac = <b>Нет связи с tTerm.</b> Этот Mac работает как обычно. Терминалы на серверах продолжают работать там и вернутся сюда вместе со связью.
+app.cut_off.computer = <b>Нет связи с tTerm.</b> Этот компьютер работает как обычно. Терминалы на серверах продолжают работать там и вернутся сюда вместе со связью.
+app.paste_busy = В этом терминале выполняется команда, поэтому строка ввода занята. Попробуй снова, когда команда закончится.
+app.paste_gone = Машины {machine} больше нет в tTerm Web. Открой терминал в другом месте и уже там вставь команду в строку ввода.
+app.picker.placeholder = Машина в любом проекте
+# Tabs: their labels and the tips under the mouse. {label} is a terminal's: P/web-01 · 2.
+app.tab.note = Заметка
+app.tab.note_in = Заметка в папке {folder}
+app.tab.close_note = Закрыть заметку. Она останется в своей папке.
+app.tab.project = Проект
+app.tab.project_title = {name}: машины и заметки
+app.tab.close_page = Закрыть страницу
+app.tab.terminal = Терминал
+app.tab.away = {label}: {machine} спит или не в сети, терминал ждёт
+app.tab.away_unknown = {label}: машина спит или не в сети, терминал ждёт её
+app.tab.ended = {label}: завершён
+app.tab.running = {label}: выполняется команда
+app.tab.close_terminal = Закрыть вкладку. Терминал продолжит работать: он в боковой панели, под своей машиной.
+# A machine's state, small, after its name in lists.
+app.machine.no_connection = нет связи
+app.machine.offline = не в сети
+app.machine.offline_seen = не в сети, {seen}
+app.machine.online = в сети
+# Search and the palette (⌘K): what it finds on the page, the lines under each, and the details beside.
+app.search.state_away = ждёт свой компьютер
+app.search.state_ended = завершён
+app.search.state_busy = выполняется команда
+app.search.state_prompt = ждёт команду
+app.search.this_tab = эта вкладка
+app.search.tab = вкладка
+app.search.no_tab = работает, без вкладки
+app.search.row_machine = Машина
+app.search.row_folder = Папка
+app.search.row_now = Сейчас
+app.search.row_in = Где
+app.search.row_edited = Изменена
+app.search.row_project = Проект
+app.search.row_system = Система
+app.search.row_address = Адрес
+app.search.row_status = Состояние
+app.search.row_terminals = Терминалы
+app.search.row_code = Код
+app.search.row_does = Что делает
+app.search.open_count = one: {n} открытый | few: {n} открытых | many: {n} открытых
+# The button that does what was found.
+app.search.open = Открыть
+app.search.open_note = Открыть заметку
+app.search.open_page = Открыть страницу
+app.search.do_it = Выполнить
+# Search words: keep the English words, add the language's own after them.
+app.search.terminal_words = terminal терминал
+app.search.note_words = note заметка
+app.search.project_words = project page folders проект страница папки
+# Things to do, in the palette: each with what it does, small, and its search words.
+app.action.add_machine = Добавить машину
+app.action.add_machine_hint = сервер или компьютер
+app.action.new_project_hint = со своими машинами и заметками
+app.action.edit_project = Изменить {name}
+app.action.edit_project_hint = название, код и цвет
+app.action.new_folder_in = Новая папка в проекте {name}
+app.action.new_folder_hint = для заметок
+app.action.close_tab = Закрыть эту вкладку
+app.action.close_tab_terminal = терминал продолжит работать
+app.action.close_tab_note = заметка останется в своей папке
+app.action.rename_terminal = Назвать этот терминал
+app.action.rename_terminal_hint = вместо номера
+app.action.end_terminal = Завершить этот терминал
+app.action.end_terminal_hint = его шелл закроется
+app.action.delete_note = Удалить эту заметку
+app.action.delete_note_hint = из папки {folder}
+app.action.theme_dark = Включить тёмную тему
+app.action.theme_light = Включить светлую тему
+app.action.settings_hint_local = тема, цвета проектов
+app.action.settings_hint = тема, цвета проектов, устройства
+app.action.sign_in_hint = твои серверы, проекты и команда
+app.action.account_hint = имя, фото и тариф
+app.action.sign_out_hint = этот браузер тебя забудет
+# Search words: keep the English words, add the language's own after them.
+app.action.add_machine_words = new server computer connect новая новый сервер компьютер подключить добавить машина
+app.action.new_project_words = project new create make проект новый создать завести
+app.action.edit_project_words = project rename edit code color colour проект переименовать изменить название код цвет
+app.action.new_folder_words = notes folder new create заметки папка новая создать
+app.action.machines_words = machines home overview машины главная обзор
+app.action.close_tab_words = tab close вкладка закрыть
+app.action.rename_terminal_words = terminal rename name label терминал переименовать назвать имя название
+app.action.end_terminal_words = terminal end stop kill exit shell терминал завершить остановить закрыть выйти шелл
+app.action.delete_note_words = note delete remove заметка удалить стереть
+app.action.theme_words = theme dark light colours colors тема тёмная темная светлая цвета
+app.action.pin_words = sidebar panel pin боковая панель закрепить открепить
+app.action.settings_words_local = settings preferences theme dark light colors colours support настройки параметры тема тёмная темная светлая цвета поддержка
+app.action.settings_words = settings preferences theme dark light colors colours devices quick code forget browsers support настройки параметры тема тёмная темная светлая цвета устройства быстрый код забыть браузеры поддержка
+app.action.sign_in_words = sign in log in login account cloud servers войти вход аккаунт облако серверы
+app.action.account_words = account profile name photo picture avatar plan limits delete аккаунт профиль имя фото фотография аватар тариф лимиты удалить
+app.action.sign_out_words = sign out log out logout leave switch account выйти выход сменить аккаунт
+# A folder: made, or named again.
+app.folder.new_title = Новая папка в проекте {name}
+app.folder.rename_title = Переименовать папку
+app.folder.create = Создать папку
+app.folder.new_help_alone = Её видишь только ты. Потом + рядом с папкой начнёт первую заметку.
+app.folder.new_help = Её видят все в проекте {name} и могут писать в ней заметки. Потом + рядом с папкой начнёт первую заметку.
+app.folder.rename_help_alone = Её видишь только ты.
+app.folder.rename_help = Все в проекте {name} сразу увидят новое название. Заметки в папке останутся как есть.
+# Asked before it is done.
+app.remove.title = Удалить {name}?
+app.remove.confirm = Удалить {name}
+app.remove.text = Машина исчезнет из tTerm Web, а её терминалы завершатся. Набранные там команды останутся в истории.
+app.remove.computer = Агент узнает, что компьютер удалён, и остановится. Чтобы снова подключить компьютер: «Добавить машину», затем «Компьютер».
+app.remove.server = tTerm Web перестанет входить на сервер и уберёт свой доступ с самого сервера. Если сервер не ответит, следом появится команда, которая сделает это на нём.
+app.end.title = Завершить {label}?
+app.end.confirm = Завершить терминал
+app.end.text = Его шелл закроется, а всё, что в нём работает, остановится, как при закрытии окна терминала. Выполненные команды останутся во вкладке и в истории.
+app.delete_note.title = Удалить заметку {title}?
+app.delete_note.sub = В папке {folder}.
+app.delete_note.confirm = Удалить заметку
+app.delete_note.alone = Она удалится навсегда.
+app.delete_note.shared = Она пропадёт у всех в проекте {project}, в том числе у тех, у кого она сейчас открыта. В журнале останется запись: кто и когда её удалил.
+app.delete_folder.title = Удалить папку {name}?
+app.delete_folder.confirm = Удалить папку
+app.delete_folder.confirm_notes = one: Удалить папку и {n} заметку | few: Удалить папку и {n} заметки | many: Удалить папку и {n} заметок
+app.delete_folder.empty = Папка пуста.
+# {names} is the notes' titles, listed: Plan, Ideas and 3 more.
+app.delete_folder.notes_go = one: Вместе с ней удалится {n} заметка: {names}. | few: Вместе с ней удалятся {n} заметки: {names}. | many: Вместе с ней удалятся {n} заметок: {names}.
+app.delete_folder.shared = Они пропадут у всех в проекте {project}, в том числе у тех, у кого одна из них сейчас открыта. В журнале останется запись: кто и когда удалил папку.
+app.delete_folder.keep = Чтобы сохранить заметку, сначала перенеси её: нажми ⋯ рядом с ней и выбери другую папку.
+
+# ------------------------------------------------------------ api: what the page says when tTerm Web gives no reason (api.ts)
+api.note_changed = Тем временем заметку изменили в другом месте.
+api.sign_in = Войди, чтобы продолжить.
+# {status} is the HTTP status: 502.
+api.answered = tTerm Web ответил кодом {status}
+api.confirm_first = Сначала подтверди, что это ты.
+api.account_changed = Сейчас выполнен вход в другой аккаунт.
+
+# ------------------------------------------------------------ app_link: the apps for computers, as the site names them (appLink.ts)
+app_link.mac = tTerm для Mac
+app_link.windows = tTerm для Windows
+app_link.linux = tTerm для Linux
+
+# ------------------------------------------------------------ add_machine: the window that adds a server or a computer to a project (AddMachine.tsx)
+# When the browser does not let the page copy the command.
+add_machine.copy_failed = Не удалось скопировать: выдели команду и скопируй её вручную.
+# How long the command works, inside add_machine.hint_computer and add_machine.hint_server as {works}.
+add_machine.works_once = one: Сработает один раз в течение {n} минуты. | few: Сработает один раз в течение {n} минут. | many: Сработает один раз в течение {n} минут.
+add_machine.title = Добавить машину
+# Before the list of the projects the machine can go to.
+add_machine.to_project = В проект
+# The two buttons Server and Computer, for screen readers.
+add_machine.kind = Тип машины
+add_machine.server = Сервер
+add_machine.computer = Компьютер
+# Step 1 for a computer, above the command.
+add_machine.run_computer = Выполни это на компьютере
+# Under the command. {works} is add_machine.works_once; sudo stays as it is.
+add_machine.hint_computer = В терминале на том компьютере, от своего пользователя, без sudo. {works} Дальше агент обновляется сам. Если позже выполнить новую команду, агент установится заново: компьютер останется как был, а его открытые терминалы завершатся.
+# A fold under the command, for trying an agent that is not released yet.
+add_machine.by_hand = Или запусти агента вручную
+# {version} is the agent's version: 0.11.0. tterm-agent, Python and websockets are names: they stay as they are.
+add_machine.by_hand_hint = Из копии tterm-agent {version} или новее, с Python, в котором есть пакет websockets. Это для проверки агента, который ещё не выпущен: он работает, пока открыто его окно терминала, а токен становится ключом компьютера.
+# Step 2, while the window waits for the machine.
+add_machine.keep_open = Не закрывай это окно
+# A fold: what the command for a computer does, point by point.
+add_machine.what_command = Что делает команда
+# {folder} is ~/.tterm-web, {bot_folder} ~/.tterm; launchd and systemd are names: they stay as they are.
+add_machine.what_command_puts = Устанавливает агента tTerm в {folder}: один файл для этой системы из выпусков tTerm, который перед запуском сверяется с контрольной суммой из скрипта команды. Запускает агента при каждом входе в систему (launchd на macOS, systemd на Linux). Агент бота tTerm в {bot_folder}, если он есть, остаётся как есть.
+add_machine.what_command_updates = Агент обновляется сам: только до версий, подписанных сборкой выпусков tTerm, и только когда на этом компьютере не открыт ни один терминал.
+add_machine.what_command_key = Создаёт для этого компьютера собственный ключ и хранит его на нём: прочитать его можешь только ты. Токен в команде нужен лишь для подключения, и только один раз.
+# root is the name of the system's administrator: it stays as it is.
+add_machine.what_command_runs = Агент работает от твоего пользователя, никогда от root, и не открывает портов: он сам подключается к tTerm Web и держит одно это соединение. Каждый терминал здесь – твой шелл там.
+# {command} is ~/.tterm-web/uninstall.sh.
+add_machine.what_command_uninstall = {command} удаляет всё это.
+# Step 1 for a server, above the command.
+add_machine.run_server = Выполни это на сервере
+# Under the command. {works} is add_machine.works_once; root and sudo stay as they are.
+add_machine.hint_server = {works} Выполни команду от root или от любого пользователя с sudo.
+# A fold: what the script for a server does, point by point.
+add_machine.what_script = Что делает скрипт
+# Here and in the next two, tterm in small letters is the name of the user the script makes on the server: it stays as it is, as sudo and sshd_config do.
+add_machine.what_script_user = Создаёт пользователя tterm без пароля. Если его уже создал бот tTerm, использует его.
+add_machine.what_script_certificates = Разрешает tTerm Web входить как tterm по сертификатам, которые живут две минуты и выпускаются только для этого сервера. Ключей на сервере не остаётся.
+add_machine.what_script_sudo = Даёт tterm права sudo, чтобы можно было управлять сервером. Забрать их можно одной командой.
+add_machine.what_script_safe = Не трогает sshd_config и не открывает портов. Запускать повторно безопасно.
+# {name} is the machine's name.
+add_machine.connected = Машина {name} подключена
+# After the machine's system and host: Ubuntu 24.04 · web-01 · in tabs it reads P/web-01.
+add_machine.tabs_label = во вкладках: {label}
+add_machine.open_terminal = Открыть терминал
+add_machine.add_another = Добавить ещё машину
+# {why} is what went wrong, as tTerm Web said it.
+add_machine.no_command = Не удалось получить команду: {why}
+add_machine.expired_token = Срок действия токена истёк: он действует 10 минут.
+add_machine.expired_command = Срок действия команды истёк: она действует 10 минут.
+add_machine.new_command = Получить новую команду
+add_machine.failed_computer = Не удалось добавить компьютер.
+add_machine.failed_server = Не удалось проверить сервер.
+add_machine.still_works = Та же команда ещё действует: исправь это и выполни её снова.
+# While the window waits: the agent or the server has called in, or not yet.
+add_machine.agent_in = Агент на связи. Читаем данные компьютера…
+add_machine.server_in = Сервер откликнулся. Входим, чтобы проверить его…
+add_machine.waiting_agent = Ждём агента…
+add_machine.waiting_server = Ждём сервер…
+# {project} is the project's name; the _unnamed ones are for when it is not known.
+add_machine.appears_computer = Он появится в проекте {project} через несколько секунд после того, как команда завершится.
+add_machine.appears_computer_unnamed = Он появится в проекте через несколько секунд после того, как команда завершится.
+add_machine.appears_server = Он появится в проекте {project}, как только скрипт завершится, обычно в течение минуты.
+add_machine.appears_server_unnamed = Он появится в проекте, как только скрипт завершится, обычно в течение минуты.
+
+# ------------------------------------------------------------ signin: signing in with a code from email, and the quick code (SignIn.tsx)
+# When the server does not answer at all.
+signin.no_answer = Сервер не отвечает. Проверь подключение и попробуй снова.
+signin.email_lead = Введи почту, и мы пришлём код
+# The field for the address, for screen readers.
+signin.email = Почта
+# The button, while the code is being sent.
+signin.sending = Отправляем…
+signin.get_code = Получить код
+signin.new_here = Впервые здесь? Аккаунт создаётся после ввода кода.
+signin.code_resent = Новый код уже в пути. Предыдущий больше не действует.
+signin.code_title = Введи код
+# {email} is the address the code went to.
+signin.code_sent = Мы отправили его на <b>{email}</b>
+# The field for the code, for screen readers.
+signin.code_label = Код из письма
+# A link that counts the seconds down until another code may be sent: New code in 42 s.
+signin.resend_in = one: Новый код через {n} с | few: Новый код через {n} с | many: Новый код через {n} с
+signin.resend = Отправить новый код
+signin.change_email = Изменить почту
+signin.no_email = Письма нет? Загляни в папку «Спам».
+signin.signup_title = Создай аккаунт
+# The field for one's name, and the words in it while it is empty.
+signin.your_name = Твоё имя
+# The one tick of signing up. <terms> and <privacy> are links to the site's two documents: their names as the site has them in the language.
+signin.agree = Я принимаю <terms>Условия использования</terms> и <privacy>Политику конфиденциальности</privacy>
+# The button, while the account is being made.
+signin.creating = Создаём…
+signin.create = Создать аккаунт
+signin.another_email = Указать другую почту
+# A quick code is four digits that sign one in on this device.
+signin.pin_easy = Слишком легко угадать: цифры не должны быть все одинаковыми или идти подряд.
+signin.pin_mismatch = Коды не совпали. Создай код заново.
+# {name} is the person's first name: Welcome for an account made just now, Hello for one there before.
+signin.welcome = Добро пожаловать, {name}!
+signin.hello = Привет, {name}!
+# The quick code, typed a second time.
+signin.pin_repeat = Повтори код
+signin.pin_repeat_lead = Введи те же четыре цифры ещё раз
+signin.pin_offer_lead = Создай быстрый код для этого устройства
+# The field for the quick code, for screen readers: the second time, the first time.
+signin.pin_repeat_label = Быстрый код, ещё раз
+signin.pin_offer_label = Быстрый код
+# The link that goes on without a quick code.
+signin.not_now = Не сейчас
+# {name} is the person's first name.
+signin.welcome_back = С возвращением, {name}!
+signin.pin_lead = Введи быстрый код
+# The field for the quick code, for screen readers.
+signin.pin_label = Быстрый код
+signin.forgot = Не помнишь код?
+signin.switch = Сменить аккаунт
+
+# ------------------------------------------------------------ connect: in the browser, allowing tTerm for the computer to sign in (Connect.tsx)
+connect.no_answer = tTerm не отвечает. Проверь подключение и перезагрузи эту страницу.
+# {app} is app_link.*: tTerm for Mac. Also the page's title in the browser.
+connect.allow_title = Разрешить вход приложению {app}?
+# The address the app opened is cut short.
+connect.incomplete = Ссылка неполная
+# Sign in with your browser is the app's button: the words of app_signin.browser.
+connect.start_again = Начни заново в tTerm на своём компьютере: нажми «Войти через браузер».
+# Above signing in, after Allow. {app} is app_link.*: tTerm for Mac.
+connect.confirm = Чтобы разрешить вход приложению {app}, подтверди, что это ты.
+connect.signin_other = Войди в другой аккаунт, затем разреши вход приложению {app}.
+connect.signin_then = Войди, затем разреши вход приложению {app}.
+connect.no_connection = Нет связи
+# {computer} is the name of the computer the app runs on, {email} the account's address.
+connect.asks = Приложение на <b>{computer}</b> просит войти в твой аккаунт {email}.
+# Above the code that both this page and the app show.
+connect.check = Проверь, что приложение показывает тот же код
+# The button.
+connect.allow = Разрешить
+connect.another = Не ты? Войди в другой аккаунт
+# Personal is the name of one's own project: it stays as it is. Settings and Devices are the page and its section, in the words of settings.title and devices.title.
+connect.small = Компьютер станет машиной в Personal. Приложение появится в Настройках, в разделе «Устройства», где его можно забыть.
+# While the browser goes back to the app. {app} is app_link.*: tTerm for Mac.
+connect.back = Возвращаемся в {app}…
+connect.takes_over = Дальше всё сделает приложение на этом компьютере.
+
+# ------------------------------------------------------------ app_signin: in tTerm for the computer, signing in with the browser (AppSignIn.tsx)
+# The app's first screen, for screen readers.
+app_signin.welcome_label = Добро пожаловать
+app_signin.welcome_title = Добро пожаловать в tTerm
+app_signin.welcome_lead = Терминалы этого компьютера работают сразу, аккаунт не нужен.
+# The button: the app opens the browser, to sign in there.
+app_signin.browser = Войти через браузер
+# The button: not now, sign in later.
+app_signin.later = Позже
+app_signin.welcome_note = После входа в этом окне появятся твои серверы, проекты, заметки и команда. Войти можно в любой момент внизу боковой панели.
+app_signin.cancelled = Вход отменён в браузере.
+# The title of the window that waits while one signs in in the browser.
+app_signin.link_title = Вход через браузер
+# {host} is app.tterm.net. The code comes under it.
+app_signin.link_note = tTerm открыл {host} в браузере. Войди там и разреши вход этому компьютеру, когда страница спросит. Страница тоже покажет этот код:
+app_signin.until_then = А пока этот компьютер работает как раньше.
+app_signin.open_again = Открыть страницу снова
+
+# ------------------------------------------------------------ welcome: the first screen, while nothing is connected yet (Welcome.tsx)
+# {name} is the person's first name.
+welcome.title = Добро пожаловать в tTerm, {name}
+welcome.lead = Терминал для твоих серверов и компьютеров прямо в браузере. Не нужно ничего ставить на этот компьютер, копировать ключи или открывать порты.
+welcome.connect = Подключи первую машину
+# The two cards: the kinds of machine to connect.
+welcome.server = Сервер
+welcome.server_note = VPS или облачный сервер, к которому ты заходишь по SSH. Выполни на нём одну команду, и он появится здесь.
+# Small labels under the cards: Linux, One command; macOS, Linux, No open ports.
+welcome.one_command = Одна команда
+welcome.computer = Компьютер
+welcome.computer_note = Mac или компьютер на Linux дома или в офисе, даже за NAT. Связь держит небольшой агент.
+welcome.no_ports = Без открытых портов
+# The three steps below, for screen readers.
+welcome.how = Как это работает
+welcome.step_add = Добавь машину
+welcome.step_add_text = Выполни на ней одну команду. Она сработает один раз в течение 10 минут.
+welcome.step_open = Открой терминал
+welcome.step_open_text = Каждая команда становится блоком: его можно скопировать, выполнить ещё раз или поделиться ссылкой на него.
+welcome.step_team = Позови команду
+welcome.step_team_text = Роли, общий журнал, и всегда видно, кто смотрит.
+# {project} is the project's name and {code} its code: P. In {code}/name, name stands for a machine's name, as in P/web-01.
+welcome.footnote = Твой первый проект, {project}, уже готов. Его код – {code}, поэтому машины во вкладках подписаны как {code}/имя.
+
+# ------------------------------------------------------------ need_account: New project and Add machine in the app before signing in (NeedAccount.tsx)
+need_account.machine_title = Добавить машину
+need_account.machine_note = Серверы и другие компьютеры доступны с аккаунтом tTerm. Если аккаунта ещё нет, он создастся при входе.
+need_account.server = Сервер
+need_account.server_text = VPS или облачный сервер, к которому ты заходишь по SSH. Выполни на нём одну команду, и он появится здесь.
+need_account.computer = Компьютер
+need_account.computer_text = Mac или компьютер на Linux дома или в офисе, даже за NAT.
+# What the Free plan gives. {machines} is need_account.plan_machines, {terminals} need_account.plan_terminals.
+need_account.machine_plan = До {machines} и {terminals}.
+# In need_account.machine_plan, after "Up to": in the form the words take there.
+need_account.plan_machines = one: {n} машины | few: {n} машин | many: {n} машин
+need_account.plan_terminals = one: {n} открытого терминала | few: {n} открытых терминалов | many: {n} открытых терминалов
+need_account.machine_stays = Этот компьютер останется как есть, со своими терминалами.
+need_account.project_title = Новый проект
+need_account.project_note = Другие проекты доступны с аккаунтом tTerm. Если аккаунта ещё нет, он создастся при входе.
+need_account.personal = Личные проекты
+need_account.personal_text = Только ты. Машины, терминалы и заметки в таком проекте только твои.
+need_account.shared = Общие проекты
+# A small label on Shared projects: they are not there yet.
+need_account.soon = Скоро
+need_account.shared_text = С командой. Ты приглашаешь людей, и они открывают терминалы на машинах проекта и правят его заметки.
+need_account.project_plan = Свои проекты, у каждого свои машины, терминалы и заметки. Общие проекты с командой скоро.
+# Personal is the name of one's own project: it stays as it is.
+need_account.project_stays = Personal останется как есть, с этим компьютером, его терминалами и заметками.
+# The button that closes the window.
+need_account.not_now = Не сейчас
+
+# ------------------------------------------------------------ updates: tTerm for Mac updating itself, only in the app (Updates.tsx)
+# The title of Restart to update in the top bar. {version} is the new version: 0.5.1.
+updates.pill_title.mac = tTerm {version} готов. Перезапуск займёт несколько секунд; если на этом Mac работают терминалы, tTerm сначала спросит.
+updates.pill_title.computer = tTerm {version} готов. Перезапуск займёт несколько секунд; если на этом компьютере работают терминалы, tTerm сначала спросит.
+updates.restarting = Перезапуск…
+# A button, in the top bar and in Settings: tTerm restarts and the new version goes in.
+updates.restart_to_update = Перезапустить и обновить
+# The card above the account in the sidebar, and Settings. {version} is the new version.
+updates.ready = tTerm {version} готов
+updates.restart_takes = Перезапуск займёт несколько секунд.
+# The card's button.
+updates.restart = Перезапустить
+# A link to the notes of the new version.
+updates.whats_new = Что нового
+# Once, after the restart. {version} is the version now: 0.5.1.
+updates.updated = tTerm обновлён до {version}
+# Settings, Updates: the two ways tTerm takes a new version.
+updates.auto = Обновляться автоматически
+updates.auto_text.mac = Новая версия ставится при выходе из tTerm, а если tTerm работает в строке меню с закрытым окном – как только на этом Mac ничего не запущено.
+updates.auto_text.computer = Новая версия ставится при выходе из tTerm, а если tTerm работает в строке меню с закрытым окном – как только на этом компьютере ничего не запущено.
+updates.ask = Сначала спрашивать
+# "Restart to update" is the button (updates.restart_to_update): the same words.
+updates.ask_text = Новая версия ждёт, пока ты не нажмёшь «Перезапустить и обновить».
+# The section of Settings.
+updates.title = Обновления
+updates.about = tTerm для Mac обновляется сам из выпусков tTerm. Ставится только версия, подписанная tTerm.
+# For screen readers: the two ways above.
+updates.how = Как обновляется tTerm
+# Beside Update by itself.
+updates.recommended = Рекомендуется
+updates.checking = Ищем новую версию…
+# {version} is the new version.
+updates.downloading = Загрузка tTerm {version}…
+# {version} is the version this app is; {day} is today, yesterday or on 12 Oct (time.today, time.yesterday, time.on_day); {time} is 10:02.
+updates.you_have_downloaded = У тебя версия {version}, загружена {day} в {time}.
+updates.you_have = У тебя версия {version}.
+# {version} is the new version; why it failed comes under it, as tTerm says it.
+updates.failed = Не удалось обновить до {version}
+# {site} is tterm.net. Applications is the folder of the Mac: as macOS names it in the language.
+updates.download = Или скачай tTerm с <link>{site}</link> и перетащи его в «Программы».
+# A button: tTerm moves itself from the disk image to Applications.
+updates.move = Переместить в «Программы»
+# {ago} is when tTerm last looked: just now, 5 min ago, 2 h ago, yesterday, on 12 Oct (time.*).
+updates.looked = tTerm {version} – последняя версия. Проверено {ago}.
+updates.this_is = Это tTerm {version}.
+# A button: look for a new version now.
+updates.check_now = Проверить сейчас
+
+# ------------------------------------------------------------ account: the name, the photo and the plan (Account.tsx)
+# The file chosen for one's photo is none.
+account.not_a_photo = Этот файл tTerm не примет как фото. Выбери JPEG, PNG или WebP размером до 5 МБ.
+# What the plan allows, after "Up to" (account.up_to): Up to 50 machines and 24 open terminals.
+account.limit_machines = one: {n} машины | few: {n} машин | many: {n} машин
+account.limit_terminals = one: {n} открытого терминала | few: {n} открытых терминалов | many: {n} открытых терминалов
+# {limits} is one or both of the two above, as a list.
+account.up_to = До {limits}
+account.no_limits = Без ограничений
+# A meter of the plan, beside its label (Machines, Open terminals): 3 of 50.
+account.used_of = {used} из {limit}
+account.used_no_limit = {used}, без ограничений
+# The title of Close at the top of Account and Settings.
+account.close_title = Вернуться назад
+account.photo_removed = Фото удалено: снова видны твои инициалы.
+# For screen readers: the card with one's name and photo.
+account.profile = Профиль
+account.change_photo = Сменить фото
+account.add_photo = Добавить фото
+account.your_name = Твоё имя
+account.saving = Сохранение…
+account.edit_name = Изменить имя
+account.remove_photo = Удалить фото
+# Under the photo's buttons: what the photo is for.
+account.photo_hint = Оно показывается рядом с твоим именем вместо инициалов.
+# For screen readers: the file chooser for the photo.
+account.choose_photo = Выбрать фото
+# Under one's email address. {email} is support's address.
+account.address_note = По этому адресу ты входишь в tTerm. Чтобы сменить его, напиши на <link>{email}</link>.
+# The section of the plan; its name (Free) stays as it is.
+account.plan = Тариф
+account.plan_note = tTerm бесплатный, пока мы его строим. Другие тарифы появятся здесь, и ты узнаешь о них до того, как что-то изменится.
+# The labels of the plan's two meters.
+account.machines = Машины
+account.open_terminals = Открытые терминалы
+account.photo_saved = Фото сохранено: оно внизу боковой панели и в меню аккаунта.
+# {email} is support's address.
+account.delete_note = Чтобы удалить аккаунт, напиши на {email} с адреса, по которому входишь.
+
+# ------------------------------------------------------------ devices: where one is signed in, in Settings (Devices.tsx)
+# On the sign-in screen, after this very device was forgotten.
+devices.this_forgotten = Это устройство забыто. Войди с кодом из письма.
+# {device} is a device's label: tTerm for Mac on MacBook-Pro. tTerm there now works with that computer only, as before signing in.
+devices.app_signed_out = {device}: выход выполнен, там теперь только терминалы самого компьютера.
+# {device} is a device's label: Chrome on macOS.
+devices.forgotten = {device}: устройство забыто, там снова понадобится код из письма.
+# On the sign-in screen.
+devices.all_forgotten = Все устройства забыты. Теперь на каждом нужно входить с кодом из письма.
+devices.about = Браузеры, где ты входишь по быстрому коду, и tTerm на твоих компьютерах, где вход выполнен через браузер. На остальных устройствах нужен код из письма.
+devices.idle = Если 8 часов ничего не делать, tTerm снова попросит быстрый код. Терминалы при этом продолжают работать.
+devices.none = Ни один браузер не запомнен. Для каждого входа нужен код из письма.
+# A mark beside the device one uses now.
+devices.this_device = Это устройство
+# Under a device's label. {created} and {used} are how long ago: just now, 3 minutes ago, 2 days ago (time.ago_*).
+devices.app_times = Вход {created}, последнее использование {used}
+devices.browser_times = Запомнен {created}, последний вход {used}
+# A button beside each device.
+devices.forget = Забыть
+# The heading, and the red button that does it.
+devices.forget_all = Забыть все устройства
+devices.forget_all_text = Все устройства будут забыты, а все сеансы завершатся, включая этот. Потом каждый браузер попросит код из письма. Терминалы продолжат работать.
+# The button that asks first.
+devices.forget_all_ask = Забыть все устройства…
+
+# ------------------------------------------------------------ this_computer: the computer the app runs on, in Settings (ThisComputer.tsx)
+# How the link to tTerm Web is, under the switch. {name} is the name tTerm Web knows this computer by.
+this_computer.online_terminals = one: На связи с tTerm Web как {name} · оттуда открыт {n} терминал | few: На связи с tTerm Web как {name} · оттуда открыто {n} терминала | many: На связи с tTerm Web как {name} · оттуда открыто {n} терминалов
+this_computer.online = На связи с tTerm Web как {name}
+this_computer.connecting = Подключение к tTerm Web…
+this_computer.waiting = Пока не подключён к tTerm Web.
+this_computer.no_network = Нет сети. tTerm попробует снова сам.
+# "Turn this on": the switch above.
+this_computer.removed.mac = Этот Mac удалён из tTerm Web, поэтому оттуда он недоступен. Включи, чтобы добавить его снова.
+this_computer.removed.computer = Этот компьютер удалён из tTerm Web, поэтому оттуда он недоступен. Включи, чтобы добавить его снова.
+this_computer.closed.mac = Сейчас этот Mac недоступен из tTerm Web.
+this_computer.closed.computer = Сейчас этот компьютер недоступен из tTerm Web.
+# The section's title, on a Mac too.
+this_computer.title = Этот компьютер
+# {name} is this computer's machine in tTerm, {project} its project.
+this_computer.about = {name} в проекте {project}. Его терминалы работают здесь, даже без интернета.
+# The switch.
+this_computer.open = Доступ из tTerm Web и с телефона
+this_computer.open_text.mac = tTerm Web и телефон открывают терминалы на этом Mac, пока здесь работает tTerm: с закрытым окном tTerm остаётся в строке меню и запускается при входе в систему. Если выключить, там этот Mac будет не в сети, а здесь всё работает как раньше.
+this_computer.open_text.computer = tTerm Web и телефон открывают терминалы на этом компьютере, пока здесь работает tTerm: с закрытым окном tTerm остаётся в строке меню и запускается при входе в систему. Если выключить, там этот компьютер будет не в сети, а здесь всё работает как раньше.
+# Asked before the switch goes off while terminals opened from tTerm Web run here.
+this_computer.ask_title.mac = Закрыть доступ к этому Mac из tTerm Web?
+this_computer.ask_title.computer = Закрыть доступ к этому компьютеру из tTerm Web?
+# The red button.
+this_computer.turn_off = Выключить
+this_computer.ask_text.mac = one: Завершится {n} терминал, открытый на этом Mac из tTerm Web, а там этот Mac будет не в сети. | few: Завершатся {n} терминала, открытых на этом Mac из tTerm Web, а там этот Mac будет не в сети. | many: Завершатся {n} терминалов, открытых на этом Mac из tTerm Web, а там этот Mac будет не в сети.
+this_computer.ask_text.computer = one: Завершится {n} терминал, открытый на этом компьютере из tTerm Web, а там этот компьютер будет не в сети. | few: Завершатся {n} терминала, открытых на этом компьютере из tTerm Web, а там этот компьютер будет не в сети. | many: Завершатся {n} терминалов, открытых на этом компьютере из tTerm Web, а там этот компьютер будет не в сети.
+
+# ------------------------------------------------------------ photo: one's photo, cut to a circle (PhotoDialog.tsx)
+# The photo could not be made here, in the browser.
+photo.browser_failed = Браузеру не удалось подготовить фото.
+photo.no_answer = tTerm не ответил. Попробуй снова.
+# The dialog's title.
+photo.title = Твоё фото
+# For screen readers: the photo in its frame, which the arrow keys move and + and - zoom.
+photo.frame = Твоё фото в круге. Перетаскивай его или двигай стрелками; + и - меняют масштаб.
+# The slider that makes the photo bigger in the circle.
+photo.zoom = Масштаб
+photo.drag = Перетащи фото, чтобы разместить его в круге.
+# Beside the photo in three small sizes.
+photo.preview = Так его видят другие
+photo.note = JPEG, PNG или WebP размером до 5 МБ. tTerm хранит копию размером 256 пикселей без сведений, которые фото несёт о себе, например где его сняли.
+photo.saving = Сохранение…
+photo.save = Сохранить фото
+
+# ------------------------------------------------------------ confirm: asking before what cannot be undone (Confirm.tsx)
+confirm.no_answer = tTerm Web не ответил.
+confirm.copy_failed = Не удалось скопировать: выдели команду и скопируй её вручную.
+# After a server is removed. {name} is the server's name.
+confirm.removed = Сервер {name} удалён
+# The command that takes the access back comes after it.
+confirm.removed_text = tTerm Web больше не показывает его в списке и не входит на него. Сервер не ответил, поэтому доступ tTerm Web на нём останется, пока ты не уберёшь его там:
+# {user} is the server's user tterm; {command} is the command that removes it and its sudo rule.
+confirm.user_stays = Пользователь {user} и его правило sudo остаются – для бота tTerm, если ты им пользуешься. Чтобы удалить и их: {command}
+
+# ------------------------------------------------------------ project_dialog: the windows of projects of one's own (ProjectDialog.tsx)
+project_dialog.code_invalid = Код – это от 1 до 4 букв или цифр.
+# When saving or moving failed and tTerm Web gave no reason.
+project_dialog.no_answer = tTerm Web не ответил.
+project_dialog.edit_title = Изменить проект
+project_dialog.new_title = Новый проект
+# Under the title, editing a project others are in: its name, code and color.
+project_dialog.edit_sub = Это меняют владелец и админы.
+project_dialog.new_sub = У проекта свои машины и заметки, отдельно от других твоих проектов.
+# The label of the project's name.
+project_dialog.name = Название
+# In the empty name field: an example of a project's name.
+project_dialog.name_example = Например, Клиент X
+# The label of the project's code: the 1 to 4 letters or digits on its badge.
+project_dialog.code = Короткий код
+project_dialog.code_help_alone = От 1 до 4 букв или цифр. Код обозначает проект во вкладках и в боковой панели.
+project_dialog.code_help_shared = От 1 до 4 букв или цифр. Код обозначает проект во вкладках и в боковой панели, сразу у всех его участников.
+project_dialog.code_help_new = Код составляется из названия, и его можно изменить: от 1 до 4 букв или цифр. Он обозначает проект во вкладках и в боковой панели.
+# The label of the project's colors.
+project_dialog.color = Цвет
+# "Whole project" and "Settings" are named as the choice and the page are (settings.tint_block, settings.title).
+project_dialog.color_help_new = Цвет подобран так, чтобы отличаться от других твоих проектов, и его можно изменить. Он заливает значок с кодом, а если в Настройках выбрать «Весь проект», то и весь проект в боковой панели.
+project_dialog.color_help_alone = Цвет заливает значок с кодом, а если в Настройках выбрать «Весь проект», то и весь проект в боковой панели.
+project_dialog.color_help_shared = Цвет заливает значок с кодом у всех участников, а у тех, кто выбрал «Весь проект» в своих Настройках, – и весь проект в боковой панели.
+# Above how the project will look in the sidebar and on a tab (a noun).
+project_dialog.preview = Предпросмотр
+# In the preview, in place of the project's name while none is typed.
+project_dialog.preview_name = Проект
+project_dialog.new_next = Ты его владелец. Дальше добавь машину или перенеси её из другого проекта и пиши заметки.
+project_dialog.create = Создать проект
+# The title of the window that moves a machine to another project: {machine} is its name.
+project_dialog.move_title = Перенести {machine}
+project_dialog.move_sub = В другой проект, где ты владелец.
+# Next to each project one may move to: whether others are in it.
+project_dialog.only_you = только ты
+project_dialog.with_others = с другими
+# {project} is the project it goes to, {code} that project's code, {name} the machine's name there: CX/web-01.
+project_dialog.move_becomes = В проекте {project} она станет {code}/{name}. Её терминалы продолжат работать, а на самой машине ничего не изменится.
+# The same, when its name is taken there: {machine} is its name now, {name} the one it gets (web-01-2).
+project_dialog.move_becomes_taken = В проекте {project} она станет {code}/{name}: имя {machine} там уже занято. Её терминалы продолжат работать, а на самой машине ничего не изменится.
+# The button: {project} is the project's name.
+project_dialog.move_to = Перенести в {project}
+# The button while there is nothing to pick (a verb).
+project_dialog.move = Перенести
+# Next to a folder one may move a note to: it has no notes.
+project_dialog.folder_empty = пустая
+# Next to a project without folders: the note goes to a new folder there, named as its own.
+project_dialog.folder_new = будет создана новая папка
+# The title of the window that moves a note to another project: {note} is its title.
+project_dialog.move_note_title = Перенести {note}
+project_dialog.move_note_sub = Сейчас в проекте {project}, в папке {folder}. Выбери папку в другом проекте.
+# Who sees the note in the project it goes to.
+project_dialog.note_alone = В проекте {project} её видишь только ты.
+project_dialog.note_shared = В проекте {project} её видят и правят все.
+# {project} is the project the note leaves.
+project_dialog.note_leaves = У остальных в проекте {project} она пропадёт. В журнале проекта {project} останется запись: кто и когда её перенёс.
+# The ticks: the items of a checklist ticked off, each with who ticked it.
+project_dialog.note_keeps = С ней переносятся название, текст и история, а также отметки в чек-листе и то, кто их поставил.
+# The button: {folder} is the name of the folder made there, the note's own folder's name.
+project_dialog.move_to_new_folder = Перенести в новую папку {folder}
+project_dialog.move_to_folder = Перенести в папку {folder}
+project_dialog.delete_title = Удалить проект {project}?
+# A project with machines in it cannot be deleted yet: {machine} is its machine's name.
+project_dialog.delete_machine_first = Сначала перенеси или удали его машину: {machine}.
+# {machines} is their names, listed: web-01, web-02 and db.
+project_dialog.delete_machines_first = Сначала перенеси или удали его машины: {machines}.
+# "Move to another project" and "Remove machine" are the items of a machine's ⋯ menu (projectpage.move_machine, projectpage.remove_machine).
+project_dialog.delete_how = На странице проекта нажми ⋯ рядом с машиной: «Перенести в другой проект» или «Удалить машину». После этого проект можно удалить.
+project_dialog.cant_undo = Это нельзя отменить.
+# {n} is how many folders the project has; {notes} is project_dialog.delete_notes.
+project_dialog.delete_folders = one: Вместе с ним удалится {n} папка с {notes}. | few: Вместе с ним удалятся {n} папки с {notes}. | many: Вместе с ним удалятся {n} папок с {notes}.
+# How many notes are in those folders, inside project_dialog.delete_folders: 2 folders with 5 notes are deleted with it.
+project_dialog.delete_notes = one: {n} заметкой | few: {n} заметками | many: {n} заметками
+project_dialog.delete_no_notes = Заметок в нём нет.
+# Above the field the project's name is typed in.
+project_dialog.delete_type = Введи {project}, чтобы подтвердить
+# The button.
+project_dialog.delete_button = Удалить {project}
+
+# ------------------------------------------------------------ projectpage: a project's page (ProjectPage.tsx)
+# The end of the line under the project's name: 2 machines · 1 terminal open · you are the owner.
+projectpage.role_owner = ты владелец
+projectpage.role_admin = ты админ
+projectpage.role_member = ты участник
+projectpage.role_observer = ты наблюдатель
+# A terminal busy with a command whose line is not known.
+projectpage.command_running = Выполняется команда
+# {duration} is how long the command has run: less than a minute, 3 minutes, an hour (time.for_*).
+projectpage.running_for = работает {duration}
+# The same, while it is not known how long.
+projectpage.running = работает
+# A terminal whose machine is away: {machine} is its name.
+projectpage.waits_for = ждёт {machine}
+# Under a terminal's name being typed. Enter and Esc are the keys.
+projectpage.rename_hint = Enter сохраняет, Esc отменяет.
+# On a terminal's name.
+projectpage.double_click = Дважды щёлкни, чтобы переименовать
+# The button next to a terminal: go to it (a verb).
+projectpage.open = Открыть
+# An offline computer's state, next to its name: {ago} is how long ago (time.ago_*): Last seen 14 minutes ago.
+projectpage.last_seen = Последний раз на связи {ago}
+# A computer's state, next to its name.
+projectpage.offline = Не в сети
+projectpage.online = В сети
+# On New terminal: {machine} is the machine's name.
+projectpage.offline_title = {machine} не в сети: спит или не запущен агент
+projectpage.new_terminal_title = Новый терминал на {machine}
+# Said when New terminal is pressed on an offline computer: {seen} is time.last_seen: last seen 14 minutes ago.
+projectpage.offline_wait_seen = {machine} не в сети, {seen}: появится снова, когда подключится агент.
+projectpage.offline_wait = {machine} не в сети: появится снова, когда подключится агент.
+projectpage.new_terminal = Новый терминал
+# The ⋯ button next to a machine, for screen readers: {machine} is its name.
+projectpage.machine_menu = {machine}: меню машины
+# The tip on that button: the items of its menu (projectpage.move_machine, projectpage.remove_machine).
+projectpage.machine_menu_title = Перенести в другой проект, удалить машину
+# An item of a machine's menu, and the tip on its ⋯ button when it is the only item.
+projectpage.remove_machine = Удалить машину
+# An item of a machine's menu.
+projectpage.move_machine = Перенести в другой проект
+projectpage.no_terminals = Нет открытых терминалов
+# Who changed a note last, and when: {ago} is just now, 5 min ago, yesterday, on 12 Oct (time.*).
+projectpage.edited_you = Ты, {ago}
+# The same, someone else: {name} is their first name.
+projectpage.edited_by = {name}, {ago}
+# A note's author when it is oneself, in the note's menu: You, the owner and admins can delete it.
+projectpage.you = Ты
+# A checklist's progress, in place of its first line: {n} items ticked of {total}.
+projectpage.done = one: Выполнено {n} из {total} | few: Выполнено {n} из {total} | many: Выполнено {n} из {total}
+# A note without text yet, in place of its first line.
+projectpage.note_empty = Пусто
+# The ⋯ button next to a note, for screen readers: {note} is its title.
+projectpage.note_menu = {note}: меню заметки
+# The tip on that button: what its menu has.
+projectpage.note_menu_title_move = Папка, перенести в другой проект, копировать как Markdown, удалить заметку
+projectpage.note_menu_title = Папка, копировать как Markdown, удалить заметку
+# The end of the line under the project's name when nobody else is in it: 1 machine · 2 terminals open · only you.
+projectpage.only_you = только ты
+# The tip on the project's code, next to its name.
+projectpage.short_code = Короткий код
+# The pencil next to the project's name.
+projectpage.edit = Изменить название, код и цвет
+# A heading.
+projectpage.machines = Машины
+# Next to the heading Machines.
+projectpage.machines_alone = Терминалы на них открываешь только ты
+projectpage.machines_shared = Твои терминалы на них
+projectpage.add_machine = Добавить машину
+# The two kinds of machine one can add, in a project without machines.
+projectpage.server = Сервер
+projectpage.server_text = VPS или облачный сервер, к которому ты заходишь по SSH. Выполни на нём одну команду, и он появится здесь.
+projectpage.computer = Компьютер
+projectpage.computer_text = Mac или компьютер на Linux дома или в офисе, даже за NAT. Связь держит небольшой агент.
+# "Move to another project" is the item of a machine's ⋯ menu (projectpage.move_machine).
+projectpage.move_hint = Машина уже есть в другом проекте? На странице того проекта нажми ⋯ рядом с машиной, затем «Перенести в другой проект».
+# On the page of Personal, the project each person has for themselves: {project} is its name.
+projectpage.personal_title = {project} – только твой
+projectpage.personal_text = Сюда никого нельзя пригласить. Чтобы держать другие машины отдельно или потом работать вместе с коллегами, создай проект и перенеси в него машины.
+projectpage.new_project = Новый проект
+# A heading.
+projectpage.notes = Заметки
+# Next to the heading Notes.
+projectpage.notes_alone = Заметки в проекте {project} видишь только ты. Папки помогают держать их в порядке
+projectpage.notes_shared = Их читают и правят все в проекте {project}. Папки помогают держать их в порядке
+projectpage.new_folder = Новая папка
+projectpage.no_notes = Заметок пока нет
+# Runbooks, Access, Checklists: examples of folders' names.
+projectpage.no_notes_text = Заметки живут в папках, как терминалы на машинах. Начни с одной: Ранбуки, Доступы, Чек-листы.
+# A folder without notes, next to its name.
+projectpage.folder_empty = Пусто
+# Who made a folder: {name} is their first name.
+projectpage.made_by_you = создана тобой
+projectpage.made_by = создана: {name}
+projectpage.new_note = Новая заметка
+# The ⋯ button next to a folder, for screen readers: {folder} is its name.
+projectpage.folder_menu = {folder}: меню папки
+# The tip on that button: what its menu has.
+projectpage.folder_menu_title = Переименовать папку, удалить папку
+# "New note" is the button next to the folder's name (projectpage.new_note).
+projectpage.folder_no_notes_writes = Заметок пока нет. «Новая заметка» создаст здесь первую
+# A heading at the end of the page: {project} is the project's name.
+projectpage.delete_title = Удалить проект {project}
+projectpage.delete_text = Вместе с ним удалятся его папки и заметки. Машины нужно сначала перенести в другой проект или удалить.
+projectpage.delete_project = Удалить проект
+
+# ------------------------------------------------------------ machines: the machines page (Machines.tsx)
+# What sudo does on the machine, after "sudo" in what tTerm Web learned about it.
+machines.sudo_works = работает
+machines.sudo_password = просит пароль
+machines.sudo_missing = недоступен
+# What tTerm Web learned about a machine when it connected: the labels, each with its value.
+machines.system = Система
+machines.kernel = Ядро
+machines.cpu = Процессор
+machines.cores = one: {n} ядро | few: {n} ядра | many: {n} ядер
+machines.memory = Память
+machines.disk = Диск
+# {free} and {total} are sizes: 7.8 GB free of 50 GB.
+machines.disk_free = свободно {free} из {total}
+# The package manager: apt, brew.
+machines.packages = Пакеты
+machines.shell = Шелл
+# {shell} is the shell its terminals start, {shells} all the shells it has: zsh (has bash, zsh).
+machines.shell_has = {shell} (есть {shells})
+machines.commands = Команды
+# How many commands tTerm Web knows there.
+machines.commands_known = one: {n} известная | few: {n} известных | many: {n} известных
+# The version of the agent, or of tTerm for the computer.
+machines.agent = Агент
+# The account on the machine the terminals run as: root, deploy.
+machines.account = Пользователь
+# A computer's state on its card: {seen} is time.last_seen: offline, last seen 14 minutes ago.
+machines.offline_seen = не в сети, {seen}
+machines.offline = не в сети
+machines.online = в сети
+machines.offline_note = Компьютер спит или не в сети, либо не запущен его агент. Он вернётся сам, когда агент сможет подключиться; эта страница заметит это в течение десяти секунд.
+# On Open a terminal while the computer is offline.
+machines.offline_title = Компьютер не в сети: спит или не запущен агент
+machines.open_terminal = Открыть терминал
+# A terminal running on the machine: {label} is as its tab shows it (P/web-01 · 2).
+machines.back_to = Вернуться к {label}, он ещё работает
+# The tip on Remove: {machine} is the machine's name.
+machines.remove_title = Удалить {machine} из tTerm Web
+# The button: take the machine out (a verb).
+machines.remove = Удалить
+# The page's heading.
+machines.title = Машины
+machines.add = Добавить машину
+machines.lead = Терминал продолжает работать, когда ты закрываешь его вкладку: он ждёт здесь и в боковой панели, пока его шелл не закроется.
+# A size: {size} is a number as the language writes it, 16 or 7.5.
+machines.gb = {size} ГБ
+
+# ------------------------------------------------------------ note_view: a note in its tab (NoteView.tsx)
+# Said for a moment at the bottom of the page. {why} is the reason tTerm
+# Web gave, as it gave it.
+note_view.not_saved = Не сохранено: {why}
+note_view.draft_back = Несохранённый текст этой заметки восстановлен.
+# When tTerm Web gives no reason.
+note_view.no_answer = tTerm Web не ответил.
+# Ticking a checklist item did not get through.
+note_view.no_tick = Не удалось отметить: {why}
+# The note's tab was closed with what was typed in it not saved. {title} is
+# the note's title, or note.untitled.
+note_view.kept_draft = {title}: набранное ещё не сохранено. Оно хранится в этом браузере и вернётся, когда ты снова откроешь заметку.
+note_view.copied_markdown = Скопировано как Markdown.
+note_view.no_copy = Не удалось скопировать: браузер не разрешил странице.
+note_view.no_move = Не удалось перенести: {why}
+# Under the note's title, the parts of one line with dots between: who
+# started it and when; or who edited it last and when · who wrote it and
+# on which day; then who sees it. Someone is a person no longer known.
+# {name} is a person's first name; {ago} is how long ago, short: just now,
+# 5 min ago, yesterday, on 12 Oct; {folder} is a folder's name.
+note_view.someone_started = Начата кем-то {ago} в папке {folder}
+note_view.you_started = Начата тобой {ago} в папке {folder}
+note_view.started = Начата: {name}, {ago}, в папке {folder}
+note_view.someone_edited = Изменена кем-то {ago}
+note_view.you_edited = Изменена тобой {ago}
+note_view.edited = Изменена: {name}, {ago}
+# {day} is today, yesterday or on 12 Oct.
+note_view.someone_wrote = Написана кем-то {day}
+note_view.you_wrote = Написана тобой {day}
+note_view.wrote = Написана: {name}, {day}
+# The end of the same line, after a dot. {project} is a project's name.
+note_view.only_you = видна только тебе
+note_view.everyone_edits = править могут все в проекте {project}
+# The note was deleted while it was open here.
+note_view.gone_title = Эта заметка удалена
+note_view.gone_text = Её удалили (или папку, где она лежала) из другой вкладки или с другого устройства.
+note_view.close_tab = Закрыть вкладку
+note_view.copy_what_was_here = Копировать то, что здесь было, как Markdown
+note_view.no_open = Не удалось открыть заметку: {why}
+# The ⋯ beside where the note is: what screen readers say, and the tip
+# under the mouse, which lists what is in its menu.
+note_view.menu = Меню заметки
+note_view.menu_title_move = Папка, перенести в другой проект, копировать как Markdown, удалить заметку
+note_view.menu_title = Папка, копировать как Markdown, удалить заметку
+# The field of the note's title, for screen readers.
+note_view.title = Название
+# The note was saved meanwhile from elsewhere, changed in the same places.
+note_view.conflict = Пока здесь шла правка, эту заметку изменили в другом месте, причём в тех же фрагментах. Что оставить в них: твою версию или другую? Всё остальное сохранится из обеих.
+note_view.keep_mine = Оставить мою
+note_view.keep_theirs = Оставить другую
+
+# ------------------------------------------------------------ note_editor: a note's blocks, written in place (NoteEditor.tsx)
+# The kinds of block: what screen readers say of one, and what an empty one
+# shows. Heading, Code, Divider and Text are also in the list that / opens.
+note_editor.text = Текст
+note_editor.heading = Заголовок
+note_editor.list_item = Пункт списка
+note_editor.checklist_item = Пункт чек-листа
+note_editor.code = Код
+note_editor.divider = Разделитель
+# In the list that / opens: what a block can become. What is typed after
+# the / picks from these names.
+note_editor.checklist = Чек-лист
+note_editor.list = Список
+# Who ticked a checklist item, beside it: You · 10:02, Denis · 12 Oct.
+note_editor.you = Ты
+# The same, for a person no longer known.
+note_editor.someone = Кто-то
+# What an empty note shows. The marks # - [ ] \`\`\` and / are typed as they
+# are; the words after them are the language's own.
+note_editor.start_writing = Начни писать. Markdown работает прямо при наборе: # заголовок, - [ ] чек-лист, \`\`\` код. Всё остальное – через /.
+# What an empty line of text shows.
+note_editor.type_slash = Набери / для чек-листа, заголовка, кода
+# A checklist item's box, for screen readers.
+note_editor.untick = Выполнено: снять отметку
+note_editor.tick = Отметить выполненным
+note_editor.no_copy = Не удалось скопировать: выдели текст и скопируй его вручную.
+# The list that / opens, for screen readers.
+note_editor.turn_into = Превратить в
+
+# ------------------------------------------------------------ menus: the menus behind ⋯, and the window that names a folder (Menus.tsx)
+# A note's menu: over the project's folders, the one the note is in
+# checked; a click moves it to another.
+menus.folder = Папка
+menus.move_out = Перенести в другой проект…
+menus.copy_markdown = Копировать как Markdown
+menus.delete_note = Удалить заметку
+# Instead of Delete note, for one who may not: who may. {name} is the first
+# name of the note's author.
+menus.note_rights_move = Перенести её в другой проект или удалить могут {name}, владелец и админы
+menus.note_rights_delete = Удалить её могут {name}, владелец и админы
+# The same, when the note's author is no longer known.
+menus.note_rights_move_someone = Перенести её в другой проект или удалить могут автор, владелец и админы
+menus.note_rights_delete_someone = Удалить её могут автор, владелец и админы
+# A folder's menu.
+menus.rename_folder = Переименовать папку
+menus.delete_folder = Удалить папку
+# Instead of Delete folder, for one who may not.
+menus.folder_rights = Папку с заметками удаляют владелец и админы
+# The window that names a folder, a new one or one renamed. First what it
+# says when tTerm Web gives no reason.
+menus.no_answer = tTerm Web не ответил.
+# The field of the folder's name, and an example of one in it.
+menus.name = Название
+menus.name_example = Например, Ранбуки
+
+# ------------------------------------------------------------ search: search over everything, by ⌘K or Search on the right of the tabs (Search.tsx)
+# The kinds of what is found: the buttons above the list, and the heads of
+# its groups.
+search.kind_commands = Команды
+search.kind_output = Вывод
+search.kind_notes = Заметки
+search.kind_terminals = Терминалы
+search.kind_machines = Машины
+search.kind_projects = Проекты
+search.kind_actions = Действия
+# The kind of the line chosen, on top of the preview beside the list.
+search.label_command = Команда
+search.label_output = Вывод
+search.label_note = Заметка
+search.label_terminal = Терминал
+search.label_machine = Машина
+search.label_project = Проект
+search.label_action = Действие
+# Nothing found. {text} is what was typed; Commands, Output… are the button
+# chosen above the list (search.kind_*).
+search.nothing_for = По запросу «{text}» ничего нет.
+search.nothing_in_commands = По запросу «{text}» среди команд ничего нет.
+search.nothing_in_output = По запросу «{text}» в выводе ничего нет.
+search.nothing_in_notes = По запросу «{text}» в заметках ничего нет.
+search.nothing_in_terminals = По запросу «{text}» среди терминалов ничего нет.
+search.nothing_in_machines = По запросу «{text}» среди машин ничего нет.
+search.nothing_in_projects = По запросу «{text}» среди проектов ничего нет.
+search.nothing_in_actions = По запросу «{text}» среди действий ничего нет.
+# How a command found ended: stopped (it has no exit code), or exit 1.
+# {code} is its exit code.
+search.stopped = остановлена
+search.exit = код {code}
+# How often it ran, at the end of the line under a command:
+# P/web-01 · ~/app · main · exit 0 · 10:46 · 3 runs.
+search.runs = one: {n} запуск | few: {n} запуска | many: {n} запусков
+# Under a line of output found: the command that printed it, in npm test.
+search.in_command = в {command}
+# Beside the list: what the line chosen is, a row each.
+search.row_machine = Машина
+# {machine} is the project's code and the machine's name: P/web-01.
+search.machine_removed = {machine}, удалена из tTerm
+search.row_folder = Папка
+search.row_branch = Ветка
+search.row_status = Состояние
+search.row_when = Когда
+search.row_terminal = Терминал
+# {terminal} is the terminal as its tab names it, P/web-01 · deploy; {when}
+# is when it ended: 10:46, yesterday 17:38, 2 Oct 09:12.
+search.terminal_ended = {terminal}, завершён: {when}
+# The buttons under the preview: the command opened at its block, or put
+# into the line of the terminal in front, not run.
+search.open_in_terminal = Открыть в терминале
+search.into_line = В строку ввода
+# A note found: where it is (its project and folder), when it was edited.
+search.row_in = Где
+search.row_edited = Изменена
+search.open_note = Открыть заметку
+# Before anything is typed: what was open last, and the commands run most
+# on the machine in front; {machine} is its name.
+search.recent = Недавнее
+search.yours_on = Твои команды на {machine}
+# Beside a group's head in All: all of its kind; + when there are more
+# than were sent.
+search.all = one: Все {n} | few: Все {n} | many: Все {n}
+search.all_more = one: Все {n}+ | few: Все {n}+ | many: Все {n}+
+# The window, and its field.
+search.label = Поиск
+search.placeholder = Команды, вывод, заметки, терминалы, машины…
+search.close_title = Закрыть (Esc)
+# The buttons above the list; All is the first of them.
+search.filters = Где искать
+search.kind_all = Всё
+# The list of what was found, for screen readers.
+search.found = Найдено
+search.nothing_typed = Запрос пока пуст: здесь то, что было открыто, и то, что ты чаще всего запускаешь на этой машине.
+search.looks_in = Поиск идёт по всем командам всех твоих терминалов, по их выводу, по заметкам, терминалам, машинам и проектам.
+search.everything = Искать везде
+# With Output, Notes or Commands chosen and nothing typed yet.
+search.type_output = Введи слово, чтобы искать в выводе команд.
+search.type_notes = Введи слово, чтобы искать в заметках.
+search.type_commands = Введи слово, чтобы искать в командах.
+# Beside the list while nothing is chosen: what to type (c: nginx,
+# o: timed out…), and what each keeps to.
+search.tips = Префикс в начале сужает поиск до одного вида
+search.tip_commands = команды
+search.tip_output = вывод команд
+search.tip_notes = заметки
+search.tip_terminals = терминалы
+search.tip_machines = машины
+search.tip_projects = проекты
+search.tip_actions = действия
+# Tab is the key.
+search.tips_buttons = Или выбери одну из кнопок над списком. Tab переходит к следующей.
+# At the bottom: a key, and what it does (move, open: verbs). {keys} is
+# ⌘ Enter or Ctrl+Enter.
+search.keys_move = <kbd>↑</kbd><kbd>↓</kbd> выбрать
+search.keys_open = <kbd>Enter</kbd> открыть
+search.keys_paste = <kbd>{keys}</kbd> в строку ввода
+search.keys_next = <kbd>Tab</kbd> следующий вид
+# The words in front, and what each keeps to. c:, o:, n:, >, t:, m: and p:
+# are typed as they are: keep them.
+search.prefixes_title = t: терминалы, m: машины, p: проекты
+search.prefix_commands = <code>c:</code> команды
+search.prefix_output = <code>o:</code> вывод
+search.prefix_notes = <code>n:</code> заметки
+search.prefix_actions = <code>></code> действия
+
+# ------------------------------------------------------------ input: tTerm's own input line, under a terminal's feed (InputLine.tsx)
+# Said for a moment at the bottom of the page.
+input.still_running = Команда ещё выполняется. Подожди или останови её через Ctrl+C в её блоке.
+# Faint, after a name in the lists over the line: .. goes up a level; the
+# branch checked out now; a branch of the remote.
+input.up_level = на уровень выше
+input.branch_current = текущая
+input.branch_remote = удалённая
+# {error} is what went wrong, as the browser or tTerm Web said it.
+input.no_answer = Машина не ответила: {error}
+# Faint in the line while it cannot take a command.
+input.starting = Запуск шелла…
+input.keys_go = Ввод идёт в работающую команду. Щёлкни здесь, чтобы набрать следующую.
+# The directory and the branch above the line are buttons: each opens a
+# list, to cd into or to switch to. Ctrl+R lists the history.
+input.change_dir = Сменить каталог
+input.switch_branch = Сменить ветку
+input.history = История
+# The search field over those lists.
+input.find_dir = Найти каталог или ввести путь
+input.find_branch = Найти ветку
+input.find_command = Найти команду
+# Tab's list of what the word could be.
+input.completions = Дополнения
+input.more_not_shown = Показаны не все: набери ещё несколько букв
+# The line itself, for screen readers.
+input.command = Команда
+# Under the line, while it holds a command search put there.
+input.from_search = Из поиска, ещё не выполнена
+input.enter_runs = <kbd>Enter</kbd> выполнит её здесь
+input.esc_clears = <kbd>Esc</kbd> очистит строку
+# Under the line: a key, and what it does. ⇧↵ is Shift+Enter.
+input.tab_complete = <kbd>Tab</kbd> дополнить или принять подсказку
+input.history_local = <kbd>↑</kbd> история на этом компьютере
+input.history_devices = <kbd>↑</kbd> история со всех устройств
+input.new_line = <kbd>⇧↵</kbd> новая строка
+input.while_running = Пока команда работает, всё набранное уходит ей
+# A terminal's two modes, beside the line: Line, with this line and the
+# commands as blocks; Classic, every key straight to the shell.
+input.mode = Режим ввода
+input.mode_line = Строка
+input.mode_classic = Классический
+
+# ------------------------------------------------------------ block: one command of the feed, with its output (BlockView.tsx)
+# The block, for screen readers. {command} is the command as typed, {code}
+# its exit code.
+block.state_input = {command}, шелл её не запустил
+block.state_running = {command}, выполняется
+block.state_failed = {command}, ошибка, код возврата {code}
+block.state_finished = {command}, выполнена
+block.state_ended = {command}, завершена
+# On a block search opened: the words found are marked in it.
+block.found = Найдено
+# A command the shell has not started; Stop is the button (block.stop).
+block.not_started_title = Шелл ждёт продолжения (незакрытая кавычка или heredoc) или не принял команду. Допиши её в блоке или нажми «Стоп».
+block.not_started = не запущена
+block.running = выполняется
+# A command that failed: exit 1.
+block.exit = код {code}
+block.stop_title = Остановить команду (Ctrl+C)
+# The button that stops the command running: a verb.
+block.stop = Стоп
+# The buttons of a finished block, with their tips.
+block.actions = Действия с блоком
+block.copy_block = Копировать команду и вывод
+block.copy_output = Копировать вывод
+block.copy_output_title = Копировать только вывод
+block.run_again = Выполнить ещё раз
+block.copy_link = Копировать ссылку на этот блок
+block.expand = Развернуть блок
+block.collapse = Свернуть блок
+# For screen readers: the browser did not let the page copy.
+block.not_copied = Не скопировано
+# A folded block, in its place; a click unfolds it.
+block.lines_hidden = one: Скрыта {n} строка | few: Скрыты {n} строки | many: Скрыто {n} строк
+# Above a long output, of which the last 400 lines show.
+block.show_earlier = one: Показать {n} строку выше | few: Показать {n} строки выше | many: Показать {n} строк выше
+block.show_whole = Показать весь вывод
+
+# ------------------------------------------------------------ feed: a terminal's commands as blocks, in the Line mode (FeedTerminal.tsx)
+# Said for a moment at the bottom of the page.
+feed.not_connected = Сейчас нет связи с tTerm Web: команда не отправлена.
+feed.still_running = Команда ещё выполняется. Её можно остановить через Ctrl+C.
+feed.copy_refused = Браузер не разрешил странице копировать.
+feed.output_gone = Полного вывода больше нет.
+feed.show_earlier = Показать предыдущие команды
+# After clear or Ctrl+L, on top: what came before is out of view; a click
+# shows it again.
+feed.cleared = one: С экрана убран {n} блок: показать | few: С экрана убрано {n} блока: показать | many: С экрана убрано {n} блоков: показать
+feed.empty = Набери команду внизу. Каждая станет здесь блоком: с выводом, временем выполнения и тем, чем она закончилась.
+# Asked before a dangerous command runs. {what} is what it would do and
+# {lost} what does not come back, as tTerm Web says them: delete a
+# directory and everything inside it; There is no undo and no bin to look
+# in. {machine} is the machine's name; the second is for while it is not
+# known.
+feed.confirm_label = Выполнить эту команду?
+feed.confirm = Эта команда собирается <strong>{what}</strong> на <strong>{machine}</strong>. {lost}
+feed.confirm_unknown = Эта команда собирается <strong>{what}</strong> на <strong>этой машине</strong>. {lost}
+# What a command held back would do ({what} of feed.confirm, so in the form
+# that fits there) and what does not come back ({lost}): the nine of the
+# core and the app (danger.ts).
+danger.delete_tree = удалить каталог со всем содержимым
+danger.delete_tree_lost = Отменить это нельзя, и в корзину ничего не попадёт.
+danger.disk = перезаписать файловую систему диска
+danger.disk_lost = С диска пропадёт всё, а не только файлы.
+danger.device = записать данные прямо в устройство
+danger.device_lost = Всё, что на нём было, пропадёт, как только начнётся запись.
+danger.database = удалить базу данных или таблицу
+danger.database_lost = Вернуть её можно будет только из резервной копии.
+danger.power_off = выключить машину
+danger.power_off_lost = Отсюда её снова не включить: для этого понадобится панель провайдера.
+danger.reboot = перезагрузить машину
+danger.reboot_lost = Сеанс оборвётся, а всё, что было запущено, остановится вместе с ним.
+danger.ssh = остановить службу SSH
+danger.ssh_lost = Через неё ты входишь на машину. Остановить её – значит запереть дверь изнутри.
+danger.firewall = изменить правила файрвола
+danger.firewall_lost = Неверное правило может отрезать машину, и войти на неё будет уже нельзя.
+danger.user = удалить учётную запись пользователя
+danger.user_lost = Вместе с ней пропадут файлы и доступ этого пользователя.
+# Under it, for rm -rf aimed at / or ~.
+feed.everything = <strong>Команда нацелена на всю машину.</strong> На ней ничего не уцелеет.
+feed.run_it = Выполнить
+
+# ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
+# A terminal's tab while its own name is not known yet.
+terminal_view.terminal = Терминал
+# The tip of Line (input.mode_line) when it cannot be chosen.
+terminal_view.no_blocks = Этот шелл не отмечает, где начинаются команды, поэтому работает только в классическом режиме.
+terminal_view.end_failed = Не удалось завершить терминал: tTerm Web не ответил.
+# Under a terminal in the Classic mode (input.mode_classic). Tab is the key.
+terminal_view.classic_hint = Классический режим: каждая клавиша идёт прямо в шелл, со своим Tab и своей историей.
+terminal_view.classic_warning = В этом режиме tTerm не переспрашивает перед опасными командами.
+# {machine} is the machine's name; the second is for while it is not known.
+terminal_view.connecting = Подключение к {machine}…
+terminal_view.connecting_unknown = Подключение к машине…
+# A terminal whose computer sleeps, or is offline. {since} is how long:
+# 3 minutes, an hour (time.for_*).
+terminal_view.away = {machine} спит или не в сети
+terminal_view.away_since = Терминал ждёт и продолжит с того же места, когда машина вернётся. Нет связи {since}.
+terminal_view.away_text = Терминал ждёт и продолжит с того же места, когда машина вернётся.
+terminal_view.end = Завершить этот терминал
+# A terminal that ended. Under it, how it ended as tTerm Web says it, or
+# not_running.
+terminal_view.no_such = Такого терминала нет
+terminal_view.ended = Этот терминал завершён
+terminal_view.not_running = Он больше не работает.
+terminal_view.open_new = Открыть новый терминал на {machine}
+terminal_view.close_tab = Закрыть вкладку
+
+# ------------------------------------------------------------ classic: the Classic mode, every key straight to the shell (ClassicTerminal.tsx)
+# A command search put here. Line is the mode (input.mode_line).
+classic.several_lines = В этой команде несколько строк, а классический режим выполнит каждую сразу при вводе. Переключись на режим «Строка» под терминалом.
+
+# ------------------------------------------------------------ tabs: the line of tabs on top (TabBar.tsx)
+# The tabs that are open, for screen readers.
+tabs.label = Открытые вкладки
+# Naming a terminal in its tab, after a double click.
+tabs.rename_title = Назвать этот терминал
+tabs.rename_hint = Enter сохраняет, Esc отменяет. Имя видно в боковой панели, во вкладках и на странице проекта.
+# {name} is the tab as it reads: P/web-01 · 2, a note's title, a project's
+# name.
+tabs.close = Закрыть вкладку {name}
+# The + after the tabs.
+tabs.new_terminal = Новый терминал
+tabs.new_terminal_title = Новый терминал на любой машине
+# The button on the right that opens search.
+tabs.search_title = Искать по командам, их выводу, заметкам, терминалам, машинам и действиям
+tabs.search = Поиск
+
+# ------------------------------------------------------------ finder: a list with a search field, as the + after the tabs opens it (Finder.tsx)
+finder.nothing = Ничего не найдено
+
+# ------------------------------------------------------------ picker: the lists over the input line: directories, branches, history (Picker.tsx)
+# While the machine is asked for its directories or branches.
+picker.asking = Спрашиваем машину…
+picker.nothing = Здесь ничего нет
+
+# ------------------------------------------------------------ name_input: the field that names a terminal (NameInput.tsx)
+# For screen readers. While the terminal has only its number,
+# terminal.numbered shows faint in it.
+name_input.label = Имя терминала
+`;export{e as default};

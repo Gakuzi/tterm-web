@@ -17,6 +17,7 @@ import type {
 import { shortPath } from "./BlockView";
 import { Face } from "./Face";
 import { colorClass, terminalName } from "./colors";
+import { useT } from "./i18n";
 import {
   Computer, Doc, Folder as FolderIcon, FolderPlus, ListCheck, Lock, Pencil,
   Plus, Server, Trash,
@@ -25,16 +26,16 @@ import { FolderMenuItems, MenuButton, NoteMenuItems } from "./Menus";
 import { NameInput } from "./NameInput";
 import { titled } from "./noteText";
 import {
-  deletesFolder, deletesNote, many, manages, writes,
+  deletesFolder, deletesNote, manages, writes,
 } from "./rights";
 import type { Dot } from "./TabBar";
-import { ago, lastSeen, since } from "./time";
+import { ago, agoLong, lastSeen, since } from "./time";
 
 const ROLE_LINE: Record<Project["role"], string> = {
-  owner: "you are the owner",
-  admin: "you are an admin",
-  member: "you are a member",
-  observer: "you are an observer",
+  owner: "projectpage.role_owner",
+  admin: "projectpage.role_admin",
+  member: "projectpage.role_member",
+  observer: "projectpage.role_observer",
 };
 
 interface Props {
@@ -103,48 +104,47 @@ export function NoteIcon({ note, size = 14 }: { note: NoteSummary; size?: number
   return note.total > 0 ? <ListCheck size={size} /> : <Doc size={size} />;
 }
 
-function capital(text: string): string {
-  return text ? text[0].toUpperCase() + text.slice(1) : text;
-}
-
-function TerminalRow({ t, me, dot, onGoTo, naming }: {
-  t: TerminalInfo;
+function TerminalRow({ term, me, dot, onGoTo, naming }: {
+  term: TerminalInfo;
   me: Me;
   dot: Dot;
   onGoTo: (id: string) => void;
   naming: Naming;
 }) {
+  const t = useT();
   const canRename = dot !== "ended";
-  const where = t.cwd ? shortPath(t.cwd, t.home) : "";
-  let text = [where, t.branch].filter(Boolean).join(" · ");
+  const where = term.cwd ? shortPath(term.cwd, term.home) : "";
+  let text = [where, term.branch].filter(Boolean).join(" · ");
   let when = "";
   if (dot === "busy") {
-    text = t.running?.command || "A command is running";
-    when = t.running?.at ? `running for ${since(t.running.at)}` : "running";
+    text = term.running?.command || t("projectpage.command_running");
+    when = term.running?.at
+      ? t("projectpage.running_for", { duration: since(term.running.at, t) })
+      : t("projectpage.running");
   } else if (dot === "away") {
-    when = `waits for ${t.machine}`;
+    when = t("projectpage.waits_for", { machine: term.machine });
   }
   return (
     <li className="pp-row">
       <Avatar who={null} me={me} size="small" />
       <span className="pp-row-text">
-        {canRename && naming.renaming === t.id ? (
+        {canRename && naming.renaming === term.id ? (
           <>
-            <NameInput id={t.id} name={t.name} className="pp-rename-input"
-              describedBy={`pp-rename-${t.id}`} onRename={naming.onRename}
-              onStop={() => naming.onStopRename(t.id)} />
-            <span className="pp-rename-hint" id={`pp-rename-${t.id}`}>
-              Enter saves, Esc cancels.
+            <NameInput id={term.id} name={term.name} className="pp-rename-input"
+              describedBy={`pp-rename-${term.id}`} onRename={naming.onRename}
+              onStop={() => naming.onStopRename(term.id)} />
+            <span className="pp-rename-hint" id={`pp-rename-${term.id}`}>
+              {t("projectpage.rename_hint")}
             </span>
           </>
         ) : (
           <>
             <strong className={canRename ? "pp-term-name" : undefined}
-              title={canRename ? "Double-click to rename" : undefined}
+              title={canRename ? t("projectpage.double_click") : undefined}
               onDoubleClick={() => {
-                if (canRename) naming.onStartRename(t.id);
+                if (canRename) naming.onStartRename(term.id);
               }}>
-              {terminalName(t.name)}
+              {terminalName(term.name, t)}
             </strong>
             <span className="pp-row-sub mono">
               <span className={`dot ${dot}`} aria-hidden="true" />
@@ -155,8 +155,8 @@ function TerminalRow({ t, me, dot, onGoTo, naming }: {
         )}
       </span>
       <span className="pp-row-actions">
-        <button type="button" className="button-plain small" onClick={() => onGoTo(t.id)}>
-          Open
+        <button type="button" className="button-plain small" onClick={() => onGoTo(term.id)}>
+          {t("projectpage.open")}
         </button>
       </span>
     </li>
@@ -179,9 +179,10 @@ function MachineCard(props: {
   local?: boolean;
 }) {
   const { machine: m, project } = props;
+  const t = useT();
   const computer = m.kind === "computer";
   const offline = computer && !m.online;
-  const seen = offline ? lastSeen(m.lastSeen) : "";
+  const seen = offline ? lastSeen(m.lastSeen, t) : "";
   return (
     <div className="pp-card">
       <div className="pp-card-head">
@@ -194,23 +195,26 @@ function MachineCard(props: {
         {computer && (
           <span className="pp-dim pp-state">
             <span className={offline ? "dot away" : "dot open"} aria-hidden="true" />
-            {offline ? capital(seen) || "Offline" : "Online"}
+            {offline ? (seen ? t("projectpage.last_seen", { ago: agoLong(m.lastSeen, t) })
+              : t("projectpage.offline")) : t("projectpage.online")}
           </span>
         )}
         <span className="pp-card-actions">
           <button type="button" className="button-ghost small"
-            title={offline ? `${m.name} is offline: asleep, or its agent is not running`
-              : `A new terminal on ${m.name}`}
+            title={offline ? t("projectpage.offline_title", { machine: m.name })
+              : t("projectpage.new_terminal_title", { machine: m.name })}
             onClick={() => (offline
-              ? props.notYet(`${m.name} is offline${seen ? `, ${seen}` : ""}: it comes back when its agent connects.`)
+              ? props.notYet(seen
+                ? t("projectpage.offline_wait_seen", { machine: m.name, seen })
+                : t("projectpage.offline_wait", { machine: m.name }))
               : props.onOpenTerminal(m.id))}>
             <Plus size={14} />
-            New terminal
+            {t("projectpage.new_terminal")}
           </button>
           {manages(project) && !props.local && (
-            <MenuButton label={`${m.name}: machine menu`}
-              title={props.onMoveMachine ? "Move to another project, Remove machine"
-                : "Remove machine"}>
+            <MenuButton label={t("projectpage.machine_menu", { machine: m.name })}
+              title={props.onMoveMachine ? t("projectpage.machine_menu_title")
+                : t("projectpage.remove_machine")}>
               {(close) => (
                 <>
                   {props.onMoveMachine && (
@@ -220,7 +224,7 @@ function MachineCard(props: {
                         props.onMoveMachine?.(m);
                       }}>
                       <FolderIcon size={15} />
-                      <span className="menu-text">Move to another project</span>
+                      <span className="menu-text">{t("projectpage.move_machine")}</span>
                     </button>
                   )}
                   <button type="button" className="menu-item danger" role="menuitem"
@@ -229,7 +233,7 @@ function MachineCard(props: {
                       props.onRemoveMachine(m);
                     }}>
                     <Trash size={15} />
-                    <span className="menu-text">Remove machine</span>
+                    <span className="menu-text">{t("projectpage.remove_machine")}</span>
                   </button>
                 </>
               )}
@@ -238,11 +242,13 @@ function MachineCard(props: {
         </span>
       </div>
       <ul className="pp-rows">
-        {props.terminals.map((t) => (
-          <TerminalRow key={t.id} t={t} me={props.me} dot={props.dotFor(t)}
+        {props.terminals.map((term) => (
+          <TerminalRow key={term.id} term={term} me={props.me} dot={props.dotFor(term)}
             onGoTo={props.onGoTo} naming={props.naming} />
         ))}
-        {props.terminals.length === 0 && <li className="pp-empty">No terminals open</li>}
+        {props.terminals.length === 0 && (
+          <li className="pp-empty">{t("projectpage.no_terminals")}</li>
+        )}
       </ul>
     </div>
   );
@@ -260,18 +266,25 @@ function NoteRow(props: {
   onDeleteNote: (noteId: string) => void;
 }) {
   const { note: n, me, project } = props;
+  const t = useT();
   const canDelete = deletesNote(project, n, me.id);
   const moveOut = !!props.onMoveNoteOut && canDelete;
   const editor = n.editedBy ?? n.createdBy;
-  const name = !editor || editor.id === me.id ? "You" : editor.firstName;
-  const author = !n.createdBy || n.createdBy.id === me.id ? "You" : n.createdBy.firstName;
-  const sub = n.total ? `${n.done} of ${n.total} done` : n.excerpt || "Empty";
+  const edited = ago(n.editedAt, t);
+  const byline = !editor || editor.id === me.id
+    ? t("projectpage.edited_you", { ago: edited })
+    : t("projectpage.edited_by", { name: editor.firstName, ago: edited });
+  // Who may delete it, said when this person may not; nobody known, "Someone".
+  const author = !n.createdBy ? null : n.createdBy.id === me.id ? t("projectpage.you")
+    : n.createdBy.firstName;
+  const sub = n.total ? t("projectpage.done", { n: n.done, total: n.total })
+    : n.excerpt || t("projectpage.note_empty");
   return (
     <li className="pp-note-row">
       <button type="button" className="pp-note" onClick={() => props.onOpenNote(n.id)}>
         <span className="pp-note-tile" aria-hidden="true"><NoteIcon note={n} /></span>
         <span className="pp-row-text">
-          <strong className={n.title.trim() ? undefined : "untitled"}>{titled(n.title)}</strong>
+          <strong className={n.title.trim() ? undefined : "untitled"}>{titled(n.title, t)}</strong>
           <span className="pp-row-sub">
             {n.total > 0 && (
               <span className="pp-progress" aria-hidden="true">
@@ -283,12 +296,12 @@ function NoteRow(props: {
         </span>
         <span className="pp-who">
           <Avatar who={editor} me={me} size="tiny" named />
-          {name}, {ago(n.editedAt)}
+          {byline}
         </span>
       </button>
-      <MenuButton label={`${titled(n.title)}: note menu`}
-        title={moveOut ? "Folder, Move to another project, Copy as Markdown, Delete note"
-          : "Folder, Copy as Markdown, Delete note"}>
+      <MenuButton label={t("projectpage.note_menu", { note: titled(n.title, t) })}
+        title={moveOut ? t("projectpage.note_menu_title_move")
+          : t("projectpage.note_menu_title")}>
         {(close) => (
           <NoteMenuItems folders={project.folders} folderId={props.folder.id}
             canWrite={writes(project)} canDelete={canDelete}
@@ -305,6 +318,7 @@ function NoteRow(props: {
 
 export function ProjectPage(props: Props) {
   const { project, me } = props;
+  const t = useT();
   const [, setTick] = useState(0);
 
   // "5 min ago" and "running for 3 minutes" go on counting.
@@ -314,13 +328,13 @@ export function ProjectPage(props: Props) {
   }, []);
 
   const machineIds = new Set(project.machines.map((m) => m.id));
-  const running = props.terminals.filter((t) => machineIds.has(t.machineId));
+  const running = props.terminals.filter((term) => machineIds.has(term.machineId));
   // Nobody else in it: Personal, and until people come, every project.
   const alone = project.personal || project.alone;
   const line = [
-    many(project.machines.length, "machine", "machines"),
-    many(running.length, "terminal open", "terminals open"),
-    alone ? "only you" : ROLE_LINE[project.role],
+    t("count.machines", { n: project.machines.length }),
+    t("count.terminals_open", { n: running.length }),
+    alone ? t("projectpage.only_you") : t(ROLE_LINE[project.role]),
   ].join(" · ");
   const manage = manages(project);
   // Before signing in too: App says what signing in brings (0.1.5).
@@ -336,11 +350,11 @@ export function ProjectPage(props: Props) {
       <div className="pp-head">
         <div className={`pp-title-row ${colorClass(project.color)}`}>
           <h1 id="pp-title">{project.name}</h1>
-          <span className="pp-code" title="Short code">{project.code}</span>
+          <span className="pp-code" title={t("projectpage.short_code")}>{project.code}</span>
           {manage && (
             <button type="button" className="icon-button small"
-              aria-label="Edit name, code and color"
-              title="Edit name, code and color"
+              aria-label={t("projectpage.edit")}
+              title={t("projectpage.edit")}
               onClick={() => props.onEditProject(project)}>
               <Pencil size={16} />
             </button>
@@ -352,15 +366,15 @@ export function ProjectPage(props: Props) {
       <section className="pp-section" aria-labelledby="pp-machines">
         <div className="pp-section-head">
           <div className="pp-section-title">
-            <h2 id="pp-machines">Machines</h2>
-            <span>{alone ? "Only you open terminals on them"
-              : "Your terminals on them"}</span>
+            <h2 id="pp-machines">{t("projectpage.machines")}</h2>
+            <span>{alone ? t("projectpage.machines_alone")
+              : t("projectpage.machines_shared")}</span>
           </div>
           {addsMachines && (
             <button type="button" className="button-plain small"
               onClick={() => props.onAddMachine(project.id)}>
               <Plus size={14} />
-              Add machine
+              {t("projectpage.add_machine")}
             </button>
           )}
         </div>
@@ -370,18 +384,16 @@ export function ProjectPage(props: Props) {
               onClick={() => props.onAddMachine(project.id, "server")}>
               <span className="tile" aria-hidden="true"><Server size={20} /></span>
               <span className="pp-kind-text">
-                <strong>Server</strong>
-                <span>A VPS or cloud server you reach over SSH. Run one command
-                  on it, and it appears here.</span>
+                <strong>{t("projectpage.server")}</strong>
+                <span>{t("projectpage.server_text")}</span>
               </span>
             </button>
             <button type="button" className="pp-kind" disabled={!addsMachines}
               onClick={() => props.onAddMachine(project.id, "computer")}>
               <span className="tile" aria-hidden="true"><Computer size={20} /></span>
               <span className="pp-kind-text">
-                <strong>Computer</strong>
-                <span>A Mac or Linux machine at home or in the office, even
-                  behind NAT. A small agent keeps it connected.</span>
+                <strong>{t("projectpage.computer")}</strong>
+                <span>{t("projectpage.computer_text")}</span>
               </span>
             </button>
           </div>
@@ -389,7 +401,7 @@ export function ProjectPage(props: Props) {
           <div className="pp-cards">
             {project.machines.map((m) => (
               <MachineCard key={m.id} machine={m} project={project} me={me}
-                terminals={running.filter((t) => t.machineId === m.id)}
+                terminals={running.filter((term) => term.machineId === m.id)}
                 dotFor={props.dotFor} onOpenTerminal={props.onOpenTerminal}
                 onGoTo={props.onGoTo} onRemoveMachine={props.onRemoveMachine}
                 onMoveMachine={props.onMoveMachine} naming={naming}
@@ -399,8 +411,7 @@ export function ProjectPage(props: Props) {
         )}
         {project.machines.length === 0 && !project.personal && addsMachines && (
           <p className="pp-hint">
-            Already have the machine in another project? On that project's page,
-            ⋯ next to the machine, then Move to another project.
+            {t("projectpage.move_hint")}
           </p>
         )}
       </section>
@@ -409,13 +420,11 @@ export function ProjectPage(props: Props) {
         <div className="pp-wide">
           <span className="tile" aria-hidden="true"><Lock size={20} /></span>
           <span className="pp-wide-text">
-            <strong>{project.name} is yours alone</strong>
-            <span>No one can be invited here. To keep other machines apart, or
-              later to work with others, create a project and move machines
-              into it.</span>
+            <strong>{t("projectpage.personal_title", { project: project.name })}</strong>
+            <span>{t("projectpage.personal_text")}</span>
           </span>
           <button type="button" className="button-plain" onClick={props.onNewProject}>
-            New project
+            {t("projectpage.new_project")}
           </button>
         </div>
       )}
@@ -423,16 +432,16 @@ export function ProjectPage(props: Props) {
       <section className="pp-section" aria-labelledby="pp-notes">
         <div className="pp-section-head">
           <div className="pp-section-title">
-            <h2 id="pp-notes">Notes</h2>
+            <h2 id="pp-notes">{t("projectpage.notes")}</h2>
             <span>{alone
-              ? `Only you see notes in ${project.name}. Folders keep them in order`
-              : `Everyone in ${project.name} reads and edits them. Folders keep them in order`}</span>
+              ? t("projectpage.notes_alone", { project: project.name })
+              : t("projectpage.notes_shared", { project: project.name })}</span>
           </div>
           {write && (
             <button type="button" className="button-plain small"
               onClick={() => props.onNewFolder(project)}>
               <FolderPlus size={14} />
-              New folder
+              {t("projectpage.new_folder")}
             </button>
           )}
         </div>
@@ -440,15 +449,14 @@ export function ProjectPage(props: Props) {
           <div className="pp-wide">
             <span className="tile" aria-hidden="true"><FolderIcon size={20} /></span>
             <span className="pp-wide-text">
-              <strong>No notes yet</strong>
-              <span>Notes live in folders, the way terminals live on machines.
-                Start with one: Runbooks, Access, Checklists.</span>
+              <strong>{t("projectpage.no_notes")}</strong>
+              <span>{t("projectpage.no_notes_text")}</span>
             </span>
             {write && (
               <button type="button" className="button-accent big"
                 onClick={() => props.onNewFolder(project)}>
                 <FolderPlus size={15} />
-                New folder
+                {t("projectpage.new_folder")}
               </button>
             )}
           </div>
@@ -462,11 +470,13 @@ export function ProjectPage(props: Props) {
                     {f.name}
                   </span>
                   <span className="pp-dim">
-                    {f.notes.length ? many(f.notes.length, "note", "notes") : "Empty"}
+                    {f.notes.length ? t("count.notes", { n: f.notes.length })
+                      : t("projectpage.folder_empty")}
                   </span>
                   {!alone && f.createdBy && (
                     <span className="pp-faint">
-                      made by {f.createdBy.id === me.id ? "you" : f.createdBy.firstName}
+                      {f.createdBy.id === me.id ? t("projectpage.made_by_you")
+                        : t("projectpage.made_by", { name: f.createdBy.firstName })}
                     </span>
                   )}
                   <span className="pp-card-actions">
@@ -474,12 +484,12 @@ export function ProjectPage(props: Props) {
                       <button type="button" className="button-ghost small"
                         onClick={() => props.onNewNote(f.id)}>
                         <Plus size={14} />
-                        New note
+                        {t("projectpage.new_note")}
                       </button>
                     )}
                     {write && (
-                      <MenuButton label={`${f.name}: folder menu`}
-                        title="Rename folder, Delete folder">
+                      <MenuButton label={t("projectpage.folder_menu", { folder: f.name })}
+                        title={t("projectpage.folder_menu_title")}>
                         {(close) => (
                           <FolderMenuItems canWrite={write}
                             canDelete={deletesFolder(project, f, me.id)} close={close}
@@ -499,8 +509,8 @@ export function ProjectPage(props: Props) {
                   ))}
                   {f.notes.length === 0 && (
                     <li className="pp-empty">
-                      {write ? "No notes yet. New note puts the first one here"
-                        : "No notes yet"}
+                      {write ? t("projectpage.folder_no_notes_writes")
+                        : t("projectpage.no_notes")}
                     </li>
                   )}
                 </ul>
@@ -514,13 +524,14 @@ export function ProjectPage(props: Props) {
         <section className="pp-section" aria-labelledby="pp-delete">
           <div className="pp-wide pp-danger">
             <span className="pp-wide-text">
-              <strong id="pp-delete">Delete {project.name}</strong>
-              <span>Its folders and notes go with it. Machines are moved to
-                another project or removed first.</span>
+              <strong id="pp-delete">
+                {t("projectpage.delete_title", { project: project.name })}
+              </strong>
+              <span>{t("projectpage.delete_text")}</span>
             </span>
             <button type="button" className="button-danger-line"
               onClick={() => props.onDeleteProject(project)}>
-              Delete project
+              {t("projectpage.delete_project")}
             </button>
           </div>
         </section>

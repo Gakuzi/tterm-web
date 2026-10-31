@@ -16,6 +16,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { AccountChanged, allowApp, ConfirmFirst, endSession, loadState, SignedOut, type Me } from "./api";
 import { appTitle, cancelAddress, linkCode, readLink } from "./appLink";
+import { languageOf, showLanguage, useT } from "./i18n";
 import { Computer, Logo } from "./icons";
 import { SignIn } from "./SignIn";
 import { applyTheme } from "./theme";
@@ -30,6 +31,7 @@ type View =
 const SUPPORT = "support@tterm.net";
 
 export function Connect() {
+  const t = useT();
   const [link] = useState(() => readLink(location.search));
   const [view, setView] = useState<View>({ kind: "loading" });
   const [code, setCode] = useState("");
@@ -77,19 +79,19 @@ export function Connect() {
     loadState(true)
       .then((state) => {
         applyTheme(state.me.theme);
+        void showLanguage(languageOf(state.me));
         setView({ kind: "ask", me: state.me });
         if (thenAllowFor !== null && state.me.id === thenAllowFor) void allowNow(state.me);
       })
       .catch((error) => {
         if (error instanceof SignedOut) setView({ kind: "signin" });
-        else setView({ kind: "problem", text: "tTerm is not answering. Check " +
-          "the connection, then reload this page." });
+        else setView({ kind: "problem", text: t("connect.no_answer") });
       });
   };
 
   useEffect(() => {
     if (!link) return;
-    document.title = `Allow ${appTitle(link)}? · tTerm`;
+    document.title = `${t("connect.allow_title", { app: appTitle(link, t) })} · tTerm`;
     linkCode(link.challenge).then(setCode).catch(() => setCode(""));
     load();
   }, [link]);
@@ -98,9 +100,9 @@ export function Connect() {
     return (
       <Frame>
         <div className="signin-form">
-          <h1>This link is not complete</h1>
+          <h1>{t("connect.incomplete")}</h1>
           <p className="signin-lead">
-            Start again in tTerm on your computer: Sign in with your browser.
+            {t("connect.start_again")}
           </p>
         </div>
       </Frame>
@@ -109,9 +111,9 @@ export function Connect() {
 
   if (view.kind === "signin") {
     return (
-      <SignIn note={confirming !== null ? `To allow ${appTitle(link)}, confirm it is you.`
-        : another ? `Sign in with the other account, then allow ${appTitle(link)}.`
-        : `Sign in, then allow ${appTitle(link)}.`}
+      <SignIn note={confirming !== null ? t("connect.confirm", { app: appTitle(link, t) })
+        : another ? t("connect.signin_other", { app: appTitle(link, t) })
+        : t("connect.signin_then", { app: appTitle(link, t) })}
         another={another}
         onSignedIn={() => {
           setConfirming(null);
@@ -129,7 +131,7 @@ export function Connect() {
     return (
       <Frame>
         <div className="signin-form">
-          <h1>No connection</h1>
+          <h1>{t("connect.no_connection")}</h1>
           <p className="signin-lead">{view.text}</p>
         </div>
       </Frame>
@@ -160,46 +162,48 @@ export function Connect() {
     setView({ kind: "signin" });
   };
 
-  const title = appTitle(link);
+  const title = appTitle(link, t);
   return (
     <Frame>
       {view.kind === "ask" ? (
         <div className="signin-form connect-form">
           <span className="connect-icon" aria-hidden="true"><Computer size={22} /></span>
-          <h1>Allow {title}?</h1>
+          <h1>{t("connect.allow_title", { app: title })}</h1>
           <p className="signin-lead connect-lead">
-            The app on <strong className="ink">{link.name}</strong> asks to
-            sign in to your account, {view.me.email}.
+            {t.rich("connect.asks", {
+              computer: link.name,
+              email: view.me.email,
+              b: (s) => <strong className="ink">{s}</strong>,
+            })}
           </p>
           <span className="connect-check" id="connect-check">
-            Check that the app shows the same code
+            {t("connect.check")}
           </span>
           <span className="connect-code" aria-describedby="connect-check">
             {code}
           </span>
           <button type="button" className="button-accent big wide connect-allow"
             disabled={busy} onClick={allow}>
-            Allow
+            {t("connect.allow")}
           </button>
           <button type="button" className="connect-cancel" disabled={busy}
             onClick={() => location.assign(cancelAddress(link))}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button type="button" className="connect-another" disabled={busy}
             onClick={() => void useAnother()}>
-            Not you? Use another account
+            {t("connect.another")}
           </button>
           {problem && <div className="error-box" role="alert">{problem}</div>}
           <p className="connect-small">
-            The computer becomes a machine in Personal. The app appears in
-            Settings, under Devices, where you can forget it.
+            {t("connect.small")}
           </p>
         </div>
       ) : (
         <div className="signin-form connect-form" role="status">
-          <h1>Back to {title}…</h1>
+          <h1>{t("connect.back", { app: title })}</h1>
           <p className="signin-lead connect-lead">
-            The app takes it from here, on this computer.
+            {t("connect.takes_over")}
           </p>
         </div>
       )}

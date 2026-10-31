@@ -51,10 +51,12 @@ It comes ready in the release archive; unpack the archive again.
 
 class MePatch(BaseModel):
     #: Any of them. The name from 0.0.10, on the account page; how much of a
-    #: project's color the sidebar shows from 0.1.1, badge or block.
+    #: project's color the sidebar shows from 0.1.1, badge or block; the
+    #: language of the page from 0.1.16.
     theme: str | None = None
     name: str | None = None
     projectTint: str | None = None
+    language: str | None = None
 
 
 class EmailBody(BaseModel):
@@ -644,6 +646,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
                 "initials": me.initials,
                 "theme": me.theme,
                 "projectTint": await projects.tint_of(pool, me.id),
+                # The language chosen (0.1.16), or null: the browser's then.
+                "language": await accounts.language_of(pool, me.id),
                 "plan": me.plan,
                 "email": me.email,
                 # One's own photo (0.1.7), or null for the initials.
@@ -657,9 +661,9 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     @app.patch("/api/me")
     async def patch_me(change: MePatch,
                        session: auth.Session = Depends(signed_in)) -> Response:
-        """The person's own settings: the theme, and from 0.0.10 the name.
-        A new name comes back as the page shows it; the theme alone, with
-        nothing."""
+        """The person's own settings: the theme, from 0.0.10 the name, from
+        0.1.16 the language. A new name comes back as the page shows it; the
+        rest alone, with nothing."""
         me = session.person
         name = None
         if change.name is not None:
@@ -675,8 +679,14 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
                 change.projectTint not in projects.TINTS:
             return _json({"error": "The tint is one of "
                           f"{', '.join(projects.TINTS)}."}, 422)
+        if change.language is not None and \
+                change.language not in accounts.LANGUAGES:
+            return _json({"error": "The language is one of "
+                          f"{', '.join(accounts.LANGUAGES)}."}, 422)
         if change.theme is not None:
             await accounts.set_theme(pool, me.id, change.theme)
+        if change.language is not None:
+            await accounts.set_language(pool, me.id, change.language)
         if change.projectTint is not None:
             await projects.set_tint(pool, me.id, change.projectTint)
         if name is None:

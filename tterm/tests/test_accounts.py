@@ -1,5 +1,7 @@
 """People and projects: initials, project codes, the local owner."""
 import asyncio
+import re
+from pathlib import Path
 
 import asyncpg
 
@@ -15,6 +17,18 @@ def test_initials_as_on_the_avatar():
     assert accounts.initials("Denis") == "D"
     assert accounts.initials("Денис Герасименко") == "ДГ"
     assert accounts.initials("  ") == "?"
+
+
+def test_the_languages_are_the_pages():
+    """The twelve an account keeps (0.1.16) are the page's, in its order,
+    and the database takes these and no other."""
+    root = Path(__file__).resolve().parents[2]
+    page = (root / "web" / "src" / "i18n.ts").read_text(encoding="utf-8")
+    block = page[page.index("export const LANGUAGES"):page.index("] as const")]
+    assert tuple(re.findall(r'code: "([^"]+)"', block)) == accounts.LANGUAGES
+    sql = (root / "tterm" / "core" / "migrations" / "012_language.sql").read_text(
+        encoding="utf-8")
+    assert tuple(re.findall(r"'([^']+)'", sql)) == accounts.LANGUAGES
 
 
 def test_first_name():

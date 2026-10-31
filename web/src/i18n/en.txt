@@ -1,0 +1,1354 @@
+# Strings of tTerm Web's page in English: one a line, `key = text`.
+# Every language has the same keys; the build stops when one is missing
+# (scripts/strings.mjs). {name} is a value the page puts in; a counting
+# string has a form for each plural of the language, "one: … | other: …",
+# and {n} is the count; <b>…</b> wraps a part the page makes a link, bold
+# or code. Names of machines, projects, notes and terminals, commands and
+# their output, tTerm, tTerm Web and Free are not translated.
+
+# ------------------------------------------------------------ common: words used in many places
+common.close = Close
+common.cancel = Cancel
+common.save = Save
+common.loading = Loading…
+common.try_again = Try again
+common.copy = Copy
+common.copied = Copied
+common.back = Back
+common.done = Done
+common.more = More
+common.sign_in = Sign in
+
+# ------------------------------------------------------------ time: how long ago (time.ts)
+# A duration after "for": Away for 3 minutes, running for an hour.
+time.for_less = less than a minute
+time.for_minutes = one: a minute | other: {n} minutes
+time.for_hours = one: an hour | other: {n} hours
+time.for_days = one: a day | other: {n} days
+# How long ago, in full words: Signed in 3 minutes ago.
+time.ago_now = just now
+time.ago_minutes = one: a minute ago | other: {n} minutes ago
+time.ago_hours = one: an hour ago | other: {n} hours ago
+time.ago_days = one: a day ago | other: {n} days ago
+# A machine that is offline: {ago} is one of the four above.
+time.last_seen = last seen {ago}
+# How long ago, short, in lists of notes and in Updates: Looked 5 min ago.
+time.short_minutes = one: {n} min ago | other: {n} min ago
+time.short_hours = one: {n} h ago | other: {n} h ago
+time.yesterday = yesterday
+time.today = today
+time.days_ago = one: {n} day ago | other: {n} days ago
+time.last_week = last week
+time.weeks_ago = one: {n} week ago | other: {n} weeks ago
+# {day} is a date as the language writes it: 12 Oct, 12. Okt.
+time.on_day = on {day}
+# In search: yesterday 17:38, 2 Oct 09:12.
+time.yesterday_at = yesterday {time}
+time.day_at = {day} {time}
+
+# ------------------------------------------------------------ here: the computer tTerm for Mac runs on
+# Alone, as a label (the sidebar, tabs). Sentences that name it have a
+# string of their own for each: .mac and .computer.
+here.mac = this Mac
+here.computer = this computer
+
+# ------------------------------------------------------------ role: one's role in a project
+role.owner = Owner
+role.admin = Admin
+role.member = Member
+role.observer = Observer
+
+# ------------------------------------------------------------ color: projects' colors (colors.ts)
+color.violet = Violet
+color.sky = Sky
+color.teal = Teal
+color.pink = Pink
+color.orange = Orange
+color.lime = Lime
+color.indigo = Indigo
+color.slate = Slate
+
+# ------------------------------------------------------------ count: how many, in lists and lines
+count.machines = one: {n} machine | other: {n} machines
+count.notes = one: {n} note | other: {n} notes
+count.terminals_open = one: {n} terminal open | other: {n} terminals open
+# The end of a list cut short: web-01, web-02, web-03, web-04 and 3 more.
+count.more = one: {n} more | other: {n} more
+
+# A terminal that has only its number, in lists: terminal 2.
+terminal.numbered = terminal {number}
+# A note without a title.
+note.untitled = Untitled
+
+# ------------------------------------------------------------ sidebar (Sidebar.tsx)
+sidebar.label = Sidebar
+sidebar.all_machines = All machines
+sidebar.keep_open = Keep sidebar open
+sidebar.keep_open_title = Keep the sidebar open
+sidebar.let_slide = Let the sidebar slide away
+sidebar.close = Close sidebar
+sidebar.projects = Projects
+sidebar.fold = Fold {name}
+sidebar.unfold = Unfold {name}
+sidebar.open_project = Open {name}: its machines and notes
+sidebar.machines = Machines
+sidebar.add_machine = Add machine
+sidebar.no_machines = No machines yet
+sidebar.notes = Notes
+sidebar.new_folder = New folder
+sidebar.no_notes = No notes yet
+sidebar.no_notes_writes = No notes yet. + makes a folder for them
+sidebar.new_project = New project
+sidebar.waits = {name} comes back with the connection to tTerm
+sidebar.offline = {name} is offline: asleep, or its agent is not running
+# {seen} is time.last_seen: last seen 14 minutes ago.
+sidebar.offline_seen = {name} is offline: asleep, or its agent is not running ({seen})
+sidebar.here.mac = {name}, this Mac: its terminals run right here, also without the internet
+sidebar.here.computer = {name}, this computer: its terminals run right here, also without the internet
+sidebar.new_terminal = New terminal
+sidebar.new_terminal_on = New terminal on {name}
+sidebar.rename_hint = Enter saves, Esc cancels
+sidebar.go_to = Go to {label}
+sidebar.go_to_away = Go to {label}: it waits for {machine} to come back
+sidebar.double_click = Double-click to rename
+sidebar.end = End {label}
+sidebar.end_title = End {label}: its shell ends
+sidebar.new_note_in = New note in {name}
+sidebar.empty_folder = Empty
+sidebar.empty_folder_writes = Empty. + starts a note
+sidebar.signin_title = Servers and projects
+sidebar.signin_text = Sign in to open terminals on your servers, keep notes in projects and work with your team. This computer stays as it is.
+sidebar.theme_dark = Switch to dark theme
+sidebar.theme_light = Switch to light theme
+
+# ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
+# "Free" is the plan's name: it stays as it is.
+account_menu.free_plan = Free plan
+account_menu.title = Settings, language, account, sign out
+account_menu.title_local = Settings, language, sign in
+account_menu.not_signed_in = Not signed in
+account_menu.only_here = Only this computer
+account_menu.offline = Offline, trying again
+account_menu.local_note = tTerm works with this computer. Sign in for your servers, projects and team.
+account_menu.sign_out = Sign out
+# The item after Settings, and the title of the list of languages.
+language.item = Language
+
+# ------------------------------------------------------------ settings (Settings.tsx)
+# The page, and the item of the account's menu that opens it.
+settings.title = Settings
+settings.appearance = Appearance
+settings.appearance_local = Saved on this computer. System follows the setting of this computer. A project's color fills its code badge, or tints the whole project in the sidebar.
+settings.appearance_account = Saved to your account. System follows the setting of each computer you use. A project's color fills its code badge, or tints the whole project in the sidebar.
+settings.theme = Theme
+settings.theme_system = System
+settings.theme_light = Light
+settings.theme_dark = Dark
+settings.tints = Project colors
+settings.tint_badge = Code badge
+settings.tint_block = Whole project
+
+# ------------------------------------------------------------ devices (Devices.tsx)
+devices.title = Devices
+
+# ------------------------------------------------------------ account (Account.tsx)
+# The page, and the item of the account's menu that opens it.
+account.title = Account
+
+# ------------------------------------------------------------ app: the page's frame, toasts and dialogs (App.tsx)
+app.session_ended = Your session ended. Sign in again: your terminals kept running.
+# How saving goes in the note in front, on the line of tabs.
+app.saved = Saved
+app.saving = Saving…
+app.not_saved_offline = Not saved: no connection
+app.not_saved = Not saved
+app.no_connection = No connection
+app.not_answering_local = tTerm Web is not answering. Is python -m tterm.dev running in a terminal window?
+app.not_answering = tTerm Web is not answering. Check the connection, then try again.
+# {why} is the reason tTerm Web gave, as it gave it.
+app.no_terminal = Could not open a terminal: {why}
+app.offline = {name} is offline: it comes back when its agent connects.
+# {seen} is time.last_seen: last seen 14 minutes ago.
+app.offline_seen = {name} is offline, {seen}: it comes back when its agent connects.
+app.removed_shared = {name} is removed from tTerm Web. The same server is in another project too, so tTerm Web's access on it stays.
+app.removed_access = {name} is removed from tTerm Web, and tTerm Web's access on the server is taken back.
+app.removed = {name} is removed from tTerm Web.
+app.no_note = Could not start a note: {why}
+app.note_deleted = The note {title} is deleted from {folder}.
+app.note_deleted_journal = The note {title} is deleted from {folder}. The journal has a line about it.
+app.folder_deleted = The folder {name} is deleted.
+app.folder_deleted_journal = The folder {name} is deleted. The journal has a line about it.
+app.folder_notes_deleted = one: The folder {name} and its note are deleted. | other: The folder {name} and its {n} notes are deleted.
+app.folder_notes_deleted_journal = one: The folder {name} and its note are deleted. The journal has a line about it. | other: The folder {name} and its {n} notes are deleted. The journal has a line about it.
+app.moved_to = Moved to {folder}.
+app.no_move = Could not move it: {why}
+app.moved_here = Moved here from {project}.
+app.moved_here_journal = Moved here from {project}. Its journal has a line about it.
+app.moved_to_project = Moved to {project}, folder {folder}.
+app.moved_to_other = Moved to the other project, folder {folder}.
+app.copied_markdown = Copied as Markdown.
+app.note_gone = The note is deleted.
+app.no_copy = Could not copy: {why}
+app.no_copy_browser = Could not copy: the browser did not let the page.
+app.project_deleted = {name} is deleted.
+app.project_deleted_notes = one: {name} is deleted, with its note. | other: {name} is deleted, with its {n} notes.
+# {label} is where it is now: P/web-01.
+app.machine_moved = {name} is in {project} now, as {label}. Its terminals keep running.
+app.no_rename = Could not rename it: {why}
+app.signed_out = You signed out. Your terminals keep running.
+app.no_sign_out = Could not sign out: tTerm Web did not answer. Try again.
+app.no_theme = Could not save the theme: tTerm Web did not answer.
+app.no_language = Could not save the language: tTerm Web did not answer.
+app.no_tints = Could not save the project colors: tTerm Web did not answer.
+app.go_on_in_browser = Go on in your browser: sign in there, and allow this computer.
+app.open_sidebar = Open sidebar
+app.no_project = No such project
+app.no_project_text = It is not among your projects any more.
+app.close_the_tab = Close the tab
+app.connection_lost = Connection lost. Reconnecting; your terminals keep running.
+app.cut_off.mac = <b>No connection to tTerm.</b> This Mac works as usual. Terminals on servers go on there and come back here with the connection.
+app.cut_off.computer = <b>No connection to tTerm.</b> This computer works as usual. Terminals on servers go on there and come back here with the connection.
+app.paste_busy = A command is running in this terminal, so its line is not free. Try again when it ends.
+app.paste_gone = {machine} is not in tTerm Web any more. Open a terminal elsewhere, and put the command into its line from there.
+app.picker.placeholder = A machine in any project
+# Tabs: their labels and the tips under the mouse. {label} is a terminal's: P/web-01 · 2.
+app.tab.note = Note
+app.tab.note_in = Note in {folder}
+app.tab.close_note = Close the note. It stays in its folder.
+app.tab.project = Project
+app.tab.project_title = {name}: its machines and notes
+app.tab.close_page = Close the page
+app.tab.terminal = Terminal
+app.tab.away = {label}: {machine} is asleep or offline, the terminal waits for it
+app.tab.away_unknown = {label}: its machine is asleep or offline, the terminal waits for it
+app.tab.ended = {label}: ended
+app.tab.running = {label}: a command is running
+app.tab.close_terminal = Close the tab. The terminal keeps running, in the sidebar under its machine.
+# A machine's state, small, after its name in lists.
+app.machine.no_connection = no connection
+app.machine.offline = offline
+app.machine.offline_seen = offline, {seen}
+app.machine.online = online
+# Search and the palette (⌘K): what it finds on the page, the lines under each, and the details beside.
+app.search.state_away = waits for its computer
+app.search.state_ended = ended
+app.search.state_busy = a command runs
+app.search.state_prompt = at the prompt
+app.search.this_tab = this tab
+app.search.tab = tab
+app.search.no_tab = running, no tab
+app.search.row_machine = Machine
+app.search.row_folder = Folder
+app.search.row_now = Now
+app.search.row_in = In
+app.search.row_edited = Edited
+app.search.row_project = Project
+app.search.row_system = System
+app.search.row_address = Address
+app.search.row_status = Status
+app.search.row_terminals = Terminals
+app.search.row_code = Code
+app.search.row_does = Does
+app.search.open_count = one: {n} open | other: {n} open
+# The button that does what was found.
+app.search.open = Open
+app.search.open_note = Open the note
+app.search.open_page = Open its page
+app.search.do_it = Do it
+# Search words: keep the English words, add the language's own after them.
+app.search.terminal_words = terminal
+app.search.note_words = note
+app.search.project_words = project page folders
+# Things to do, in the palette: each with what it does, small, and its search words.
+app.action.add_machine = Add a machine
+app.action.add_machine_hint = a server or a computer
+app.action.new_project_hint = its own machines and notes
+app.action.edit_project = Edit {name}
+app.action.edit_project_hint = name, code and color
+app.action.new_folder_in = New folder in {name}
+app.action.new_folder_hint = for notes
+app.action.close_tab = Close this tab
+app.action.close_tab_terminal = the terminal keeps running
+app.action.close_tab_note = the note stays in its folder
+app.action.rename_terminal = Name this terminal
+app.action.rename_terminal_hint = instead of its number
+app.action.end_terminal = End this terminal
+app.action.end_terminal_hint = its shell ends
+app.action.delete_note = Delete this note
+app.action.delete_note_hint = from {folder}
+app.action.theme_dark = Switch to the dark theme
+app.action.theme_light = Switch to the light theme
+app.action.settings_hint_local = theme, project colors
+app.action.settings_hint = theme, project colors, devices
+app.action.sign_in_hint = your servers, projects and team
+app.action.account_hint = name, photo and plan
+app.action.sign_out_hint = this browser forgets you
+# Search words: keep the English words, add the language's own after them.
+app.action.add_machine_words = new server computer connect
+app.action.new_project_words = project new create make
+app.action.edit_project_words = project rename edit code color colour
+app.action.new_folder_words = notes folder new create
+app.action.machines_words = machines home overview
+app.action.close_tab_words = tab close
+app.action.rename_terminal_words = terminal rename name label
+app.action.end_terminal_words = terminal end stop kill exit shell
+app.action.delete_note_words = note delete remove
+app.action.theme_words = theme dark light colours colors
+app.action.pin_words = sidebar panel pin
+app.action.settings_words_local = settings preferences theme dark light colors colours support
+app.action.settings_words = settings preferences theme dark light colors colours devices quick code forget browsers support
+app.action.sign_in_words = sign in log in login account cloud servers
+app.action.account_words = account profile name photo picture avatar plan limits delete
+app.action.sign_out_words = sign out log out logout leave switch account
+# A folder: made, or named again.
+app.folder.new_title = New folder in {name}
+app.folder.rename_title = Rename folder
+app.folder.create = Create folder
+app.folder.new_help_alone = Only you see it. Then + next to the folder starts the first note.
+app.folder.new_help = Everyone in {name} sees it and can write notes in it. Then + next to the folder starts the first note.
+app.folder.rename_help_alone = Only you see it.
+app.folder.rename_help = Everyone in {name} sees the new name at once. The notes inside stay as they are.
+# Asked before it is done.
+app.remove.title = Remove {name}?
+app.remove.confirm = Remove {name}
+app.remove.text = It disappears from tTerm Web, and its terminals end. The commands typed there stay in the history.
+app.remove.computer = Its agent hears that the computer is removed and stops. To connect the computer again: Add a machine, then Computer.
+app.remove.server = tTerm Web stops signing in to it and takes its access back on the server itself. If the server does not answer, the command for that comes next.
+app.end.title = End {label}?
+app.end.confirm = End the terminal
+app.end.text = Its shell ends, and whatever runs in it stops, as when a terminal window is closed. What it ran stays in its tab and in the history.
+app.delete_note.title = Delete the note {title}?
+app.delete_note.sub = In {folder}.
+app.delete_note.confirm = Delete note
+app.delete_note.alone = It is gone for good.
+app.delete_note.shared = Everyone in {project} loses it, also whoever has it open now. The journal keeps a line: who deleted it, and when.
+app.delete_folder.title = Delete the folder {name}?
+app.delete_folder.confirm = Delete folder
+app.delete_folder.confirm_notes = one: Delete folder and {n} note | other: Delete folder and {n} notes
+app.delete_folder.empty = The folder is empty.
+# {names} is the notes' titles, listed: Plan, Ideas and 3 more.
+app.delete_folder.notes_go = one: Its note goes with it: {names}. | other: Its {n} notes go with it: {names}.
+app.delete_folder.shared = Everyone in {project} loses them, also whoever has one open now. The journal keeps a line: who deleted the folder, and when.
+app.delete_folder.keep = To keep a note, move it first: ⋯ next to the note, then another folder.
+
+# ------------------------------------------------------------ api: what the page says when tTerm Web gives no reason (api.ts)
+api.note_changed = The note changed elsewhere meanwhile.
+api.sign_in = Sign in to go on.
+# {status} is the HTTP status: 502.
+api.answered = tTerm Web answered {status}
+api.confirm_first = Confirm it is you first.
+api.account_changed = Another account is signed in now.
+
+# ------------------------------------------------------------ app_link: the apps for computers, as the site names them (appLink.ts)
+app_link.mac = tTerm for Mac
+app_link.windows = tTerm for Windows
+app_link.linux = tTerm for Linux
+
+# ------------------------------------------------------------ add_machine: the window that adds a server or a computer to a project (AddMachine.tsx)
+# When the browser does not let the page copy the command.
+add_machine.copy_failed = Could not copy: select the command and copy it by hand.
+# How long the command works, inside add_machine.hint_computer and add_machine.hint_server as {works}.
+add_machine.works_once = one: Works once, for the next {n} minute. | other: Works once, for the next {n} minutes.
+add_machine.title = Add a machine
+# Before the list of the projects the machine can go to.
+add_machine.to_project = To project
+# The two buttons Server and Computer, for screen readers.
+add_machine.kind = Kind of machine
+add_machine.server = Server
+add_machine.computer = Computer
+# Step 1 for a computer, above the command.
+add_machine.run_computer = Run this on the computer
+# Under the command. {works} is add_machine.works_once; sudo stays as it is.
+add_machine.hint_computer = In a terminal on that computer, as yourself, not with sudo. {works} The agent then updates itself. A new command run later puts it in again: the computer stays as it is, its open terminals end.
+# A fold under the command, for trying an agent that is not released yet.
+add_machine.by_hand = Or start the agent by hand
+# {version} is the agent's version: 0.11.0. tterm-agent, Python and websockets are names: they stay as they are.
+add_machine.by_hand_hint = From a copy of tterm-agent {version} or newer, with Python that has the websockets package. For trying an agent that is not released yet: it runs while its terminal window is open, and the token becomes the computer's key.
+# Step 2, while the window waits for the machine.
+add_machine.keep_open = Keep this window open
+# A fold: what the command for a computer does, point by point.
+add_machine.what_command = What the command does
+# {folder} is ~/.tterm-web, {bot_folder} ~/.tterm; launchd and systemd are names: they stay as they are.
+add_machine.what_command_puts = Puts tTerm's agent in {folder}, one file for this system from tTerm's releases, checked against the checksum in the command's script before it runs, and starts it whenever you log in (launchd on macOS, systemd on Linux). The tTerm bot's agent in {bot_folder}, if there is one, stays as it is.
+add_machine.what_command_updates = The agent updates itself, only to versions signed by tTerm's release build, and only while no terminal is open on this computer.
+add_machine.what_command_key = Makes this computer a key of its own and keeps it there, readable by you only. The token in the command only lets it join, once.
+# root is the name of the system's administrator: it stays as it is.
+add_machine.what_command_runs = The agent runs as you, never as root, and opens no ports: it connects out to tTerm Web and keeps that one connection. Each terminal here is a shell of yours there.
+# {command} is ~/.tterm-web/uninstall.sh.
+add_machine.what_command_uninstall = {command} removes it all.
+# Step 1 for a server, above the command.
+add_machine.run_server = Run this on the server
+# Under the command. {works} is add_machine.works_once; root and sudo stay as they are.
+add_machine.hint_server = {works} Run it as root or as any user with sudo.
+# A fold: what the script for a server does, point by point.
+add_machine.what_script = What the script does
+# Here and in the next two, tterm in small letters is the name of the user the script makes on the server: it stays as it is, as sudo and sshd_config do.
+add_machine.what_script_user = Creates the user tterm, with no password. If the tTerm bot already made it, it is reused.
+add_machine.what_script_certificates = Lets tTerm Web sign in as tterm with certificates that live two minutes and are made for this server alone. No keys stay on the server.
+add_machine.what_script_sudo = Gives tterm sudo, so you can manage the server. One command takes it back.
+add_machine.what_script_safe = Never touches sshd_config and opens no ports. Running it twice is safe.
+# {name} is the machine's name.
+add_machine.connected = {name} is connected
+# After the machine's system and host: Ubuntu 24.04 · web-01 · in tabs it reads P/web-01.
+add_machine.tabs_label = in tabs it reads {label}
+add_machine.open_terminal = Open a terminal
+add_machine.add_another = Add another machine
+# {why} is what went wrong, as tTerm Web said it.
+add_machine.no_command = Could not make a command: {why}
+add_machine.expired_token = This token has expired: it works for 10 minutes.
+add_machine.expired_command = This command has expired: it works for 10 minutes.
+add_machine.new_command = Get a new command
+add_machine.failed_computer = The computer could not be added.
+add_machine.failed_server = The server could not be checked.
+add_machine.still_works = The same command still works: fix this and run it again.
+# While the window waits: the agent or the server has called in, or not yet.
+add_machine.agent_in = The agent is in. Reading the computer's details…
+add_machine.server_in = The server reported in. Signing in to check it…
+add_machine.waiting_agent = Waiting for the agent…
+add_machine.waiting_server = Waiting for the server…
+# {project} is the project's name; the _unnamed ones are for when it is not known.
+add_machine.appears_computer = It appears in {project} a few seconds after the command finishes.
+add_machine.appears_computer_unnamed = It appears in the project a few seconds after the command finishes.
+add_machine.appears_server = It appears in {project} as soon as the script finishes, usually within a minute.
+add_machine.appears_server_unnamed = It appears in the project as soon as the script finishes, usually within a minute.
+
+# ------------------------------------------------------------ signin: signing in with a code from email, and the quick code (SignIn.tsx)
+# When the server does not answer at all.
+signin.no_answer = The server is not answering. Check the connection and try again.
+signin.email_lead = Enter your email, and we will send you a code
+# The field for the address, for screen readers.
+signin.email = Email
+# The button, while the code is being sent.
+signin.sending = Sending…
+signin.get_code = Get a code
+signin.new_here = New here? You create an account after the code.
+signin.code_resent = A new code is on its way. The one before no longer works.
+signin.code_title = Enter the code
+# {email} is the address the code went to.
+signin.code_sent = We sent it to <b>{email}</b>
+# The field for the code, for screen readers.
+signin.code_label = Code from the email
+# A link that counts the seconds down until another code may be sent: New code in 42 s.
+signin.resend_in = one: New code in {n} s | other: New code in {n} s
+signin.resend = Send a new code
+signin.change_email = Change email
+signin.no_email = No email? Look in the spam folder.
+signin.signup_title = Create your account
+# The field for one's name, and the words in it while it is empty.
+signin.your_name = Your name
+# The one tick of signing up. <terms> and <privacy> are links to the site's two documents: their names as the site has them in the language.
+signin.agree = I agree to the <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>
+# The button, while the account is being made.
+signin.creating = Creating…
+signin.create = Create account
+signin.another_email = Use another email
+# A quick code is four digits that sign one in on this device.
+signin.pin_easy = Too easy to guess: choose digits that are not all the same and not in a row.
+signin.pin_mismatch = The codes did not match. Create it again.
+# {name} is the person's first name: Welcome for an account made just now, Hello for one there before.
+signin.welcome = Welcome, {name}!
+signin.hello = Hello, {name}!
+# The quick code, typed a second time.
+signin.pin_repeat = Repeat the code
+signin.pin_repeat_lead = Enter the same four digits once more
+signin.pin_offer_lead = Create a quick code for this device
+# The field for the quick code, for screen readers: the second time, the first time.
+signin.pin_repeat_label = The quick code, once more
+signin.pin_offer_label = A quick code
+# The link that goes on without a quick code.
+signin.not_now = Not now
+# {name} is the person's first name.
+signin.welcome_back = Welcome back, {name}!
+signin.pin_lead = Enter your quick code
+# The field for the quick code, for screen readers.
+signin.pin_label = Quick code
+signin.forgot = Forgot the code?
+signin.switch = Switch account
+
+# ------------------------------------------------------------ connect: in the browser, allowing tTerm for the computer to sign in (Connect.tsx)
+connect.no_answer = tTerm is not answering. Check the connection, then reload this page.
+# {app} is app_link.*: tTerm for Mac. Also the page's title in the browser.
+connect.allow_title = Allow {app}?
+# The address the app opened is cut short.
+connect.incomplete = This link is not complete
+# Sign in with your browser is the app's button: the words of app_signin.browser.
+connect.start_again = Start again in tTerm on your computer: Sign in with your browser.
+# Above signing in, after Allow. {app} is app_link.*: tTerm for Mac.
+connect.confirm = To allow {app}, confirm it is you.
+connect.signin_other = Sign in with the other account, then allow {app}.
+connect.signin_then = Sign in, then allow {app}.
+connect.no_connection = No connection
+# {computer} is the name of the computer the app runs on, {email} the account's address.
+connect.asks = The app on <b>{computer}</b> asks to sign in to your account, {email}.
+# Above the code that both this page and the app show.
+connect.check = Check that the app shows the same code
+# The button.
+connect.allow = Allow
+connect.another = Not you? Use another account
+# Personal is the name of one's own project: it stays as it is. Settings and Devices are the page and its section, in the words of settings.title and devices.title.
+connect.small = The computer becomes a machine in Personal. The app appears in Settings, under Devices, where you can forget it.
+# While the browser goes back to the app. {app} is app_link.*: tTerm for Mac.
+connect.back = Back to {app}…
+connect.takes_over = The app takes it from here, on this computer.
+
+# ------------------------------------------------------------ app_signin: in tTerm for the computer, signing in with the browser (AppSignIn.tsx)
+# The app's first screen, for screen readers.
+app_signin.welcome_label = Welcome
+app_signin.welcome_title = Welcome to tTerm
+app_signin.welcome_lead = The terminals of this computer work right away, no account needed.
+# The button: the app opens the browser, to sign in there.
+app_signin.browser = Sign in with your browser
+# The button: not now, sign in later.
+app_signin.later = Later
+app_signin.welcome_note = Signing in brings your servers, projects, notes and team into this window. You can do it any time, from the bottom of the sidebar.
+app_signin.cancelled = Signing in was cancelled in the browser.
+# The title of the window that waits while one signs in in the browser.
+app_signin.link_title = Sign in with your browser
+# {host} is app.tterm.net. The code comes under it.
+app_signin.link_note = tTerm opened {host} in your browser. Sign in there, and allow this computer when the page asks. The page shows this code too:
+app_signin.until_then = Until then, this computer works as before.
+app_signin.open_again = Open the page again
+
+# ------------------------------------------------------------ welcome: the first screen, while nothing is connected yet (Welcome.tsx)
+# {name} is the person's first name.
+welcome.title = Welcome to tTerm, {name}
+welcome.lead = A terminal to your servers and computers, right in the browser. Nothing to install on this computer, no keys to copy, no ports to open.
+welcome.connect = Connect your first machine
+# The two cards: the kinds of machine to connect.
+welcome.server = Server
+welcome.server_note = A VPS or cloud server you reach over SSH. Run one command on it, and it appears here.
+# Small labels under the cards: Linux, One command; macOS, Linux, No open ports.
+welcome.one_command = One command
+welcome.computer = Computer
+welcome.computer_note = A Mac or Linux machine at home or in the office, even behind NAT. A small agent keeps it connected.
+welcome.no_ports = No open ports
+# The three steps below, for screen readers.
+welcome.how = How it works
+welcome.step_add = Add a machine
+welcome.step_add_text = Run one command on it. It works once, for 10 minutes.
+welcome.step_open = Open a terminal
+welcome.step_open_text = Each command becomes a block: copy it, run it again, share a link.
+welcome.step_team = Bring your team
+welcome.step_team_text = Roles, a shared journal, and you always see who is watching.
+# {project} is the project's name and {code} its code: P. In {code}/name, name stands for a machine's name, as in P/web-01.
+welcome.footnote = Your first project, {project}, is ready, with the code {code}: its machines show up in tabs as {code}/name.
+
+# ------------------------------------------------------------ need_account: New project and Add machine in the app before signing in (NeedAccount.tsx)
+need_account.machine_title = Add a machine
+need_account.machine_note = Servers and other computers come with a tTerm account. Signing in makes one, if you have none yet.
+need_account.server = Server
+need_account.server_text = A VPS or cloud server you reach over SSH. Run one command on it, and it appears here.
+need_account.computer = Computer
+need_account.computer_text = A Mac or Linux machine at home or in the office, even behind NAT.
+# What the Free plan gives. {machines} is need_account.plan_machines, {terminals} need_account.plan_terminals.
+need_account.machine_plan = Up to {machines} and {terminals}.
+# In need_account.machine_plan, after "Up to": in the form the words take there.
+need_account.plan_machines = one: {n} machine | other: {n} machines
+need_account.plan_terminals = one: {n} open terminal | other: {n} open terminals
+need_account.machine_stays = This computer stays as it is, with its terminals.
+need_account.project_title = New project
+need_account.project_note = More projects come with a tTerm account. Signing in makes one, if you have none yet.
+need_account.personal = Personal projects
+need_account.personal_text = Only you. Its machines, terminals and notes are yours alone.
+need_account.shared = Shared projects
+# A small label on Shared projects: they are not there yet.
+need_account.soon = Soon
+need_account.shared_text = With your team. You invite people: they open terminals on its machines and edit its notes.
+need_account.project_plan = Projects of your own, each with its machines, terminals and notes. Shared projects with a team come soon.
+# Personal is the name of one's own project: it stays as it is.
+need_account.project_stays = Personal stays as it is, with this computer, its terminals and notes.
+# The button that closes the window.
+need_account.not_now = Not now
+
+# ------------------------------------------------------------ updates: tTerm for Mac updating itself, only in the app (Updates.tsx)
+# The title of Restart to update in the top bar. {version} is the new version: 0.5.1.
+updates.pill_title.mac = tTerm {version} is ready. The restart takes a few seconds; if terminals run on this Mac, tTerm asks first.
+updates.pill_title.computer = tTerm {version} is ready. The restart takes a few seconds; if terminals run on this computer, tTerm asks first.
+updates.restarting = Restarting…
+# A button, in the top bar and in Settings: tTerm restarts and the new version goes in.
+updates.restart_to_update = Restart to update
+# The card above the account in the sidebar, and Settings. {version} is the new version.
+updates.ready = tTerm {version} is ready
+updates.restart_takes = The restart takes a few seconds.
+# The card's button.
+updates.restart = Restart
+# A link to the notes of the new version.
+updates.whats_new = What's new
+# Once, after the restart. {version} is the version now: 0.5.1.
+updates.updated = tTerm is updated to {version}
+# Settings, Updates: the two ways tTerm takes a new version.
+updates.auto = Update by itself
+updates.auto_text.mac = A new version goes in as tTerm quits, and, with tTerm in the menu bar and its window closed, as soon as nothing runs on this Mac.
+updates.auto_text.computer = A new version goes in as tTerm quits, and, with tTerm in the menu bar and its window closed, as soon as nothing runs on this computer.
+updates.ask = Ask me first
+# "Restart to update" is the button (updates.restart_to_update): the same words.
+updates.ask_text = A new version waits until you press Restart to update.
+# The section of Settings.
+updates.title = Updates
+updates.about = tTerm for Mac updates itself from tTerm's releases. Only a version signed by tTerm goes in.
+# For screen readers: the two ways above.
+updates.how = How tTerm updates
+# Beside Update by itself.
+updates.recommended = Recommended
+updates.checking = Looking for a new version…
+# {version} is the new version.
+updates.downloading = Downloading tTerm {version}…
+# {version} is the version this app is; {day} is today, yesterday or on 12 Oct (time.today, time.yesterday, time.on_day); {time} is 10:02.
+updates.you_have_downloaded = You have {version}. Downloaded {day} at {time}.
+updates.you_have = You have {version}.
+# {version} is the new version; why it failed comes under it, as tTerm says it.
+updates.failed = Could not update to {version}
+# {site} is tterm.net. Applications is the folder of the Mac: as macOS names it in the language.
+updates.download = Or download tTerm from <link>{site}</link> and drag it to Applications.
+# A button: tTerm moves itself from the disk image to Applications.
+updates.move = Move to Applications
+# {ago} is when tTerm last looked: just now, 5 min ago, 2 h ago, yesterday, on 12 Oct (time.*).
+updates.looked = tTerm {version} is up to date. Looked {ago}.
+updates.this_is = This is tTerm {version}.
+# A button: look for a new version now.
+updates.check_now = Check now
+
+# ------------------------------------------------------------ account: the name, the photo and the plan (Account.tsx)
+# The file chosen for one's photo is none.
+account.not_a_photo = This file is not a photo tTerm takes. Choose a JPEG, PNG or WebP of up to 5 MB.
+# What the plan allows, after "Up to" (account.up_to): Up to 50 machines and 24 open terminals.
+account.limit_machines = one: {n} machine | other: {n} machines
+account.limit_terminals = one: {n} open terminal | other: {n} open terminals
+# {limits} is one or both of the two above, as a list.
+account.up_to = Up to {limits}
+account.no_limits = No limits
+# A meter of the plan, beside its label (Machines, Open terminals): 3 of 50.
+account.used_of = {used} of {limit}
+account.used_no_limit = {used}, no limit
+# The title of Close at the top of Account and Settings.
+account.close_title = Back to where you were
+account.photo_removed = Photo removed: your initials are back.
+# For screen readers: the card with one's name and photo.
+account.profile = Profile
+account.change_photo = Change photo
+account.add_photo = Add a photo
+account.your_name = Your name
+account.saving = Saving…
+account.edit_name = Edit name
+account.remove_photo = Remove photo
+# Under the photo's buttons: what the photo is for.
+account.photo_hint = It shows next to your name, in place of your initials.
+# For screen readers: the file chooser for the photo.
+account.choose_photo = Choose a photo
+# Under one's email address. {email} is support's address.
+account.address_note = You sign in with this address. To change it, write to <link>{email}</link>.
+# The section of the plan; its name (Free) stays as it is.
+account.plan = Plan
+account.plan_note = tTerm is free while we build it. Other plans will appear here, and you will hear about them before anything changes.
+# The labels of the plan's two meters.
+account.machines = Machines
+account.open_terminals = Open terminals
+account.photo_saved = Your photo is in: at the bottom of the sidebar and in its menu.
+# {email} is support's address.
+account.delete_note = To delete your account, write to {email} from the address you sign in with.
+
+# ------------------------------------------------------------ devices: where one is signed in, in Settings (Devices.tsx)
+# On the sign-in screen, after this very device was forgotten.
+devices.this_forgotten = This device is forgotten. Sign in with a code from email.
+# {device} is a device's label: tTerm for Mac on MacBook-Pro. tTerm there now works with that computer only, as before signing in.
+devices.app_signed_out = {device} is signed out: there it is this computer only now.
+# {device} is a device's label: Chrome on macOS.
+devices.forgotten = {device} is forgotten: there it is email again.
+# On the sign-in screen.
+devices.all_forgotten = All devices are forgotten. Each one signs in with a code from email now.
+devices.about = Browsers where you sign in with your quick code, and tTerm on your computers, signed in with the browser. Anywhere else, it takes a code from email.
+devices.idle = After 8 hours without anything done, tTerm asks for the quick code again. Your terminals keep running.
+devices.none = No browser is remembered. Each sign-in takes a code from email.
+# A mark beside the device one uses now.
+devices.this_device = This device
+# Under a device's label. {created} and {used} are how long ago: just now, 3 minutes ago, 2 days ago (time.ago_*).
+devices.app_times = Signed in {created}, last used {used}
+devices.browser_times = Trusted {created}, last sign-in {used}
+# A button beside each device.
+devices.forget = Forget
+# The heading, and the red button that does it.
+devices.forget_all = Forget all devices
+devices.forget_all_text = Every device is forgotten and every session ends, this one too. Each browser then asks for a code from email. Your terminals keep running.
+# The button that asks first.
+devices.forget_all_ask = Forget all devices…
+
+# ------------------------------------------------------------ this_computer: the computer the app runs on, in Settings (ThisComputer.tsx)
+# How the link to tTerm Web is, under the switch. {name} is the name tTerm Web knows this computer by.
+this_computer.online_terminals = one: Online in tTerm Web as {name} · {n} terminal opened from there | other: Online in tTerm Web as {name} · {n} terminals opened from there
+this_computer.online = Online in tTerm Web as {name}
+this_computer.connecting = Connecting to tTerm Web…
+this_computer.waiting = Not connected to tTerm Web yet.
+this_computer.no_network = No network. tTerm tries again by itself.
+# "Turn this on": the switch above.
+this_computer.removed.mac = This Mac was removed from tTerm Web, so it is not opened from there. Turn this on to add it again.
+this_computer.removed.computer = This computer was removed from tTerm Web, so it is not opened from there. Turn this on to add it again.
+this_computer.closed.mac = This Mac is not opened from tTerm Web now.
+this_computer.closed.computer = This computer is not opened from tTerm Web now.
+# The section's title, on a Mac too.
+this_computer.title = This computer
+# {name} is this computer's machine in tTerm, {project} its project.
+this_computer.about = {name}, in {project}. Its terminals run here, also without the internet.
+# The switch.
+this_computer.open = Open from tTerm Web and your phone
+this_computer.open_text.mac = tTerm Web and your phone open terminals on this Mac while tTerm runs here: with its window closed it stays in the menu bar, and it starts when you log in. Off: there this Mac is offline; here everything works as before.
+this_computer.open_text.computer = tTerm Web and your phone open terminals on this computer while tTerm runs here: with its window closed it stays in the menu bar, and it starts when you log in. Off: there this computer is offline; here everything works as before.
+# Asked before the switch goes off while terminals opened from tTerm Web run here.
+this_computer.ask_title.mac = Close this Mac to tTerm Web?
+this_computer.ask_title.computer = Close this computer to tTerm Web?
+# The red button.
+this_computer.turn_off = Turn off
+this_computer.ask_text.mac = one: {n} terminal opened from tTerm Web on this Mac will end, and there this Mac goes offline. | other: {n} terminals opened from tTerm Web on this Mac will end, and there this Mac goes offline.
+this_computer.ask_text.computer = one: {n} terminal opened from tTerm Web on this computer will end, and there this computer goes offline. | other: {n} terminals opened from tTerm Web on this computer will end, and there this computer goes offline.
+
+# ------------------------------------------------------------ photo: one's photo, cut to a circle (PhotoDialog.tsx)
+# The photo could not be made here, in the browser.
+photo.browser_failed = The browser could not make the photo.
+photo.no_answer = tTerm did not answer. Try again.
+# The dialog's title.
+photo.title = Your photo
+# For screen readers: the photo in its frame, which the arrow keys move and + and - zoom.
+photo.frame = Your photo in a circle. Drag it, or move it with the arrows; + and - zoom.
+# The slider that makes the photo bigger in the circle.
+photo.zoom = Zoom
+photo.drag = Drag the photo to place it in the circle.
+# Beside the photo in three small sizes.
+photo.preview = As others see it
+photo.note = JPEG, PNG or WebP of up to 5 MB. tTerm keeps a 256-pixel copy, without what the photo says about itself, such as where it was taken.
+photo.saving = Saving…
+photo.save = Save photo
+
+# ------------------------------------------------------------ confirm: asking before what cannot be undone (Confirm.tsx)
+confirm.no_answer = tTerm Web did not answer.
+confirm.copy_failed = Could not copy: select the command and copy it by hand.
+# After a server is removed. {name} is the server's name.
+confirm.removed = {name} is removed
+# The command that takes the access back comes after it.
+confirm.removed_text = tTerm Web no longer lists it or signs in to it. The server did not answer, so tTerm Web's access on it stays until you take it back there:
+# {user} is the server's user tterm; {command} is the command that removes it and its sudo rule.
+confirm.user_stays = The user {user} and its sudo rule stay, for the tTerm bot if you use it. To remove them too: {command}
+
+# ------------------------------------------------------------ project_dialog: the windows of projects of one's own (ProjectDialog.tsx)
+project_dialog.code_invalid = The code is 1 to 4 letters or digits.
+# When saving or moving failed and tTerm Web gave no reason.
+project_dialog.no_answer = tTerm Web did not answer.
+project_dialog.edit_title = Edit project
+project_dialog.new_title = New project
+# Under the title, editing a project others are in: its name, code and color.
+project_dialog.edit_sub = The owner and admins change these.
+project_dialog.new_sub = A project keeps its own machines and notes, apart from your other projects.
+# The label of the project's name.
+project_dialog.name = Name
+# In the empty name field: an example of a project's name.
+project_dialog.name_example = For example, Client X
+# The label of the project's code: the 1 to 4 letters or digits on its badge.
+project_dialog.code = Short code
+project_dialog.code_help_alone = 1 to 4 letters or digits. The code marks the project in tabs and in the sidebar.
+project_dialog.code_help_shared = 1 to 4 letters or digits. The code marks the project in tabs and in the sidebar, for everyone in it at once.
+project_dialog.code_help_new = The code is made from the name, and you can change it: 1 to 4 letters or digits. It marks the project in tabs and in the sidebar.
+# The label of the project's colors.
+project_dialog.color = Color
+# "Whole project" and "Settings" are named as the choice and the page are (settings.tint_block, settings.title).
+project_dialog.color_help_new = The color is picked to differ from your other projects, and you can change it. It fills the code badge, and the whole project in the sidebar if you choose Whole project in Settings.
+project_dialog.color_help_alone = The color fills the code badge, and the whole project in the sidebar if you choose Whole project in Settings.
+project_dialog.color_help_shared = The color fills the code badge for everyone in it, and the whole project in the sidebar for those who choose Whole project in their Settings.
+# Above how the project will look in the sidebar and on a tab (a noun).
+project_dialog.preview = Preview
+# In the preview, in place of the project's name while none is typed.
+project_dialog.preview_name = Project
+project_dialog.new_next = You own it. Next you add a machine or move one in from another project, and write notes.
+project_dialog.create = Create project
+# The title of the window that moves a machine to another project: {machine} is its name.
+project_dialog.move_title = Move {machine}
+project_dialog.move_sub = To another project you own.
+# Next to each project one may move to: whether others are in it.
+project_dialog.only_you = only you
+project_dialog.with_others = with others
+# {project} is the project it goes to, {code} that project's code, {name} the machine's name there: CX/web-01.
+project_dialog.move_becomes = In {project} it becomes {code}/{name}. Its terminals keep running, and nothing changes on the machine itself.
+# The same, when its name is taken there: {machine} is its name now, {name} the one it gets (web-01-2).
+project_dialog.move_becomes_taken = In {project} it becomes {code}/{name}: the name {machine} is taken there. Its terminals keep running, and nothing changes on the machine itself.
+# The button: {project} is the project's name.
+project_dialog.move_to = Move to {project}
+# The button while there is nothing to pick (a verb).
+project_dialog.move = Move
+# Next to a folder one may move a note to: it has no notes.
+project_dialog.folder_empty = empty
+# Next to a project without folders: the note goes to a new folder there, named as its own.
+project_dialog.folder_new = a new folder, made there for it
+# The title of the window that moves a note to another project: {note} is its title.
+project_dialog.move_note_title = Move {note}
+project_dialog.move_note_sub = Now in {project}, folder {folder}. Pick a folder in another project.
+# Who sees the note in the project it goes to.
+project_dialog.note_alone = In {project} only you see it.
+project_dialog.note_shared = Everyone in {project} sees and edits it.
+# {project} is the project the note leaves.
+project_dialog.note_leaves = Everyone else in {project} loses it. The journal of {project} keeps a line: who moved it out, and when.
+# The ticks: the items of a checklist ticked off, each with who ticked it.
+project_dialog.note_keeps = Its title, text and history go with it, and so do the ticks with who made them.
+# The button: {folder} is the name of the folder made there, the note's own folder's name.
+project_dialog.move_to_new_folder = Move to a new folder {folder}
+project_dialog.move_to_folder = Move to {folder}
+project_dialog.delete_title = Delete {project}?
+# A project with machines in it cannot be deleted yet: {machine} is its machine's name.
+project_dialog.delete_machine_first = Move or remove its machine first: {machine}.
+# {machines} is their names, listed: web-01, web-02 and db.
+project_dialog.delete_machines_first = Move or remove its machines first: {machines}.
+# "Move to another project" and "Remove machine" are the items of a machine's ⋯ menu (projectpage.move_machine, projectpage.remove_machine).
+project_dialog.delete_how = On the project's page, ⋯ next to a machine: Move to another project, or Remove machine. Then the project can go.
+project_dialog.cant_undo = This can't be undone.
+# {n} is how many folders the project has; {notes} is project_dialog.delete_notes.
+project_dialog.delete_folders = one: {n} folder with {notes} is deleted with it. | other: {n} folders with {notes} are deleted with it.
+# How many notes are in those folders, inside project_dialog.delete_folders: 2 folders with 5 notes are deleted with it.
+project_dialog.delete_notes = one: {n} note | other: {n} notes
+project_dialog.delete_no_notes = It has no notes.
+# Above the field the project's name is typed in.
+project_dialog.delete_type = Type {project} to confirm
+# The button.
+project_dialog.delete_button = Delete {project}
+
+# ------------------------------------------------------------ projectpage: a project's page (ProjectPage.tsx)
+# The end of the line under the project's name: 2 machines · 1 terminal open · you are the owner.
+projectpage.role_owner = you are the owner
+projectpage.role_admin = you are an admin
+projectpage.role_member = you are a member
+projectpage.role_observer = you are an observer
+# A terminal busy with a command whose line is not known.
+projectpage.command_running = A command is running
+# {duration} is how long the command has run: less than a minute, 3 minutes, an hour (time.for_*).
+projectpage.running_for = running for {duration}
+# The same, while it is not known how long.
+projectpage.running = running
+# A terminal whose machine is away: {machine} is its name.
+projectpage.waits_for = waits for {machine}
+# Under a terminal's name being typed. Enter and Esc are the keys.
+projectpage.rename_hint = Enter saves, Esc cancels.
+# On a terminal's name.
+projectpage.double_click = Double-click to rename
+# The button next to a terminal: go to it (a verb).
+projectpage.open = Open
+# An offline computer's state, next to its name: {ago} is how long ago (time.ago_*): Last seen 14 minutes ago.
+projectpage.last_seen = Last seen {ago}
+# A computer's state, next to its name.
+projectpage.offline = Offline
+projectpage.online = Online
+# On New terminal: {machine} is the machine's name.
+projectpage.offline_title = {machine} is offline: asleep, or its agent is not running
+projectpage.new_terminal_title = A new terminal on {machine}
+# Said when New terminal is pressed on an offline computer: {seen} is time.last_seen: last seen 14 minutes ago.
+projectpage.offline_wait_seen = {machine} is offline, {seen}: it comes back when its agent connects.
+projectpage.offline_wait = {machine} is offline: it comes back when its agent connects.
+projectpage.new_terminal = New terminal
+# The ⋯ button next to a machine, for screen readers: {machine} is its name.
+projectpage.machine_menu = {machine}: machine menu
+# The tip on that button: the items of its menu (projectpage.move_machine, projectpage.remove_machine).
+projectpage.machine_menu_title = Move to another project, Remove machine
+# An item of a machine's menu, and the tip on its ⋯ button when it is the only item.
+projectpage.remove_machine = Remove machine
+# An item of a machine's menu.
+projectpage.move_machine = Move to another project
+projectpage.no_terminals = No terminals open
+# Who changed a note last, and when: {ago} is just now, 5 min ago, yesterday, on 12 Oct (time.*).
+projectpage.edited_you = You, {ago}
+# The same, someone else: {name} is their first name.
+projectpage.edited_by = {name}, {ago}
+# A note's author when it is oneself, in the note's menu: You, the owner and admins can delete it.
+projectpage.you = You
+# A checklist's progress, in place of its first line: {n} items ticked of {total}.
+projectpage.done = one: {n} of {total} done | other: {n} of {total} done
+# A note without text yet, in place of its first line.
+projectpage.note_empty = Empty
+# The ⋯ button next to a note, for screen readers: {note} is its title.
+projectpage.note_menu = {note}: note menu
+# The tip on that button: what its menu has.
+projectpage.note_menu_title_move = Folder, Move to another project, Copy as Markdown, Delete note
+projectpage.note_menu_title = Folder, Copy as Markdown, Delete note
+# The end of the line under the project's name when nobody else is in it: 1 machine · 2 terminals open · only you.
+projectpage.only_you = only you
+# The tip on the project's code, next to its name.
+projectpage.short_code = Short code
+# The pencil next to the project's name.
+projectpage.edit = Edit name, code and color
+# A heading.
+projectpage.machines = Machines
+# Next to the heading Machines.
+projectpage.machines_alone = Only you open terminals on them
+projectpage.machines_shared = Your terminals on them
+projectpage.add_machine = Add machine
+# The two kinds of machine one can add, in a project without machines.
+projectpage.server = Server
+projectpage.server_text = A VPS or cloud server you reach over SSH. Run one command on it, and it appears here.
+projectpage.computer = Computer
+projectpage.computer_text = A Mac or Linux machine at home or in the office, even behind NAT. A small agent keeps it connected.
+# "Move to another project" is the item of a machine's ⋯ menu (projectpage.move_machine).
+projectpage.move_hint = Already have the machine in another project? On that project's page, ⋯ next to the machine, then Move to another project.
+# On the page of Personal, the project each person has for themselves: {project} is its name.
+projectpage.personal_title = {project} is yours alone
+projectpage.personal_text = No one can be invited here. To keep other machines apart, or later to work with others, create a project and move machines into it.
+projectpage.new_project = New project
+# A heading.
+projectpage.notes = Notes
+# Next to the heading Notes.
+projectpage.notes_alone = Only you see notes in {project}. Folders keep them in order
+projectpage.notes_shared = Everyone in {project} reads and edits them. Folders keep them in order
+projectpage.new_folder = New folder
+projectpage.no_notes = No notes yet
+# Runbooks, Access, Checklists: examples of folders' names.
+projectpage.no_notes_text = Notes live in folders, the way terminals live on machines. Start with one: Runbooks, Access, Checklists.
+# A folder without notes, next to its name.
+projectpage.folder_empty = Empty
+# Who made a folder: {name} is their first name.
+projectpage.made_by_you = made by you
+projectpage.made_by = made by {name}
+projectpage.new_note = New note
+# The ⋯ button next to a folder, for screen readers: {folder} is its name.
+projectpage.folder_menu = {folder}: folder menu
+# The tip on that button: what its menu has.
+projectpage.folder_menu_title = Rename folder, Delete folder
+# "New note" is the button next to the folder's name (projectpage.new_note).
+projectpage.folder_no_notes_writes = No notes yet. New note puts the first one here
+# A heading at the end of the page: {project} is the project's name.
+projectpage.delete_title = Delete {project}
+projectpage.delete_text = Its folders and notes go with it. Machines are moved to another project or removed first.
+projectpage.delete_project = Delete project
+
+# ------------------------------------------------------------ machines: the machines page (Machines.tsx)
+# What sudo does on the machine, after "sudo" in what tTerm Web learned about it.
+machines.sudo_works = works
+machines.sudo_password = asks for a password
+machines.sudo_missing = not available
+# What tTerm Web learned about a machine when it connected: the labels, each with its value.
+machines.system = System
+machines.kernel = Kernel
+machines.cpu = CPU
+machines.cores = one: {n} core | other: {n} cores
+machines.memory = Memory
+machines.disk = Disk
+# {free} and {total} are sizes: 7.8 GB free of 50 GB.
+machines.disk_free = {free} free of {total}
+# The package manager: apt, brew.
+machines.packages = Packages
+machines.shell = Shell
+# {shell} is the shell its terminals start, {shells} all the shells it has: zsh (has bash, zsh).
+machines.shell_has = {shell} (has {shells})
+machines.commands = Commands
+# How many commands tTerm Web knows there.
+machines.commands_known = one: {n} known | other: {n} known
+# The version of the agent, or of tTerm for the computer.
+machines.agent = Agent
+# The account on the machine the terminals run as: root, deploy.
+machines.account = Account
+# A computer's state on its card: {seen} is time.last_seen: offline, last seen 14 minutes ago.
+machines.offline_seen = offline, {seen}
+machines.offline = offline
+machines.online = online
+machines.offline_note = The computer is asleep or offline, or its agent is not running. It comes back by itself when its agent can connect; this page notices within ten seconds.
+# On Open a terminal while the computer is offline.
+machines.offline_title = It is offline: asleep, or its agent is not running
+machines.open_terminal = Open a terminal
+# A terminal running on the machine: {label} is as its tab shows it (P/web-01 · 2).
+machines.back_to = Back to {label}, still running
+# The tip on Remove: {machine} is the machine's name.
+machines.remove_title = Take {machine} out of tTerm Web
+# The button: take the machine out (a verb).
+machines.remove = Remove
+# The page's heading.
+machines.title = Machines
+machines.add = Add a machine
+machines.lead = A terminal keeps running when you close its tab: it waits here and in the sidebar until its shell ends.
+# A size: {size} is a number as the language writes it, 16 or 7.5.
+machines.gb = {size} GB
+
+# ------------------------------------------------------------ note_view: a note in its tab (NoteView.tsx)
+# Said for a moment at the bottom of the page. {why} is the reason tTerm
+# Web gave, as it gave it.
+note_view.not_saved = Not saved: {why}
+note_view.draft_back = What was typed in this note and not saved is back.
+# When tTerm Web gives no reason.
+note_view.no_answer = tTerm Web did not answer.
+# Ticking a checklist item did not get through.
+note_view.no_tick = Could not tick it: {why}
+# The note's tab was closed with what was typed in it not saved. {title} is
+# the note's title, or note.untitled.
+note_view.kept_draft = {title}: what was typed is not saved yet. It is kept in this browser and comes back when you open the note again.
+note_view.copied_markdown = Copied as Markdown.
+note_view.no_copy = Could not copy: the browser did not let the page.
+note_view.no_move = Could not move it: {why}
+# Under the note's title, the parts of one line with dots between: who
+# started it and when; or who edited it last and when · who wrote it and
+# on which day; then who sees it. Someone is a person no longer known.
+# {name} is a person's first name; {ago} is how long ago, short: just now,
+# 5 min ago, yesterday, on 12 Oct; {folder} is a folder's name.
+note_view.someone_started = Someone started it {ago} in {folder}
+note_view.you_started = You started it {ago} in {folder}
+note_view.started = {name} started it {ago} in {folder}
+note_view.someone_edited = Someone edited it {ago}
+note_view.you_edited = You edited it {ago}
+note_view.edited = {name} edited it {ago}
+# {day} is today, yesterday or on 12 Oct.
+note_view.someone_wrote = Someone wrote it {day}
+note_view.you_wrote = You wrote it {day}
+note_view.wrote = {name} wrote it {day}
+# The end of the same line, after a dot. {project} is a project's name.
+note_view.only_you = only you see it
+note_view.everyone_edits = everyone in {project} can edit
+# The note was deleted while it was open here.
+note_view.gone_title = This note is deleted
+note_view.gone_text = It was deleted, or the folder it was in, from another tab or device.
+note_view.close_tab = Close the tab
+note_view.copy_what_was_here = Copy what was here as Markdown
+note_view.no_open = Could not open the note: {why}
+# The ⋯ beside where the note is: what screen readers say, and the tip
+# under the mouse, which lists what is in its menu.
+note_view.menu = Note menu
+note_view.menu_title_move = Folder, Move to another project, Copy as Markdown, Delete note
+note_view.menu_title = Folder, Copy as Markdown, Delete note
+# The field of the note's title, for screen readers.
+note_view.title = Title
+# The note was saved meanwhile from elsewhere, changed in the same places.
+note_view.conflict = This note changed elsewhere while you were writing, in the same places. There, keep yours or the other version? Everything else stays from both.
+note_view.keep_mine = Keep mine
+note_view.keep_theirs = Keep the other version
+
+# ------------------------------------------------------------ note_editor: a note's blocks, written in place (NoteEditor.tsx)
+# The kinds of block: what screen readers say of one, and what an empty one
+# shows. Heading, Code, Divider and Text are also in the list that / opens.
+note_editor.text = Text
+note_editor.heading = Heading
+note_editor.list_item = List item
+note_editor.checklist_item = Checklist item
+note_editor.code = Code
+note_editor.divider = Divider
+# In the list that / opens: what a block can become. What is typed after
+# the / picks from these names.
+note_editor.checklist = Checklist
+note_editor.list = List
+# Who ticked a checklist item, beside it: You · 10:02, Denis · 12 Oct.
+note_editor.you = You
+# The same, for a person no longer known.
+note_editor.someone = Someone
+# What an empty note shows. The marks # - [ ] ``` and / are typed as they
+# are; the words after them are the language's own.
+note_editor.start_writing = Start writing. Markdown works as you type: # heading, - [ ] checklist, ``` code. Type / for the rest.
+# What an empty line of text shows.
+note_editor.type_slash = Type / for a checklist, a heading, code
+# A checklist item's box, for screen readers.
+note_editor.untick = Done: untick
+note_editor.tick = Tick as done
+note_editor.no_copy = Could not copy: select the text and copy it by hand.
+# The list that / opens, for screen readers.
+note_editor.turn_into = Turn into
+
+# ------------------------------------------------------------ menus: the menus behind ⋯, and the window that names a folder (Menus.tsx)
+# A note's menu: over the project's folders, the one the note is in
+# checked; a click moves it to another.
+menus.folder = Folder
+menus.move_out = Move to another project…
+menus.copy_markdown = Copy as Markdown
+menus.delete_note = Delete note
+# Instead of Delete note, for one who may not: who may. {name} is the first
+# name of the note's author.
+menus.note_rights_move = {name}, the owner and admins can move it to another project or delete it
+menus.note_rights_delete = {name}, the owner and admins can delete it
+# The same, when the note's author is no longer known.
+menus.note_rights_move_someone = Someone, the owner and admins can move it to another project or delete it
+menus.note_rights_delete_someone = Someone, the owner and admins can delete it
+# A folder's menu.
+menus.rename_folder = Rename folder
+menus.delete_folder = Delete folder
+# Instead of Delete folder, for one who may not.
+menus.folder_rights = The owner and admins delete a folder with notes in it
+# The window that names a folder, a new one or one renamed. First what it
+# says when tTerm Web gives no reason.
+menus.no_answer = tTerm Web did not answer.
+# The field of the folder's name, and an example of one in it.
+menus.name = Name
+menus.name_example = For example, Runbooks
+
+# ------------------------------------------------------------ search: search over everything, by ⌘K or Search on the right of the tabs (Search.tsx)
+# The kinds of what is found: the buttons above the list, and the heads of
+# its groups.
+search.kind_commands = Commands
+search.kind_output = Output
+search.kind_notes = Notes
+search.kind_terminals = Terminals
+search.kind_machines = Machines
+search.kind_projects = Projects
+search.kind_actions = Actions
+# The kind of the line chosen, on top of the preview beside the list.
+search.label_command = Command
+search.label_output = Output
+search.label_note = Note
+search.label_terminal = Terminal
+search.label_machine = Machine
+search.label_project = Project
+search.label_action = Action
+# Nothing found. {text} is what was typed; Commands, Output… are the button
+# chosen above the list (search.kind_*).
+search.nothing_for = Nothing for “{text}”.
+search.nothing_in_commands = Nothing for “{text}” in Commands.
+search.nothing_in_output = Nothing for “{text}” in Output.
+search.nothing_in_notes = Nothing for “{text}” in Notes.
+search.nothing_in_terminals = Nothing for “{text}” in Terminals.
+search.nothing_in_machines = Nothing for “{text}” in Machines.
+search.nothing_in_projects = Nothing for “{text}” in Projects.
+search.nothing_in_actions = Nothing for “{text}” in Actions.
+# How a command found ended: stopped (it has no exit code), or exit 1.
+# {code} is its exit code.
+search.stopped = stopped
+search.exit = exit {code}
+# How often it ran, at the end of the line under a command:
+# P/web-01 · ~/app · main · exit 0 · 10:46 · 3 runs.
+search.runs = one: {n} run | other: {n} runs
+# Under a line of output found: the command that printed it, in npm test.
+search.in_command = in {command}
+# Beside the list: what the line chosen is, a row each.
+search.row_machine = Machine
+# {machine} is the project's code and the machine's name: P/web-01.
+search.machine_removed = {machine}, removed from tTerm
+search.row_folder = Folder
+search.row_branch = Branch
+search.row_status = Status
+search.row_when = When
+search.row_terminal = Terminal
+# {terminal} is the terminal as its tab names it, P/web-01 · deploy; {when}
+# is when it ended: 10:46, yesterday 17:38, 2 Oct 09:12.
+search.terminal_ended = {terminal}, ended {when}
+# The buttons under the preview: the command opened at its block, or put
+# into the line of the terminal in front, not run.
+search.open_in_terminal = Open in its terminal
+search.into_line = Into the line
+# A note found: where it is (its project and folder), when it was edited.
+search.row_in = In
+search.row_edited = Edited
+search.open_note = Open the note
+# Before anything is typed: what was open last, and the commands run most
+# on the machine in front; {machine} is its name.
+search.recent = Recent
+search.yours_on = Your commands on {machine}
+# Beside a group's head in All: all of its kind; + when there are more
+# than were sent.
+search.all = one: All {n} | other: All {n}
+search.all_more = one: All {n}+ | other: All {n}+
+# The window, and its field.
+search.label = Search
+search.placeholder = Commands, output, notes, terminals, machines…
+search.close_title = Close (Esc)
+# The buttons above the list; All is the first of them.
+search.filters = What to search
+search.kind_all = All
+# The list of what was found, for screen readers.
+search.found = Found
+search.nothing_typed = Nothing typed yet: what you had open, and what you run most here.
+search.looks_in = Search looks in every command of every terminal of yours, in what they printed, in notes, terminals, machines and projects.
+search.everything = Search everything
+# With Output, Notes or Commands chosen and nothing typed yet.
+search.type_output = Type a word to look for in what commands printed.
+search.type_notes = Type a word to look for in notes.
+search.type_commands = Type a word to look for in commands.
+# Beside the list while nothing is chosen: what to type (c: nginx,
+# o: timed out…), and what each keeps to.
+search.tips = A word in front keeps to one kind
+search.tip_commands = commands
+search.tip_output = what commands printed
+search.tip_notes = notes
+search.tip_terminals = terminals
+search.tip_machines = machines
+search.tip_projects = projects
+search.tip_actions = things to do
+# Tab is the key.
+search.tips_buttons = Or pick one of the buttons above the list. Tab goes to the next one.
+# At the bottom: a key, and what it does (move, open: verbs). {keys} is
+# ⌘ Enter or Ctrl+Enter.
+search.keys_move = <kbd>↑</kbd><kbd>↓</kbd> move
+search.keys_open = <kbd>Enter</kbd> open
+search.keys_paste = <kbd>{keys}</kbd> into the line
+search.keys_next = <kbd>Tab</kbd> next kind
+# The words in front, and what each keeps to. c:, o:, n:, >, t:, m: and p:
+# are typed as they are: keep them.
+search.prefixes_title = t: terminals, m: machines, p: projects
+search.prefix_commands = <code>c:</code> commands
+search.prefix_output = <code>o:</code> output
+search.prefix_notes = <code>n:</code> notes
+search.prefix_actions = <code>></code> actions
+
+# ------------------------------------------------------------ input: tTerm's own input line, under a terminal's feed (InputLine.tsx)
+# Said for a moment at the bottom of the page.
+input.still_running = A command is still running. Wait for it, or stop it with Ctrl+C in its block.
+# Faint, after a name in the lists over the line: .. goes up a level; the
+# branch checked out now; a branch of the remote.
+input.up_level = up a level
+input.branch_current = current
+input.branch_remote = remote
+# {error} is what went wrong, as the browser or tTerm Web said it.
+input.no_answer = The machine did not answer: {error}
+# Faint in the line while it cannot take a command.
+input.starting = Starting the shell…
+input.keys_go = Keys go to the running command. Click here to type the next one.
+# The directory and the branch above the line are buttons: each opens a
+# list, to cd into or to switch to. Ctrl+R lists the history.
+input.change_dir = Change directory
+input.switch_branch = Switch branch
+input.history = History
+# The search field over those lists.
+input.find_dir = Find a directory, or type a path
+input.find_branch = Find a branch
+input.find_command = Find a command
+# Tab's list of what the word could be.
+input.completions = Completions
+input.more_not_shown = More not shown: type a few more letters
+# The line itself, for screen readers.
+input.command = Command
+# Under the line, while it holds a command search put there.
+input.from_search = From search, not run yet
+input.enter_runs = <kbd>Enter</kbd> runs it here
+input.esc_clears = <kbd>Esc</kbd> clears the line
+# Under the line: a key, and what it does. ⇧↵ is Shift+Enter.
+input.tab_complete = <kbd>Tab</kbd> complete, or take the suggestion
+input.history_local = <kbd>↑</kbd> history on this computer
+input.history_devices = <kbd>↑</kbd> history across your devices
+input.new_line = <kbd>⇧↵</kbd> new line
+input.while_running = While a command runs, what you type goes to it
+# A terminal's two modes, beside the line: Line, with this line and the
+# commands as blocks; Classic, every key straight to the shell.
+input.mode = Input mode
+input.mode_line = Line
+input.mode_classic = Classic
+
+# ------------------------------------------------------------ block: one command of the feed, with its output (BlockView.tsx)
+# The block, for screen readers. {command} is the command as typed, {code}
+# its exit code.
+block.state_input = {command}, not started by the shell
+block.state_running = {command}, running
+block.state_failed = {command}, failed with exit code {code}
+block.state_finished = {command}, finished
+block.state_ended = {command}, ended
+# On a block search opened: the words found are marked in it.
+block.found = Found
+# A command the shell has not started; Stop is the button (block.stop).
+block.not_started_title = The shell is waiting for the rest of it (an open quote or heredoc), or did not take it. Type into the block, or Stop.
+block.not_started = not started
+block.running = running
+# A command that failed: exit 1.
+block.exit = exit {code}
+block.stop_title = Stop the command (Ctrl+C)
+# The button that stops the command running: a verb.
+block.stop = Stop
+# The buttons of a finished block, with their tips.
+block.actions = Block actions
+block.copy_block = Copy the command and its output
+block.copy_output = Copy output
+block.copy_output_title = Copy output only
+block.run_again = Run again
+block.copy_link = Copy link to this block
+block.expand = Expand block
+block.collapse = Collapse block
+# For screen readers: the browser did not let the page copy.
+block.not_copied = Not copied
+# A folded block, in its place; a click unfolds it.
+block.lines_hidden = one: {n} line hidden | other: {n} lines hidden
+# Above a long output, of which the last 400 lines show.
+block.show_earlier = one: Show {n} earlier line | other: Show {n} earlier lines
+block.show_whole = Show the whole output
+
+# ------------------------------------------------------------ feed: a terminal's commands as blocks, in the Line mode (FeedTerminal.tsx)
+# Said for a moment at the bottom of the page.
+feed.not_connected = Not connected to tTerm Web right now: the command was not sent.
+feed.still_running = A command is still running. It can be stopped with Ctrl+C.
+feed.copy_refused = The browser did not let the page copy.
+feed.output_gone = The whole output is not there any more.
+feed.show_earlier = Show earlier commands
+# After clear or Ctrl+L, on top: what came before is out of view; a click
+# shows it again.
+feed.cleared = one: {n} block cleared from view: show | other: {n} blocks cleared from view: show
+feed.empty = Type a command below. Each one becomes a block here, with its output, how long it took and how it ended.
+# Asked before a dangerous command runs. {what} is what it would do and
+# {lost} what does not come back, as tTerm Web says them: delete a
+# directory and everything inside it; There is no undo and no bin to look
+# in. {machine} is the machine's name; the second is for while it is not
+# known.
+feed.confirm_label = Run this command?
+feed.confirm = This would <strong>{what}</strong> on <strong>{machine}</strong>. {lost}
+feed.confirm_unknown = This would <strong>{what}</strong> on <strong>the machine</strong>. {lost}
+# What a command held back would do ({what} of feed.confirm, so in the form
+# that fits there) and what does not come back ({lost}): the nine of the
+# core and the app (danger.ts).
+danger.delete_tree = delete a directory and everything inside it
+danger.delete_tree_lost = There is no undo and no bin to look in.
+danger.disk = rewrite a disk's filesystem
+danger.disk_lost = Everything on that disk goes, not just files.
+danger.device = write directly onto a device
+danger.device_lost = Whatever was on it is gone the moment this starts.
+danger.database = drop a database or a table
+danger.database_lost = Only a backup brings it back.
+danger.power_off = turn the machine off
+danger.power_off_lost = Nothing here can turn it back on: that needs the provider's panel.
+danger.reboot = reboot the machine
+danger.reboot_lost = The session drops, and whatever was running stops with it.
+danger.ssh = stop the SSH service
+danger.ssh_lost = That is the way in. Stopping it locks the door from the inside.
+danger.firewall = change the firewall
+danger.firewall_lost = A wrong rule can cut the machine off with no way back in.
+danger.user = delete a user account
+danger.user_lost = Their files and access go with them.
+# Under it, for rm -rf aimed at / or ~.
+feed.everything = <strong>This points at the whole machine.</strong> Nothing on it would survive.
+feed.run_it = Run it
+
+# ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
+# A terminal's tab while its own name is not known yet.
+terminal_view.terminal = Terminal
+# The tip of Line (input.mode_line) when it cannot be chosen.
+terminal_view.no_blocks = This shell does not mark where commands start, so it runs in the classic mode only.
+terminal_view.end_failed = Could not end the terminal: tTerm Web did not answer.
+# Under a terminal in the Classic mode (input.mode_classic). Tab is the key.
+terminal_view.classic_hint = Classic: every key goes straight to the shell, with its own Tab and history.
+terminal_view.classic_warning = No confirmation for dangerous commands in this mode.
+# {machine} is the machine's name; the second is for while it is not known.
+terminal_view.connecting = Connecting to {machine}…
+terminal_view.connecting_unknown = Connecting to the machine…
+# A terminal whose computer sleeps, or is offline. {since} is how long:
+# 3 minutes, an hour (time.for_*).
+terminal_view.away = {machine} is asleep or offline
+terminal_view.away_since = This terminal waits for it and goes on where it was when it is back. Away for {since}.
+terminal_view.away_text = This terminal waits for it and goes on where it was when it is back.
+terminal_view.end = End this terminal
+# A terminal that ended. Under it, how it ended as tTerm Web says it, or
+# not_running.
+terminal_view.no_such = No such terminal
+terminal_view.ended = This terminal has ended
+terminal_view.not_running = It is no longer running.
+terminal_view.open_new = Open a new terminal on {machine}
+terminal_view.close_tab = Close the tab
+
+# ------------------------------------------------------------ classic: the Classic mode, every key straight to the shell (ClassicTerminal.tsx)
+# A command search put here. Line is the mode (input.mode_line).
+classic.several_lines = This command has several lines, and the classic mode would run each as it goes in. Switch to Line under the terminal.
+
+# ------------------------------------------------------------ tabs: the line of tabs on top (TabBar.tsx)
+# The tabs that are open, for screen readers.
+tabs.label = Open tabs
+# Naming a terminal in its tab, after a double click.
+tabs.rename_title = Name this terminal
+tabs.rename_hint = Enter saves, Esc cancels. The name shows in the sidebar, in tabs and on the project's page.
+# {name} is the tab as it reads: P/web-01 · 2, a note's title, a project's
+# name.
+tabs.close = Close the tab {name}
+# The + after the tabs.
+tabs.new_terminal = New terminal
+tabs.new_terminal_title = A new terminal on any machine
+# The button on the right that opens search.
+tabs.search_title = Search commands, their output, notes, terminals, machines, and what there is to do
+tabs.search = Search
+
+# ------------------------------------------------------------ finder: a list with a search field, as the + after the tabs opens it (Finder.tsx)
+finder.nothing = Nothing found
+
+# ------------------------------------------------------------ picker: the lists over the input line: directories, branches, history (Picker.tsx)
+# While the machine is asked for its directories or branches.
+picker.asking = Asking the machine…
+picker.nothing = Nothing here
+
+# ------------------------------------------------------------ name_input: the field that names a terminal (NameInput.tsx)
+# For screen readers. While the terminal has only its number,
+# terminal.numbered shows faint in it.
+name_input.label = Terminal name

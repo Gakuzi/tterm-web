@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode,
   type RefObject } from "react";
+import { useT } from "./i18n";
 import { Search } from "./icons";
 
 export interface FinderItem {
@@ -58,6 +59,7 @@ function narrow(groups: FinderGroup[], query: string): FinderGroup[] {
 }
 
 export function Finder(props: Props) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const box = useRef<HTMLDivElement>(null);
@@ -148,7 +150,7 @@ export function Finder(props: Props) {
           }),
         ])}
         {items.length === 0 && (
-          <li className="finder-empty" aria-disabled="true">Nothing found</li>
+          <li className="finder-empty" aria-disabled="true">{t("finder.nothing")}</li>
         )}
       </ul>
     </div>

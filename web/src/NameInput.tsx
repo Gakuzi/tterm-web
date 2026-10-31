@@ -4,6 +4,7 @@
 // was. A number stays a placeholder.
 
 import { useEffect, useRef, useState } from "react";
+import { useT } from "./i18n";
 
 /** As many as the core takes (terminals.NAME_MAX). */
 const NAME_MAX = 40;
@@ -18,6 +19,7 @@ export function NameInput(props: {
   onRename: (id: string, name: string) => void;
   onStop: () => void;
 }) {
+  const t = useT();
   const numbered = /^\d+$/.test(props.name);
   const [value, setValue] = useState(numbered ? "" : props.name);
   const input = useRef<HTMLInputElement>(null);
@@ -37,9 +39,9 @@ export function NameInput(props: {
   };
 
   return (
-    <input ref={input} className={props.className} aria-label="Terminal name"
+    <input ref={input} className={props.className} aria-label={t("name_input.label")}
       value={value} maxLength={NAME_MAX} autoComplete="off" spellCheck={false}
-      placeholder={numbered ? `terminal ${props.name}` : undefined}
+      placeholder={numbered ? t("terminal.numbered", { number: props.name }) : undefined}
       aria-describedby={props.describedBy}
       onChange={(e) => setValue(e.target.value)}
       onKeyDown={(e) => {

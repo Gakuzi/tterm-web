@@ -18,6 +18,7 @@ import { shortPath } from "./BlockView";
 import { ClassicTerminal, type ViewEvents } from "./ClassicTerminal";
 import { FeedTerminal } from "./FeedTerminal";
 import { useFoundBlock, wentThere } from "./found";
+import { useT } from "./i18n";
 import { ModeToggle } from "./InputLine";
 import type { Shown } from "./theme";
 import { since } from "./time";
@@ -72,6 +73,7 @@ interface Props {
 
 export function TerminalView(props: Props) {
   const { terminalId, active, shownTheme, onStatus } = props;
+  const t = useT();
   const [info, setInfo] = useState<TerminalInfo | null>(null);
   const [missing, setMissing] = useState(false);
   const [running, setRunning] = useState(false);
@@ -111,7 +113,7 @@ export function TerminalView(props: Props) {
   // The tab follows it.
   useEffect(() => {
     onStatus(terminalId, {
-      label: info?.label ?? "Terminal",
+      label: info?.label ?? t("terminal_view.terminal"),
       machine: info?.machine ?? "",
       where,
       state,
@@ -119,7 +121,7 @@ export function TerminalView(props: Props) {
       running: running && !isEnded,
     });
   }, [terminalId, onStatus, info?.label, info?.machine, where, state, away,
-    running, isEnded]);
+    running, isEnded, t]);
 
   // A computer going away or coming back is news for the lists too.
   const wasAway = useRef(away);
@@ -165,8 +167,7 @@ export function TerminalView(props: Props) {
 
   // A shell that does not mark where commands start has no blocks.
   const noBlocks = info?.state === "open" && info.blocks === false
-    ? "This shell does not mark where commands start, so it runs in the " +
-      "classic mode only." : undefined;
+    ? t("terminal_view.no_blocks") : undefined;
   const shownMode: Mode = noBlocks ? "classic" : mode;
   const choose = (next: Mode) => {
     if (next === mode) return;
@@ -176,11 +177,10 @@ export function TerminalView(props: Props) {
   const end = () => {
     setEnding(true);
     endTerminal(terminalId)
-      .catch(() => props.notify("Could not end the terminal: tTerm Web did " +
-        "not answer."))
+      .catch(() => props.notify(t("terminal_view.end_failed")))
       .finally(() => setEnding(false));
   };
-  const machine = info?.machine ?? "the machine";
+  const machine = info?.machine;
 
   return (
     <div className={active ? "terminal-view" : "terminal-view behind"}
@@ -197,10 +197,8 @@ export function TerminalView(props: Props) {
             {!isEnded && (
               <footer className="classic-footer">
                 <div className="input-hints">
-                  <span>Classic: every key goes straight to the shell, with its
-                    own Tab and history.</span>
-                  <span className="amber">No confirmation for dangerous
-                    commands in this mode.</span>
+                  <span>{t("terminal_view.classic_hint")}</span>
+                  <span className="amber">{t("terminal_view.classic_warning")}</span>
                 </div>
                 <ModeToggle mode="classic" disabled={noBlocks}
                   onLine={() => choose("line")} onClassic={() => {}} />
@@ -217,42 +215,44 @@ export function TerminalView(props: Props) {
         {state === "connecting" && !missing && (
           <div className="terminal-note" role="status">
             <span className="spinner" aria-hidden="true" />
-            Connecting to {machine}…
+            {machine === undefined ? t("terminal_view.connecting_unknown")
+              : t("terminal_view.connecting", { machine })}
           </div>
         )}
-        {away && (
+        {away && info && (
           <div className="away-note" role="status">
             <span className="dot away" aria-hidden="true" />
             <div className="away-text">
-              <strong>{machine} is asleep or offline</strong>
+              <strong>{t("terminal_view.away", { machine: info.machine })}</strong>
               <span>
-                This terminal waits for it and goes on where it was when it is
-                back{info?.awaySince ? `. Away for ${since(info.awaySince)}` : ""}.
+                {info.awaySince
+                  ? t("terminal_view.away_since", { since: since(info.awaySince, t) })
+                  : t("terminal_view.away_text")}
               </span>
             </div>
             <button type="button" className="button-plain" disabled={ending}
               onClick={end}>
-              End this terminal
+              {t("terminal_view.end")}
             </button>
           </div>
         )}
         {isEnded && (
           <div className="terminal-ended" role="status">
             <div className="ended-text">
-              <strong>{missing && !info ? "No such terminal"
-                : "This terminal has ended"}</strong>
-              <span>{info?.reason ?? "It is no longer running."}</span>
+              <strong>{missing && !info ? t("terminal_view.no_such")
+                : t("terminal_view.ended")}</strong>
+              <span>{info?.reason ?? t("terminal_view.not_running")}</span>
             </div>
             <div className="button-row">
               {info && props.machineThere(info.machineId) && (
                 <button type="button" className="button-accent big"
                   onClick={() => props.onOpenNew(info.machineId, terminalId)}>
-                  Open a new terminal on {info.machine}
+                  {t("terminal_view.open_new", { machine: info.machine })}
                 </button>
               )}
               <button type="button" className="button-plain"
                 onClick={() => props.onCloseTab(terminalId)}>
-                Close the tab
+                {t("terminal_view.close_tab")}
               </button>
             </div>
           </div>
