@@ -25,6 +25,7 @@ from .api.page import create_page_app
 from .core import accounts, auth, db, machines, stats
 from .core.agents import FRAME_MAX, Agents
 from .core.terminals import Terminals
+from .core.vault import VaultRelay
 from .core.accounts import Person
 from .core.config import Settings
 from .core.mail import BrevoMailer, LogMailer, Mailer
@@ -111,6 +112,8 @@ class Core:
         self.terminals: Terminals | None = None
         #: The computers whose agent is connected right now.
         self.agents = Agents()
+        #: Relays a vault key's signing to the capable page sockets (0.1.17).
+        self.vault: VaultRelay | None = None
         #: How emails go: Brevo, or this window's log.
         self.mailer: Mailer = (BrevoMailer(settings.brevo_key, settings.mail_from)
                                if settings.brevo_key else LogMailer())
@@ -162,7 +165,9 @@ class Core:
                         "from now on, to find the machines and the history "
                         "on this computer.")
             await self._meet_signer()
-            self.terminals = Terminals(self.pool, self.signer, self.agents)
+            self.vault = VaultRelay(self.pool)
+            self.terminals = Terminals(self.pool, self.signer, self.agents,
+                                       self.vault)
             await self.terminals.start()
         except BaseException:
             await self.stop()
@@ -171,7 +176,7 @@ class Core:
 
         page = create_page_app(self.pool, s.web_dist, s.page_url,
                                s.connect_url, self.terminals, self.agents,
-                               secret=secret, mailer=self.mailer,
+                               self.vault, secret=secret, mailer=self.mailer,
                                legal={"terms": s.terms_url,
                                       "privacy": s.privacy_url,
                                       "support": s.support_email})

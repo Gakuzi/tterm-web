@@ -9,6 +9,12 @@
 //
 // Except when the session ended: the core closes the socket with
 // SIGNED_OUT, and it stays closed until the person signs in again.
+//
+// From 0.1.17 it also carries the vault's messages, which belong to no
+// channel (vault.sign, vault.changed, vault.pairing…; src/vault/store.ts):
+// while the vault is open in this browser, or a pairing waits, the socket
+// is held open even with no terminal on the page, so that the core can ask
+// it to sign a login.
 
 import { signedOutNow, type RunningCommand, type TerminalInfo } from "./api";
 
@@ -83,6 +89,10 @@ interface Open {
 
 type Listener = (connected: boolean) => void;
 
+/** A message of the vault: no channel, an op that starts with "vault.". */
+export type VaultMessage = { op: string; [key: string]: unknown };
+type VaultListener = (message: VaultMessage) => void;
+
 const encoder = new TextEncoder();
 
 class Socket {
@@ -92,13 +102,53 @@ class Socket {
   private retry = 0;
   private timer: number | undefined;
   private listeners = new Set<Listener>();
+  private vaultListeners = new Set<VaultListener>();
+  private openListeners = new Set<() => void>();
+  /** Reasons to stay connected with no channel (0.1.17): the vault. */
+  private holds = 0;
   private signedOut = false;
   connected = false;
 
   /** Signed in again: the socket may connect. */
   signedIn(): void {
     this.signedOut = false;
-    if (this.channels.size > 0) this.connect();
+    if (this.wanted()) this.connect();
+  }
+
+  private wanted(): boolean {
+    return this.channels.size > 0 || this.holds > 0;
+  }
+
+  /** Keeps the socket connected, also with no terminal on the page, until
+   * the function it gives back is called. */
+  hold(): () => void {
+    this.holds += 1;
+    this.connect();
+    let held = true;
+    return () => {
+      if (!held) return;
+      held = false;
+      this.holds -= 1;
+    };
+  }
+
+  /** The vault's messages, as they come. */
+  onVault(listener: VaultListener): () => void {
+    this.vaultListeners.add(listener);
+    return () => this.vaultListeners.delete(listener);
+  }
+
+  /** Called each time the socket connects (again): a new socket on the
+   * core's side knows nothing of what the page said on the one before. */
+  onOpen(listener: () => void): () => void {
+    this.openListeners.add(listener);
+    return () => this.openListeners.delete(listener);
+  }
+
+  /** A message of the page's own, outside any channel; dropped while not
+   * connected (onOpen says it again). */
+  send(message: object): void {
+    this.json(message);
   }
 
   onConnection(listener: Listener): () => void {
@@ -172,6 +222,7 @@ class Socket {
         open.paused = false;
         this.sendAttach(ch, open);
       }
+      for (const listener of [...this.openListeners]) listener();
     };
     ws.onmessage = (event) => this.receive(event.data);
     ws.onclose = (event) => {
@@ -182,7 +233,7 @@ class Socket {
         signedOutNow();
         return;
       }
-      if (this.channels.size === 0) return;
+      if (!this.wanted()) return;
       const wait = RETRY_MS[Math.min(this.retry, RETRY_MS.length - 1)];
       this.retry += 1;
       this.timer = window.setTimeout(() => this.connect(), wait);
@@ -230,6 +281,10 @@ class Socket {
     try {
       msg = JSON.parse(data);
     } catch {
+      return;
+    }
+    if (msg.ch === undefined && typeof msg.op === "string" && msg.op.startsWith("vault.")) {
+      for (const listener of [...this.vaultListeners]) listener(msg);
       return;
     }
     const open = msg.ch !== undefined ? this.channels.get(msg.ch) : undefined;

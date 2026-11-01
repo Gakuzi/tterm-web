@@ -120,6 +120,13 @@ sidebar.signin_title = Servidores e projetos
 sidebar.signin_text = Entre para abrir terminais nos seus servidores, guardar notas em projetos e trabalhar com a sua equipe. Este computador continua como está.
 sidebar.theme_dark = Mudar para o tema escuro
 sidebar.theme_light = Mudar para o tema claro
+# A server that opens with the person's own key, from their vault (0.1.17):
+# the key's tip, after the server's name.
+sidebar.with_key = Abre com a sua chave, do seu cofre
+# A server that opens through the person's Mac: a small label after its
+# name, and its tip ({mac} is the Mac's name).
+sidebar.via_mac = via Mac
+sidebar.via_title = Por {mac}, enquanto ele estiver ligado
 
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
@@ -131,6 +138,13 @@ account_menu.only_here = Só este computador
 account_menu.offline = Offline, tentando de novo
 account_menu.local_note = O tTerm funciona com este computador. Entre para usar seus servidores, projetos e equipe.
 account_menu.sign_out = Sair
+# Only in tTerm for Mac, right under Settings: the servers and keys of this
+# Mac to the account (0.1.17). The second line is small, under the first.
+account_menu.move = Migrar para a nuvem
+account_menu.move_note = Servidores e chaves deste Mac, em todo lugar
+# Only in a browser: the app for a Mac. "tTerm for Mac" is the app's name.
+account_menu.download = Baixar o tTerm para Mac
+account_menu.download_note = Terminais no seu Mac, mesmo offline
 # The item after Settings, and the title of the list of languages.
 language.item = Idioma
 
@@ -296,6 +310,7 @@ app.action.delete_note_words = note delete remove nota excluir apagar remover
 app.action.theme_words = theme dark light colours colors tema escuro claro cores
 app.action.pin_words = sidebar panel pin barra lateral painel fixar
 app.action.settings_words_local = settings preferences theme dark light colors colours support configurações configuracoes preferências preferencias tema escuro claro cores suporte
+app.action.move_words = move cloud servers keys ssh vault migrate import mover nuvem servidores chaves cofre migrar importar migração migracao
 app.action.settings_words = settings preferences theme dark light colors colours devices quick code forget browsers support configurações configuracoes preferências preferencias tema escuro claro cores dispositivos código codigo rápido rapido esquecer navegadores suporte
 app.action.sign_in_words = sign in log in login account cloud servers entrar conta nuvem servidores
 app.action.account_words = account profile name photo picture avatar plan limits delete conta perfil nome foto imagem plano limites excluir
@@ -1352,3 +1367,317 @@ picker.nothing = Nada aqui
 # For screen readers. While the terminal has only its number,
 # terminal.numbered shows faint in it.
 name_input.label = Nome do terminal
+
+# ------------------------------------------------------------ vault: the vault of SSH keys, words used in many places (0.1.17)
+# The vault keeps the person's SSH keys, locked on their own devices; tTerm
+# never sees them. Touch ID, Windows Hello and passkey are the names the
+# systems give these: they stay as the systems name them in the language.
+vault.your_mac = seu Mac
+vault.open_touch = Abrir com Touch ID
+vault.open_hello = Abrir com Windows Hello
+vault.open_passkey = Abrir com uma chave de acesso
+vault.not_now = Agora não
+# For screen readers: the six digits both devices show, "Code 482 913".
+vault.code_label = Código {code}
+
+# ------------------------------------------------------------ keys: Settings › Keys, the vault (Keys.tsx)
+keys.title = Chaves
+keys.about = Seu cofre: as chaves SSH que você salvou, em todos os seus dispositivos. Só os seus dispositivos o abrem, do jeito que você os desbloqueia; o tTerm não consegue.
+keys.open_here = Aberto neste navegador
+# How it opened, then when it locks again: one of these under "Open in this browser".
+keys.open_text.touch = Aberto com o Touch ID. Ele é bloqueado de novo depois de 8 horas sem nenhuma atividade, quando você fecha o tTerm Web ou quando clica em Bloquear.
+keys.open_text.hello = Aberto com o Windows Hello. Ele é bloqueado de novo depois de 8 horas sem nenhuma atividade, quando você fecha o tTerm Web ou quando clica em Bloquear.
+keys.open_text.passkey = Aberto com a sua chave de acesso. Ele é bloqueado de novo depois de 8 horas sem nenhuma atividade, quando você fecha o tTerm Web ou quando clica em Bloquear.
+keys.open_text.recovery = Aberto com o seu código de recuperação, para esta sessão. Ele é bloqueado de novo depois de 8 horas sem nenhuma atividade, quando você fecha o tTerm Web ou quando clica em Bloquear.
+keys.open_text.pairing = Aberto com a aprovação do seu Mac, para esta sessão. Ele é bloqueado de novo depois de 8 horas sem nenhuma atividade, quando você fecha o tTerm Web ou quando clica em Bloquear.
+keys.open_text.new = Criado neste navegador agora há pouco. Ele é bloqueado de novo depois de 8 horas sem nenhuma atividade, quando você fecha o tTerm Web ou quando clica em Bloquear.
+# In tTerm for Mac.
+keys.open_mac = Aberto neste Mac
+keys.open_text.mac = Aberto com o Touch ID ou a senha do seu Mac. Ele fica aberto enquanto o tTerm estiver rodando, até você clicar em Bloquear ou sair da conta.
+keys.lock = Bloquear
+keys.locked_here = Bloqueado neste navegador
+keys.locked_text = Abra o cofre para usar suas chaves aqui: do jeito que você desbloqueia este computador, com a aprovação do seu Mac ou com o seu código de recuperação.
+keys.locked_mac = Bloqueado neste Mac
+keys.locked_mac_text = Abra o cofre com o Touch ID ou a senha do seu Mac: então este Mac entra nos seus servidores.
+keys.locked_mac_code = Este Mac ainda não consegue abrir o seu cofre sozinho. Abra-o aqui uma vez com o seu código de recuperação: depois, o Touch ID ou a senha do seu Mac passam a abri-lo.
+keys.open = Abrir
+keys.open_code = Abrir com o código de recuperação
+keys.none_title = Nenhum cofre ainda
+keys.none_web = Adicione uma chave de um arquivo: o seu cofre é criado nesse momento, neste navegador, com um código de recuperação que você guarda.
+keys.none_app = Salve uma chave usando Migrar para a nuvem ou a faixa que aparece depois de um ssh num terminal: o seu cofre é criado nesse momento, com o Touch ID.
+keys.no_passkey_here = Este navegador não consegue guardar o seu cofre com uma chave de acesso: aqui ele abre com o seu código de recuperação ou com a aprovação do seu Mac, uma sessão por vez.
+keys.no_ed25519_here = Este navegador não consegue assinar com chaves Ed25519. Abra esses servidores num navegador mais novo ou no tTerm para Mac.
+# {servers} is a list of servers: droplet and staging; web-01 in Client X.
+keys.opens = Abre {servers}
+keys.opens_none = Nenhum servidor abre com ela ainda
+keys.server_in = {server} em {project}
+# Where the key came from, and when: {where} is a Mac's name, {day} is
+# time.today, time.yesterday or time.on_day ("on 29 Oct").
+keys.from_mac = Salva a partir de {where} {day}
+keys.from_file = Adicionada a partir de um arquivo {day}
+# After the line above, with " · ": {ago} is "2 hours ago".
+keys.used = último uso {ago}
+keys.unused = ainda não usada
+keys.cannot_ed25519 = Este navegador não consegue assinar com chaves Ed25519
+keys.cannot_open = Não abre aqui: adicione-a de novo a partir do arquivo
+keys.remove = Remover
+keys.add_file = Adicionar uma chave de um arquivo
+keys.new_recovery = Gerar um novo código de recuperação
+# {places} is where the vault opens: "MacBook-Pro-Denis · tTerm for Mac, Chrome on macOS".
+keys.opens_on = Abre em: {places}.
+keys.opens_on_code = Abre só com o seu código de recuperação.
+keys.place_mac = {mac} · {app}
+keys.place_browser = um navegador
+keys.more_web = Mais servidores e chaves de um Mac: Migrar para a nuvem, no tTerm para Mac.
+keys.more_app = Mais servidores e chaves: Migrar para a nuvem, no menu da conta.
+keys.remove_title = Remover {name} do seu cofre?
+keys.remove_confirm = Remover {name}
+keys.remove_text = O tTerm mantém {servers}, mas não será possível abrir terminais lá até você escolher outro jeito de entrar.
+keys.remove_text_none = Nenhum servidor abre com ela.
+keys.remove_hint = A chave continua onde estava: no seu Mac ou no arquivo dela.
+keys.removed = {name} saiu do seu cofre
+
+# ------------------------------------------------------------ add_key: Add a key from a file (Keys.tsx)
+add_key.title = Adicionar uma chave de um arquivo
+add_key.passphrase = Frase secreta
+add_key.passphrase_hint = A chave está criptografada. A frase secreta abre a chave aqui, neste navegador, e não vai para lugar nenhum.
+add_key.open_key = Abrir a chave
+add_key.reading = Lendo a chave…
+add_key.name = Nome
+add_key.sealed_here = A chave é bloqueada aqui, antes de sair deste navegador. Só os seus dispositivos conseguem abri-la; o tTerm, não.
+add_key.add = Adicionar ao cofre
+add_key.next = Continuar
+add_key.added = {name} está no seu cofre
+# What is wrong with the file chosen. ssh-keygen and its options are commands: they stay as they are.
+add_key.problem_big = Esse arquivo é grande demais para uma chave privada.
+add_key.problem_read = O navegador não conseguiu ler esse arquivo.
+add_key.problem_format = Isto não é uma chave privada que o tTerm consiga ler: ele lê o formato do próprio OpenSSH ou PEM (PKCS#8, PKCS#1).
+add_key.problem_public = Esta é uma chave pública (.pub). Escolha a chave privada: o arquivo com o mesmo nome, sem .pub.
+add_key.problem_passphrase = A chave tem uma frase secreta: digite-a para abrir a chave.
+add_key.problem_wrong_passphrase = Essa frase secreta não abre esta chave.
+add_key.problem_security_key = Esta chave está numa chave de segurança e não pode sair dela: abra os servidores dela pelo seu Mac.
+add_key.problem_dsa = O cofre não guarda chaves DSA. Gere uma nova chave com ssh-keygen -t ed25519.
+add_key.problem_nistp521 = O cofre ainda não guarda chaves ECDSA P-521, só Ed25519, ECDSA P-256 e P-384, e RSA.
+add_key.problem_type = O cofre não guarda este tipo de chave: só Ed25519, ECDSA P-256 e P-384, e RSA.
+add_key.problem_cipher = Esta chave está criptografada de um jeito que este navegador não consegue abrir. Troque a frase secreta dela com ssh-keygen -p e depois adicione-a de novo.
+add_key.problem_encrypted_pem = Este arquivo de chave usa a criptografia antiga do formato PEM. Converta-o para o formato do OpenSSH com ssh-keygen -p -f seguido do arquivo e depois adicione-o de novo.
+add_key.problem_ed25519 = Este navegador não consegue ler chaves Ed25519 neste formato. Tente um navegador mais novo ou a chave no formato do OpenSSH.
+add_key.problem_several = O arquivo tem mais de uma chave: adicione uma de cada vez.
+
+# ------------------------------------------------------------ vault_new: Save your key to your vault (VaultDialogs.tsx)
+vault_new.title = Salvar a chave no seu cofre
+# <code>…</code> is the key's name: id_ed25519. {server} is the server's name.
+vault_new.text_server = <code>{key}</code> vai para o seu cofre, e {server} passa a abrir com essa chave pelo tTerm Web, pelo celular ou por qualquer computador em que você entrar na conta.
+vault_new.text = <code>{key}</code> vai para o seu cofre: os servidores que abrem com essa chave passam a abrir pelo tTerm Web, pelo celular ou por qualquer computador em que você entrar na conta.
+# In tTerm for Mac.
+vault_new.point_mac_unlock = O cofre abre do jeito que você desbloqueia este Mac: com o Touch ID ou a senha do seu Mac. Nada novo para memorizar.
+vault_new.point_mac_locked = A chave é bloqueada antes de sair deste Mac. Só os seus dispositivos conseguem abri-la; o tTerm, não.
+vault_new.point_mac_browser = Um navegador novo abre o cofre depois que você o aprovar aqui, ou com o seu código de recuperação.
+# In a browser.
+vault_new.point_web_unlock = O cofre abre do jeito que você desbloqueia este computador: Touch ID, Windows Hello ou o bloqueio de tela do seu celular. Nada novo para memorizar.
+vault_new.point_web_no_passkey = Este navegador não consegue guardar o cofre com uma chave de acesso: aqui ele abre com o seu código de recuperação, uma sessão por vez.
+vault_new.point_web_locked = A chave é bloqueada antes de sair deste navegador. Só os seus dispositivos conseguem abri-la; o tTerm, não.
+vault_new.point_web_browser = Outro navegador abre o cofre com o seu código de recuperação, ou depois que você o aprovar no tTerm para Mac.
+vault_new.make_touch = Criar meu cofre com Touch ID
+vault_new.make_hello = Criar meu cofre com Windows Hello
+vault_new.make_passkey = Criar meu cofre com uma chave de acesso
+vault_new.make = Criar meu cofre
+
+# ------------------------------------------------------------ recovery: the recovery code, shown once (VaultDialogs.tsx)
+recovery.title = Seu código de recuperação
+recovery.text = Se um dia você perder todos os dispositivos que abrem o seu cofre, este código é a única forma de voltar a ter acesso às suas chaves. O tTerm não tem como recuperá-las para você. Ele aparece só uma vez.
+recovery.title_new = Seu novo código de recuperação
+recovery.text_new = O código que você tinha antes não abre mais o seu cofre. Se um dia você perder todos os dispositivos que abrem o seu cofre, este novo código é a única forma de voltar a ter acesso às suas chaves. Ele aparece só uma vez.
+# For screen readers.
+recovery.code_label = Código de recuperação {code}
+recovery.save_file = Salvar como arquivo
+recovery.copy_failed = Não foi possível copiar: selecione o código e copie manualmente.
+# What the file saved holds.
+recovery.file_text = Código de recuperação do cofre do tTerm: {code}\nEle abre o seu cofre quando nenhum dos seus dispositivos conseguir abri-lo. Guarde este código num lugar seguro, longe dos seus dispositivos.
+recovery.kept_mac = Guardei o código num lugar seguro, não só neste Mac
+recovery.kept_web = Guardei o código num lugar seguro, não só neste computador
+recovery.make_title = Gerar um novo código de recuperação?
+recovery.make_text = O código que você tem agora para de funcionar, e o novo aparece só uma vez. Suas chaves e seus dispositivos continuam como estão.
+recovery.now_code = Seu código de recuperação atual
+recovery.now_code_hint = Este navegador não tem uma chave de acesso do seu cofre, então o código que você tem agora é usado para gerar o novo. Perdeu o código? Gere o novo no tTerm para Mac.
+recovery.make_go = Gerar um novo código
+recovery.make_go_passkey = Gerar com a sua chave de acesso
+recovery.make_touch = Gerar com Touch ID
+
+# ------------------------------------------------------------ vault_open: Open your keys on this browser (VaultDialogs.tsx)
+vault_open.title = Abrir suas chaves neste navegador
+vault_open.text = Este navegador é novo para o seu cofre. Aprove-o num dispositivo que já abre o cofre.
+vault_open.text_code = Abra o seu cofre neste navegador com o seu código de recuperação.
+# {mac} is the Mac's name, {app} is app_link.mac: "MacBook-Pro-Denis · tTerm for Mac".
+vault_open.mac_name = {mac} · {app}
+vault_open.mac_ask = Pedir para abrir o seu cofre aqui
+vault_open.mac_waiting = Pedido enviado. Aguardando você lá…
+vault_open.mac_compare = Autorize lá só se aparecer o mesmo código
+vault_open.mac_approved = Aprovado: abrindo suas chaves…
+vault_open.mac_denied = Recusado lá.
+vault_open.mac_expired = O pedido expirou. Peça de novo.
+vault_open.sas_text = O seu Mac também mostra um código. Autorize lá só se for o mesmo:
+vault_open.or = ou
+vault_open.code = Código de recuperação
+vault_open.open = Abrir
+# Once open with the recovery code or the Mac's approval: whether this browser keeps a passkey.
+vault_open.opened_title = Suas chaves estão abertas neste navegador
+vault_open.opened_text = Guardar uma chave de acesso aqui, para que da próxima vez elas abram do jeito que você desbloqueia este computador? Num computador que não é seu, escolha Só desta vez.
+vault_open.keep_touch = Guardar com Touch ID
+vault_open.keep_hello = Guardar com Windows Hello
+vault_open.keep_passkey = Guardar com uma chave de acesso
+vault_open.only_now = Só desta vez
+vault_open.kept_session = Elas ficam abertas só nesta sessão.
+
+# ------------------------------------------------------------ app_code: in tTerm for Mac, a vault this Mac has no lock of (VaultDialogs.tsx)
+app_code.title = Abrir o seu cofre neste Mac
+app_code.text = Este Mac ainda não consegue abrir o seu cofre sozinho. Abra-o aqui uma vez com o seu código de recuperação: depois, este Mac passa a abri-lo com o Touch ID.
+# When this Mac's lock is there but no longer opens the vault (taken off in a browser, or gone from the keychain).
+app_code.text_lost = Este Mac não consegue mais abrir o seu cofre sozinho. Abra-o aqui uma vez com o seu código de recuperação: depois, este Mac volta a abri-lo com o Touch ID.
+
+# ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
+# {key} is the key's name: id_ed25519.
+passphrase.title = {key} tem uma frase secreta
+passphrase.text = Digite-a: este Mac abre a chave com ela, e ela não vai para nenhum outro lugar. A chave vai para o seu cofre já bloqueada.
+# For Let tTerm in: {server} is the server's name, or several ("staging and old-vps").
+passphrase.text_sign_in = Digite-a: este Mac entra em {server} uma vez com a chave para adicionar lá a linha do tTerm. A frase secreta não vai para nenhum outro lugar, e a chave fica neste Mac.
+passphrase.label = Frase secreta
+passphrase.go = Abrir a chave
+
+# ------------------------------------------------------------ mac_approve: in tTerm for Mac, a new browser asks for the keys (VaultDialogs.tsx)
+# {device} is the browser, "Chrome on Windows".
+mac_approve.title = {device} quer abrir suas chaves
+mac_approve.a_browser = Um navegador
+# {ago} is "2 minutes ago", {ip} the address it signed in from.
+mac_approve.text_code = Esse navegador entrou na sua conta {ago}, com um código do e-mail, a partir de {ip}. Autorize só se for você: ele vai abrir servidores com as suas chaves.
+mac_approve.text_code_now = Esse navegador entrou na sua conta com um código do e-mail, a partir de {ip}. Autorize só se for você: ele vai abrir servidores com as suas chaves.
+mac_approve.text_other = Esse navegador entrou na sua conta a partir de {ip}. Autorize só se for você: ele vai abrir servidores com as suas chaves.
+mac_approve.sas_text = Aquele navegador mostra um código. Autorize só se for o mesmo:
+# For screen readers, while the code is on its way.
+mac_approve.sas_waiting = Aguardando o código
+mac_approve.not_me = Não sou eu
+mac_approve.allow = Autorizar com Touch ID
+mac_approve.not_me_note = Não sou eu: esse login é encerrado e, em Configurações › Dispositivos, você vê o que mais conferir.
+
+# ------------------------------------------------------------ vault_locked: a server with your key, the vault locked here (VaultLocked.tsx)
+vault_locked.title = {machine} abre com a sua chave
+vault_locked.text = Suas chaves estão bloqueadas neste navegador. Abra-as do jeito que você desbloqueia este computador; então o tTerm entra em {machine}, e a sua chave nunca sai deste navegador.
+vault_locked.text_app = Suas chaves estão bloqueadas neste Mac. Abra-as com o Touch ID ou a senha do seu Mac; então este Mac entra em {machine}.
+vault_locked.text_app_code = Este Mac ainda não consegue abrir o seu cofre sozinho. Abra-o aqui uma vez com o seu código de recuperação; então este Mac entra em {machine}.
+# Small links under the button: "or approve on MacBook-Pro-Denis · use the recovery code".
+vault_locked.or = ou
+vault_locked.approve_on = aprovar em {mac}
+vault_locked.use_code = usar o código de recuperação
+vault_locked.approve_on_button = Aprovar em {mac}
+vault_locked.use_code_button = Usar o código de recuperação
+vault_locked.signing = Entrando em {machine} com a sua chave…
+vault_locked.no_ed25519 = Este navegador não consegue assinar com chaves Ed25519. Abra {machine} num navegador mais novo ou no tTerm para Mac.
+# {key} is the key's name, or vault_locked.its_key.
+vault_locked.not_here = Seu cofre está aberto aqui, mas {key} não abre neste navegador. Adicione-a de novo a partir do arquivo em Configurações › Chaves.
+vault_locked.its_key = a chave dele
+
+# ------------------------------------------------------------ vault_problem: what went wrong with the vault (vault/store.ts)
+vault_problem.no_vault = Você ainda não tem um cofre.
+vault_problem.exists = Você já tem um cofre: abra-o e depois adicione a chave.
+vault_problem.locked = Abra o seu cofre primeiro.
+vault_problem.no_passkey = Nenhuma chave de acesso do seu cofre respondeu aqui. Aprove este navegador no seu Mac ou use o seu código de recuperação.
+vault_problem.no_prf = Esta chave de acesso não consegue abrir o seu cofre aqui. Aprove este navegador no seu Mac ou use o seu código de recuperação.
+vault_problem.no_prf_here = Este navegador não consegue guardar o seu cofre com uma chave de acesso: ele fica aberto só nesta sessão.
+vault_problem.lock_broken = O bloqueio deste navegador não abre mais o seu cofre. Use o seu código de recuperação ou aprove o navegador no seu Mac.
+vault_problem.code_form = Um código de recuperação tem 24 letras e dígitos, em seis grupos de quatro.
+vault_problem.code_wrong = Esse código de recuperação não abre o seu cofre. Confira o código ou aprove este navegador no seu Mac.
+# In tTerm for Mac: the engine's answers, said by the page (the code window, Touch ID).
+vault_problem.code_wrong_app = Esse código de recuperação não abre o seu cofre. Confira o código e tente de novo.
+vault_problem.touch_failed = A confirmação com o Touch ID ou a senha do seu Mac não foi concluída. Nada mudou.
+vault_problem.need_code = Digite agora o seu código de recuperação: este navegador não tem uma chave de acesso do seu cofre.
+vault_problem.no_x25519 = Este navegador é antigo demais para ser aprovado pelo seu Mac: use o seu código de recuperação ou um navegador mais novo.
+vault_problem.pairing = O pedido não foi concluído. Peça de novo.
+vault_problem.passkey_exists = Este navegador já tem uma chave de acesso para o tTerm.
+vault_problem.no_passkey_here = Este navegador não consegue criar uma chave de acesso.
+vault_problem.something = Algo deu errado. Tente de novo.
+
+# ------------------------------------------------------------ ssh_strip: under a successful ssh in tTerm for Mac's terminals (SshStrip.tsx)
+# {alias} is the server's name as ssh knows it: droplet.
+ssh_strip.region = Guardar {alias} no tTerm
+ssh_strip.title = {alias}: abra de qualquer lugar
+# <code>…</code>: the address, root@203.0.113.7, and the key, ~/.ssh/id_ed25519.
+ssh_strip.text = Pelo tTerm Web, pelo celular, por qualquer computador em que você entrar na conta. <code>{address}</code>, sua chave <code>{key}</code>
+ssh_strip.text_no_key = Pelo tTerm Web, pelo celular, por qualquer computador em que você entrar na conta. <code>{address}</code>
+ssh_strip.save = Salvar minha chave
+ssh_strip.let_in = Deixar o tTerm entrar
+ssh_strip.not_now = Agora não
+ssh_strip.never = Não perguntar sobre {alias}
+# <b>…</b> are the two buttons' names, as above.
+ssh_strip.explain = <b>Salvar minha chave:</b> ela vai para o seu cofre, que só os seus dispositivos abrem; {alias} continua como está. <b>Deixar o tTerm entrar:</b> o tTerm adiciona uma linha própria em {alias}; a sua chave fica neste Mac. Vários servidores de uma vez: Migrar para a nuvem, no menu da conta.
+ssh_strip.explain_pass = <b>Deixar o tTerm entrar:</b> o tTerm adiciona uma linha própria em {alias}; a sua chave fica neste Mac. Vários servidores de uma vez: Migrar para a nuvem, no menu da conta.
+ssh_strip.unreachable = O tTerm Web não alcança {alias} a partir da nuvem: ele abre por este Mac, enquanto o Mac estiver ligado.
+ssh_strip.through_mac = Abrir por este Mac
+ssh_strip.saved_key = {alias} está no tTerm: abre com a sua chave, de qualquer lugar.
+ssh_strip.saved_cert = {alias} está no tTerm: ele tem a linha própria do tTerm e abre de qualquer lugar.
+ssh_strip.saved_mac = {alias} está no tTerm: abre por este Mac, enquanto ele estiver ligado.
+
+# ------------------------------------------------------------ move: Move to cloud, in tTerm for Mac (MoveToCloud.tsx)
+move.title = Migrar para a nuvem
+move.text = Os servidores que este Mac conhece vão para a sua conta: abra-os pelo tTerm Web, pelo celular ou por qualquer computador em que você entrar na conta. Nada é migrado até você clicar em Migrar.
+move.servers = Servidores neste Mac
+# <code>…</code> are ssh's files: they stay as they are.
+move.servers_from = do <code>~/.ssh/config</code>, do <code>known_hosts</code> e dos comandos ssh que você rodou aqui
+move.looking = Lendo o ~/.ssh…
+move.no_servers = Este Mac ainda não conhece nenhum servidor: nada no ~/.ssh/config nem no known_hosts, e nenhum ssh rodado nos terminais dele.
+# For screen readers: the tick and the choice of each server.
+move.tick_server = Migrar {name}
+move.how = Como {name} abre
+# The three ways, in the choice of each server and on the cards under the list.
+move.method_key = Minha chave
+move.method_cert = Passe do tTerm
+move.method_mac = Por este Mac
+move.way_key = A chave vai para o seu cofre; o servidor continua como está. Abre em qualquer navegador depois que ele desbloquear o seu cofre.
+move.way_cert = O tTerm adiciona uma linha própria no servidor, e a sua chave fica aqui. Abre em qualquer lugar, inclusive pelo Telegram.
+move.way_mac = Nada é migrado: o tTerm pede a este Mac que se conecte, enquanto ele estiver ligado. Para servidores atrás de uma VPN.
+# {address} is root@203.0.113.7, {jump} the bastion it goes through.
+move.addr_via = {address} via {jump}
+# After "~/.ssh/config · ": {ago} is "3 minutes ago".
+move.ran_ago = você rodou ssh {alias} {ago}
+move.ran_here = você rodou ssh {alias} aqui
+move.note_known = conhecido por este Mac
+move.note_git = Um host git: sem terminal para abrir
+move.note_there = Já está no tTerm
+move.note_checking = Verificando se o tTerm Web alcança este servidor…
+move.note_jump = Atrás do bastion {jump}, que a nuvem alcança: abre por ele
+move.note_jump_far = Atrás de um bastion que só a sua rede alcança ({jump}): por este Mac
+move.note_far = O tTerm Web não alcança este servidor a partir da nuvem: por este Mac
+move.note_key_stays = A chave dele, {key}, não pode sair deste Mac: por este Mac
+move.keys = Chaves em ~/.ssh
+move.keys_note = só as marcadas vão para o seu cofre
+# For screen readers.
+move.tick_key = Salvar {name} no seu cofre
+# {servers} is a server, or a list of them: droplet, staging and app-01.
+move.key_used_one = Abre {servers}: vai para o seu cofre
+move.key_used_many = Abre {servers}: vai para o seu cofre
+move.key_unused = Nenhum servidor acima usa esta chave
+move.key_in_vault = Já está no seu cofre
+move.key_security = Numa chave de segurança: não pode sair dela. Os servidores dela vão por este Mac
+move.key_agent = Só num agente SSH: não pode ser copiada. Os servidores dela vão por este Mac
+move.key_type = Um tipo de chave que o cofre ainda não guarda. Os servidores dela vão por este Mac
+move.key_passphrase = tem frase secreta
+move.vault_note = Seu cofre abre do jeito que você desbloqueia este Mac: com o Touch ID ou a senha do seu Mac. Só os seus dispositivos conseguem abri-lo; o tTerm, não.
+move.go = one: Migrar {n} servidor | other: Migrar {n} servidores
+
+# ------------------------------------------------------------ moved: what came of Move to cloud (MoveToCloud.tsx)
+moved.title = one: {ok} de {n} servidor no tTerm | other: {ok} de {n} servidores no tTerm
+# {project} is where they are: Personal.
+moved.text = No projeto {project}: abra-os pelo tTerm Web, pelo celular ou por qualquer computador em que você entrar na conta.
+moved.key = Abre com a sua chave
+moved.key_jump = Abre com a sua chave, por {jump}
+moved.cert = Abre com o passe do tTerm
+moved.cert_jump = Abre com o passe do tTerm, por {jump}
+moved.mac = Por este Mac, enquanto ele estiver ligado
+moved.failed = Não foi migrado.
+# {why} is what went wrong, as the Mac said it.
+moved.failed_text = {why} Nada foi salvo para este servidor.
+moved.open = Abrir um terminal
+moved.change = Alterar
+# <b>…</b> is the key's name, or a list of them.
+moved.keys_one = <b>{keys}</b> está no seu cofre, bloqueada do jeito que você desbloqueia os seus dispositivos. Ela aparece em Configurações › Chaves, em todo lugar.
+moved.keys_many = <b>{keys}</b> estão no seu cofre, bloqueadas do jeito que você desbloqueia os seus dispositivos. Elas aparecem em Configurações › Chaves, em todo lugar.
+moved.no_keys = Nenhuma chave foi migrada: suas chaves continuam neste Mac.

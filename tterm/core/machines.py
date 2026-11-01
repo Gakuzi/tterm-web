@@ -30,13 +30,13 @@ import logging
 import re
 import secrets
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import asyncpg
 import asyncssh
 
-from . import accounts, passport, ssh, trust
+from . import accounts, passport, reach, ssh, trust, vault
 from .signer_client import SignerClient
 
 log = logging.getLogger("tterm.machines")
@@ -602,6 +602,9 @@ class Removal:
     #: A server with the line from before 0.0.12, which the same server in
     #: another project still goes by: the line stays.
     shared: bool = False
+    #: Added by the person (0.1.17): its name is checked before the dial
+    #: that takes the line out, as at every terminal (reach.py).
+    own: bool = False
 
 
 async def remove(pool: asyncpg.Pool, user_id: uuid.UUID,
@@ -616,7 +619,7 @@ async def remove(pool: asyncpg.Pool, user_id: uuid.UUID,
             """
             SELECT m.id, m.name, m.kind, m.project_id, m.ca_id, m.host_keys,
                    m.host, m.port, m.login, m.principal, m.own_line, p.code,
-                   pm.role
+                   pm.role, m.own_server
             FROM machines m
             JOIN projects p ON p.id = m.project_id
             JOIN project_members pm ON pm.project_id = m.project_id
@@ -662,6 +665,7 @@ async def remove(pool: asyncpg.Pool, user_id: uuid.UUID,
         removal.cleanup = server_cleanup(row["principal"], row["ca_id"],
                                          row["own_line"])
         removal.shared = bool(shared)
+        removal.own = bool(row["own_server"])
     return removal
 
 
@@ -675,6 +679,13 @@ async def take_back(pool: asyncpg.Pool, signer: SignerClient | None,
     server = removal.server
     if server is None:
         return out
+    if removal.own and server.host:
+        # A server the person added: its name is resolved and checked once,
+        # and that very address dialled (reach.py), as for its terminals.
+        try:
+            server = replace(server, host=await reach.checked_address(server.host))
+        except reach.Blocked:
+            server = replace(server, host="")
     if (signer is not None and server.host and server.port and server.ca_id
             and await trust.take_back(pool, signer, server, who)):
         out["accessRemoved"] = True
@@ -913,6 +924,259 @@ async def _check_server(signer: SignerClient, e: Enrollment, ca_id: str,
     if e.os and "os" not in details:
         details["os"] = e.os[:200]
     return conn, details
+
+
+#: The ways a server the person adds themselves opens (0.1.17).
+OWN_METHODS = ("key", "cert", "mac")
+#: A server's name as its person gives it, at most (as a machine name).
+OWN_NAME_MAX = 64
+#: What the check of a 'cert' server at creation may take.
+OWN_CHECK_TIMEOUT = 20
+
+
+class OwnRefused(Exception):
+    """A server the person tried to add cannot be: an HTTP status for the
+    page and the words for the person."""
+
+    def __init__(self, status: int, message: str) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+def _own_name(raw: object) -> str:
+    name = accounts.one_line(raw) if isinstance(raw, str) else ""
+    if not 1 <= len(name) <= OWN_NAME_MAX:
+        raise OwnRefused(422, f"Name the server: 1 to {OWN_NAME_MAX} characters.")
+    return name
+
+
+def _own_host(raw: object) -> str:
+    host = raw.strip() if isinstance(raw, str) else ""
+    if not 1 <= len(host) <= 255:
+        raise OwnRefused(422, "Say the server's address.")
+    return host
+
+
+def _own_port(raw: object) -> int:
+    try:
+        port = int(raw)
+    except (TypeError, ValueError):
+        raise OwnRefused(422, "The port is a number from 1 to 65535.") from None
+    if not 1 <= port <= 65535:
+        raise OwnRefused(422, "The port is a number from 1 to 65535.")
+    return port
+
+
+def _own_login(raw: object) -> str:
+    login = raw.strip() if isinstance(raw, str) else ""
+    if not 1 <= len(login) <= 64 or not login.isprintable() or " " in login:
+        raise OwnRefused(422, "Say the user to sign in as.")
+    return login
+
+
+async def own_line(pool: asyncpg.Pool, signer: SignerClient, user_id: uuid.UUID,
+                   project_id: uuid.UUID) -> dict:
+    """For a 'cert' server: a principal of its own and the CA line the app
+    adds to the person's own authorized_keys on the server. The app then
+    posts the machine with that principal (add_own, method 'cert')."""
+    role = await pool.fetchval(
+        "SELECT role FROM project_members WHERE project_id = $1 AND user_id = $2 "
+        "AND (until IS NULL OR until > now())", project_id, user_id)
+    if role not in ("owner", "admin"):
+        raise OwnRefused(403, "Only the owner and admins add servers.")
+    ca = await signer.active_key()
+    principal = trust.new_principal()
+    return {"principal": principal,
+            "line": trust.line(principal, ca["public_key"], ca["id"])}
+
+
+def _jump_fields(jump: object) -> dict | None:
+    """The bastion a server is reached through, from the request: checked
+    like the server itself. None when there is none."""
+    if jump is None:
+        return None
+    if not isinstance(jump, dict):
+        raise OwnRefused(422, "The jump host is not complete.")
+    keys = clean_host_keys(jump.get("hostKeys") or [])
+    if not keys:
+        raise OwnRefused(422, "The jump host has no host keys.")
+    return {"host": _own_host(jump.get("host")),
+            "port": _own_port(jump.get("port", 22)),
+            "login": _own_login(jump.get("login")), "host_keys": keys}
+
+
+async def add_own(pool: asyncpg.Pool, signer: SignerClient, relay,
+                  user_id: uuid.UUID, *, project_id: uuid.UUID, name: object,
+                  host: object, port: object, login: object, host_keys: object,
+                  method: object, key_id: object = None,
+                  principal: object = None, jump: object = None,
+                  via: object = None, target: object = None,
+                  who_name: str = "") -> dict:
+    """Registers a server the person adds themselves: with their vault key
+    ('key'), a certificate in their own authorized_keys ('cert'), or through
+    their Mac ('mac'). For 'cert' the core signs in once with a certificate
+    before saving and answers 422 if it cannot; for 'key' it does not try
+    (the app already did with the real key)."""
+    if method not in OWN_METHODS:
+        raise OwnRefused(422, "A server opens with your key, a certificate, or "
+                              "through your Mac.")
+    name = _own_name(name)
+    jump_fields = _jump_fields(jump) if method != "mac" else None
+    async with pool.acquire() as conn:
+        role = await conn.fetchval(
+            "SELECT role FROM project_members WHERE project_id = $1 "
+            "AND user_id = $2 AND (until IS NULL OR until > now())",
+            project_id, user_id)
+        if role not in ("owner", "admin"):
+            raise OwnRefused(403, "Only the owner and admins add servers.")
+
+    row: dict = {"login_method": method, "jump_host": None, "jump_port": None,
+                 "jump_login": None, "jump_host_keys": [], "vault_key_id": None,
+                 "ca_id": None, "principal": None, "own_line": True,
+                 "via_machine_id": None, "ssh_target": None, "host": None,
+                 "port": None, "login": None, "host_keys": []}
+    if jump_fields is not None:
+        row.update(jump_host=jump_fields["host"], jump_port=jump_fields["port"],
+                   jump_login=jump_fields["login"],
+                   jump_host_keys=jump_fields["host_keys"])
+
+    if method == "mac":
+        row.update(await _own_via(pool, user_id, project_id, via, target))
+    else:
+        keys = clean_host_keys(host_keys or [])
+        if not keys:
+            raise OwnRefused(422, "The server sent no host key tTerm could read.")
+        row.update(host=_own_host(host), port=_own_port(port),
+                   login=_own_login(login), host_keys=keys)
+        if method == "key":
+            key = await vault.key_for(pool, user_id, vault.is_uuid(key_id))
+            if key is None:
+                raise OwnRefused(422, "That key is not in your vault.")
+            row["vault_key_id"] = key["id"]
+        else:                                           # cert
+            row.update(await _own_cert(pool, signer, relay, user_id, row,
+                                       principal, who_name, name))
+
+    return await _save_own(pool, user_id, project_id, name, row)
+
+
+async def _own_via(pool: asyncpg.Pool, user_id: uuid.UUID,
+                   project_id: uuid.UUID, via: object, target: object) -> dict:
+    """The Mac a 'mac' server runs ssh on, and the target it runs ssh to.
+    The Mac is a computer in the same project as the new server, which the
+    person is in: a computer of another project, even one they are in too,
+    is not one this project's server may go through."""
+    try:
+        via_id = uuid.UUID(str(via))
+    except (TypeError, ValueError):
+        raise OwnRefused(422, "Say which Mac opens this server.") from None
+    found = await pool.fetchval(
+        """
+        SELECT m.id FROM machines m
+        JOIN project_members pm ON pm.project_id = m.project_id
+         AND pm.user_id = $2 AND (pm.until IS NULL OR pm.until > now())
+        WHERE m.id = $1 AND m.project_id = $3 AND m.kind = 'computer'
+          AND m.removed_at IS NULL
+        """, via_id, user_id, project_id)
+    if found is None:
+        raise OwnRefused(422, "That Mac is not a computer of this project.")
+    if not isinstance(target, str) or not 1 <= len(target.strip()) <= 255:
+        raise OwnRefused(422, "Say what the Mac runs ssh to.")
+    return {"via_machine_id": found, "ssh_target": target.strip()}
+
+
+async def _own_cert(pool: asyncpg.Pool, signer: SignerClient, relay,
+                    user_id: uuid.UUID, row: dict, principal: object,
+                    who_name: str, name: str) -> dict:
+    """Signs in once with a certificate for `principal` (from own_line),
+    through the bastion if any, to check the line is in place. Raises
+    OwnRefused(422) with the reason if it cannot."""
+    if not isinstance(principal, str) or not trust.PRINCIPAL_RE.fullmatch(
+            principal):
+        raise OwnRefused(422, "Ask for the certificate line again.")
+    ca = await signer.active_key()
+    who = ssh.key_id(who_name, str(user_id), name)
+    limiter = relay.limiter if relay is not None else None
+
+    def client_key() -> ssh.ClientKey:
+        async def factory():
+            return await signer.credentials(principal, who, ca=ca["id"])
+        return factory
+
+    jump = None
+    if row["jump_host"]:
+        jump = {"host": row["jump_host"], "port": row["jump_port"],
+                "login": row["jump_login"], "host_keys": row["jump_host_keys"],
+                "client_key": client_key()}
+    try:
+        conn = await asyncio.wait_for(ssh.connect_own(
+            host=row["host"], port=row["port"], login=row["login"],
+            host_keys=row["host_keys"], client_key=client_key(), who=who,
+            user_id=user_id, limiter=limiter, jump=jump), OWN_CHECK_TIMEOUT)
+    except ssh.reach.Blocked as exc:
+        raise OwnRefused(422, str(exc)) from None
+    except ssh.reach.TooSoon as exc:
+        raise OwnRefused(429, str(exc)) from None
+    except asyncssh.PermissionDenied:
+        raise OwnRefused(422, "The server did not accept tTerm's certificate. "
+                              "Is tTerm's line in your authorized_keys on it?"
+                         ) from None
+    except (asyncssh.Error, OSError, asyncio.TimeoutError) as exc:
+        raise OwnRefused(422, ssh.explain(exc, row["host"], row["port"])
+                         ) from None
+    conn.close()
+    return {"ca_id": ca["id"], "principal": principal}
+
+
+async def _save_own(pool: asyncpg.Pool, user_id: uuid.UUID,
+                    project_id: uuid.UUID, name: str, row: dict) -> dict:
+    """Puts the own server in the database, within the plan's room, with a
+    free name in the project."""
+    async with pool.acquire() as conn, conn.transaction():
+        await conn.execute("SELECT pg_advisory_xact_lock(hashtext($1))",
+                           str(project_id))
+        project = await conn.fetchrow(
+            "SELECT owner_id, deleted_at, code FROM projects WHERE id = $1 "
+            "FOR SHARE", project_id)
+        if project is None or project["deleted_at"] is not None:
+            raise OwnRefused(404, "No such project.")
+        role = await conn.fetchval(
+            "SELECT role FROM project_members WHERE project_id = $1 "
+            "AND user_id = $2 AND (until IS NULL OR until > now())",
+            project_id, user_id)
+        if role not in ("owner", "admin"):
+            raise OwnRefused(403, "Only the owner and admins add servers.")
+        try:
+            await _make_room(conn, project_id)
+        except LimitReached as exc:
+            raise OwnRefused(403, str(exc)) from None
+        taken = {r["name"] for r in await conn.fetch(
+            "SELECT name FROM machines WHERE project_id = $1 AND "
+            "removed_at IS NULL", project_id)}
+        final = free_name(name, taken)
+        machine_id = await conn.fetchval(
+            """
+            INSERT INTO machines (project_id, kind, name, host, port, login,
+                host_keys, ca_id, principal, own_line, created_by,
+                login_method, vault_key_id, jump_host, jump_port, jump_login,
+                jump_host_keys, via_machine_id, ssh_target, own_server)
+            VALUES ($1, 'server', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
+                    $12, $13, $14, $15, $16, $17, $18, true)
+            RETURNING id
+            """, project_id, final, row["host"], row["port"], row["login"],
+            row["host_keys"], row["ca_id"], row["principal"], row["own_line"],
+            user_id, row["login_method"], row["vault_key_id"],
+            row["jump_host"], row["jump_port"], row["jump_login"],
+            row["jump_host_keys"], row["via_machine_id"], row["ssh_target"])
+        await accounts.journal(conn, "machine.added", project_id=project_id,
+                               user_id=user_id, machine_id=machine_id,
+                               details={"name": final, "kind": "server",
+                                        "method": row["login_method"],
+                                        "via": "own"})
+    log.info("machine.added: own server %s (%s)", final, row["login_method"])
+    return {"machine": {"id": str(machine_id), "name": final,
+                        "projectId": str(project_id), "code": project["code"],
+                        "method": row["login_method"]}}
 
 
 async def machine_details(pool: asyncpg.Pool, user_id: uuid.UUID,

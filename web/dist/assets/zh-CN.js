@@ -120,6 +120,13 @@ sidebar.signin_title = 服务器和项目
 sidebar.signin_text = 登录后，你可以在服务器上打开终端、在项目中记笔记，并与团队协作。这台电脑会保持原样。
 sidebar.theme_dark = 切换到深色主题
 sidebar.theme_light = 切换到浅色主题
+# A server that opens with the person's own key, from their vault (0.1.17):
+# the key's tip, after the server's name.
+sidebar.with_key = 用你保险库中的密钥打开
+# A server that opens through the person's Mac: a small label after its
+# name, and its tip ({mac} is the Mac's name).
+sidebar.via_mac = 通过 Mac
+sidebar.via_title = 通过 {mac}，在它开机时可用
 
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
@@ -131,6 +138,13 @@ account_menu.only_here = 仅这台电脑
 account_menu.offline = 离线，正在重试
 account_menu.local_note = tTerm 目前只用于这台电脑。登录即可使用你的服务器、项目和团队。
 account_menu.sign_out = 退出登录
+# Only in tTerm for Mac, right under Settings: the servers and keys of this
+# Mac to the account (0.1.17). The second line is small, under the first.
+account_menu.move = 迁移到云端
+account_menu.move_note = 这台 Mac 的服务器和密钥，随处可用
+# Only in a browser: the app for a Mac. "tTerm for Mac" is the app's name.
+account_menu.download = 下载 tTerm Mac 版
+account_menu.download_note = 你 Mac 上的终端，没有网络也能用
 # The item after Settings, and the title of the list of languages.
 language.item = 语言
 
@@ -296,6 +310,7 @@ app.action.delete_note_words = note delete remove 笔记 删除 移除 删除笔
 app.action.theme_words = theme dark light colours colors 主题 深色 浅色 暗色 亮色 夜间 颜色
 app.action.pin_words = sidebar panel pin 侧边栏 面板 固定
 app.action.settings_words_local = settings preferences theme dark light colors colours support 设置 偏好设置 主题 深色 浅色 颜色 技术支持
+app.action.move_words = move cloud servers keys ssh vault migrate import 迁移 迁移到云端 云端 云 服务器 密钥 保险库 导入 移动
 app.action.settings_words = settings preferences theme dark light colors colours devices quick code forget browsers support 设置 偏好设置 主题 深色 浅色 颜色 设备 快捷码 移除 浏览器 技术支持
 app.action.sign_in_words = sign in log in login account cloud servers 登录 账号 云端 服务器
 app.action.account_words = account profile name photo picture avatar plan limits delete 账号 个人资料 名字 头像 照片 方案 限额 删除账号
@@ -1352,4 +1367,318 @@ picker.nothing = 这里什么都没有
 # For screen readers. While the terminal has only its number,
 # terminal.numbered shows faint in it.
 name_input.label = 终端名称
+
+# ------------------------------------------------------------ vault: the vault of SSH keys, words used in many places (0.1.17)
+# The vault keeps the person's SSH keys, locked on their own devices; tTerm
+# never sees them. Touch ID, Windows Hello and passkey are the names the
+# systems give these: they stay as the systems name them in the language.
+vault.your_mac = Mac
+vault.open_touch = 用触控 ID 打开
+vault.open_hello = 用 Windows Hello 打开
+vault.open_passkey = 用通行密钥打开
+vault.not_now = 以后再说
+# For screen readers: the six digits both devices show, "Code 482 913".
+vault.code_label = 确认码 {code}
+
+# ------------------------------------------------------------ keys: Settings › Keys, the vault (Keys.tsx)
+keys.title = 密钥
+keys.about = 你的保险库：你保存的 SSH 密钥，在你的所有设备上都可用。只有你的设备能用各自的解锁方式打开它；tTerm 不能。
+keys.open_here = 已在这个浏览器中打开
+# How it opened, then when it locks again: one of these under "Open in this browser".
+keys.open_text.touch = 已用触控 ID 打开。8 小时没有任何操作、关闭 tTerm Web 或点击“锁定”后，它会重新锁定。
+keys.open_text.hello = 已用 Windows Hello 打开。8 小时没有任何操作、关闭 tTerm Web 或点击“锁定”后，它会重新锁定。
+keys.open_text.passkey = 已用你的通行密钥打开。8 小时没有任何操作、关闭 tTerm Web 或点击“锁定”后，它会重新锁定。
+keys.open_text.recovery = 已用你的恢复代码打开，本次会话内有效。8 小时没有任何操作、关闭 tTerm Web 或点击“锁定”后，它会重新锁定。
+keys.open_text.pairing = 已由你的 Mac 批准打开，本次会话内有效。8 小时没有任何操作、关闭 tTerm Web 或点击“锁定”后，它会重新锁定。
+keys.open_text.new = 刚刚在这个浏览器中创建。8 小时没有任何操作、关闭 tTerm Web 或点击“锁定”后，它会重新锁定。
+# In tTerm for Mac.
+keys.open_mac = 已在这台 Mac 上打开
+keys.open_text.mac = 已用触控 ID 或 Mac 的密码打开。tTerm 运行期间它会一直保持打开，直到你点击“锁定”或退出登录。
+keys.lock = 锁定
+keys.locked_here = 已在这个浏览器中锁定
+keys.locked_text = 要在这里使用你的密钥，请先打开它：用解锁这台电脑的方式、经你的 Mac 批准，或用你的恢复代码。
+keys.locked_mac = 已在这台 Mac 上锁定
+keys.locked_mac_text = 用触控 ID 或 Mac 的密码打开它：之后这台 Mac 就能登录你的服务器。
+keys.locked_mac_code = 这台 Mac 还不能自己打开你的保险库。请用恢复代码在这里打开它一次：之后用触控 ID 或 Mac 的密码就能打开它。
+keys.open = 打开
+keys.open_code = 用恢复代码打开
+keys.none_title = 还没有保险库
+keys.none_web = 从文件添加密钥：届时会在这个浏览器中创建你的保险库，同时生成一个由你保管的恢复代码。
+keys.none_app = 用“迁移到云端”保存密钥，或在终端中运行 ssh 后用出现的提示条保存：届时会用触控 ID 创建你的保险库。
+keys.no_passkey_here = 这个浏览器无法用通行密钥保存你的保险库：在这里，它要用你的恢复代码或经你的 Mac 批准才能打开，每次只在当次会话中有效。
+keys.no_ed25519_here = 这个浏览器无法用 Ed25519 密钥签名。请在较新的浏览器或 tTerm Mac 版中打开这些服务器。
+# {servers} is a list of servers: droplet and staging; web-01 in Client X.
+keys.opens = 可打开 {servers}
+keys.opens_none = 还没有服务器用它打开
+keys.server_in = {project} 中的 {server}
+# Where the key came from, and when: {where} is a Mac's name, {day} is
+# time.today, time.yesterday or time.on_day ("on 29 Oct").
+keys.from_mac = {day}从 {where} 保存
+keys.from_file = {day}从文件添加
+# After the line above, with " · ": {ago} is "2 hours ago".
+keys.used = 上次使用：{ago}
+keys.unused = 尚未使用
+keys.cannot_ed25519 = 这个浏览器无法用 Ed25519 密钥签名
+keys.cannot_open = 无法在这里打开：请从它的文件重新添加
+keys.remove = 移除
+keys.add_file = 从文件添加密钥
+keys.new_recovery = 生成新的恢复代码
+# {places} is where the vault opens: "MacBook-Pro-Denis · tTerm for Mac, Chrome on macOS".
+keys.opens_on = 可在以下设备上打开：{places}。
+keys.opens_on_code = 只能用你的恢复代码打开。
+keys.place_mac = {mac} · {app}
+keys.place_browser = 一个浏览器
+keys.more_web = 从 Mac 添加更多服务器和密钥：使用 tTerm Mac 版中的“迁移到云端”。
+keys.more_app = 添加更多服务器和密钥：使用账号菜单中的“迁移到云端”。
+keys.remove_title = 从你的保险库中移除 {name}？
+keys.remove_confirm = 移除 {name}
+keys.remove_text = {servers} 会保留在 tTerm 中，但在你选择其他打开方式之前无法打开。
+keys.remove_text_none = 没有服务器用它打开。
+keys.remove_hint = 密钥仍保留在原处：你的 Mac 上，或它的文件中。
+keys.removed = {name} 已移出你的保险库
+
+# ------------------------------------------------------------ add_key: Add a key from a file (Keys.tsx)
+add_key.title = 从文件添加密钥
+add_key.passphrase = 密码短语
+add_key.passphrase_hint = 这个密钥已加密。密码短语就在这个浏览器中用来打开它，不会发往任何地方。
+add_key.open_key = 打开密钥
+add_key.reading = 正在读取密钥…
+add_key.name = 名称
+add_key.sealed_here = 它在离开这个浏览器之前，就已在这里锁定。只有你的设备能打开它；tTerm 不能。
+add_key.add = 添加到你的保险库
+add_key.next = 下一步
+add_key.added = {name} 已加入你的保险库
+# What is wrong with the file chosen. ssh-keygen and its options are commands: they stay as they are.
+add_key.problem_big = 对私钥来说，这个文件太大了。
+add_key.problem_read = 浏览器无法读取这个文件。
+add_key.problem_format = 这不是 tTerm 能读取的私钥。支持的格式：OpenSSH 自有格式，或 PEM（PKCS#8、PKCS#1）。
+add_key.problem_public = 这是公钥（.pub）。请选择私钥：同名但不带 .pub 的文件。
+add_key.problem_passphrase = 这个密钥设有密码短语：请输入密码短语来打开它。
+add_key.problem_wrong_passphrase = 输入的密码短语无法打开这个密钥。
+add_key.problem_security_key = 这个密钥存放在安全密钥上，无法从中取出：请通过你的 Mac 打开它的服务器。
+add_key.problem_dsa = 保险库不保存 DSA 密钥。请用 ssh-keygen -t ed25519 生成新密钥。
+add_key.problem_nistp521 = 保险库暂不保存 ECDSA P-521 密钥：可以保存的是 Ed25519、ECDSA P-256 和 P-384，以及 RSA 密钥。
+add_key.problem_type = 保险库不保存这类密钥：只保存 Ed25519、ECDSA P-256 和 P-384，以及 RSA 密钥。
+add_key.problem_cipher = 这个浏览器无法打开以这种方式加密的密钥。请用 ssh-keygen -p 修改它的密码短语，然后重新添加。
+add_key.problem_encrypted_pem = 这个密钥文件采用旧的 PEM 方式加密。请运行 ssh-keygen -p -f 加文件名，把它转换为 OpenSSH 格式，然后重新添加。
+add_key.problem_ed25519 = 这个浏览器无法读取这种格式的 Ed25519 密钥。请试试较新的浏览器，或改用 OpenSSH 格式的密钥。
+add_key.problem_several = 这个文件中有多个密钥：请逐个添加。
+
+# ------------------------------------------------------------ vault_new: Save your key to your vault (VaultDialogs.tsx)
+vault_new.title = 把你的密钥保存到保险库
+# <code>…</code> is the key's name: id_ed25519. {server} is the server's name.
+vault_new.text_server = <code>{key}</code> 会存入你的保险库，之后就能用它从 tTerm Web、手机或你登录的任何电脑打开 {server}。
+vault_new.text = <code>{key}</code> 会存入你的保险库：用它打开的服务器，都能从 tTerm Web、手机或你登录的任何电脑打开。
+# In tTerm for Mac.
+vault_new.point_mac_unlock = 它用解锁这台 Mac 的方式打开：触控 ID 或 Mac 的密码。不用多记任何东西。
+vault_new.point_mac_locked = 它在离开这台 Mac 之前就已锁定。只有你的设备能打开它；tTerm 不能。
+vault_new.point_mac_browser = 新的浏览器要经你在这里批准，或用你的恢复代码，才能打开它。
+# In a browser.
+vault_new.point_web_unlock = 它用解锁这台电脑的方式打开：触控 ID、Windows Hello 或手机锁屏。不用多记任何东西。
+vault_new.point_web_no_passkey = 这个浏览器无法用通行密钥保存它：在这里，它要用你的恢复代码打开，每次只在当次会话中有效。
+vault_new.point_web_locked = 它在离开这个浏览器之前就已锁定。只有你的设备能打开它；tTerm 不能。
+vault_new.point_web_browser = 其他浏览器要用你的恢复代码，或经你在 tTerm Mac 版中批准，才能打开它。
+vault_new.make_touch = 用触控 ID 创建我的保险库
+vault_new.make_hello = 用 Windows Hello 创建我的保险库
+vault_new.make_passkey = 用通行密钥创建我的保险库
+vault_new.make = 创建我的保险库
+
+# ------------------------------------------------------------ recovery: the recovery code, shown once (VaultDialogs.tsx)
+recovery.title = 你的恢复代码
+recovery.text = 万一你丢失了所有能打开保险库的设备，这个代码就是找回密钥的唯一途径。tTerm 无法替你找回它们。它只会显示这一次。
+recovery.title_new = 你的新恢复代码
+recovery.text_new = 之前的代码已无法再打开你的保险库。万一你丢失了所有能打开保险库的设备，这个新代码就是找回密钥的唯一途径。它只会显示这一次。
+# For screen readers.
+recovery.code_label = 恢复代码 {code}
+recovery.save_file = 保存为文件
+recovery.copy_failed = 无法复制：请选中代码并手动复制。
+# What the file saved holds.
+recovery.file_text = tTerm 保险库恢复代码：{code}\\n当你的任何设备都打不开保险库时，可以用它打开。请把它保存在安全的地方，与你的设备分开存放。
+recovery.kept_mac = 我已把它保存在安全的地方，不只是在这台 Mac 上
+recovery.kept_web = 我已把它保存在安全的地方，不只是在这台电脑上
+recovery.make_title = 生成新的恢复代码？
+recovery.make_text = 你现在的代码将会失效，新代码只会显示一次。你的密钥和设备保持不变。
+recovery.now_code = 你现在的恢复代码
+recovery.now_code_hint = 这个浏览器上没有你保险库的通行密钥，所以要用你现在的代码来生成新代码。弄丢了？请在 tTerm Mac 版中生成新代码。
+recovery.make_go = 生成新代码
+recovery.make_go_passkey = 用你的通行密钥生成
+recovery.make_touch = 用触控 ID 生成
+
+# ------------------------------------------------------------ vault_open: Open your keys on this browser (VaultDialogs.tsx)
+vault_open.title = 在这个浏览器中打开你的密钥
+vault_open.text = 你的保险库还不认识这个浏览器。请在已经能打开保险库的设备上批准它。
+vault_open.text_code = 用你的恢复代码在这个浏览器中打开保险库。
+# {mac} is the Mac's name, {app} is app_link.mac: "MacBook-Pro-Denis · tTerm for Mac".
+vault_open.mac_name = {mac} · {app}
+vault_open.mac_ask = 请它在这里打开你的保险库
+vault_open.mac_waiting = 已发出请求，正在等你在那边处理…
+vault_open.mac_compare = 请只在那边显示相同的确认码时允许
+vault_open.mac_approved = 已批准：正在打开你的密钥…
+vault_open.mac_denied = 已在那边被拒绝。
+vault_open.mac_expired = 请求已过期。请重新发送请求。
+vault_open.sas_text = 你的 Mac 上也会显示一个确认码。只有两者相同时，才在那边允许：
+vault_open.or = 或
+vault_open.code = 恢复代码
+vault_open.open = 打开
+# Once open with the recovery code or the Mac's approval: whether this browser keeps a passkey.
+vault_open.opened_title = 你的密钥已在这个浏览器中打开
+vault_open.opened_text = 要在这里保存通行密钥，让它们下次用解锁这台电脑的方式打开吗？如果这不是你自己的电脑，请选择“仅此一次”。
+vault_open.keep_touch = 用触控 ID 保存
+vault_open.keep_hello = 用 Windows Hello 保存
+vault_open.keep_passkey = 用通行密钥保存
+vault_open.only_now = 仅此一次
+vault_open.kept_session = 它们只在本次会话中保持打开。
+
+# ------------------------------------------------------------ app_code: in tTerm for Mac, a vault this Mac has no lock of (VaultDialogs.tsx)
+app_code.title = 在这台 Mac 上打开你的保险库
+app_code.text = 这台 Mac 还不能自己打开你的保险库。请用恢复代码在这里打开它一次：之后这台 Mac 就能用触控 ID 打开它。
+# When this Mac's lock is there but no longer opens the vault (taken off in a browser, or gone from the keychain).
+app_code.text_lost = 这台 Mac 已无法再自己打开你的保险库。请用恢复代码在这里打开它一次：之后这台 Mac 就能重新用触控 ID 打开它。
+
+# ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
+# {key} is the key's name: id_ed25519.
+passphrase.title = {key} 设有密码短语
+passphrase.text = 请输入密码短语：这台 Mac 会用它打开密钥，它不会发往其他任何地方。密钥会以锁定状态存入你的保险库。
+# For Let tTerm in: {server} is the server's name, or several ("staging and old-vps").
+passphrase.text_sign_in = 请输入密码短语：这台 Mac 会用这个密钥登录 {server} 一次，在那里添加 tTerm 的授权。密码短语不会发往其他任何地方，密钥留在这台 Mac 上。
+passphrase.label = 密码短语
+passphrase.go = 打开密钥
+
+# ------------------------------------------------------------ mac_approve: in tTerm for Mac, a new browser asks for the keys (VaultDialogs.tsx)
+# {device} is the browser, "Chrome on Windows".
+mac_approve.title = {device} 请求打开你的密钥
+mac_approve.a_browser = 某个浏览器
+# {ago} is "2 minutes ago", {ip} the address it signed in from.
+mac_approve.text_code = {ago}，它从 {ip} 用邮件验证码登录了你的账号。只有是你本人时才允许：它将能用你的密钥打开服务器。
+mac_approve.text_code_now = 它从 {ip} 用邮件验证码登录了你的账号。只有是你本人时才允许：它将能用你的密钥打开服务器。
+mac_approve.text_other = 它从 {ip} 登录了你的账号。只有是你本人时才允许：它将能用你的密钥打开服务器。
+mac_approve.sas_text = 那个浏览器上显示了一个确认码。只有两者相同时才允许：
+# For screen readers, while the code is on its way.
+mac_approve.sas_waiting = 正在等待确认码
+mac_approve.not_me = 不是我
+mac_approve.allow = 用触控 ID 允许
+mac_approve.not_me_note = “不是我”：那次登录会结束，“设置”›“设备”会显示还需要检查什么。
+
+# ------------------------------------------------------------ vault_locked: a server with your key, the vault locked here (VaultLocked.tsx)
+vault_locked.title = {machine} 用你的密钥打开
+vault_locked.text = 你的密钥在这个浏览器中已锁定。请用解锁这台电脑的方式打开它们；tTerm 随后会登录 {machine}，而你的密钥始终不会离开这个浏览器。
+vault_locked.text_app = 你的密钥在这台 Mac 上已锁定。请用触控 ID 或 Mac 的密码打开它们；之后这台 Mac 会登录 {machine}。
+vault_locked.text_app_code = 这台 Mac 还不能自己打开你的保险库。请用恢复代码在这里打开它一次；之后这台 Mac 会登录 {machine}。
+# Small links under the button: "or approve on MacBook-Pro-Denis · use the recovery code".
+vault_locked.or = 或
+vault_locked.approve_on = 在 {mac} 上批准
+vault_locked.use_code = 使用恢复代码
+vault_locked.approve_on_button = 在 {mac} 上批准
+vault_locked.use_code_button = 使用恢复代码
+vault_locked.signing = 正在用你的密钥登录 {machine}…
+vault_locked.no_ed25519 = 这个浏览器无法用 Ed25519 密钥签名。请在较新的浏览器或 tTerm Mac 版中打开 {machine}。
+# {key} is the key's name, or vault_locked.its_key.
+vault_locked.not_here = 你的保险库已在这里打开，但这个浏览器无法打开 {key}。请在“设置”›“密钥”中从它的文件重新添加。
+vault_locked.its_key = 这台服务器的密钥
+
+# ------------------------------------------------------------ vault_problem: what went wrong with the vault (vault/store.ts)
+vault_problem.no_vault = 你还没有保险库。
+vault_problem.exists = 你已经有保险库了：请先打开它，再添加密钥。
+vault_problem.locked = 请先打开你的保险库。
+vault_problem.no_passkey = 在这里，你保险库的通行密钥都没有响应。请在你的 Mac 上批准这个浏览器，或使用你的恢复代码。
+vault_problem.no_prf = 这个通行密钥无法在这里打开你的保险库。请在你的 Mac 上批准这个浏览器，或使用你的恢复代码。
+vault_problem.no_prf_here = 这个浏览器无法用通行密钥保存你的保险库：它只在本次会话中保持打开。
+vault_problem.lock_broken = 这个浏览器上的解锁方式已无法再打开你的保险库。请使用你的恢复代码，或在你的 Mac 上批准这个浏览器。
+vault_problem.code_form = 恢复代码由 24 个字母和数字组成，分为六组，每组四个。
+vault_problem.code_wrong = 这个恢复代码无法打开你的保险库。请检查一下，或在你的 Mac 上批准这个浏览器。
+# In tTerm for Mac: the engine's answers, said by the page (the code window, Touch ID).
+vault_problem.code_wrong_app = 这个恢复代码无法打开你的保险库。请检查一下，然后重试。
+vault_problem.touch_failed = 触控 ID 或 Mac 密码验证没有通过。没有任何更改。
+vault_problem.need_code = 请现在输入你的恢复代码：这个浏览器上没有你保险库的通行密钥。
+vault_problem.no_x25519 = 这个浏览器版本太旧，你的 Mac 无法批准它：请使用你的恢复代码，或换用较新的浏览器。
+vault_problem.pairing = 请求没有成功。请重新发送请求。
+vault_problem.passkey_exists = 这个浏览器上已经有 tTerm 的通行密钥。
+vault_problem.no_passkey_here = 这个浏览器无法创建通行密钥。
+vault_problem.something = 出了点问题。请重试。
+
+# ------------------------------------------------------------ ssh_strip: under a successful ssh in tTerm for Mac's terminals (SshStrip.tsx)
+# {alias} is the server's name as ssh knows it: droplet.
+ssh_strip.region = 在 tTerm 中保存 {alias}
+ssh_strip.title = {alias}：从任何地方打开它
+# <code>…</code>: the address, root@203.0.113.7, and the key, ~/.ssh/id_ed25519.
+ssh_strip.text = tTerm Web、手机，以及你登录的任何电脑。<code>{address}</code>，你的密钥 <code>{key}</code>
+ssh_strip.text_no_key = tTerm Web、手机，以及你登录的任何电脑。<code>{address}</code>
+ssh_strip.save = 保存我的密钥
+ssh_strip.let_in = 允许 tTerm 登录
+ssh_strip.not_now = 以后再说
+ssh_strip.never = 不再为 {alias} 询问
+# <b>…</b> are the two buttons' names, as above.
+ssh_strip.explain = <b>保存我的密钥：</b>密钥会存入你的保险库，只有你的设备能打开它；{alias} 保持不变。<b>允许 tTerm 登录：</b>tTerm 会在 {alias} 上添加一条自己的授权；你的密钥留在这台 Mac 上。一次添加多台服务器：使用账号菜单中的“迁移到云端”。
+ssh_strip.explain_pass = <b>允许 tTerm 登录：</b>tTerm 会在 {alias} 上添加一条自己的授权；你的密钥留在这台 Mac 上。一次添加多台服务器：使用账号菜单中的“迁移到云端”。
+ssh_strip.unreachable = tTerm Web 无法从云端连接到 {alias}：它会通过这台 Mac 打开，在这台 Mac 开机时可用。
+ssh_strip.through_mac = 通过这台 Mac 打开
+ssh_strip.saved_key = {alias} 已加入 tTerm：可以用你的密钥从任何地方打开。
+ssh_strip.saved_cert = {alias} 已加入 tTerm：上面已有 tTerm 自己的授权，可以从任何地方打开。
+ssh_strip.saved_mac = {alias} 已加入 tTerm：它通过这台 Mac 打开，在这台 Mac 开机时可用。
+
+# ------------------------------------------------------------ move: Move to cloud, in tTerm for Mac (MoveToCloud.tsx)
+move.title = 迁移到云端
+move.text = 这台 Mac 知道的服务器将迁移到你的账号：之后可以从 tTerm Web、手机或你登录的任何电脑打开它们。在你点击“迁移”之前，什么都不会迁移。
+move.servers = 这台 Mac 上的服务器
+# <code>…</code> are ssh's files: they stay as they are.
+move.servers_from = 来自 <code>~/.ssh/config</code>、<code>known_hosts</code> 以及你在这里运行过的 ssh
+move.looking = 正在查看 ~/.ssh…
+move.no_servers = 这台 Mac 还不知道任何服务器：~/.ssh/config 和 known_hosts 中都没有，它的终端里也没有运行过 ssh。
+# For screen readers: the tick and the choice of each server.
+move.tick_server = 迁移 {name}
+move.how = {name} 的打开方式
+# The three ways, in the choice of each server and on the cards under the list.
+move.method_key = 我的密钥
+move.method_cert = tTerm 通行证
+move.method_mac = 通过这台 Mac
+move.way_key = 密钥存入你的保险库；服务器保持不变。在任何浏览器中解锁你的保险库后即可打开。
+move.way_cert = tTerm 在服务器上添加一条自己的授权，你的密钥留在这里。在任何地方都能打开，Telegram 中也可以。
+move.way_mac = 什么都不迁移：tTerm 会在这台 Mac 开机时请它去连接。适用于位于 VPN 之后的服务器。
+# {address} is root@203.0.113.7, {jump} the bastion it goes through.
+move.addr_via = {address}，经由 {jump}
+# After "~/.ssh/config · ": {ago} is "3 minutes ago".
+move.ran_ago = {ago}运行过 ssh {alias}
+move.ran_here = 在这里运行过 ssh {alias}
+move.note_known = 这台 Mac 已知
+move.note_git = git 托管平台：没有可打开的终端
+move.note_there = 已在 tTerm 中
+move.note_checking = 正在检查 tTerm Web 能否连接到它…
+move.note_jump = 位于跳板机 {jump} 之后，云端能连接到该跳板机：经由它打开
+move.note_jump_far = 位于只有你的网络能连接到的跳板机（{jump}）之后：通过这台 Mac
+move.note_far = tTerm Web 无法从云端连接到它：通过这台 Mac
+move.note_key_stays = 它的密钥 {key} 无法离开这台 Mac：通过这台 Mac
+move.keys = ~/.ssh 中的密钥
+move.keys_note = 只有勾选的密钥会存入你的保险库
+# For screen readers.
+move.tick_key = 把 {name} 保存到你的保险库
+# {servers} is a server, or a list of them: droplet, staging and app-01.
+move.key_used_one = {servers} 用它打开：将存入你的保险库
+move.key_used_many = {servers} 用它打开：将存入你的保险库
+move.key_unused = 上面的服务器都没有使用它
+move.key_in_vault = 已在你的保险库中
+move.key_security = 在安全密钥上：无法从中取出。它的服务器将通过这台 Mac 打开
+move.key_agent = 只在 SSH 代理中：无法复制。它的服务器将通过这台 Mac 打开
+move.key_type = 保险库暂不保存这类密钥。它的服务器将通过这台 Mac 打开
+move.key_passphrase = 设有密码短语
+move.vault_note = 你的保险库用解锁这台 Mac 的方式打开：触控 ID 或 Mac 的密码。只有你的设备能打开它；tTerm 不能。
+move.go = other: 迁移 {n} 台服务器
+
+# ------------------------------------------------------------ moved: what came of Move to cloud (MoveToCloud.tsx)
+moved.title = other: {n} 台服务器中有 {ok} 台已加入 tTerm
+# {project} is where they are: Personal.
+moved.text = 位于 {project}：可以从 tTerm Web、手机或你登录的任何电脑打开它们。
+moved.key = 用你的密钥打开
+moved.key_jump = 用你的密钥打开，经由 {jump}
+moved.cert = 用 tTerm 通行证打开
+moved.cert_jump = 用 tTerm 通行证打开，经由 {jump}
+moved.mac = 通过这台 Mac，在它开机时可用
+moved.failed = 未能迁移。
+# {why} is what went wrong, as the Mac said it.
+moved.failed_text = 没有为它保存任何内容：{why}
+moved.open = 打开终端
+moved.change = 更改
+# <b>…</b> is the key's name, or a list of them.
+moved.keys_one = <b>{keys}</b> 已存入你的保险库，以你设备的解锁方式锁定。在任何设备上，“设置”›“密钥”中都会显示它。
+moved.keys_many = <b>{keys}</b> 已存入你的保险库，以你设备的解锁方式锁定。在任何设备上，“设置”›“密钥”中都会显示它们。
+moved.no_keys = 没有迁移任何密钥：你的密钥仍留在这台 Mac 上。
 `;export{e as default};

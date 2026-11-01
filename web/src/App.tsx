@@ -17,7 +17,7 @@ import { Confirm, Removed } from "./Confirm";
 import { Finder, type FinderGroup, type FinderItem } from "./Finder";
 import { foundBlock, foundNote } from "./found";
 import {
-  ChevronRight, Close, CloudOff, Computer, Doc, Folder as FolderIcon, Gear, ListCheck,
+  ChevronRight, Close, CloudOff, CloudUp, Computer, Doc, Folder as FolderIcon, Gear, ListCheck,
   Moon, Pencil, Person, Pin, Plus, Server, SignIn as SignInIcon,
   SignOut as SignOutIcon, Sun, Trash,
 } from "./icons";
@@ -27,6 +27,10 @@ import {
 import { hereWord, onMac } from "./local";
 import { InApp, LocalOnly } from "./local";
 import { Machines } from "./Machines";
+import { MoveToCloud } from "./MoveToCloud";
+import { MoveContext, type MoveFrame } from "./SshStrip";
+import { VaultDialogHost } from "./VaultDialogs";
+import { vaultStore } from "./vault/store";
 import { FolderDialog } from "./Menus";
 import { NeedAccount, type Need } from "./NeedAccount";
 import { draftsOf, forgetDrafts, markDeleted } from "./drafts";
@@ -73,9 +77,10 @@ const COMPUTERS_MS = 10_000;
 const LISTS_MS = 60_000;
 
 /** /t/<id> is a terminal, /n/<id> a note, /p/<id> a project's page (tabs.ts),
- * /account the account page (0.0.10) and /settings Settings (0.1.4);
- * anything else is the machines page. */
-const PAGE_PATH = /^\/(settings|account)\/?$/;
+ * /account the account page (0.0.10), /settings Settings (0.1.4) and, in
+ * the app, /move Move to cloud (0.1.17); anything else is the machines
+ * page. */
+const PAGE_PATH = /^\/(settings|account|move)\/?$/;
 
 /** The page of the account's menu at this address, if it is one. */
 function pageOf(path: string): AccountPage | null {
@@ -399,10 +404,23 @@ export function App() {
 
   useEffect(load, [load]);
 
+  // The person's vault (0.1.17): this person's, signed in; in the app the
+  // engine holds it.
+  const meId = state?.me.id ?? null;
+  const vaultApp = !!state?.app;
+  const vaultLocal = !!state?.local;
+  useEffect(() => {
+    const me = stateNow.current?.me;
+    if (!meId || vaultLocal || !me) return;
+    vaultStore.start({ id: me.id, name: me.name, email: me.email }, vaultApp);
+  }, [meId, vaultApp, vaultLocal]);
+
   /** The session is over: the sign-in screen, and nothing of the page
    * behind it. A note from Sign out itself wins over one from the socket
    * closing because of it. */
   const endSession = useCallback((note: string | null, firm = true) => {
+    // The vault leaves this page's memory with the session (0.1.17).
+    vaultStore.stop();
     // In the app signed in (0.1.6) the page starts over instead: the engine
     // has this computer only then, as before signing in.
     if (stateNow.current?.app) {
@@ -1102,19 +1120,27 @@ export function App() {
     return null;
   }, [state]);
   const shownPage = current ? null : pageOf(path);
-  const pageOpen = local && shownPage === "account" ? null : shownPage;
+  // Move to cloud is the app's, signed in (0.1.17).
+  const pageOpen = (local && shownPage === "account") ||
+    (shownPage === "move" && (local || !state?.app)) ? null : shownPage;
   const title = front
     ? `${front.kind === "terminal" && front.code ? `${front.code}/` : ""}${front.label} · tTerm`
     : pageOpen === "settings" ? `${t("settings.title")} · tTerm`
+    : pageOpen === "move" ? `${t("move.title")} · tTerm`
     : pageOpen === "account" ? `${t("account.title")} · tTerm` : "tTerm";
   useEffect(() => {
     document.title = title;
   }, [title]);
   // No Account before signing in: its address gives way to the machines
-  // page, so that signing in later does not open it there.
+  // page, so that signing in later does not open it there; nor Move to
+  // cloud outside the app.
+  const appNow = !!state?.app;
   useEffect(() => {
-    if (local && shownPage === "account") navigate("/", true);
-  }, [local, shownPage, navigate]);
+    if (!state) return;
+    if ((local && shownPage === "account") || (shownPage === "move" && (local || !appNow))) {
+      navigate("/", true);
+    }
+  }, [local, shownPage, navigate, appNow, state]);
   // Signed in meanwhile: New project and Add machine are themselves again.
   useEffect(() => {
     if (!local) setNeedAccount(null);
@@ -1260,6 +1286,12 @@ export function App() {
   const pageProject = frontKind === "project"
     ? projects.find((p) => p.id === tabTarget(current!)) : undefined;
   const machineIds = new Set(projects.flatMap((p) => p.machines.map((m) => m.id)));
+  // In the app, this Mac's own machines: their terminals get the strip after
+  // `ssh <host>` (0.1.17).
+  const hereIds = new Set(state.app ? projects.flatMap((p) =>
+    p.machines.filter((m) => m.here).map((m) => m.id)) : []);
+  const moveFrame: MoveFrame = { enabled: !!state.app && !local, projects, personal: personal ?? null,
+    notify: notYet, refresh: () => void refresh() };
   const dotFor = (t: TerminalInfo): Dot => dotOf(statuses[t.id], t, false);
 
   const sidebarButton = !pinned && (
@@ -1470,6 +1502,14 @@ export function App() {
         words: local ? t("app.action.settings_words_local") : t("app.action.settings_words"),
         run: () => openPage("settings"),
       },
+      ...(state.app && !local ? [{
+        key: "move",
+        label: t("account_menu.move"),
+        hint: t("account_menu.move_note"),
+        icon: <CloudUp size={15} />,
+        words: t("app.action.move_words"),
+        run: () => openPage("move"),
+      }] : []),
       ...(local ? [{
         key: "sign-in",
         label: t("common.sign_in"),
@@ -1567,6 +1607,7 @@ export function App() {
     <InApp.Provider value={inApp}>
     <LocalOnly.Provider value={local}>
     <UpdateState.Provider value={updates}>
+    <MoveContext.Provider value={moveFrame}>
     <div className={`${pinned ? "app pinned" : "app"}${tint === "block" ? " tint-block" : ""}`}>
       <TabBar sidebarButton={sidebarButton} tabs={tabViews}
         update={<UpdatePill />}
@@ -1603,7 +1644,8 @@ export function App() {
             shownTheme={shownTheme} onStatus={onStatus} onCloseTab={closeTab}
             onOpenNew={startTerminal} onChanged={refresh} notify={notYet}
             machineThere={(machineId) => machineIds.has(machineId)}
-            paste={paste?.terminalId === id ? paste : null} />
+            paste={paste?.terminalId === id ? paste : null}
+            here={hereIds.has(liveTerminals.find((x) => x.id === id)?.machineId ?? "")} />
         ))}
         {shownTabs.filter((tab) => tabKind(tab) === "note").map((tab) => (
           <NoteView key={tab} noteId={tabTarget(tab)} active={tab === current}
@@ -1676,7 +1718,13 @@ export function App() {
                 forgetDrafts();
                 endSession(note);
               }} onClose={closePage}
-              notify={notYet} />
+              notify={notYet} projects={projects} />
+          </div>
+        )}
+        {pageOpen === "move" && (
+          <div className="page-scroll">
+            <MoveToCloud key={pageVisit} onClose={closePage}
+              onOpenTerminal={(machineId) => startTerminal(machineId)} />
           </div>
         )}
         {!current && !pageOpen && (
@@ -1764,6 +1812,8 @@ export function App() {
           onSignIn={signInHere}
           language={t.lang}
           onLanguage={chooseLanguage}
+          inApp={!!state.app && !local}
+          onMove={() => openPage("move")}
           onHome={away(() => navigate("/"))}
           notYet={notYet}
         />
@@ -1924,9 +1974,12 @@ export function App() {
           onClose={() => setRemoved(null)} notify={notYet} />
       )}
 
+      <VaultDialogHost />
+
       {toast && <div className="toast" role="status">{toast}</div>}
       {!toast && <UpdatedToast />}
     </div>
+    </MoveContext.Provider>
     </UpdateState.Provider>
     </LocalOnly.Provider>
     </InApp.Provider>

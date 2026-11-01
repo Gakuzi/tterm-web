@@ -1,10 +1,20 @@
 """SSH to servers: a fresh certificate every time, and the server's own key
 checked against what it told us when it registered.
+
+From 0.1.17 the core also signs in to servers the person added themselves,
+to a host they typed: with their own key from the vault (the signature made
+by their device and relayed over the page's socket, see core/vault.py), or
+with a certificate as for Add machine. Those connections go through
+`connect_own`, which checks the address first (core/reach.py) and, for a
+server behind a bastion, connects through the jump host.
 """
 from __future__ import annotations
 
+from typing import Awaitable, Callable
+
 import asyncssh
 
+from . import reach
 from .signer_client import SignerClient, SignerRefused, SignerUnavailable
 
 #: How long to wait for a server to answer at all.
@@ -74,10 +84,70 @@ async def connect(signer: SignerClient, *, host: str, port: int, login: str,
     )
 
 
+#: A client key for one hop: a vault relay keypair, or a (key, cert) pair.
+#: Built fresh per hop, since a connection consumes it.
+ClientKey = Callable[[], Awaitable[object]]
+
+
+async def connect_own(*, host: str, port: int, login: str,
+                      host_keys: list[str], client_key: ClientKey, who: str,
+                      user_id, limiter: reach.Limiter | None = None,
+                      jump: dict | None = None) -> asyncssh.SSHClientConnection:
+    """Signs in to a server the person added, at a host they typed.
+
+    The address is resolved and checked once (reach.py), and the connection
+    goes to that very address with the host keys pinned to it. A server
+    behind a bastion is reached through the jump host: the core connects to
+    the jump the same way (its own checked address and pinned keys), then the
+    target over it (asyncssh `tunnel=`), the jump doing the target's lookup.
+    `client_key` builds the client key for the target; `jump["client_key"]`
+    the one for the jump.
+    """
+    if limiter is not None:
+        limiter.check(user_id)
+    tunnel = None
+    try:
+        if jump is not None:
+            jump_address = await reach.checked_address(jump["host"])
+            tunnel = await asyncssh.connect(
+                jump_address, port=jump["port"], username=jump["login"],
+                client_keys=[await jump["client_key"]()],
+                known_hosts=known_hosts(jump_address, jump["port"],
+                                        jump["host_keys"]),
+                agent_path=None, password=None, kbdint_auth=False,
+                preferred_auth=("publickey",), connect_timeout=CONNECT_TIMEOUT,
+                keepalive_interval=30, keepalive_count_max=3)
+            # Behind the bastion the target is reached by the name the person
+            # gave; the jump looks it up, so the core does not dial it itself.
+            target, pinned = host, known_hosts(host, port, host_keys)
+        else:
+            target = await reach.checked_address(host)
+            pinned = known_hosts(target, port, host_keys)
+        conn = await asyncssh.connect(
+            target, port=port, username=login,
+            client_keys=[await client_key()], known_hosts=pinned,
+            agent_path=None, password=None, kbdint_auth=False,
+            preferred_auth=("publickey",), connect_timeout=CONNECT_TIMEOUT,
+            keepalive_interval=30, keepalive_count_max=3, tunnel=tunnel)
+        # The tunnel is the core's to close: asyncssh does not own one passed
+        # in. It goes when the connection that rides it does (SshLink).
+        if tunnel is not None:
+            conn._tterm_jump = tunnel
+        return conn
+    except BaseException:
+        if tunnel is not None:
+            tunnel.close()
+        raise
+
+
 def explain(exc: BaseException, host: str, port: int) -> str:
     """Why connecting failed, in a sentence for the person and for the
     installer's output."""
     where = f"{host}:{port}"
+    if isinstance(exc, reach.Blocked):
+        return str(exc)
+    if isinstance(exc, reach.TooSoon):
+        return str(exc)
     if isinstance(exc, (SignerUnavailable, SignerRefused)):
         return f"tTerm Web could not sign a certificate: {exc}"
     if isinstance(exc, HostKeysUnusable):

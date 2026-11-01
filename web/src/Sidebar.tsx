@@ -25,15 +25,19 @@
 // account's menu has Language after Settings: the languages slide out
 // beside it, the one shown on top with a check (canvas version 90); where
 // there is no mouse to point, or no room beside, they take the menu's
-// place, with an arrow back.
+// place, with an arrow back. From 0.1.17 (Vault.dc) a server that opens
+// with the person's own key has a key after its name, and one that goes
+// through their Mac says "via Mac", with the Mac's dot; in the app the
+// menu has Move to cloud right under Settings, in a browser Download tTerm
+// for Mac.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Machine, Me, Project, TerminalInfo } from "./api";
 import { colorClass, terminalName } from "./colors";
 import { LANGUAGES, useT, type Lang } from "./i18n";
 import {
-  Check, ChevronDown, ChevronLeft, ChevronRight, Close, CloudOff, Computer, Doc,
-  Folder as FolderIcon, FolderOpen, Gear, Languages, Logo, Moon, People, Person,
+  Check, ChevronDown, ChevronLeft, ChevronRight, Close, CloudOff, CloudUp, Computer, Doc,
+  Download, Folder as FolderIcon, FolderOpen, Gear, Key, Languages, Logo, Moon, People, Person,
   Pin, Plus, Server, SignIn, SignOut, Sun,
 } from "./icons";
 import { hereWord, onMac } from "./local";
@@ -101,10 +105,26 @@ interface Props {
   /** The language shown, and another chosen (0.1.16). */
   language: Lang;
   onLanguage: (lang: Lang) => void;
+  /** In tTerm for Mac, signed in (0.1.17): Move to cloud in the menu. */
+  inApp: boolean;
+  onMove: () => void;
 }
 
-/** The pages behind the menu of the account at the bottom (0.1.4). */
-export type AccountPage = "settings" | "account";
+/** The pages behind the menu of the account at the bottom (0.1.4); Move to
+ * cloud from 0.1.17, in the app. */
+export type AccountPage = "settings" | "account" | "move";
+
+/** tTerm for Mac (0.1.17): Download in the menu opens the site's download
+ * page in the language shown. It has the latest release's dmg and says how
+ * to open an app signed with tTerm's own certificate, not Apple's, which
+ * macOS does not open with a double click the first time. The site keeps
+ * English at the root, Portuguese in pt and Chinese in zh. */
+const SITE_FOLDER: Partial<Record<Lang, string>> = { en: "", "pt-BR": "pt", "zh-CN": "zh" };
+
+export function macDownload(lang: Lang): string {
+  const folder = SITE_FOLDER[lang] ?? lang;
+  return folder ? `https://tterm.net/${folder}/download/` : "https://tterm.net/download/";
+}
 
 /** The ⌄ before a row: turned while folded. Only for the mouse: the row's
  * name does the same and is the one the keyboard reaches. */
@@ -149,6 +169,11 @@ export function Sidebar(props: Props) {
     const waits = !!props.cutOff && !here;
     const offline = (computer && !m.online && !here) || waits;
     const seen = offline && !waits ? lastSeen(m.lastSeen, t) : "";
+    // Through the person's Mac (0.1.17): there while that Mac is.
+    const viaMac = m.method === "mac";
+    const via = viaMac ? projects.flatMap((p) => p.machines).find((x) => x.id === m.via?.id) : undefined;
+    const viaOn = !!via && (via.here || !!via.online) && !waits;
+    const viaName = m.via?.name || via?.name || t("vault.your_mac");
     return (
       <div key={m.id} className="sb-group">
         <div className="sb-row">
@@ -168,11 +193,25 @@ export function Sidebar(props: Props) {
               <span className="here-mark" aria-hidden="true"><Computer size={13} /></span>
             ) : computer ? <Computer size={14} /> : <Server size={14} />}
             <span className="sb-text">{m.name}</span>
+            {m.method === "key" && (
+              <span className="sb-key" title={t("sidebar.with_key")}>
+                <Key size={13} />
+                <span className="visually-hidden">{t("sidebar.with_key")}</span>
+              </span>
+            )}
+            {viaMac && (
+              <span className="via-pill" title={t("sidebar.via_title", { mac: viaName })}>
+                <Computer size={11} />{t("sidebar.via_mac")}
+              </span>
+            )}
             {here && <span className="here-pill">{hereWord(t)}</span>}
             {!open && mine.length > 0 && <span className="sb-count">{mine.length}</span>}
             {computer && (
               <span className={offline ? "sb-state away" : "sb-state on"}
                 aria-hidden="true" />
+            )}
+            {viaMac && (
+              <span className={viaOn ? "sb-state on" : "sb-state away"} aria-hidden="true" />
             )}
           </button>
           <button type="button" className="sb-plus"
@@ -364,7 +403,8 @@ export function Sidebar(props: Props) {
           cutOff={!!props.cutOff}
           onSettings={props.onSettings} onAccount={props.onAccount}
           onSignOut={props.onSignOut} onSignIn={props.onSignIn}
-          language={props.language} onLanguage={props.onLanguage} />
+          language={props.language} onLanguage={props.onLanguage}
+          inApp={props.inApp} onMove={props.onMove} />
         <button type="button" className="icon-button"
           aria-label={themeLabel} title={themeLabel}
           onClick={props.onToggleTheme}>
@@ -411,6 +451,38 @@ function MenuItem(props: {
   );
 }
 
+/** An item of two lines on an amber tint (0.1.17): Move to cloud in the
+ * app, Download tTerm for Mac in a browser (a link). */
+function OfferItem(props: {
+  icon: ReactNode;
+  text: string;
+  note: string;
+  current?: boolean;
+  href?: string;
+  onClick: () => void;
+}) {
+  const inside = (
+    <>
+      {props.icon}
+      <span className="menu-two">
+        <span>{props.text}</span>
+        <span className="menu-sub">{props.note}</span>
+      </span>
+    </>
+  );
+  return props.href ? (
+    <a role="menuitem" className="menu-item offer" href={props.href} target="_blank" rel="noreferrer"
+      onClick={props.onClick}>
+      {inside}
+    </a>
+  ) : (
+    <button type="button" role="menuitem" className="menu-item offer"
+      aria-current={props.current ? "page" : undefined} onClick={props.onClick}>
+      {inside}
+    </button>
+  );
+}
+
 /** Where the languages show (0.1.16): beside the menu, where a mouse points
  * and there is room right of the sidebar; else in the menu's place. */
 type LanguageList = "shut" | "beside" | "inside";
@@ -440,6 +512,8 @@ function AccountPlace(props: {
   onSignIn: () => void;
   language: Lang;
   onLanguage: (lang: Lang) => void;
+  inApp: boolean;
+  onMove: () => void;
 }) {
   const { me, local } = props;
   const t = useT();
@@ -670,9 +744,19 @@ function AccountPlace(props: {
               <div className="menu-line" role="separator" />
               <MenuItem icon={<Gear size={15} />} text={t("settings.title")}
                 current={props.page === "settings"} onClick={pick(props.onSettings)} />
+              {props.inApp && (
+                <OfferItem icon={<CloudUp size={16} />} text={t("account_menu.move")}
+                  note={t("account_menu.move_note")} current={props.page === "move"}
+                  onClick={pick(props.onMove)} />
+              )}
               {languageItem}
               <MenuItem icon={<Person size={15} />} text={t("account.title")}
                 current={props.page === "account"} onClick={pick(props.onAccount)} />
+              {!props.inApp && (
+                <OfferItem icon={<Download size={16} />} text={t("account_menu.download")}
+                  note={t("account_menu.download_note")} href={macDownload(props.language)}
+                  onClick={() => setOpen(false)} />
+              )}
               <div className="menu-line" role="separator" />
               <MenuItem icon={<SignOut size={15} />} text={t("account_menu.sign_out")}
                 onClick={pick(props.onSignOut)} />

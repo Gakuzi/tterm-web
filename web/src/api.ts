@@ -70,7 +70,14 @@ export interface Machine {
   /** In tTerm for the computer signed in (0.1.6): the computer the app runs
    * on, whose terminals run right here. tTerm Web never sends it. */
   here?: boolean;
+  /** How a server opens (0.1.17): with tTerm's certificate (as from Add
+   * machine), with the person's own key from their vault, or through their
+   * Mac (`via`), while it is on. */
+  method?: LoginMethod;
+  via?: { id: string; name: string | null } | null;
 }
+
+export type LoginMethod = "cert" | "key" | "mac";
 
 /** A machine taken out of tTerm Web. For a server, whether tTerm Web took
  * its access back on the server itself, or the command that does. */
@@ -230,6 +237,10 @@ export interface TerminalInfo {
   venv?: string;
   /** The command running now, if any. */
   running?: RunningCommand | null;
+  /** A server that opens with the person's own key (0.1.17), while no page
+   * or app that can sign with it is there: its login waits, and goes on by
+   * itself once one is. */
+  vault?: { key: string; keyName: string | null; since: string } | null;
 }
 
 export interface RunningCommand {
@@ -1041,4 +1052,254 @@ export async function moveNote(id: string,
 export async function deleteNote(id: string): Promise<{ title: string }> {
   return (await check(await fetch(`/api/notes/${id}`,
     { method: "DELETE", headers: { "x-tterm": "1" } }))).json();
+}
+
+// ------------------------------------------------- the vault (0.1.17)
+//
+// The person's SSH keys, sealed on their own devices (src/vault, and
+// vault-design.md). Nothing here carries a key or the vault key in the
+// clear: the core has only what is sealed, the wraps and the salts.
+
+export type VaultKeyType = "ssh-ed25519" | "ecdsa-sha2-nistp256" | "ecdsa-sha2-nistp384" | "ssh-rsa";
+
+export interface VaultLock {
+  id: string;
+  /** A browser's passkey, or tTerm for Mac's lock in its keychain. */
+  kind: "passkey" | "app";
+  /** "Chrome on macOS", "tTerm for Mac on MacBook-Pro-Denis". */
+  label: string;
+  credentialId: string | null;
+  /** VK wrapped with this lock's KEK. */
+  wrap: string;
+  createdAt: number;
+  lastUsedAt: number | null;
+  /** The lock of this very device (a trusted browser's). */
+  thisDevice: boolean;
+}
+
+export interface VaultKey {
+  id: string;
+  name: string;
+  type: VaultKeyType;
+  publicKey: string;
+  fingerprint: string;
+  sealed: string;
+  /** Saved from a Mac, or added from a file. */
+  source: "mac" | "file";
+  sourceLabel: string;
+  createdAt: number;
+  lastUsedAt: number | null;
+  /** The servers that open with it. */
+  servers: { id: string; name: string; project: string }[];
+}
+
+export interface Vault {
+  id: string;
+  prfSalt: string;
+  createdAt: number;
+  recoveryAt: number | null;
+  locks: VaultLock[];
+  keys: VaultKey[];
+}
+
+export async function loadVault(): Promise<Vault | null> {
+  const response = await fetch("/api/vault", { cache: "no-store", headers: BACKGROUND });
+  return (await (await check(response)).json()).vault;
+}
+
+export interface NewLock {
+  id: string;
+  kind: "passkey";
+  credentialId: string;
+  wrap: string;
+  label: string;
+}
+
+/** The vault, made in this browser: its recovery code's salt and wrap; its
+ * passkey lock comes after (addVaultLock), from the prfSalt made here. */
+export async function createVault(body: { id: string; recoverySalt: string;
+  recoveryWrap: string }): Promise<Vault> {
+  return (await (await check(await fetch("/api/vault", change("POST", body)))).json()).vault;
+}
+
+export async function vaultRecovery(): Promise<{ recoverySalt: string; recoveryWrap: string }> {
+  return (await check(await fetch("/api/vault/recovery", { cache: "no-store" }))).json();
+}
+
+/** Make a new recovery code: the one before stops working. */
+export async function setVaultRecovery(body: { recoverySalt: string; recoveryWrap: string }): Promise<void> {
+  await check(await fetch("/api/vault/recovery", change("PUT", body)));
+}
+
+export async function addVaultLock(lock: NewLock): Promise<Vault> {
+  return (await (await check(await fetch("/api/vault/locks", change("POST", lock)))).json()).vault;
+}
+
+export async function vaultLockUsed(id: string): Promise<void> {
+  await check(await fetch(`/api/vault/locks/${id}/used`, change("POST", {})));
+}
+
+export async function addVaultKey(body: { id: string; name: string; type: VaultKeyType;
+  publicKey: string; fingerprint: string; sealed: string; source: "file";
+  sourceLabel: string }): Promise<Vault> {
+  return (await (await check(await fetch("/api/vault/keys", change("POST", body)))).json()).vault;
+}
+
+/** Takes a key out of the vault: its servers stay, and cannot open until
+ * another way in is chosen. */
+export async function removeVaultKey(id: string): Promise<void> {
+  await check(await fetch(`/api/vault/keys/${id}`,
+    { method: "DELETE", headers: { "x-tterm": "1" } }));
+}
+
+/** A new browser asks the Mac to open the vault for it (pairing). */
+export interface Pairing {
+  id: string;
+  state: "waiting" | "answered" | "revealed" | "approved" | "denied" | "expired";
+  commit: string;
+  pubA: string | null;
+  pubB: string | null;
+  sealed: string | null;
+  /** The new browser, "Chrome on Windows", and how it signed in. */
+  device: string;
+  method: string;
+  ip: string;
+  createdAt: number | null;
+  expiresAt: string;
+}
+
+export async function startPairing(commit: string): Promise<{ id: string; expiresAt: string }> {
+  return (await check(await fetch("/api/vault/pairings", change("POST", { commit })))).json();
+}
+
+/** Asked every few seconds while the new browser waits: in the background. */
+export async function loadPairing(id: string): Promise<Pairing | null> {
+  const response = await fetch(`/api/vault/pairings/${id}`,
+    { cache: "no-store", headers: BACKGROUND });
+  if (response.status === 404) return null;
+  return (await check(response)).json();
+}
+
+export async function revealPairing(id: string, pubB: string): Promise<void> {
+  await check(await fetch(`/api/vault/pairings/${id}/reveal`, change("POST", { pubB })));
+}
+
+// ------------------------- tTerm for Mac's vault and servers (0.1.17)
+//
+// Only the app's engine answers these (the contract's "Engine local API"):
+// in the app the vault opens in the engine, which signs on the page's
+// socket itself; the page asks it.
+
+export interface AppVault {
+  /** The Mac has what the vault needs (macOS's keychain and Touch ID). */
+  available: boolean;
+  exists: boolean;
+  open: boolean;
+  /** The fingerprints it can sign for now. */
+  keys: string[];
+}
+
+export async function loadAppVault(): Promise<AppVault> {
+  return (await check(await fetch("/api/app/vault", { cache: "no-store", headers: BACKGROUND }))).json();
+}
+
+/** The vault made on this Mac with Touch ID: its recovery code, shown once. */
+export async function createAppVault(): Promise<{ recoveryCode: string }> {
+  return (await check(await fetch("/api/app/vault/create", change("POST", {})))).json();
+}
+
+/** Opens the vault on this Mac, with Touch ID; with `recoveryCode`, a vault
+ * made elsewhere that this Mac has no lock of yet (see "Changes"). */
+export async function openAppVault(recoveryCode?: string): Promise<{ open: boolean }> {
+  return (await check(await fetch("/api/app/vault/open",
+    change("POST", recoveryCode ? { recoveryCode } : {})))).json();
+}
+
+export async function lockAppVault(): Promise<void> {
+  await check(await fetch("/api/app/vault/lock", change("POST", {})));
+}
+
+export async function appRecoveryCode(): Promise<{ recoveryCode: string }> {
+  return (await check(await fetch("/api/app/vault/recovery", change("POST", {})))).json();
+}
+
+/** The Mac's side of a new browser's request: its key posted, then the six
+ * digits both show. */
+export async function answerAppPairing(id: string): Promise<{ sas: string }> {
+  return (await check(await fetch(`/api/app/vault/pairings/${id}/answer`, change("POST", {})))).json();
+}
+
+/** Allow, with Touch ID: the engine seals the vault key for that browser. */
+export async function approveAppPairing(id: string): Promise<void> {
+  await check(await fetch(`/api/app/vault/pairings/${id}/approve`, change("POST", {})));
+}
+
+/** It's not me: that browser's session ends. */
+export async function denyAppPairing(id: string): Promise<void> {
+  await check(await fetch(`/api/app/vault/pairings/${id}/deny`, change("POST", {})));
+}
+
+/** A server this Mac knows (~/.ssh/config, known_hosts, the ssh run in its
+ * terminals). */
+export interface SshHost {
+  alias: string;
+  host: string;
+  port: number;
+  user: string;
+  identityFiles: string[];
+  proxyJump: string | null;
+  from: ("config" | "known_hosts" | "history")[];
+  /** When ssh to it ran here last: milliseconds or an ISO time. */
+  lastUsed: number | string | null;
+  /** A git host and the like, with no terminal to open. */
+  noTerminal: boolean;
+  hostKeys: string[];
+  /** The key ssh offers it first: the first of its identity files that is a
+   * file on this Mac and can be moved; null when none is. */
+  key?: string | null;
+}
+
+export interface SshKeyFile {
+  path: string;
+  name: string;
+  type: string;
+  fingerprint: string;
+  comment: string;
+  encrypted: boolean;
+  movable: boolean;
+  why?: "security key" | "agent only" | "type" | null;
+}
+
+export interface SshInventory {
+  hosts: SshHost[];
+  keys: SshKeyFile[];
+}
+
+export async function loadAppSsh(): Promise<SshInventory> {
+  return (await check(await fetch("/api/app/ssh", { cache: "no-store" }))).json();
+}
+
+/** Whether tTerm Web, in the cloud, reaches the host and port. */
+export async function reachableFromCloud(host: string, port: number): Promise<boolean> {
+  const response = await fetch("/api/app/ssh/reachable", change("POST", { host, port }));
+  return !!(await (await check(response)).json()).ok;
+}
+
+export type MoveMethod = "key" | "cert" | "mac";
+
+export interface MoveResult {
+  alias: string;
+  ok: boolean;
+  machine?: { id: string; name: string; projectId?: string; code?: string; method?: string };
+  error?: string;
+}
+
+/** Move to cloud: each server in order, the way chosen for it; nothing is
+ * saved for one that fails. `keys`: the ticked keys of `key` servers, which
+ * go to the vault, and the keys with a passphrase that Let tTerm in signs in
+ * with (only a `key` server's key goes to the vault). */
+export async function moveToCloud(body: { project: string;
+  servers: { alias: string; method: MoveMethod }[];
+  keys: { path: string; passphrase?: string }[] }): Promise<MoveResult[]> {
+  return (await (await check(await fetch("/api/app/move", change("POST", body)))).json()).results;
 }

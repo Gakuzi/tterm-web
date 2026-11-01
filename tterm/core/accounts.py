@@ -332,14 +332,19 @@ async def projects_of(pool: asyncpg.Pool, user_id: uuid.UUID) -> list[dict]:
         WHERE (m.until IS NULL OR m.until > now()) AND p.deleted_at IS NULL
         ORDER BY (p.owner_id = $1) DESC, p.created_at, p.name
         """, user_id)
+    # How each server opens (0.1.17): the sidebar marks one that opens with
+    # the person's own key, and one that goes through their Mac.
     machines = await pool.fetch(
         """
-        SELECT id, project_id, kind, name, host, last_seen_at,
-               passport - 'commands' AS passport,
-               jsonb_array_length(COALESCE(passport->'commands', '[]')) AS commands
-        FROM machines
-        WHERE removed_at IS NULL AND project_id = ANY($1::uuid[])
-        ORDER BY lower(name)
+        SELECT m.id, m.project_id, m.kind, m.name, m.host, m.last_seen_at,
+               m.passport - 'commands' AS passport,
+               jsonb_array_length(COALESCE(m.passport->'commands', '[]')) AS commands,
+               m.login_method, m.via_machine_id, via.name AS via_name
+        FROM machines m
+        LEFT JOIN machines via ON via.id = m.via_machine_id
+             AND via.removed_at IS NULL
+        WHERE m.removed_at IS NULL AND m.project_id = ANY($1::uuid[])
+        ORDER BY lower(m.name)
         """, [r["id"] for r in rows])
     by_project: dict[uuid.UUID, list[dict]] = {}
     for m in machines:
@@ -351,7 +356,12 @@ async def projects_of(pool: asyncpg.Pool, user_id: uuid.UUID) -> list[dict]:
             "host": m["host"], "os": pp.get("os"), "passport": pp,
             # When its agent was last connected, for a computer: "last seen
             # 14 minutes ago" says more than offline alone.
-            "lastSeen": int(seen.timestamp() * 1000) if seen else None})
+            "lastSeen": int(seen.timestamp() * 1000) if seen else None,
+            # 'cert', 'key' (the person's vault key) or 'mac' (through
+            # their Mac, named in `via`).
+            "method": m["login_method"],
+            "via": ({"id": str(m["via_machine_id"]), "name": m["via_name"]}
+                    if m["via_machine_id"] is not None else None)})
     return [{
         "id": str(r["id"]),
         "name": r["name"],

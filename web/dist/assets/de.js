@@ -120,6 +120,13 @@ sidebar.signin_title = Server und Projekte
 sidebar.signin_text = Melde dich an, um Terminals auf deinen Servern zu öffnen, Notizen in Projekten zu führen und mit deinem Team zu arbeiten. Dieser Computer bleibt, wie er ist.
 sidebar.theme_dark = Zum dunklen Design wechseln
 sidebar.theme_light = Zum hellen Design wechseln
+# A server that opens with the person's own key, from their vault (0.1.17):
+# the key's tip, after the server's name.
+sidebar.with_key = Öffnet sich mit deinem Schlüssel aus deinem Tresor
+# A server that opens through the person's Mac: a small label after its
+# name, and its tip ({mac} is the Mac's name).
+sidebar.via_mac = via Mac
+sidebar.via_title = Öffnet sich von {mac} aus, solange der Mac eingeschaltet ist
 
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
@@ -131,6 +138,13 @@ account_menu.only_here = Nur dieser Computer
 account_menu.offline = Offline, neuer Versuch
 account_menu.local_note = tTerm arbeitet mit diesem Computer. Mit der Anmeldung kommen deine Server, Projekte und dein Team dazu.
 account_menu.sign_out = Abmelden
+# Only in tTerm for Mac, right under Settings: the servers and keys of this
+# Mac to the account (0.1.17). The second line is small, under the first.
+account_menu.move = Umzug in die Cloud
+account_menu.move_note = Server und Schlüssel dieses Macs überall nutzen
+# Only in a browser: the app for a Mac. "tTerm for Mac" is the app's name.
+account_menu.download = tTerm für Mac herunterladen
+account_menu.download_note = Terminals auf deinem Mac, auch offline
 # The item after Settings, and the title of the list of languages.
 language.item = Sprache
 
@@ -296,6 +310,7 @@ app.action.delete_note_words = note delete remove notiz löschen entfernen
 app.action.theme_words = theme dark light colours colors design dunkel dunkles hell helles farben darstellung
 app.action.pin_words = sidebar panel pin seitenleiste anheften fixieren
 app.action.settings_words_local = settings preferences theme dark light colors colours support einstellungen optionen design dunkel hell farben hilfe
+app.action.move_words = move cloud servers keys ssh vault migrate import umzug umziehen server schlüssel tresor migrieren importieren übertragen
 app.action.settings_words = settings preferences theme dark light colors colours devices quick code forget browsers support einstellungen optionen design dunkel hell farben geräte schnellcode vergessen hilfe
 app.action.sign_in_words = sign in log in login account cloud servers anmelden einloggen konto
 app.action.account_words = account profile name photo picture avatar plan limits delete konto foto bild tarif grenzen löschen
@@ -1352,4 +1367,318 @@ picker.nothing = Hier ist nichts
 # For screen readers. While the terminal has only its number,
 # terminal.numbered shows faint in it.
 name_input.label = Terminalname
+
+# ------------------------------------------------------------ vault: the vault of SSH keys, words used in many places (0.1.17)
+# The vault keeps the person's SSH keys, locked on their own devices; tTerm
+# never sees them. Touch ID, Windows Hello and passkey are the names the
+# systems give these: they stay as the systems name them in the language.
+vault.your_mac = deinem Mac
+vault.open_touch = Mit Touch ID öffnen
+vault.open_hello = Mit Windows Hello öffnen
+vault.open_passkey = Mit einem Passkey öffnen
+vault.not_now = Nicht jetzt
+# For screen readers: the six digits both devices show, "Code 482 913".
+vault.code_label = Code {code}
+
+# ------------------------------------------------------------ keys: Settings › Keys, the vault (Keys.tsx)
+keys.title = Schlüssel
+keys.about = Dein Tresor: die SSH-Schlüssel, die du gespeichert hast, auf all deinen Geräten. Öffnen können ihn nur deine Geräte, so wie du sie entsperrst; tTerm kann das nicht.
+keys.open_here = In diesem Browser geöffnet
+# How it opened, then when it locks again: one of these under "Open in this browser".
+keys.open_text.touch = Mit Touch ID geöffnet. Dein Tresor wird wieder gesperrt: nach 8 Stunden ohne Aktivität, wenn du tTerm Web schließt oder wenn du auf „Sperren“ drückst.
+keys.open_text.hello = Mit Windows Hello geöffnet. Dein Tresor wird wieder gesperrt: nach 8 Stunden ohne Aktivität, wenn du tTerm Web schließt oder wenn du auf „Sperren“ drückst.
+keys.open_text.passkey = Mit deinem Passkey geöffnet. Dein Tresor wird wieder gesperrt: nach 8 Stunden ohne Aktivität, wenn du tTerm Web schließt oder wenn du auf „Sperren“ drückst.
+keys.open_text.recovery = Mit deinem Wiederherstellungscode geöffnet, für diese Sitzung. Dein Tresor wird wieder gesperrt: nach 8 Stunden ohne Aktivität, wenn du tTerm Web schließt oder wenn du auf „Sperren“ drückst.
+keys.open_text.pairing = Mit der Freigabe deines Macs geöffnet, für diese Sitzung. Dein Tresor wird wieder gesperrt: nach 8 Stunden ohne Aktivität, wenn du tTerm Web schließt oder wenn du auf „Sperren“ drückst.
+keys.open_text.new = Gerade eben in diesem Browser erstellt. Dein Tresor wird wieder gesperrt: nach 8 Stunden ohne Aktivität, wenn du tTerm Web schließt oder wenn du auf „Sperren“ drückst.
+# In tTerm for Mac.
+keys.open_mac = Auf diesem Mac geöffnet
+keys.open_text.mac = Mit Touch ID oder dem Passwort deines Macs geöffnet. Dein Tresor bleibt geöffnet, solange tTerm läuft, bis du auf „Sperren“ drückst oder dich abmeldest.
+keys.lock = Sperren
+keys.locked_here = In diesem Browser gesperrt
+keys.locked_text = Öffne deinen Tresor, um deine Schlüssel hier zu verwenden: so, wie du diesen Computer entsperrst, mit der Freigabe deines Macs oder mit deinem Wiederherstellungscode.
+keys.locked_mac = Auf diesem Mac gesperrt
+keys.locked_mac_text = Öffne deinen Tresor mit Touch ID oder dem Passwort deines Macs: Dann meldet dich dieser Mac bei deinen Servern an.
+keys.locked_mac_code = Dieser Mac kann deinen Tresor noch nicht selbst öffnen. Öffne ihn hier einmal mit deinem Wiederherstellungscode: Danach öffnet er sich mit Touch ID oder dem Passwort deines Macs.
+keys.open = Öffnen
+keys.open_code = Mit Wiederherstellungscode öffnen
+keys.none_title = Noch kein Tresor
+keys.none_web = Füg einen Schlüssel aus einer Datei hinzu: Dabei wird dein Tresor in diesem Browser erstellt, mit einem Wiederherstellungscode, den du aufbewahrst.
+keys.none_app = Speichere einen Schlüssel über „Umzug in die Cloud“ oder über die Leiste, die nach ssh in einem Terminal erscheint: Dabei wird dein Tresor mit Touch ID erstellt.
+keys.no_passkey_here = Dieser Browser kann keinen Passkey für deinen Tresor speichern: Hier öffnet sich der Tresor mit deinem Wiederherstellungscode oder mit der Freigabe deines Macs, jeweils für eine Sitzung.
+keys.no_ed25519_here = Dieser Browser kann nicht mit Ed25519-Schlüsseln signieren. Öffne diese Server in einem neueren Browser oder in tTerm für Mac.
+# {servers} is a list of servers: droplet and staging; web-01 in Client X.
+keys.opens = Öffnet {servers}
+keys.opens_none = Öffnet noch keinen Server
+keys.server_in = {server} in {project}
+# Where the key came from, and when: {where} is a Mac's name, {day} is
+# time.today, time.yesterday or time.on_day ("on 29 Oct").
+keys.from_mac = Gespeichert {day} von {where}
+keys.from_file = Hinzugefügt {day} aus einer Datei
+# After the line above, with " · ": {ago} is "2 hours ago".
+keys.used = zuletzt genutzt {ago}
+keys.unused = noch nicht genutzt
+keys.cannot_ed25519 = Dieser Browser kann nicht mit Ed25519-Schlüsseln signieren
+keys.cannot_open = Lässt sich hier nicht öffnen: Füg ihn noch einmal aus seiner Datei hinzu
+keys.remove = Entfernen
+keys.add_file = Schlüssel aus Datei hinzufügen
+keys.new_recovery = Neuen Wiederherstellungscode erstellen
+# {places} is where the vault opens: "MacBook-Pro-Denis · tTerm for Mac, Chrome on macOS".
+keys.opens_on = Wo sich dein Tresor öffnet: {places}.
+keys.opens_on_code = Dein Tresor öffnet sich nur mit deinem Wiederherstellungscode.
+keys.place_mac = {mac} · {app}
+keys.place_browser = ein Browser
+keys.more_web = Weitere Server und Schlüssel von einem Mac: „Umzug in die Cloud“ in tTerm für Mac.
+keys.more_app = Weitere Server und Schlüssel: „Umzug in die Cloud“ im Kontomenü.
+keys.remove_title = {name} aus deinem Tresor entfernen?
+keys.remove_confirm = {name} entfernen
+keys.remove_text = Du behältst {servers} in tTerm, kannst darauf aber erst wieder Terminals öffnen, wenn du einen anderen Zugang wählst.
+keys.remove_text_none = Damit öffnet sich kein Server.
+keys.remove_hint = Der Schlüssel selbst bleibt, wo er war: auf deinem Mac oder in seiner Datei.
+keys.removed = {name} wurde aus deinem Tresor entfernt
+
+# ------------------------------------------------------------ add_key: Add a key from a file (Keys.tsx)
+add_key.title = Schlüssel aus Datei hinzufügen
+add_key.passphrase = Passphrase
+add_key.passphrase_hint = Der Schlüssel ist verschlüsselt. Seine Passphrase öffnet ihn hier, in diesem Browser; sie wird nirgendwohin gesendet.
+add_key.open_key = Schlüssel öffnen
+add_key.reading = Schlüssel wird gelesen …
+add_key.name = Name
+add_key.sealed_here = Der Schlüssel wird hier verschlossen, bevor er diesen Browser verlässt. Öffnen können ihn nur deine Geräte, tTerm nicht.
+add_key.add = Zum Tresor hinzufügen
+add_key.next = Weiter
+add_key.added = {name} ist jetzt in deinem Tresor
+# What is wrong with the file chosen. ssh-keygen and its options are commands: they stay as they are.
+add_key.problem_big = Diese Datei ist zu groß für einen privaten Schlüssel.
+add_key.problem_read = Der Browser konnte diese Datei nicht lesen.
+add_key.problem_format = Das ist kein privater Schlüssel, den tTerm lesen kann. tTerm liest das eigene Format von OpenSSH und PEM (PKCS#8, PKCS#1).
+add_key.problem_public = Das ist ein öffentlicher Schlüssel (.pub). Wähl den privaten Schlüssel: die gleichnamige Datei ohne .pub.
+add_key.problem_passphrase = Der Schlüssel hat eine Passphrase: Gib sie ein, um ihn zu öffnen.
+add_key.problem_wrong_passphrase = Diese Passphrase öffnet den Schlüssel nicht.
+add_key.problem_security_key = Dieser Schlüssel liegt auf einem Sicherheitsschlüssel und kann ihn nicht verlassen: Öffne seine Server über deinen Mac.
+add_key.problem_dsa = DSA-Schlüssel werden im Tresor nicht gespeichert. Erstelle einen neuen Schlüssel mit ssh-keygen -t ed25519.
+add_key.problem_nistp521 = Schlüssel vom Typ ECDSA P-521 speichert der Tresor noch nicht: Ed25519, ECDSA P-256 und P-384 sowie RSA schon.
+add_key.problem_type = Diesen Schlüsseltyp speichert der Tresor nicht: nur Ed25519, ECDSA P-256 und P-384 sowie RSA.
+add_key.problem_cipher = Dieser Schlüssel ist auf eine Weise verschlüsselt, die dieser Browser nicht öffnen kann. Ändere seine Passphrase mit ssh-keygen -p und füg ihn dann noch einmal hinzu.
+add_key.problem_encrypted_pem = Diese Schlüsseldatei ist nach dem alten PEM-Verfahren verschlüsselt. Wandle sie mit ssh-keygen -p -f und der Datei in das Format von OpenSSH um und füg sie dann noch einmal hinzu.
+add_key.problem_ed25519 = Dieser Browser kann Ed25519-Schlüssel in diesem Format nicht lesen. Versuch es mit einem neueren Browser oder mit dem Schlüssel im Format von OpenSSH.
+add_key.problem_several = Die Datei enthält mehr als einen Schlüssel: Füg sie einzeln hinzu.
+
+# ------------------------------------------------------------ vault_new: Save your key to your vault (VaultDialogs.tsx)
+vault_new.title = Schlüssel in deinem Tresor speichern
+# <code>…</code> is the key's name: id_ed25519. {server} is the server's name.
+vault_new.text_server = <code>{key}</code> kommt in deinen Tresor, und du öffnest {server} damit in tTerm Web, auf deinem Handy oder auf jedem Computer, an dem du dich anmeldest.
+vault_new.text = <code>{key}</code> kommt in deinen Tresor: Die Server, die sich damit öffnen, öffnest du dann in tTerm Web, auf deinem Handy oder auf jedem Computer, an dem du dich anmeldest.
+# In tTerm for Mac.
+vault_new.point_mac_unlock = Dein Tresor öffnet sich so, wie du diesen Mac entsperrst: mit Touch ID oder dem Passwort deines Macs. Du musst dir nichts Neues merken.
+vault_new.point_mac_locked = Dein Schlüssel wird verschlossen, bevor er diesen Mac verlässt. Öffnen können ihn nur deine Geräte, tTerm nicht.
+vault_new.point_mac_browser = Ein neuer Browser öffnet deinen Tresor, sobald du den Browser hier freigibst, oder mit deinem Wiederherstellungscode.
+# In a browser.
+vault_new.point_web_unlock = Dein Tresor öffnet sich so, wie du diesen Computer entsperrst: mit Touch ID, Windows Hello oder der Displaysperre deines Handys. Du musst dir nichts Neues merken.
+vault_new.point_web_no_passkey = Dieser Browser kann keinen Passkey für deinen Tresor speichern: Hier öffnet sich der Tresor mit deinem Wiederherstellungscode, jeweils für eine Sitzung.
+vault_new.point_web_locked = Dein Schlüssel wird verschlossen, bevor er diesen Browser verlässt. Öffnen können ihn nur deine Geräte, tTerm nicht.
+vault_new.point_web_browser = Ein anderer Browser öffnet deinen Tresor mit deinem Wiederherstellungscode oder sobald du den Browser in tTerm für Mac freigibst.
+vault_new.make_touch = Tresor mit Touch ID erstellen
+vault_new.make_hello = Tresor mit Windows Hello erstellen
+vault_new.make_passkey = Tresor mit einem Passkey erstellen
+vault_new.make = Tresor erstellen
+
+# ------------------------------------------------------------ recovery: the recovery code, shown once (VaultDialogs.tsx)
+recovery.title = Dein Wiederherstellungscode
+recovery.text = Wenn du jemals alle Geräte verlierst, die deinen Tresor öffnen, ist dieser Code der einzige Weg zurück zu deinen Schlüsseln. tTerm kann sie nicht für dich wiederherstellen. Du siehst ihn nur dieses eine Mal.
+recovery.title_new = Dein neuer Wiederherstellungscode
+recovery.text_new = Der bisherige Code öffnet deinen Tresor nicht mehr. Wenn du jemals alle Geräte verlierst, die deinen Tresor öffnen, ist dieser neue Code der einzige Weg zurück zu deinen Schlüsseln. Du siehst ihn nur dieses eine Mal.
+# For screen readers.
+recovery.code_label = Wiederherstellungscode {code}
+recovery.save_file = Als Datei speichern
+recovery.copy_failed = Kopieren fehlgeschlagen: Markier den Code und kopier ihn von Hand.
+# What the file saved holds.
+recovery.file_text = Wiederherstellungscode für deinen tTerm-Tresor: {code}\\nEr öffnet deinen Tresor, wenn keines deiner Geräte das kann. Bewahre ihn an einem sicheren Ort auf, getrennt von deinen Geräten.
+recovery.kept_mac = Ich habe ihn sicher aufbewahrt, nicht nur auf diesem Mac
+recovery.kept_web = Ich habe ihn sicher aufbewahrt, nicht nur auf diesem Computer
+recovery.make_title = Neuen Wiederherstellungscode erstellen?
+recovery.make_text = Dein aktueller Code funktioniert dann nicht mehr, und der neue wird nur einmal angezeigt. Deine Schlüssel und Geräte bleiben, wie sie sind.
+recovery.now_code = Dein aktueller Wiederherstellungscode
+recovery.now_code_hint = Dieser Browser hat keinen Passkey für deinen Tresor, deshalb brauchst du für den neuen Code deinen aktuellen. Du hast ihn verloren? Dann erstelle den neuen in tTerm für Mac.
+recovery.make_go = Neuen Code erstellen
+recovery.make_go_passkey = Mit deinem Passkey erstellen
+recovery.make_touch = Mit Touch ID erstellen
+
+# ------------------------------------------------------------ vault_open: Open your keys on this browser (VaultDialogs.tsx)
+vault_open.title = Deine Schlüssel in diesem Browser öffnen
+vault_open.text = Dieser Browser ist für deinen Tresor neu. Gib ihn auf einem Gerät frei, das den Tresor schon öffnet.
+vault_open.text_code = Öffne deinen Tresor in diesem Browser mit deinem Wiederherstellungscode.
+# {mac} is the Mac's name, {app} is app_link.mac: "MacBook-Pro-Denis · tTerm for Mac".
+vault_open.mac_name = {app} auf {mac}
+vault_open.mac_ask = Freigabe für diesen Browser anfordern
+vault_open.mac_waiting = Anfrage gesendet. Sie wartet dort auf dich …
+vault_open.mac_compare = Lass es dort nur zu, wenn der Mac denselben Code zeigt
+vault_open.mac_approved = Freigegeben: Deine Schlüssel werden geöffnet …
+vault_open.mac_denied = Dort abgelehnt.
+vault_open.mac_expired = Die Anfrage ist abgelaufen. Fordere die Freigabe noch einmal an.
+vault_open.sas_text = Auch dein Mac zeigt einen Code. Lass es dort nur zu, wenn der Code übereinstimmt:
+vault_open.or = oder
+vault_open.code = Wiederherstellungscode
+vault_open.open = Öffnen
+# Once open with the recovery code or the Mac's approval: whether this browser keeps a passkey.
+vault_open.opened_title = Deine Schlüssel sind in diesem Browser geöffnet
+vault_open.opened_text = Hier einen Passkey speichern, damit sie sich nächstes Mal so öffnen, wie du diesen Computer entsperrst? Auf einem Computer, der nicht dir gehört, wähl „Nur dieses Mal“.
+vault_open.keep_touch = Mit Touch ID speichern
+vault_open.keep_hello = Mit Windows Hello speichern
+vault_open.keep_passkey = Mit einem Passkey speichern
+vault_open.only_now = Nur dieses Mal
+vault_open.kept_session = Sie bleiben nur für diese Sitzung geöffnet.
+
+# ------------------------------------------------------------ app_code: in tTerm for Mac, a vault this Mac has no lock of (VaultDialogs.tsx)
+app_code.title = Deinen Tresor auf diesem Mac öffnen
+app_code.text = Dieser Mac kann deinen Tresor noch nicht selbst öffnen. Öffne ihn hier einmal mit deinem Wiederherstellungscode: Danach öffnet dieser Mac ihn mit Touch ID.
+# When this Mac's lock is there but no longer opens the vault (taken off in a browser, or gone from the keychain).
+app_code.text_lost = Dieser Mac kann deinen Tresor nicht mehr selbst öffnen. Öffne ihn hier einmal mit deinem Wiederherstellungscode: Dann öffnet dieser Mac ihn wieder mit Touch ID.
+
+# ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
+# {key} is the key's name: id_ed25519.
+passphrase.title = {key} hat eine Passphrase
+passphrase.text = Gib sie ein: Dieser Mac öffnet den Schlüssel damit, und sonst geht sie nirgendwohin. Der Schlüssel kommt verschlossen in deinen Tresor.
+# For Let tTerm in: {server} is the server's name, or several ("staging and old-vps").
+passphrase.text_sign_in = Gib sie ein: Dieser Mac meldet sich einmal mit dem Schlüssel bei {server} an, um dort die Zeile von tTerm hinzuzufügen. Die Passphrase geht sonst nirgendwohin, und der Schlüssel bleibt auf diesem Mac.
+passphrase.label = Passphrase
+passphrase.go = Schlüssel öffnen
+
+# ------------------------------------------------------------ mac_approve: in tTerm for Mac, a new browser asks for the keys (VaultDialogs.tsx)
+# {device} is the browser, "Chrome on Windows".
+mac_approve.title = {device} möchte deine Schlüssel öffnen
+mac_approve.a_browser = Ein Browser
+# {ago} is "2 minutes ago", {ip} the address it signed in from.
+mac_approve.text_code = Der Browser hat sich {ago} mit einem Code per E-Mail bei deinem Konto angemeldet, von {ip} aus. Lass ihn nur zu, wenn du es bist: Er öffnet dann Server mit deinen Schlüsseln.
+mac_approve.text_code_now = Der Browser hat sich mit einem Code per E-Mail bei deinem Konto angemeldet, von {ip} aus. Lass ihn nur zu, wenn du es bist: Er öffnet dann Server mit deinen Schlüsseln.
+mac_approve.text_other = Der Browser hat sich von {ip} aus bei deinem Konto angemeldet. Lass ihn nur zu, wenn du es bist: Er öffnet dann Server mit deinen Schlüsseln.
+mac_approve.sas_text = Der Browser zeigt einen Code. Lass ihn nur zu, wenn der Code übereinstimmt:
+# For screen readers, while the code is on its way.
+mac_approve.sas_waiting = Warten auf den Code
+mac_approve.not_me = Das bin ich nicht
+mac_approve.allow = Mit Touch ID zulassen
+mac_approve.not_me_note = „Das bin ich nicht“: Die Anmeldung dort wird beendet, und unter Einstellungen › Geräte siehst du, was du sonst noch prüfen solltest.
+
+# ------------------------------------------------------------ vault_locked: a server with your key, the vault locked here (VaultLocked.tsx)
+vault_locked.title = {machine} öffnet sich mit deinem Schlüssel
+vault_locked.text = Deine Schlüssel sind in diesem Browser gesperrt. Öffne sie so, wie du diesen Computer entsperrst; tTerm meldet dich dann bei {machine} an, und dein Schlüssel verlässt diesen Browser nie.
+vault_locked.text_app = Deine Schlüssel sind auf diesem Mac gesperrt. Öffne sie mit Touch ID oder dem Passwort deines Macs; dann meldet dich dieser Mac bei {machine} an.
+vault_locked.text_app_code = Dieser Mac kann deinen Tresor noch nicht selbst öffnen. Öffne ihn hier einmal mit deinem Wiederherstellungscode; dann meldet dich dieser Mac bei {machine} an.
+# Small links under the button: "or approve on MacBook-Pro-Denis · use the recovery code".
+vault_locked.or = oder
+vault_locked.approve_on = auf {mac} freigeben
+vault_locked.use_code = den Wiederherstellungscode verwenden
+vault_locked.approve_on_button = Auf {mac} freigeben
+vault_locked.use_code_button = Wiederherstellungscode verwenden
+vault_locked.signing = Anmeldung bei {machine} mit deinem Schlüssel …
+vault_locked.no_ed25519 = Dieser Browser kann nicht mit Ed25519-Schlüsseln signieren. Öffne {machine} in einem neueren Browser oder in tTerm für Mac.
+# {key} is the key's name, or vault_locked.its_key.
+vault_locked.not_here = Dein Tresor ist hier geöffnet, aber {key} lässt sich in diesem Browser nicht öffnen. Füg ihn unter Einstellungen › Schlüssel noch einmal aus seiner Datei hinzu.
+vault_locked.its_key = der zugehörige Schlüssel
+
+# ------------------------------------------------------------ vault_problem: what went wrong with the vault (vault/store.ts)
+vault_problem.no_vault = Du hast noch keinen Tresor.
+vault_problem.exists = Du hast schon einen Tresor: Öffne ihn und füg dann den Schlüssel hinzu.
+vault_problem.locked = Öffne zuerst deinen Tresor.
+vault_problem.no_passkey = Hier hat sich kein Passkey für deinen Tresor gemeldet. Gib diesen Browser auf deinem Mac frei oder verwende deinen Wiederherstellungscode.
+vault_problem.no_prf = Dieser Passkey kann deinen Tresor hier nicht öffnen. Gib diesen Browser auf deinem Mac frei oder verwende deinen Wiederherstellungscode.
+vault_problem.no_prf_here = Dieser Browser kann keinen Passkey für deinen Tresor speichern: Der Tresor bleibt nur für diese Sitzung geöffnet.
+vault_problem.lock_broken = Der Passkey dieses Browsers öffnet deinen Tresor nicht mehr. Verwende deinen Wiederherstellungscode oder gib den Browser auf deinem Mac frei.
+vault_problem.code_form = Ein Wiederherstellungscode besteht aus 24 Buchstaben und Ziffern in sechs Vierergruppen.
+vault_problem.code_wrong = Dieser Wiederherstellungscode öffnet deinen Tresor nicht. Prüf den Code oder gib diesen Browser auf deinem Mac frei.
+# In tTerm for Mac: the engine's answers, said by the page (the code window, Touch ID).
+vault_problem.code_wrong_app = Dieser Wiederherstellungscode öffnet deinen Tresor nicht. Prüf den Code und versuch es noch einmal.
+vault_problem.touch_failed = Die Bestätigung mit Touch ID oder dem Passwort deines Macs ist nicht durchgegangen. Es wurde nichts geändert.
+vault_problem.need_code = Gib jetzt deinen Wiederherstellungscode ein: Dieser Browser hat keinen Passkey für deinen Tresor.
+vault_problem.no_x25519 = Dieser Browser ist zu alt, um von deinem Mac freigegeben zu werden: Verwende deinen Wiederherstellungscode oder einen neueren Browser.
+vault_problem.pairing = Die Anfrage ist nicht durchgekommen. Fordere die Freigabe noch einmal an.
+vault_problem.passkey_exists = Dieser Browser hat schon einen Passkey für tTerm.
+vault_problem.no_passkey_here = Dieser Browser kann keinen Passkey erstellen.
+vault_problem.something = Etwas ist schiefgelaufen. Versuch es noch einmal.
+
+# ------------------------------------------------------------ ssh_strip: under a successful ssh in tTerm for Mac's terminals (SshStrip.tsx)
+# {alias} is the server's name as ssh knows it: droplet.
+ssh_strip.region = {alias} in tTerm übernehmen
+ssh_strip.title = {alias}: von überall öffnen
+# <code>…</code>: the address, root@203.0.113.7, and the key, ~/.ssh/id_ed25519.
+ssh_strip.text = tTerm Web, dein Handy, jeder Computer, an dem du dich anmeldest. <code>{address}</code>, dein Schlüssel <code>{key}</code>
+ssh_strip.text_no_key = tTerm Web, dein Handy, jeder Computer, an dem du dich anmeldest. <code>{address}</code>
+ssh_strip.save = Schlüssel speichern
+ssh_strip.let_in = tTerm Zugang geben
+ssh_strip.not_now = Nicht jetzt
+ssh_strip.never = Bei {alias} nicht mehr fragen
+# <b>…</b> are the two buttons' names, as above.
+ssh_strip.explain = <b>Schlüssel speichern:</b> Er kommt in deinen Tresor, den nur deine Geräte öffnen; auf {alias} ändert sich nichts. <b>tTerm Zugang geben:</b> tTerm fügt auf {alias} eine eigene Zeile hinzu; dein Schlüssel bleibt auf diesem Mac. Mehrere Server auf einmal: „Umzug in die Cloud“ im Kontomenü.
+ssh_strip.explain_pass = <b>tTerm Zugang geben:</b> tTerm fügt auf {alias} eine eigene Zeile hinzu; dein Schlüssel bleibt auf diesem Mac. Mehrere Server auf einmal: „Umzug in die Cloud“ im Kontomenü.
+ssh_strip.unreachable = tTerm Web erreicht {alias} aus der Cloud nicht: Der Server öffnet sich über diesen Mac, solange dieser eingeschaltet ist.
+ssh_strip.through_mac = Über diesen Mac öffnen
+ssh_strip.saved_key = {alias} ist jetzt in tTerm und öffnet sich von überall mit deinem Schlüssel.
+ssh_strip.saved_cert = {alias} ist jetzt in tTerm: tTerm hat darauf eine eigene Zeile hinzugefügt, und der Server öffnet sich von überall.
+ssh_strip.saved_mac = {alias} ist jetzt in tTerm und öffnet sich über diesen Mac, solange dieser eingeschaltet ist.
+
+# ------------------------------------------------------------ move: Move to cloud, in tTerm for Mac (MoveToCloud.tsx)
+move.title = Umzug in die Cloud
+move.text = Die Server, die dieser Mac kennt, kommen in dein Konto: Öffne sie in tTerm Web, auf deinem Handy oder auf jedem Computer, an dem du dich anmeldest. Nichts zieht um, bis du auf „Umziehen“ drückst.
+move.servers = Server auf diesem Mac
+# <code>…</code> are ssh's files: they stay as they are.
+move.servers_from = aus <code>~/.ssh/config</code>, <code>known_hosts</code> und deinen ssh-Aufrufen hier
+move.looking = ~/.ssh wird gelesen …
+move.no_servers = Dieser Mac kennt noch keine Server: nichts in ~/.ssh/config oder known_hosts und kein ssh-Aufruf in seinen Terminals.
+# For screen readers: the tick and the choice of each server.
+move.tick_server = {name} umziehen
+move.how = Wie sich {name} öffnet
+# The three ways, in the choice of each server and on the cards under the list.
+move.method_key = Mein Schlüssel
+move.method_cert = tTerm-Zugang
+move.method_mac = Über diesen Mac
+move.way_key = Der Schlüssel kommt in deinen Tresor; auf dem Server ändert sich nichts. Öffnet sich in jedem Browser, sobald dieser deinen Tresor entsperrt hat.
+move.way_cert = tTerm fügt auf dem Server eine eigene Zeile hinzu, dein Schlüssel bleibt hier. Öffnet sich überall, auch in Telegram.
+move.way_mac = Nichts zieht um: tTerm bittet diesen Mac, sich zu verbinden, solange er eingeschaltet ist. Für Server hinter einem VPN.
+# {address} is root@203.0.113.7, {jump} the bastion it goes through.
+move.addr_via = {address} via {jump}
+# After "~/.ssh/config · ": {ago} is "3 minutes ago".
+move.ran_ago = ssh {alias} {ago} ausgeführt
+move.ran_here = ssh {alias} hier ausgeführt
+move.note_known = diesem Mac bekannt
+move.note_git = Ein Git-Host: kein Terminal zum Öffnen
+move.note_there = Schon in tTerm
+move.note_checking = Es wird geprüft, ob tTerm Web ihn erreicht …
+move.note_jump = Hinter dem Bastion-Host {jump}, den die Cloud erreicht: öffnet sich darüber
+move.note_jump_far = Hinter einem Bastion-Host, den nur dein Netzwerk erreicht ({jump}): über diesen Mac
+move.note_far = tTerm Web erreicht ihn aus der Cloud nicht: über diesen Mac
+move.note_key_stays = Sein Schlüssel {key} kann diesen Mac nicht verlassen: über diesen Mac
+move.keys = Schlüssel in ~/.ssh
+move.keys_note = nur die angehakten kommen in deinen Tresor
+# For screen readers.
+move.tick_key = {name} in deinem Tresor speichern
+# {servers} is a server, or a list of them: droplet, staging and app-01.
+move.key_used_one = {servers} öffnet sich damit: kommt in deinen Tresor
+move.key_used_many = {servers} öffnen sich damit: kommt in deinen Tresor
+move.key_unused = Keiner der Server oben nutzt ihn
+move.key_in_vault = Schon in deinem Tresor
+move.key_security = Liegt auf einem Sicherheitsschlüssel und kann ihn nicht verlassen. Seine Server laufen über diesen Mac
+move.key_agent = Liegt nur in einem Agenten und lässt sich nicht kopieren. Seine Server laufen über diesen Mac
+move.key_type = Ein Schlüsseltyp, den der Tresor noch nicht speichert. Seine Server laufen über diesen Mac
+move.key_passphrase = hat eine Passphrase
+move.vault_note = Dein Tresor öffnet sich so, wie du diesen Mac entsperrst: mit Touch ID oder dem Passwort deines Macs. Öffnen können ihn nur deine Geräte, tTerm nicht.
+move.go = one: {n} Server umziehen | other: {n} Server umziehen
+
+# ------------------------------------------------------------ moved: what came of Move to cloud (MoveToCloud.tsx)
+moved.title = one: {ok} von {n} Server in tTerm übernommen | other: {ok} von {n} Servern in tTerm übernommen
+# {project} is where they are: Personal.
+moved.text = In {project}: Öffne sie in tTerm Web, auf deinem Handy oder auf jedem Computer, an dem du dich anmeldest.
+moved.key = Öffnet sich mit deinem Schlüssel
+moved.key_jump = Öffnet sich mit deinem Schlüssel, über {jump}
+moved.cert = Öffnet sich mit dem tTerm-Zugang
+moved.cert_jump = Öffnet sich mit dem tTerm-Zugang, über {jump}
+moved.mac = Über diesen Mac, solange er eingeschaltet ist
+moved.failed = Nicht umgezogen.
+# {why} is what went wrong, as the Mac said it.
+moved.failed_text = {why} Für diesen Server wurde nichts gespeichert.
+moved.open = Terminal öffnen
+moved.change = Ändern
+# <b>…</b> is the key's name, or a list of them.
+moved.keys_one = <b>{keys}</b> ist jetzt in deinem Tresor verschlossen und öffnet sich so, wie du deine Geräte entsperrst. Unter Einstellungen › Schlüssel siehst du ihn überall.
+moved.keys_many = <b>{keys}</b> sind jetzt in deinem Tresor verschlossen und öffnen sich so, wie du deine Geräte entsperrst. Unter Einstellungen › Schlüssel siehst du sie überall.
+moved.no_keys = Kein Schlüssel ist umgezogen: Deine Schlüssel bleiben auf diesem Mac.
 `;export{e as default};

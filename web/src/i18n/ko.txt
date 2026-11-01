@@ -120,6 +120,13 @@ sidebar.signin_title = 서버와 프로젝트
 sidebar.signin_text = 로그인하면 서버에서 터미널을 열고, 프로젝트에 노트를 남기고, 팀과 함께 작업할 수 있어요. 이 컴퓨터는 그대로 유지돼요.
 sidebar.theme_dark = 다크 테마로 전환
 sidebar.theme_light = 라이트 테마로 전환
+# A server that opens with the person's own key, from their vault (0.1.17):
+# the key's tip, after the server's name.
+sidebar.with_key = 보관함에 있는 내 키로 열려요
+# A server that opens through the person's Mac: a small label after its
+# name, and its tip ({mac} is the Mac's name).
+sidebar.via_mac = Mac 경유
+sidebar.via_title = {mac} 경유, 켜져 있는 동안 열려요
 
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
@@ -131,6 +138,13 @@ account_menu.only_here = 이 컴퓨터에서만 사용
 account_menu.offline = 오프라인, 다시 시도하는 중
 account_menu.local_note = tTerm이 이 컴퓨터에서 작동하고 있어요. 서버, 프로젝트, 팀을 쓰려면 로그인하세요.
 account_menu.sign_out = 로그아웃
+# Only in tTerm for Mac, right under Settings: the servers and keys of this
+# Mac to the account (0.1.17). The second line is small, under the first.
+account_menu.move = 클라우드로 옮기기
+account_menu.move_note = 어디서든 쓰는 이 Mac의 서버와 키
+# Only in a browser: the app for a Mac. "tTerm for Mac" is the app's name.
+account_menu.download = Mac용 tTerm 다운로드
+account_menu.download_note = 오프라인에서도 쓰는 내 Mac의 터미널
 # The item after Settings, and the title of the list of languages.
 language.item = 언어
 
@@ -296,6 +310,7 @@ app.action.delete_note_words = note delete remove 노트 메모 삭제 제거 �
 app.action.theme_words = theme dark light colours colors 테마 다크 라이트 어두운 밝은 색상
 app.action.pin_words = sidebar panel pin 사이드바 패널 고정
 app.action.settings_words_local = settings preferences theme dark light colors colours support 설정 환경설정 테마 다크 라이트 색상 지원
+app.action.move_words = move cloud servers keys ssh vault migrate import 옮기기 이동 클라우드 서버 키 보관함 이전 가져오기
 app.action.settings_words = settings preferences theme dark light colors colours devices quick code forget browsers support 설정 환경설정 테마 다크 라이트 색상 기기 간편 코드 지우기 브라우저 지원
 app.action.sign_in_words = sign in log in login account cloud servers 로그인 계정 클라우드 서버
 app.action.account_words = account profile name photo picture avatar plan limits delete 계정 프로필 이름 사진 아바타 요금제 한도 삭제
@@ -1352,3 +1367,317 @@ picker.nothing = 항목이 없어요
 # For screen readers. While the terminal has only its number,
 # terminal.numbered shows faint in it.
 name_input.label = 터미널 이름
+
+# ------------------------------------------------------------ vault: the vault of SSH keys, words used in many places (0.1.17)
+# The vault keeps the person's SSH keys, locked on their own devices; tTerm
+# never sees them. Touch ID, Windows Hello and passkey are the names the
+# systems give these: they stay as the systems name them in the language.
+vault.your_mac = 내 Mac
+vault.open_touch = Touch ID로 열기
+vault.open_hello = Windows Hello로 열기
+vault.open_passkey = 패스키로 열기
+vault.not_now = 나중에
+# For screen readers: the six digits both devices show, "Code 482 913".
+vault.code_label = 코드 {code}
+
+# ------------------------------------------------------------ keys: Settings › Keys, the vault (Keys.tsx)
+keys.title = SSH 키
+keys.about = 내 보관함: 저장한 SSH 키를 내 모든 기기에서 쓸 수 있어요. 보관함은 내 기기만 각 기기의 잠금 해제 방식으로 열 수 있고, tTerm은 열 수 없어요.
+keys.open_here = 이 브라우저에서 열려 있음
+# How it opened, then when it locks again: one of these under "Open in this browser".
+keys.open_text.touch = Touch ID로 열었어요. 8시간 동안 아무 활동이 없거나, tTerm Web을 닫거나, ‘잠그기’를 누르면 다시 잠겨요.
+keys.open_text.hello = Windows Hello로 열었어요. 8시간 동안 아무 활동이 없거나, tTerm Web을 닫거나, ‘잠그기’를 누르면 다시 잠겨요.
+keys.open_text.passkey = 패스키로 열었어요. 8시간 동안 아무 활동이 없거나, tTerm Web을 닫거나, ‘잠그기’를 누르면 다시 잠겨요.
+keys.open_text.recovery = 복구 코드로 이 세션 동안 열었어요. 8시간 동안 아무 활동이 없거나, tTerm Web을 닫거나, ‘잠그기’를 누르면 다시 잠겨요.
+keys.open_text.pairing = Mac의 승인으로 이 세션 동안 열었어요. 8시간 동안 아무 활동이 없거나, tTerm Web을 닫거나, ‘잠그기’를 누르면 다시 잠겨요.
+keys.open_text.new = 방금 이 브라우저에서 만들었어요. 8시간 동안 아무 활동이 없거나, tTerm Web을 닫거나, ‘잠그기’를 누르면 다시 잠겨요.
+# In tTerm for Mac.
+keys.open_mac = 이 Mac에서 열려 있음
+keys.open_text.mac = Touch ID 또는 Mac 암호로 열었어요. tTerm이 실행되는 동안 ‘잠그기’를 누르거나 로그아웃할 때까지 열려 있어요.
+keys.lock = 잠그기
+keys.locked_here = 이 브라우저에서 잠겨 있음
+keys.locked_text = 여기서 키를 쓰려면 보관함을 여세요. 이 컴퓨터의 잠금 해제 방식, Mac의 승인, 또는 복구 코드로 열 수 있어요.
+keys.locked_mac = 이 Mac에서 잠겨 있음
+keys.locked_mac_text = Touch ID 또는 Mac 암호로 여세요. 그러면 이 Mac이 내 서버에 로그인해요.
+keys.locked_mac_code = 이 Mac은 아직 보관함을 직접 열 수 없어요. 여기서 복구 코드로 한 번만 열면, 그다음부터는 Touch ID 또는 Mac 암호로 열려요.
+keys.open = 열기
+keys.open_code = 복구 코드로 열기
+keys.none_title = 아직 보관함이 없어요
+keys.none_web = 파일에서 키를 추가하세요. 그러면 이 브라우저에서 보관함이 만들어지고, 직접 보관할 복구 코드도 생겨요.
+keys.none_app = ‘클라우드로 옮기기’에서, 또는 터미널에서 ssh를 실행한 뒤 나타나는 배너에서 키를 저장하세요. 그러면 Touch ID로 보관함이 만들어져요.
+keys.no_passkey_here = 이 브라우저에는 보관함 패스키를 저장할 수 없어요. 여기서는 복구 코드나 Mac의 승인으로 매번 한 세션 동안만 열려요.
+keys.no_ed25519_here = 이 브라우저는 Ed25519 키로 서명할 수 없어요. 이런 키로 여는 서버는 최신 브라우저나 Mac용 tTerm에서 여세요.
+# {servers} is a list of servers: droplet and staging; web-01 in Client X.
+keys.opens = 여는 서버: {servers}
+keys.opens_none = 아직 이 키로 여는 서버가 없어요
+keys.server_in = {project}의 {server}
+# Where the key came from, and when: {where} is a Mac's name, {day} is
+# time.today, time.yesterday or time.on_day ("on 29 Oct").
+keys.from_mac = {day} {where}에서 저장함
+keys.from_file = {day} 파일에서 추가함
+# After the line above, with " · ": {ago} is "2 hours ago".
+keys.used = 마지막 사용: {ago}
+keys.unused = 아직 사용 안 함
+keys.cannot_ed25519 = 이 브라우저는 Ed25519 키로 서명할 수 없어요
+keys.cannot_open = 여기서는 열리지 않아요: 키 파일에서 다시 추가하세요
+keys.remove = 제거
+keys.add_file = 파일에서 키 추가
+keys.new_recovery = 새 복구 코드 만들기
+# {places} is where the vault opens: "MacBook-Pro-Denis · tTerm for Mac, Chrome on macOS".
+keys.opens_on = 보관함이 열리는 곳: {places}.
+keys.opens_on_code = 보관함은 복구 코드로만 열려요.
+keys.place_mac = {mac} · {app}
+keys.place_browser = 브라우저
+keys.more_web = Mac의 서버와 키를 더 옮기려면 Mac용 tTerm에서 ‘클라우드로 옮기기’를 쓰세요.
+keys.more_app = 서버와 키를 더 옮기려면 계정 메뉴에서 ‘클라우드로 옮기기’를 쓰세요.
+keys.remove_title = 보관함에서 {name} 키를 제거할까요?
+keys.remove_confirm = {name} 제거
+keys.remove_text = {servers} 서버는 tTerm에 남지만, 다른 접속 방법을 고르기 전까지는 열 수 없어요.
+keys.remove_text_none = 이 키로 여는 서버는 없어요.
+keys.remove_hint = 키 원본은 원래 있던 곳, 즉 내 Mac이나 키 파일에 그대로 남아요.
+keys.removed = 보관함에서 {name} 키를 제거했어요
+
+# ------------------------------------------------------------ add_key: Add a key from a file (Keys.tsx)
+add_key.title = 파일에서 키 추가
+add_key.passphrase = 암호 문구
+add_key.passphrase_hint = 키가 암호화되어 있어요. 암호 문구는 여기 이 브라우저에서 키를 여는 데 쓰이고, 어디로도 전송되지 않아요.
+add_key.open_key = 키 열기
+add_key.reading = 키를 읽는 중…
+add_key.name = 이름
+add_key.sealed_here = 키는 이 브라우저를 떠나기 전에 여기서 잠겨요. 내 기기만 열 수 있고, tTerm은 열 수 없어요.
+add_key.add = 보관함에 추가
+add_key.next = 다음
+add_key.added = {name} 키를 보관함에 추가했어요
+# What is wrong with the file chosen. ssh-keygen and its options are commands: they stay as they are.
+add_key.problem_big = 개인 키라고 하기에는 파일이 너무 커요.
+add_key.problem_read = 브라우저가 이 파일을 읽지 못했어요.
+add_key.problem_format = tTerm이 읽을 수 있는 개인 키가 아니에요. OpenSSH 자체 형식이나 PEM(PKCS#8, PKCS#1) 형식이어야 해요.
+add_key.problem_public = 공개 키(.pub)예요. 개인 키를 고르세요. .pub이 붙지 않은 같은 이름의 파일이에요.
+add_key.problem_passphrase = 키에 암호 문구가 있어요. 암호 문구를 입력해 키를 여세요.
+add_key.problem_wrong_passphrase = 이 암호 문구로는 키를 열 수 없어요.
+add_key.problem_security_key = 이 키는 보안 키에 들어 있어서 밖으로 꺼낼 수 없어요. 이 키의 서버는 내 Mac을 경유해 여세요.
+add_key.problem_dsa = DSA 키는 보관함에 저장할 수 없어요. ssh-keygen -t ed25519로 새 키를 만드세요.
+add_key.problem_nistp521 = ECDSA P-521 키는 아직 보관함에 저장할 수 없어요. Ed25519, ECDSA P-256과 P-384, RSA 키는 저장할 수 있어요.
+add_key.problem_type = 이 종류의 키는 보관함에 저장할 수 없어요. Ed25519, ECDSA P-256과 P-384, RSA 키만 저장할 수 있어요.
+add_key.problem_cipher = 이 키는 이 브라우저가 열 수 없는 방식으로 암호화되어 있어요. ssh-keygen -p로 암호 문구를 바꾼 다음 다시 추가하세요.
+add_key.problem_encrypted_pem = 이 키 파일은 예전 PEM 방식으로 암호화되어 있어요. ssh-keygen -p -f 뒤에 파일을 지정해 OpenSSH 형식으로 바꾼 다음 다시 추가하세요.
+add_key.problem_ed25519 = 이 브라우저는 이 형식의 Ed25519 키를 읽을 수 없어요. 최신 브라우저를 쓰거나 OpenSSH 형식의 키를 추가해 보세요.
+add_key.problem_several = 파일에 키가 여러 개 있어요. 하나씩 추가하세요.
+
+# ------------------------------------------------------------ vault_new: Save your key to your vault (VaultDialogs.tsx)
+vault_new.title = 보관함에 내 키 저장
+# <code>…</code> is the key's name: id_ed25519. {server} is the server's name.
+vault_new.text_server = <code>{key}</code> 키가 보관함에 저장되고, tTerm Web, 휴대폰, 로그인한 어떤 컴퓨터에서든 이 키로 {server} 서버를 열 수 있어요.
+vault_new.text = <code>{key}</code> 키가 보관함에 저장돼요. 이 키로 여는 서버를 tTerm Web, 휴대폰, 로그인한 어떤 컴퓨터에서든 열 수 있어요.
+# In tTerm for Mac.
+vault_new.point_mac_unlock = 보관함은 이 Mac의 잠금 해제 방식, 즉 Touch ID나 Mac 암호로 열려요. 새로 외울 건 없어요.
+vault_new.point_mac_locked = 키는 이 Mac을 떠나기 전에 잠겨요. 내 기기만 열 수 있고, tTerm은 열 수 없어요.
+vault_new.point_mac_browser = 새 브라우저에서는 여기서 승인하거나 복구 코드를 입력하면 열려요.
+# In a browser.
+vault_new.point_web_unlock = 보관함은 이 컴퓨터의 잠금 해제 방식, 즉 Touch ID, Windows Hello 또는 휴대폰 화면 잠금으로 열려요. 새로 외울 건 없어요.
+vault_new.point_web_no_passkey = 이 브라우저에는 보관함 패스키를 저장할 수 없어요. 여기서는 복구 코드로 매번 한 세션 동안만 열려요.
+vault_new.point_web_locked = 키는 이 브라우저를 떠나기 전에 잠겨요. 내 기기만 열 수 있고, tTerm은 열 수 없어요.
+vault_new.point_web_browser = 다른 브라우저에서는 복구 코드를 입력하거나 Mac용 tTerm에서 승인하면 열려요.
+vault_new.make_touch = Touch ID로 보관함 만들기
+vault_new.make_hello = Windows Hello로 보관함 만들기
+vault_new.make_passkey = 패스키로 보관함 만들기
+vault_new.make = 보관함 만들기
+
+# ------------------------------------------------------------ recovery: the recovery code, shown once (VaultDialogs.tsx)
+recovery.title = 복구 코드
+recovery.text = 보관함을 여는 기기를 모두 잃어버리면 이 코드가 키를 되찾는 유일한 방법이에요. tTerm은 키를 대신 복구해 줄 수 없어요. 이 코드는 한 번만 보여요.
+recovery.title_new = 새 복구 코드
+recovery.text_new = 이전 코드로는 더 이상 보관함을 열 수 없어요. 보관함을 여는 기기를 모두 잃어버리면 이 코드가 키를 되찾는 유일한 방법이에요. 이 코드는 한 번만 보여요.
+# For screen readers.
+recovery.code_label = 복구 코드 {code}
+recovery.save_file = 파일로 저장
+recovery.copy_failed = 복사하지 못했어요. 코드를 선택해서 직접 복사하세요.
+# What the file saved holds.
+recovery.file_text = tTerm 보관함 복구 코드: {code}\n내 기기로 보관함을 열 수 없을 때 이 코드로 열 수 있어요. 기기와 떨어진 안전한 곳에 보관하세요.
+recovery.kept_mac = 이 Mac에만 두지 않고 안전한 곳에 보관했어요
+recovery.kept_web = 이 컴퓨터에만 두지 않고 안전한 곳에 보관했어요
+recovery.make_title = 새 복구 코드를 만들까요?
+recovery.make_text = 현재 코드는 더 이상 쓸 수 없게 되고, 새 코드는 한 번만 보여요. 키와 기기는 그대로 유지돼요.
+recovery.now_code = 현재 복구 코드
+recovery.now_code_hint = 이 브라우저에는 보관함 패스키가 없어서, 현재 코드로 새 코드를 만들어요. 현재 코드를 잃어버렸나요? Mac용 tTerm에서 새 코드를 만드세요.
+recovery.make_go = 새 코드 만들기
+recovery.make_go_passkey = 패스키로 만들기
+recovery.make_touch = Touch ID로 만들기
+
+# ------------------------------------------------------------ vault_open: Open your keys on this browser (VaultDialogs.tsx)
+vault_open.title = 이 브라우저에서 키 열기
+vault_open.text = 이 브라우저에서 보관함을 여는 건 처음이에요. 보관함을 이미 열 수 있는 기기에서 이 브라우저를 승인하세요.
+vault_open.text_code = 복구 코드로 이 브라우저에서 보관함을 여세요.
+# {mac} is the Mac's name, {app} is app_link.mac: "MacBook-Pro-Denis · tTerm for Mac".
+vault_open.mac_name = {mac} · {app}
+vault_open.mac_ask = 여기서 보관함을 열도록 요청하기
+vault_open.mac_waiting = 요청했어요. Mac에서 확인하기를 기다리는 중…
+vault_open.mac_compare = 같은 코드가 표시될 때만 Mac에서 허용하세요
+vault_open.mac_approved = 승인됐어요. 키를 여는 중…
+vault_open.mac_denied = Mac에서 거부했어요.
+vault_open.mac_expired = 요청이 만료됐어요. 다시 요청하세요.
+vault_open.sas_text = Mac에도 코드가 표시돼요. 같은 코드일 때만 Mac에서 허용하세요:
+vault_open.or = 또는
+vault_open.code = 복구 코드
+vault_open.open = 열기
+# Once open with the recovery code or the Mac's approval: whether this browser keeps a passkey.
+vault_open.opened_title = 이 브라우저에서 키가 열렸어요
+vault_open.opened_text = 다음에 이 컴퓨터의 잠금 해제 방식으로 열리도록 여기에 패스키를 저장할까요? 내 컴퓨터가 아니라면 ‘이번만’을 고르세요.
+vault_open.keep_touch = Touch ID로 저장
+vault_open.keep_hello = Windows Hello로 저장
+vault_open.keep_passkey = 패스키로 저장
+vault_open.only_now = 이번만
+vault_open.kept_session = 이 세션 동안만 열려 있어요.
+
+# ------------------------------------------------------------ app_code: in tTerm for Mac, a vault this Mac has no lock of (VaultDialogs.tsx)
+app_code.title = 이 Mac에서 보관함 열기
+app_code.text = 이 Mac은 아직 보관함을 직접 열 수 없어요. 여기서 복구 코드로 한 번만 열면, 그다음부터는 이 Mac에서 Touch ID로 열려요.
+# When this Mac's lock is there but no longer opens the vault (taken off in a browser, or gone from the keychain).
+app_code.text_lost = 이 Mac은 더 이상 보관함을 직접 열 수 없어요. 여기서 복구 코드로 한 번만 열면, 이 Mac에서 다시 Touch ID로 열 수 있게 설정돼요.
+
+# ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
+# {key} is the key's name: id_ed25519.
+passphrase.title = {key} 키에 암호 문구가 있어요
+passphrase.text = 암호 문구를 입력하세요. 이 Mac은 암호 문구로 키를 열 뿐, 다른 곳으로 보내지 않아요. 키는 잠긴 상태로 보관함에 저장돼요.
+# For Let tTerm in: {server} is the server's name, or several ("staging and old-vps").
+passphrase.text_sign_in = 암호 문구를 입력하세요. 이 Mac이 키로 {server} 서버에 한 번 로그인해 tTerm 전용 줄을 추가해요. 암호 문구는 다른 곳으로 보내지 않고, 키는 이 Mac에 남아요.
+passphrase.label = 암호 문구
+passphrase.go = 키 열기
+
+# ------------------------------------------------------------ mac_approve: in tTerm for Mac, a new browser asks for the keys (VaultDialogs.tsx)
+# {device} is the browser, "Chrome on Windows".
+mac_approve.title = {device}에서 내 키를 열려고 해요
+mac_approve.a_browser = 어떤 브라우저
+# {ago} is "2 minutes ago", {ip} the address it signed in from.
+mac_approve.text_code = {ago}, 이메일로 받은 코드로 {ip}에서 내 계정에 로그인했어요. 본인일 때만 허용하세요. 허용하면 그 브라우저가 내 키로 서버를 열게 돼요.
+mac_approve.text_code_now = 이메일로 받은 코드로 {ip}에서 내 계정에 로그인했어요. 본인일 때만 허용하세요. 허용하면 그 브라우저가 내 키로 서버를 열게 돼요.
+mac_approve.text_other = {ip}에서 내 계정에 로그인했어요. 본인일 때만 허용하세요. 허용하면 그 브라우저가 내 키로 서버를 열게 돼요.
+mac_approve.sas_text = 그 브라우저에 코드가 표시돼요. 같은 코드일 때만 허용하세요:
+# For screen readers, while the code is on its way.
+mac_approve.sas_waiting = 코드를 기다리는 중
+mac_approve.not_me = 제가 아니에요
+mac_approve.allow = Touch ID로 허용
+mac_approve.not_me_note = ‘제가 아니에요’를 누르면 그 로그인이 종료되고, 설정 > 기기에서 그 밖에 확인할 사항을 볼 수 있어요.
+
+# ------------------------------------------------------------ vault_locked: a server with your key, the vault locked here (VaultLocked.tsx)
+vault_locked.title = {machine} 서버는 내 키로 열려요
+vault_locked.text = 이 브라우저에서 키가 잠겨 있어요. 이 컴퓨터의 잠금 해제 방식으로 키를 열면 tTerm이 {machine} 서버에 로그인하고, 키는 절대 이 브라우저 밖으로 나가지 않아요.
+vault_locked.text_app = 이 Mac에서 키가 잠겨 있어요. Touch ID 또는 Mac 암호로 키를 열면 이 Mac이 {machine} 서버에 로그인해요.
+vault_locked.text_app_code = 이 Mac은 아직 보관함을 직접 열 수 없어요. 여기서 복구 코드로 한 번만 열면 이 Mac이 {machine} 서버에 로그인해요.
+# Small links under the button: "or approve on MacBook-Pro-Denis · use the recovery code".
+vault_locked.or = 또는
+vault_locked.approve_on = {mac}에서 승인
+vault_locked.use_code = 복구 코드 사용
+vault_locked.approve_on_button = {mac}에서 승인
+vault_locked.use_code_button = 복구 코드 사용
+vault_locked.signing = 내 키로 {machine} 서버에 로그인하는 중…
+vault_locked.no_ed25519 = 이 브라우저는 Ed25519 키로 서명할 수 없어요. {machine} 서버는 최신 브라우저나 Mac용 tTerm에서 여세요.
+# {key} is the key's name, or vault_locked.its_key.
+vault_locked.not_here = 여기서 보관함은 열려 있지만, {key} 키는 이 브라우저에서 열리지 않아요. 설정 > SSH 키에서 키 파일로 다시 추가하세요.
+vault_locked.its_key = 이 서버의
+
+# ------------------------------------------------------------ vault_problem: what went wrong with the vault (vault/store.ts)
+vault_problem.no_vault = 아직 보관함이 없어요.
+vault_problem.exists = 이미 보관함이 있어요. 보관함을 연 다음 키를 추가하세요.
+vault_problem.locked = 먼저 보관함을 여세요.
+vault_problem.no_passkey = 여기서는 보관함 패스키가 응답하지 않았어요. Mac에서 이 브라우저를 승인하거나 복구 코드를 사용하세요.
+vault_problem.no_prf = 이 패스키로는 여기서 보관함을 열 수 없어요. Mac에서 이 브라우저를 승인하거나 복구 코드를 사용하세요.
+vault_problem.no_prf_here = 이 브라우저에는 보관함 패스키를 저장할 수 없어요. 보관함은 이 세션 동안만 열려 있어요.
+vault_problem.lock_broken = 이 브라우저의 잠금으로는 더 이상 보관함을 열 수 없어요. 복구 코드를 사용하거나 Mac에서 이 브라우저를 승인하세요.
+vault_problem.code_form = 복구 코드는 문자와 숫자 24자로, 4자씩 6묶음이에요.
+vault_problem.code_wrong = 이 복구 코드로는 보관함을 열 수 없어요. 코드를 확인하거나 Mac에서 이 브라우저를 승인하세요.
+# In tTerm for Mac: the engine's answers, said by the page (the code window, Touch ID).
+vault_problem.code_wrong_app = 이 복구 코드로는 보관함을 열 수 없어요. 코드를 확인하고 다시 시도하세요.
+vault_problem.touch_failed = Touch ID 또는 Mac 암호로 확인하지 못했어요. 바뀐 것은 없어요.
+vault_problem.need_code = 지금 복구 코드를 입력하세요. 이 브라우저에는 보관함 패스키가 없어요.
+vault_problem.no_x25519 = 이 브라우저는 너무 오래돼서 Mac에서 승인할 수 없어요. 복구 코드를 사용하거나 최신 브라우저를 쓰세요.
+vault_problem.pairing = 요청이 전달되지 않았어요. 다시 요청하세요.
+vault_problem.passkey_exists = 이 브라우저에는 이미 tTerm 패스키가 있어요.
+vault_problem.no_passkey_here = 이 브라우저에서는 패스키를 만들 수 없어요.
+vault_problem.something = 문제가 생겼어요. 다시 시도하세요.
+
+# ------------------------------------------------------------ ssh_strip: under a successful ssh in tTerm for Mac's terminals (SshStrip.tsx)
+# {alias} is the server's name as ssh knows it: droplet.
+ssh_strip.region = tTerm에 {alias} 서버 저장
+ssh_strip.title = {alias}: 어디서든 열어 보세요
+# <code>…</code>: the address, root@203.0.113.7, and the key, ~/.ssh/id_ed25519.
+ssh_strip.text = tTerm Web, 휴대폰, 로그인한 어떤 컴퓨터에서든. <code>{address}</code>, 내 키 <code>{key}</code>
+ssh_strip.text_no_key = tTerm Web, 휴대폰, 로그인한 어떤 컴퓨터에서든. <code>{address}</code>
+ssh_strip.save = 내 키 저장
+ssh_strip.let_in = tTerm 접근 허용
+ssh_strip.not_now = 나중에
+ssh_strip.never = {alias} 서버는 다시 묻지 않기
+# <b>…</b> are the two buttons' names, as above.
+ssh_strip.explain = <b>내 키 저장:</b> 키가 내 기기만 열 수 있는 보관함에 저장되고, {alias} 서버는 그대로예요. <b>tTerm 접근 허용:</b> tTerm이 {alias} 서버에 전용 줄을 하나 추가하고, 키는 이 Mac에 남아요. 여러 서버를 한 번에 옮기려면 계정 메뉴의 ‘클라우드로 옮기기’를 쓰세요.
+ssh_strip.explain_pass = <b>tTerm 접근 허용:</b> tTerm이 {alias} 서버에 전용 줄을 하나 추가하고, 키는 이 Mac에 남아요. 여러 서버를 한 번에 옮기려면 계정 메뉴의 ‘클라우드로 옮기기’를 쓰세요.
+ssh_strip.unreachable = tTerm Web은 클라우드에서 {alias} 서버에 접속할 수 없어요. 이 Mac이 켜져 있는 동안 이 Mac을 경유해 열려요.
+ssh_strip.through_mac = 이 Mac 경유로 열기
+ssh_strip.saved_key = {alias} 서버가 tTerm에 추가됐어요. 어디서든 내 키로 열려요.
+ssh_strip.saved_cert = {alias} 서버가 tTerm에 추가됐어요. 서버에 tTerm 전용 줄이 추가되어 어디서든 열려요.
+ssh_strip.saved_mac = {alias} 서버가 tTerm에 추가됐어요. 이 Mac이 켜져 있는 동안 이 Mac을 경유해 열려요.
+
+# ------------------------------------------------------------ move: Move to cloud, in tTerm for Mac (MoveToCloud.tsx)
+move.title = 클라우드로 옮기기
+move.text = 이 Mac이 알고 있는 서버가 내 계정으로 옮겨져요. tTerm Web, 휴대폰, 로그인한 어떤 컴퓨터에서든 열 수 있어요. ‘옮기기’를 누르기 전에는 아무것도 옮겨지지 않아요.
+move.servers = 이 Mac의 서버
+# <code>…</code> are ssh's files: they stay as they are.
+move.servers_from = <code>~/.ssh/config</code>, <code>known_hosts</code>, 여기서 실행한 ssh에서 가져옴
+move.looking = ~/.ssh 폴더를 살펴보는 중…
+move.no_servers = 이 Mac이 알고 있는 서버가 아직 없어요. ~/.ssh/config와 known_hosts에 아무것도 없고, 이 Mac의 터미널에서 실행한 ssh도 없어요.
+# For screen readers: the tick and the choice of each server.
+move.tick_server = {name} 옮기기
+move.how = {name} 서버를 여는 방법
+# The three ways, in the choice of each server and on the cards under the list.
+move.method_key = 내 키
+move.method_cert = tTerm 접근 권한
+move.method_mac = 이 Mac 경유
+move.way_key = 키가 보관함에 저장되고, 서버는 그대로예요. 보관함을 연 브라우저라면 어디서든 열려요.
+move.way_cert = tTerm이 서버에 전용 줄을 하나 추가하고, 키는 여기에 남아요. 어디서든, Telegram에서도 열려요.
+move.way_mac = 아무것도 옮겨지지 않아요. 이 Mac이 켜져 있는 동안 tTerm이 이 Mac에 서버 접속을 요청해요. VPN 뒤에 있는 서버용이에요.
+# {address} is root@203.0.113.7, {jump} the bastion it goes through.
+move.addr_via = {address}, {jump} 경유
+# After "~/.ssh/config · ": {ago} is "3 minutes ago".
+move.ran_ago = {ago} ssh {alias} 실행함
+move.ran_here = 여기서 ssh {alias} 실행함
+move.note_known = 이 Mac이 알고 있는 서버
+move.note_git = git 호스트: 열 터미널이 없어요
+move.note_there = 이미 tTerm에 있어요
+move.note_checking = tTerm Web에서 접속할 수 있는지 확인하는 중…
+move.note_jump = 클라우드에서 접속할 수 있는 배스천 호스트 {jump} 뒤에 있어요: 그 호스트를 경유해 열려요
+move.note_jump_far = 내 네트워크에서만 접속할 수 있는 배스천 호스트({jump}) 뒤에 있어요: 이 Mac 경유
+move.note_far = tTerm Web이 클라우드에서 접속할 수 없어요: 이 Mac 경유
+move.note_key_stays = {key} 키는 이 Mac 밖으로 나갈 수 없어요: 이 Mac 경유
+move.keys = ~/.ssh의 키
+move.keys_note = 체크한 키만 보관함에 저장돼요
+# For screen readers.
+move.tick_key = 보관함에 {name} 키 저장
+# {servers} is a server, or a list of them: droplet, staging and app-01.
+move.key_used_one = {servers} 서버가 이 키로 열려요: 보관함에 저장돼요
+move.key_used_many = {servers} 서버가 이 키로 열려요: 보관함에 저장돼요
+move.key_unused = 위 서버 중 이 키를 쓰는 서버가 없어요
+move.key_in_vault = 이미 보관함에 있어요
+move.key_security = 보안 키에 들어 있어서 꺼낼 수 없어요. 이 키의 서버는 이 Mac을 경유해요
+move.key_agent = SSH 에이전트에만 있어서 복사할 수 없어요. 이 키의 서버는 이 Mac을 경유해요
+move.key_type = 보관함에 아직 저장할 수 없는 종류의 키예요. 이 키의 서버는 이 Mac을 경유해요
+move.key_passphrase = 암호 문구 있음
+move.vault_note = 보관함은 이 Mac의 잠금 해제 방식, 즉 Touch ID나 Mac 암호로 열려요. 내 기기만 열 수 있고, tTerm은 열 수 없어요.
+move.go = other: 서버 {n}대 옮기기
+
+# ------------------------------------------------------------ moved: what came of Move to cloud (MoveToCloud.tsx)
+moved.title = other: 서버 {n}대 중 {ok}대가 tTerm에 추가됐어요
+# {project} is where they are: Personal.
+moved.text = {project} 프로젝트에 추가됐어요. tTerm Web, 휴대폰, 로그인한 어떤 컴퓨터에서든 열 수 있어요.
+moved.key = 내 키로 열려요
+moved.key_jump = {jump} 경유, 내 키로 열려요
+moved.cert = tTerm 접근 권한으로 열려요
+moved.cert_jump = {jump} 경유, tTerm 접근 권한으로 열려요
+moved.mac = 이 Mac 경유, 켜져 있는 동안 열려요
+moved.failed = 옮기지 못했어요.
+# {why} is what went wrong, as the Mac said it.
+moved.failed_text = {why} 이 서버에 대해서는 아무것도 저장하지 않았어요.
+moved.open = 터미널 열기
+moved.change = 변경
+# <b>…</b> is the key's name, or a list of them.
+moved.keys_one = <b>{keys}</b> 키가 보관함에 저장됐고, 내 기기의 잠금 해제 방식으로 열리도록 잠겨 있어요. 설정 > SSH 키에서 어디서든 볼 수 있어요.
+moved.keys_many = <b>{keys}</b> 키가 보관함에 저장됐고, 내 기기의 잠금 해제 방식으로 열리도록 잠겨 있어요. 설정 > SSH 키에서 어디서든 볼 수 있어요.
+moved.no_keys = 옮긴 키가 없어요. 키는 이 Mac에 그대로 있어요.

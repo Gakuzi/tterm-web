@@ -23,6 +23,7 @@
 // a file of its own, loaded once it is wanted.
 
 import { createElement, Fragment, useSyncExternalStore, type ReactNode } from "react";
+import { gapIn } from "./gap";
 import englishText from "./i18n/en.txt?raw";
 
 export const LANGUAGES = [
@@ -300,4 +301,11 @@ export function list(items: string[], lang: Lang = shown): string {
     const after = /^[A-Za-z0-9]/.test(parts[i + 1]?.value ?? "") ? " " : "";
     return before + p.value + after;
   }).join("");
+}
+
+/** The space between two words or sentences put side by side: none in
+ * Chinese and Japanese, which write without spaces, except where Latin
+ * letters or digits touch (as list() does). */
+export function gap(before: string, after: string, lang: Lang = shown): string {
+  return gapIn(lang, before, after);
 }

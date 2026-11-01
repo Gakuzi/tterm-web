@@ -6584,3 +6584,947 @@ mark.found-mark {
 .update-line .button-accent {
   align-self: center;
 }
+
+/* ---------------------------------------------- the vault of SSH keys (0.1.17)
+ * As on the canvas (Vault.dc, the rows of 29.10 and 01.11): windows of
+ * 480–520 pixels with an amber tile on top, the six digits large in mono,
+ * Settings › Keys in the cards of Settings, the card a key server's
+ * terminal shows while its login waits, the strip after ssh in the app,
+ * and Move to cloud. */
+
+.vault-tile {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: var(--amber-tint);
+  color: var(--amber-ink);
+}
+
+.vault-tile.big {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+}
+
+.vault-tile.small {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--amber);
+  color: var(--on-accent);
+}
+
+.vault-dialog {
+  max-width: 480px;
+  gap: 14px;
+  padding: 28px;
+}
+
+.vault-dialog.wide {
+  max-width: 520px;
+}
+
+.vault-dialog-title {
+  margin: 0;
+  font: 800 21px/1.25 var(--font-ui);
+  letter-spacing: -0.01em;
+}
+
+.vault-dialog-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--dim);
+}
+
+.vault-dialog-text.small {
+  font-size: 13px;
+}
+
+.vault-code-inline,
+.vault-dialog-text code {
+  font: 500 13px var(--font-mono);
+  color: var(--ink);
+}
+
+.vault-points {
+  margin: 0;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+.vault-buttons {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.vault-buttons .button-accent,
+.vault-code-row .button-accent {
+  align-self: auto;
+}
+
+.button-accent.big svg,
+.button-plain svg {
+  flex: none;
+}
+
+.vault-dialog .button-plain,
+.vault-state .button-plain,
+.vault-keys .button-plain,
+.move-view .button-plain,
+.ssh-strip .button-plain,
+.button-plain.with-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.vault-dialog .button-plain:disabled,
+.move-view .button-plain:disabled,
+.ssh-strip .button-plain:disabled,
+.button-plain.with-icon:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.button-plain.red-line {
+  border-color: var(--red-line);
+  color: var(--red-ink);
+}
+
+.button-plain.red-line:hover {
+  background: var(--red-tint);
+}
+
+.button-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--dim);
+  font: 600 13px var(--font-ui);
+  cursor: pointer;
+}
+
+.button-ghost:hover:not(:disabled) {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--amber-ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  color: var(--amber-hover);
+}
+
+.link-button.dim {
+  color: var(--dim);
+  font-weight: 500;
+  font-size: 12.5px;
+}
+
+.link-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.recovery-box {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px dashed var(--sep);
+  border-radius: 12px;
+  background: var(--ground);
+}
+
+.recovery-code {
+  flex: 1 1 auto;
+  font: 700 17px var(--font-mono);
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.recovery-box .button-plain.small svg {
+  margin-right: -2px;
+}
+
+.vault-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.vault-check input,
+.move-row input[type="checkbox"] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--amber);
+}
+
+/* The Mac asked: the row of the Mac, with a spinner while it waits. */
+.vault-mac {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vault-mac.asked {
+  border-color: var(--amber-ring);
+  background: var(--amber-tint);
+  cursor: default;
+}
+
+.vault-mac:disabled {
+  color: var(--ink);
+}
+
+.vault-mac > svg {
+  flex: none;
+  color: var(--dim);
+}
+
+.vault-mac-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.vault-mac-text strong {
+  font-weight: 600;
+}
+
+.vault-mac-text span {
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.vault-sas {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--ground);
+}
+
+.vault-sas > span:first-child {
+  flex: 1 1 auto;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+.vault-sas code {
+  flex: none;
+  font: 700 24px var(--font-mono);
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.vault-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.vault-or span {
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--line);
+}
+
+.vault-label {
+  font-weight: 600;
+}
+
+.vault-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vault-code-row {
+  display: flex;
+  gap: 8px;
+}
+
+.vault-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--ground);
+  color: var(--ink);
+  font: 500 14px var(--font-ui);
+}
+
+.vault-input.mono {
+  font: 500 14px var(--font-mono);
+}
+
+.vault-input:focus {
+  outline: none;
+  border-color: var(--amber-ring);
+  box-shadow: 0 0 0 3px var(--amber-tint);
+}
+
+.vault-small {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+.vault-read {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--raised);
+}
+
+.vault-read > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--amber-ink);
+}
+
+.vault-read-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.vault-read-text strong {
+  color: var(--ink);
+}
+
+.vault-read-text code {
+  font: 500 12px var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.dialog-note.mono {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+/* Settings › Keys */
+.account-section-head h2.with-icon {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.account-section-head h2.with-icon svg {
+  color: var(--amber-ink);
+}
+
+.vault-state {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.vault-state.open {
+  background: var(--green-tint);
+}
+
+.vault-state-icon {
+  flex: none;
+  color: var(--dim);
+}
+
+.vault-state.open .vault-state-icon {
+  color: var(--green-ink);
+}
+
+.vault-state-text {
+  flex: 1 1 280px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vault-state-text strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.vault-state .button-accent {
+  align-self: auto;
+}
+
+.vault-note {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--amber-tint);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.vault-keys .device-row {
+  align-items: flex-start;
+}
+
+.vault-kind {
+  font: 500 12px var(--font-mono);
+  color: var(--faint);
+}
+
+.vault-key-servers {
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.vault-keys .device-text > span:not(.vault-key-servers) {
+  color: var(--faint);
+}
+
+.vault-keys .device-text .vault-warn {
+  color: var(--amber-ink);
+}
+
+.vault-places {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+.button-plain.with-icon {
+  height: 36px;
+}
+
+/* A key server's terminal while its login waits for the vault. */
+.vault-locked {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  background: var(--ground);
+}
+
+.vault-locked-card {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 32px 28px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.vault-locked-card h1 {
+  margin: 0;
+  font: 800 21px/1.25 var(--font-ui);
+}
+
+.vault-locked-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--dim);
+}
+
+.vault-locked-text.waiting-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vault-locked-card .button-accent.big {
+  align-self: center;
+  height: 44px;
+  margin-top: 6px;
+  padding: 0 22px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.vault-locked-links {
+  margin: 0;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.vault-locked-links .link-button {
+  font-weight: 500;
+}
+
+.vault-locked-card .error-box {
+  align-self: stretch;
+  text-align: left;
+}
+
+/* The sidebar: a key server's key, and "via Mac". */
+.sb-key {
+  flex: none;
+  display: inline-flex;
+  color: var(--amber-ink);
+}
+
+.sb-name .sb-key svg {
+  color: var(--amber-ink);
+}
+
+.via-pill {
+  flex: none;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--raised);
+  color: var(--dim);
+  font: 600 10.5px var(--font-ui);
+  white-space: nowrap;
+}
+
+.sb-name .via-pill svg {
+  color: inherit;
+}
+
+/* The account's menu: Move to cloud, Download tTerm for Mac. */
+.menu-item.offer {
+  min-height: 52px;
+  padding: 6px 10px;
+  background: var(--amber-tint);
+  text-decoration: none;
+}
+
+.menu-item.offer + .menu-item.offer,
+.menu-item + .menu-item.offer,
+.menu-item.offer + .menu-item {
+  margin-top: 2px;
+}
+
+.menu-item.offer svg {
+  color: var(--amber-ink);
+}
+
+.menu-item.offer:hover,
+.menu-item.offer:focus-visible {
+  background: var(--amber-ring);
+}
+
+.menu-two {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.menu-sub {
+  font: 500 12px var(--font-ui);
+  color: var(--dim);
+}
+
+/* The strip after ssh, under its block. */
+.ssh-strip {
+  margin: -6px 0 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--amber-ring);
+  border-radius: 12px;
+  background: var(--amber-tint);
+}
+
+.ssh-strip-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.ssh-strip-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.ssh-strip-text strong {
+  font: 700 15px var(--font-ui);
+  color: var(--ink);
+}
+
+.ssh-strip-text code {
+  font: 500 12.5px var(--font-mono);
+}
+
+.ssh-strip-actions,
+.ssh-strip-note,
+.ssh-strip-explain,
+.ssh-strip > .error-box {
+  margin-left: 46px;
+}
+
+.ssh-strip-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ssh-strip-actions .button-accent {
+  align-self: auto;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+
+.ssh-strip-actions .button-plain {
+  height: 36px;
+  background: var(--surface);
+}
+
+.ssh-strip-note,
+.ssh-strip-explain {
+  margin-top: 0;
+  margin-bottom: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--dim);
+}
+
+.ssh-strip-note {
+  color: var(--amber-ink);
+}
+
+.ssh-strip-explain strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Move to cloud, and what came of it. */
+.move-view {
+  max-width: 920px;
+  gap: 28px;
+}
+
+.move-lead {
+  margin: -20px 0 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--dim);
+}
+
+.move-lead svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--amber-ink);
+}
+
+.move-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.move-head h1 {
+  margin: 0;
+  font: 800 28px/1.2 var(--font-ui);
+  letter-spacing: -0.01em;
+}
+
+.move-head p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--dim);
+}
+
+.move-section-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.move-section-head h2 {
+  margin: 0;
+  font: 700 17px var(--font-ui);
+}
+
+.move-section-head span {
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.move-section-head code {
+  font: 500 12.5px var(--font-mono);
+}
+
+.move-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.move-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.move-row + .move-row {
+  border-top: 1px solid var(--raised);
+}
+
+.move-row.off {
+  opacity: 0.55;
+}
+
+.move-row > svg {
+  flex: none;
+  color: var(--dim);
+}
+
+.move-text {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+.move-text strong {
+  font: 700 14px var(--font-ui);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.move-text strong.mono {
+  font: 600 14px var(--font-mono);
+}
+
+.move-text .amber {
+  color: var(--amber-ink);
+}
+
+.move-addr {
+  margin-left: 6px;
+  font: 500 12.5px var(--font-mono);
+  color: var(--dim);
+}
+
+.move-addr.ui {
+  font: 500 12px var(--font-ui);
+  color: var(--faint);
+}
+
+.move-method {
+  flex: none;
+  width: 176px;
+  height: 34px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--ground);
+  color: var(--ink);
+  font: 600 13px var(--font-ui);
+}
+
+.move-method.mine {
+  border-color: var(--amber-ring);
+}
+
+.move-ways {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.move-way {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+.move-way strong {
+  font: 700 13px var(--font-ui);
+  color: var(--ink);
+}
+
+.move-way.mine {
+  border-color: var(--amber-ring);
+}
+
+.move-way.mine strong {
+  color: var(--amber-ink);
+}
+
+.move-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+.move-foot > svg {
+  flex: none;
+  color: var(--amber-ink);
+}
+
+.move-foot > span {
+  flex: 1 1 320px;
+}
+
+.move-foot strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.move-foot .button-accent {
+  align-self: auto;
+}
+
+.move-mark {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.move-mark.ok {
+  background: var(--green-tint);
+  color: var(--green-ink);
+}
+
+.move-mark.bad {
+  background: var(--amber-tint);
+  color: var(--amber-ink);
+}
+
+.move-list .move-text > span {
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.move-list .move-text > span.amber {
+  color: var(--amber-ink);
+}
+
+@media (max-width: 720px) {
+  .move-ways {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .move-method {
+    width: 100%;
+  }
+
+  .ssh-strip {
+    margin-left: 0;
+  }
+
+  .ssh-strip-actions,
+  .ssh-strip-note,
+  .ssh-strip-explain,
+  .ssh-strip > .error-box {
+    margin-left: 0;
+  }
+
+  .vault-dialog {
+    padding: 22px;
+  }
+
+  .vault-sas code {
+    font-size: 20px;
+  }
+}

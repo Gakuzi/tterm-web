@@ -33,6 +33,7 @@ import asyncio
 import base64
 import contextlib
 import datetime as dt
+import functools
 import itertools
 import json
 import logging
@@ -45,8 +46,9 @@ from dataclasses import dataclass, field
 from typing import Awaitable, Callable
 
 import asyncpg
+import asyncssh
 
-from . import accounts, complete, search, shell, ssh, transport, trust
+from . import accounts, complete, search, shell, ssh, transport, trust, vault
 from .accounts import Person
 from .signer_client import SignerClient
 from .transport import LinkError
@@ -142,6 +144,30 @@ class Machine:
     #: (trust.py, from 0.0.12).
     principal: str | None = None
     own_line: bool = False
+    #: How the core signs in (0.1.17): 'cert' (a certificate, as for Add
+    #: machine), 'key' (the person's vault key, relayed over the page's
+    #: socket), or 'mac' (a terminal on the person's Mac that runs ssh).
+    login_method: str = "cert"
+    #: For 'key': the vault key, with its public half for verifying the
+    #: relayed signature.
+    vault_key_id: uuid.UUID | None = None
+    vault_public_key: str | None = None
+    vault_fingerprint: str | None = None
+    vault_key_name: str | None = None
+    #: For a server behind a bastion: the jump host, reached the same way.
+    jump_host: str | None = None
+    jump_port: int | None = None
+    jump_login: str | None = None
+    jump_host_keys: list[str] = field(default_factory=list)
+    #: For 'mac': the person's Mac (a computer) the ssh runs on, and what it
+    #: runs ssh to.
+    via_machine_id: uuid.UUID | None = None
+    via_name: str | None = None
+    ssh_target: str | None = None
+    #: Added by the person (POST /api/machines/own), not with Add machine:
+    #: always dialled the checked way (reach.py), also as a 'cert' server
+    #: with no bastion.
+    own_server: bool = False
 
     @property
     def label(self) -> str:
@@ -231,12 +257,14 @@ class Terminal:
 
     def __init__(self, *, pool: asyncpg.Pool, signer: SignerClient,
                  owner: Person, machine: Machine, name: str,
-                 cols: int, rows: int, agents=None) -> None:
+                 cols: int, rows: int, agents=None, relay=None) -> None:
         self.id = uuid.uuid4()
         self.pool = pool
         self.signer = signer
         #: The connected agents, for a terminal on a computer.
         self.agents = agents
+        #: The vault signing relay (vault.VaultRelay), for a 'key' server.
+        self.relay = relay
         self.owner = owner
         self.machine = machine
         self.name = name
@@ -288,6 +316,10 @@ class Terminal:
         self._nudging = False
         #: Why it is being closed, once close() was asked; what it says then.
         self._closing: str | None = None
+        #: While a 'key' server waits for a page socket to sign its login:
+        #: the key it waits for, as the contract's "vault" field. None when
+        #: nothing waits.
+        self.vault_wait: dict | None = None
         #: The page typing into this terminal; see Watcher.
         self.active: "Watcher | None" = None
 
@@ -324,6 +356,7 @@ class Terminal:
             "branch": self.branch,
             "venv": self.venv,
             "running": self._running(),
+            "vault": self.vault_wait,
             "openedAt": self.opened_at.isoformat(timespec="seconds"),
         }
 
@@ -362,6 +395,14 @@ class Terminal:
 
     async def _run(self) -> None:
         m = self.machine
+        # A terminal on the Mac that runs ssh (login_method 'mac') is
+        # classic: it runs an argv, not the login shell, so it has no
+        # markers and no blocks.
+        classic_exec: list[str] | None = None
+        markers = False
+        # A server reached over SSH (not a computer's agent, not through the
+        # Mac): its failures read as SSH ones.
+        over_ssh = m.kind != "computer" and m.login_method != "mac"
         try:
             if m.kind == "computer":
                 link = self.agents.get(m.id) if self.agents is not None else None
@@ -372,29 +413,61 @@ class Terminal:
                         "a terminal again.")
                     return
                 self._link = link
+            elif m.login_method == "mac":
+                link = (self.agents.get(m.via_machine_id)
+                        if self.agents is not None and m.via_machine_id else None)
+                if link is None:
+                    await self._end(
+                        f"{m.via_name or 'The Mac'} is not connected right now. "
+                        "Open it from the Mac, or start tTerm for Mac, then "
+                        "open this terminal again.")
+                    return
+                self._link = link
+                classic_exec = ["ssh", "--", m.ssh_target or ""]
+            elif m.login_method == "key" or (m.login_method == "cert"
+                                             and (m.jump_host or m.own_server)):
+                # A server the person added, at a host they typed: the
+                # address is checked at every opening (its name could point
+                # elsewhere since), and the login is their vault key or a
+                # certificate. connect_own does the bastion, if any.
+                self._link = transport.SshLink(await self._connect_own(m))
             else:
+                # As for Add machine: a 2-minute certificate for the server's
+                # own principal (own cert machines without a bastion too).
                 self._link = transport.SshLink(await trust.sign_in(
                     self.pool, self.signer,
                     trust.Server(m.id, m.label, m.host, m.port, m.host_keys,
                                  m.ca_id, m.principal, m.own_line,
                                  m.login or trust.LOGIN),
                     ssh.key_id(self.owner.name, str(self.owner.id), m.name)))
-            how = await self._deploy()
-            self.shell = how.shell
-            self.blocks = how.blocks
-            # Echo starts off so the key never shows; the shell turns it
-            # back on as soon as it has read the key.
-            self._chan = await self._link.open(how.command, self.cols,
-                                               self.rows, echo=not how.markers)
+            if classic_exec is not None:
+                self.shell = None
+                self.blocks = False
+                self._chan = await self._link.open(
+                    None, self.cols, self.rows, echo=True,
+                    exec_argv=classic_exec)
+            else:
+                how = await self._deploy()
+                self.shell = how.shell
+                self.blocks = how.blocks
+                markers = how.markers
+                # Echo starts off so the key never shows; the shell turns it
+                # back on as soon as it has read the key.
+                self._chan = await self._link.open(how.command, self.cols,
+                                                   self.rows, echo=not markers)
             self._chan.on_change = self._changed
         except asyncio.CancelledError:
             raise
         except Exception as exc:        # noqa: BLE001 - every reason is shown
             log.info("terminal on %s did not open: %s", m.label, exc)
-            await self._end(ssh.explain(exc, m.host, m.port) if m.kind != "computer"
-                            else f"Could not open a terminal on {m.name}: {exc}")
+            await self._end(ssh.explain(exc, m.host or "", m.port or 0)
+                            if over_ssh else
+                            f"Could not open a terminal on {m.name}: {exc}")
             return
-        if how.markers:
+        finally:
+            # However it ends, it is not waiting on the vault any more.
+            self._set_vault_wait(False)
+        if markers:
             self._chan.write(self._key.encode() + b"\n")
         if self._pending:
             self._chan.write(bytes(self._pending))
@@ -404,6 +477,57 @@ class Terminal:
         await self._journal("terminal.opened", {"shell": self.shell})
         log.info("terminal opened on %s (%s)", m.label, self.shell)
         await self._read()
+
+    def _set_vault_wait(self, waiting: bool) -> None:
+        """Called by the relay while a 'key' server waits for a page socket
+        to sign its login, and again when it goes on: the terminal shows it
+        (the "vault" field) and pages hear it."""
+        now = (self.vault_wait is not None)
+        if waiting and not now:
+            self.vault_wait = {
+                "key": self.machine.vault_fingerprint,
+                "keyName": self.machine.vault_key_name,
+                "since": dt.datetime.now(dt.UTC).isoformat(timespec="seconds")}
+            self._changed()
+        elif not waiting and now:
+            self.vault_wait = None
+            self._changed()
+
+    async def _connect_own(self, m: Machine) -> asyncssh.SSHClientConnection:
+        """Signs in to a server the person added (ssh.connect_own): with
+        their vault key (relayed) or a certificate, through a bastion when
+        the machine has one. The jump uses the same way in."""
+        who = ssh.key_id(self.owner.name, str(self.owner.id), m.name)
+
+        def client_key() -> ssh.ClientKey:
+            if m.login_method == "key":
+                pub = asyncssh.import_public_key(m.vault_public_key)
+                sign = functools.partial(
+                    self.relay.sign_blob, public_key=m.vault_public_key,
+                    user_id=self.owner.id, fingerprint=m.vault_fingerprint,
+                    key_name=m.vault_key_name or "", machine=m.name,
+                    machine_id=m.id, project_id=m.project_id,
+                    waiting=self._set_vault_wait)
+
+                async def key_factory():
+                    return vault.RelayKeyPair(pub, sign)
+                return key_factory
+
+            async def cert_factory():
+                return await self.signer.credentials(m.principal, who,
+                                                     ca=m.ca_id)
+            return cert_factory
+
+        jump = None
+        if m.jump_host:
+            jump = {"host": m.jump_host, "port": m.jump_port or 22,
+                    "login": m.jump_login or (m.login or trust.LOGIN),
+                    "host_keys": m.jump_host_keys, "client_key": client_key()}
+        limiter = self.relay.limiter if self.relay is not None else None
+        return await ssh.connect_own(
+            host=m.host, port=m.port or 22, login=m.login or trust.LOGIN,
+            host_keys=m.host_keys, client_key=client_key(), who=who,
+            user_id=self.owner.id, limiter=limiter, jump=jump)
 
     async def _deploy(self) -> shell.Plan:
         """Puts the shell scripts on the machine and picks the shell.
@@ -882,11 +1006,13 @@ class Terminals:
     opened it, and only they see it: every way in takes the person asking."""
 
     def __init__(self, pool: asyncpg.Pool, signer: SignerClient,
-                 agents=None) -> None:
+                 agents=None, relay=None) -> None:
         self.pool = pool
         self.signer = signer
         #: The connected agents (agents.Agents), for terminals on computers.
         self.agents = agents
+        #: The vault signing relay (vault.VaultRelay), for 'key' servers.
+        self.relay = relay
         self._live: dict[uuid.UUID, Terminal] = {}
         #: One opening at a time per person, so that their count holds.
         self._opening: dict[uuid.UUID, asyncio.Lock] = {}
@@ -932,7 +1058,8 @@ class Terminals:
                             if str(n) not in used))
             terminal = Terminal(pool=self.pool, signer=self.signer,
                                 owner=person, machine=machine, name=name,
-                                cols=cols, rows=rows, agents=self.agents)
+                                cols=cols, rows=rows, agents=self.agents,
+                                relay=self.relay)
             await self.pool.execute(
                 "INSERT INTO terminals (id, machine_id, owner_id, name, kind) "
                 "VALUES ($1, $2, $3, $4, 'term')",
@@ -969,20 +1096,44 @@ class Terminals:
         row = await self.pool.fetchrow(
             """
             SELECT m.id, m.project_id, p.code, m.name, m.host, m.port, m.login,
-                   m.host_keys, m.ca_id, m.kind, m.principal, m.own_line
+                   m.host_keys, m.ca_id, m.kind, m.principal, m.own_line,
+                   m.login_method, m.vault_key_id, m.jump_host, m.jump_port,
+                   m.jump_login, m.jump_host_keys, m.via_machine_id,
+                   m.ssh_target, m.own_server,
+                   vk.public_key AS vault_public_key,
+                   vk.fingerprint AS vault_fingerprint, vk.name AS vault_key_name,
+                   vk.removed_at AS vault_key_removed, via.name AS via_name,
+                   via.removed_at AS via_removed
             FROM machines m
             JOIN projects p ON p.id = m.project_id
             JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $2
+            LEFT JOIN vault_keys vk ON vk.id = m.vault_key_id
+            LEFT JOIN machines via ON via.id = m.via_machine_id
             WHERE m.id = $1 AND m.removed_at IS NULL
               AND pm.role = ANY($3::text[])
               AND (pm.until IS NULL OR pm.until > now())
             """, machine_id, user_id, list(CAN_OPEN))
         if row is None:
             raise NotAllowed("No such machine.")
-        return Machine(row["id"], row["project_id"], row["code"], row["name"],
-                       row["host"], row["port"], row["login"],
-                       list(row["host_keys"]), row["ca_id"], row["kind"],
-                       row["principal"], row["own_line"])
+        if row["login_method"] == "key" and (row["vault_key_id"] is None
+                                              or row["vault_key_removed"]
+                                              is not None):
+            raise NotAllowed(
+                "This server opens with a key from your vault, and that key "
+                "was removed. Choose another way to open it.")
+        return Machine(
+            row["id"], row["project_id"], row["code"], row["name"],
+            row["host"], row["port"], row["login"], list(row["host_keys"]),
+            row["ca_id"], row["kind"], row["principal"], row["own_line"],
+            login_method=row["login_method"], vault_key_id=row["vault_key_id"],
+            vault_public_key=row["vault_public_key"],
+            vault_fingerprint=row["vault_fingerprint"],
+            vault_key_name=row["vault_key_name"],
+            jump_host=row["jump_host"], jump_port=row["jump_port"],
+            jump_login=row["jump_login"],
+            jump_host_keys=list(row["jump_host_keys"] or []),
+            via_machine_id=row["via_machine_id"], via_name=row["via_name"],
+            ssh_target=row["ssh_target"], own_server=row["own_server"])
 
     def get(self, terminal_id: uuid.UUID, user_id: uuid.UUID) -> Terminal | None:
         """The person's terminal: someone else's is as if it were not."""
@@ -1323,7 +1474,8 @@ class Watcher:
 
     async def _state(self) -> None:
         t = self.terminal
-        now = (t.state, t.reason, t.markers, t.shell, t.away, t.label)
+        waiting = t.vault_wait.get("since") if t.vault_wait else None
+        now = (t.state, t.reason, t.markers, t.shell, t.away, t.label, waiting)
         if now != self._state_sent:
             self._state_sent = now
             await self._json({"op": "state", "ch": self.channel,

@@ -120,6 +120,13 @@ sidebar.signin_title = Servers and projects
 sidebar.signin_text = Sign in to open terminals on your servers, keep notes in projects and work with your team. This computer stays as it is.
 sidebar.theme_dark = Switch to dark theme
 sidebar.theme_light = Switch to light theme
+# A server that opens with the person's own key, from their vault (0.1.17):
+# the key's tip, after the server's name.
+sidebar.with_key = Opens with your key, from your vault
+# A server that opens through the person's Mac: a small label after its
+# name, and its tip ({mac} is the Mac's name).
+sidebar.via_mac = via Mac
+sidebar.via_title = Through {mac}, while it is on
 
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
@@ -131,6 +138,13 @@ account_menu.only_here = Only this computer
 account_menu.offline = Offline, trying again
 account_menu.local_note = tTerm works with this computer. Sign in for your servers, projects and team.
 account_menu.sign_out = Sign out
+# Only in tTerm for Mac, right under Settings: the servers and keys of this
+# Mac to the account (0.1.17). The second line is small, under the first.
+account_menu.move = Move to cloud
+account_menu.move_note = Servers and keys of this Mac, everywhere
+# Only in a browser: the app for a Mac. "tTerm for Mac" is the app's name.
+account_menu.download = Download tTerm for Mac
+account_menu.download_note = Terminals on your Mac, also offline
 # The item after Settings, and the title of the list of languages.
 language.item = Language
 
@@ -296,6 +310,7 @@ app.action.delete_note_words = note delete remove
 app.action.theme_words = theme dark light colours colors
 app.action.pin_words = sidebar panel pin
 app.action.settings_words_local = settings preferences theme dark light colors colours support
+app.action.move_words = move cloud servers keys ssh vault migrate import
 app.action.settings_words = settings preferences theme dark light colors colours devices quick code forget browsers support
 app.action.sign_in_words = sign in log in login account cloud servers
 app.action.account_words = account profile name photo picture avatar plan limits delete
@@ -1352,3 +1367,317 @@ picker.nothing = Nothing here
 # For screen readers. While the terminal has only its number,
 # terminal.numbered shows faint in it.
 name_input.label = Terminal name
+
+# ------------------------------------------------------------ vault: the vault of SSH keys, words used in many places (0.1.17)
+# The vault keeps the person's SSH keys, locked on their own devices; tTerm
+# never sees them. Touch ID, Windows Hello and passkey are the names the
+# systems give these: they stay as the systems name them in the language.
+vault.your_mac = your Mac
+vault.open_touch = Open with Touch ID
+vault.open_hello = Open with Windows Hello
+vault.open_passkey = Open with a passkey
+vault.not_now = Not now
+# For screen readers: the six digits both devices show, "Code 482 913".
+vault.code_label = Code {code}
+
+# ------------------------------------------------------------ keys: Settings › Keys, the vault (Keys.tsx)
+keys.title = Keys
+keys.about = Your vault: the SSH keys you saved, on all your devices. Only your devices open it, the way they unlock; tTerm cannot.
+keys.open_here = Open in this browser
+# How it opened, then when it locks again: one of these under "Open in this browser".
+keys.open_text.touch = Opened with Touch ID. It locks again after 8 hours without anything done, when you close tTerm Web, or when you press Lock.
+keys.open_text.hello = Opened with Windows Hello. It locks again after 8 hours without anything done, when you close tTerm Web, or when you press Lock.
+keys.open_text.passkey = Opened with your passkey. It locks again after 8 hours without anything done, when you close tTerm Web, or when you press Lock.
+keys.open_text.recovery = Opened with your recovery code, for this session. It locks again after 8 hours without anything done, when you close tTerm Web, or when you press Lock.
+keys.open_text.pairing = Opened with your Mac's approval, for this session. It locks again after 8 hours without anything done, when you close tTerm Web, or when you press Lock.
+keys.open_text.new = Made in this browser just now. It locks again after 8 hours without anything done, when you close tTerm Web, or when you press Lock.
+# In tTerm for Mac.
+keys.open_mac = Open on this Mac
+keys.open_text.mac = Opened with Touch ID or your Mac's password. It stays open while tTerm runs, until you press Lock or sign out.
+keys.lock = Lock
+keys.locked_here = Locked in this browser
+keys.locked_text = Open it to use your keys here: the way this computer unlocks, your Mac's approval, or your recovery code.
+keys.locked_mac = Locked on this Mac
+keys.locked_mac_text = Open it with Touch ID or your Mac's password: then this Mac signs your servers in.
+keys.locked_mac_code = This Mac has no lock on your vault yet. Open it here once with your recovery code: after that, Touch ID or your Mac's password opens it.
+keys.open = Open
+keys.open_code = Open with the recovery code
+keys.none_title = No vault yet
+keys.none_web = Add a key from a file: your vault is made then, in this browser, with a recovery code you keep.
+keys.none_app = Save a key with Move to cloud, or with the strip after ssh in a terminal: your vault is made then, with Touch ID.
+keys.no_passkey_here = This browser cannot keep your vault with a passkey: here it opens with your recovery code or your Mac's approval, for one session at a time.
+keys.no_ed25519_here = This browser cannot sign with Ed25519 keys. Open those servers in a newer browser, or in tTerm for Mac.
+# {servers} is a list of servers: droplet and staging; web-01 in Client X.
+keys.opens = Opens {servers}
+keys.opens_none = No server opens with it yet
+keys.server_in = {server} in {project}
+# Where the key came from, and when: {where} is a Mac's name, {day} is
+# time.today, time.yesterday or time.on_day ("on 29 Oct").
+keys.from_mac = Saved from {where} {day}
+keys.from_file = Added from a file {day}
+# After the line above, with " · ": {ago} is "2 hours ago".
+keys.used = last used {ago}
+keys.unused = not used yet
+keys.cannot_ed25519 = This browser cannot sign with Ed25519 keys
+keys.cannot_open = It does not open here: add it again from its file
+keys.remove = Remove
+keys.add_file = Add a key from a file
+keys.new_recovery = Make a new recovery code
+# {places} is where the vault opens: "MacBook-Pro-Denis · tTerm for Mac, Chrome on macOS".
+keys.opens_on = Opens on: {places}.
+keys.opens_on_code = Opens with your recovery code only.
+keys.place_mac = {mac} · {app}
+keys.place_browser = a browser
+keys.more_web = More servers and keys from a Mac: Move to cloud in tTerm for Mac.
+keys.more_app = More servers and keys: Move to cloud in the account menu.
+keys.remove_title = Remove {name} from your vault?
+keys.remove_confirm = Remove {name}
+keys.remove_text = {servers} stay in tTerm, but cannot open until you choose another way in.
+keys.remove_text_none = No server opens with it.
+keys.remove_hint = The key stays where it came from: on your Mac, or in its file.
+keys.removed = {name} is out of your vault
+
+# ------------------------------------------------------------ add_key: Add a key from a file (Keys.tsx)
+add_key.title = Add a key from a file
+add_key.passphrase = Passphrase
+add_key.passphrase_hint = The key is encrypted. Its passphrase opens it here, in this browser; it goes nowhere.
+add_key.open_key = Open the key
+add_key.reading = Reading the key…
+add_key.name = Name
+add_key.sealed_here = It is locked here, before it leaves this browser. Only your devices can open it; tTerm cannot.
+add_key.add = Add to your vault
+add_key.next = Next
+add_key.added = {name} is in your vault
+# What is wrong with the file chosen. ssh-keygen and its options are commands: they stay as they are.
+add_key.problem_big = That file is too big for a private key.
+add_key.problem_read = The browser could not read that file.
+add_key.problem_format = This is not a private key tTerm can read: OpenSSH's own format, or PEM (PKCS#8, PKCS#1).
+add_key.problem_public = This is a public key (.pub). Choose the private key: the file of the same name without .pub.
+add_key.problem_passphrase = The key has a passphrase: type it to open the key.
+add_key.problem_wrong_passphrase = That passphrase does not open this key.
+add_key.problem_security_key = This key is on a security key, and cannot leave it: open its servers through your Mac.
+add_key.problem_dsa = DSA keys are not kept in the vault. Make a new key with ssh-keygen -t ed25519.
+add_key.problem_nistp521 = ECDSA P-521 keys are not kept in the vault yet: Ed25519, ECDSA P-256 and P-384, and RSA are.
+add_key.problem_type = The vault does not keep this kind of key: Ed25519, ECDSA P-256 and P-384, and RSA only.
+add_key.problem_cipher = This key is encrypted in a way this browser cannot open. Change its passphrase with ssh-keygen -p, then add it again.
+add_key.problem_encrypted_pem = This key file is encrypted the old PEM way. Turn it into OpenSSH's format with ssh-keygen -p -f and the file, then add it again.
+add_key.problem_ed25519 = This browser cannot read Ed25519 keys in this format. Try a newer browser, or the key in OpenSSH's format.
+add_key.problem_several = The file has more than one key: add them one by one.
+
+# ------------------------------------------------------------ vault_new: Save your key to your vault (VaultDialogs.tsx)
+vault_new.title = Save your key to your vault
+# <code>…</code> is the key's name: id_ed25519. {server} is the server's name.
+vault_new.text_server = <code>{key}</code> goes to your vault, and {server} opens with it from tTerm Web, your phone or any computer you sign in on.
+vault_new.text = <code>{key}</code> goes to your vault: the servers that open with it open from tTerm Web, your phone or any computer you sign in on.
+# In tTerm for Mac.
+vault_new.point_mac_unlock = It opens the way this Mac unlocks: Touch ID or your Mac's password. Nothing new to remember.
+vault_new.point_mac_locked = It is locked before it leaves this Mac. Only your devices can open it; tTerm cannot.
+vault_new.point_mac_browser = A new browser opens it once you approve it here, or with your recovery code.
+# In a browser.
+vault_new.point_web_unlock = It opens the way this computer unlocks: Touch ID, Windows Hello or your phone's lock. Nothing new to remember.
+vault_new.point_web_no_passkey = This browser cannot keep it with a passkey: here it opens with your recovery code, one session at a time.
+vault_new.point_web_locked = It is locked before it leaves this browser. Only your devices can open it; tTerm cannot.
+vault_new.point_web_browser = Another browser opens it with your recovery code, or once you approve it in tTerm for Mac.
+vault_new.make_touch = Make my vault with Touch ID
+vault_new.make_hello = Make my vault with Windows Hello
+vault_new.make_passkey = Make my vault with a passkey
+vault_new.make = Make my vault
+
+# ------------------------------------------------------------ recovery: the recovery code, shown once (VaultDialogs.tsx)
+recovery.title = Your recovery code
+recovery.text = If you ever lose every device that opens your vault, this code is the only way back to your keys. tTerm cannot recover them for you. You see it once.
+recovery.title_new = Your new recovery code
+recovery.text_new = The code you had before does not open your vault any more. If you ever lose every device that opens your vault, this one is the only way back to your keys. You see it once.
+# For screen readers.
+recovery.code_label = Recovery code {code}
+recovery.save_file = Save as a file
+recovery.copy_failed = Could not copy: select the code and copy it by hand.
+# What the file saved holds.
+recovery.file_text = tTerm vault recovery code: {code}\nIt opens your vault when no device of yours does. Keep it somewhere safe, away from your devices.
+recovery.kept_mac = I have kept it somewhere safe, not on this Mac only
+recovery.kept_web = I have kept it somewhere safe, not on this computer only
+recovery.make_title = Make a new recovery code?
+recovery.make_text = The code you have now stops working, and the new one is shown once. Your keys and devices stay as they are.
+recovery.now_code = Your recovery code now
+recovery.now_code_hint = This browser has no passkey of your vault, so the code you have now makes the new one. Lost it? Make the new one in tTerm for Mac.
+recovery.make_go = Make a new code
+recovery.make_go_passkey = Make it with your passkey
+recovery.make_touch = Make it with Touch ID
+
+# ------------------------------------------------------------ vault_open: Open your keys on this browser (VaultDialogs.tsx)
+vault_open.title = Open your keys on this browser
+vault_open.text = This browser is new to your vault. Approve it on a device that already opens it.
+vault_open.text_code = Open your vault on this browser with your recovery code.
+# {mac} is the Mac's name, {app} is app_link.mac: "MacBook-Pro-Denis · tTerm for Mac".
+vault_open.mac_name = {mac} · {app}
+vault_open.mac_ask = Ask it to open your vault here
+vault_open.mac_waiting = Asked. Waiting for you there…
+vault_open.mac_compare = Allow there only if it shows the same code
+vault_open.mac_approved = Approved: opening your keys…
+vault_open.mac_denied = Refused there.
+vault_open.mac_expired = The request expired. Ask again.
+vault_open.sas_text = Your Mac shows a code too. Allow there only if it is the same:
+vault_open.or = or
+vault_open.code = Recovery code
+vault_open.open = Open
+# Once open with the recovery code or the Mac's approval: whether this browser keeps a passkey.
+vault_open.opened_title = Your keys are open in this browser
+vault_open.opened_text = Keep a passkey here, so that they open the way this computer unlocks next time? On a computer that is not yours, choose Only this time.
+vault_open.keep_touch = Keep with Touch ID
+vault_open.keep_hello = Keep with Windows Hello
+vault_open.keep_passkey = Keep with a passkey
+vault_open.only_now = Only this time
+vault_open.kept_session = They stay open for this session only.
+
+# ------------------------------------------------------------ app_code: in tTerm for Mac, a vault this Mac has no lock of (VaultDialogs.tsx)
+app_code.title = Open your vault on this Mac
+app_code.text = This Mac has no lock on your vault yet. Open it here once with your recovery code: then this Mac opens it with Touch ID.
+# When this Mac's lock is there but no longer opens the vault (taken off in a browser, or gone from the keychain).
+app_code.text_lost = This Mac's lock no longer opens your vault. Open it here once with your recovery code: then this Mac gets a new lock, and Touch ID opens it again.
+
+# ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
+# {key} is the key's name: id_ed25519.
+passphrase.title = {key} has a passphrase
+passphrase.text = Type it: this Mac opens the key with it, and it goes nowhere else. The key goes to your vault locked.
+# For Let tTerm in: {server} is the server's name, or several ("staging and old-vps").
+passphrase.text_sign_in = Type it: this Mac signs in to {server} with the key once, to add tTerm's line there. The passphrase goes nowhere else, and the key stays on this Mac.
+passphrase.label = Passphrase
+passphrase.go = Open the key
+
+# ------------------------------------------------------------ mac_approve: in tTerm for Mac, a new browser asks for the keys (VaultDialogs.tsx)
+# {device} is the browser, "Chrome on Windows".
+mac_approve.title = {device} wants to open your keys
+mac_approve.a_browser = A browser
+# {ago} is "2 minutes ago", {ip} the address it signed in from.
+mac_approve.text_code = Signed in to your account {ago}, with a code from your email, from {ip}. Allow only if it is you: it will open servers with your keys.
+mac_approve.text_code_now = Signed in to your account with a code from your email, from {ip}. Allow only if it is you: it will open servers with your keys.
+mac_approve.text_other = Signed in to your account from {ip}. Allow only if it is you: it will open servers with your keys.
+mac_approve.sas_text = That browser shows a code. Allow only if it is the same:
+# For screen readers, while the code is on its way.
+mac_approve.sas_waiting = Waiting for the code
+mac_approve.not_me = It's not me
+mac_approve.allow = Allow with Touch ID
+mac_approve.not_me_note = It's not me: that sign-in ends, and Settings › Devices shows what else to check.
+
+# ------------------------------------------------------------ vault_locked: a server with your key, the vault locked here (VaultLocked.tsx)
+vault_locked.title = {machine} opens with your key
+vault_locked.text = Your keys are locked in this browser. Open them the way this computer unlocks; tTerm then signs {machine} in, and your key never leaves this browser.
+vault_locked.text_app = Your keys are locked on this Mac. Open them with Touch ID or your Mac's password; then this Mac signs {machine} in.
+vault_locked.text_app_code = This Mac has no lock on your vault yet. Open it here once with your recovery code; then this Mac signs {machine} in.
+# Small links under the button: "or approve on MacBook-Pro-Denis · use the recovery code".
+vault_locked.or = or
+vault_locked.approve_on = approve on {mac}
+vault_locked.use_code = use the recovery code
+vault_locked.approve_on_button = Approve on {mac}
+vault_locked.use_code_button = Use the recovery code
+vault_locked.signing = Signing {machine} in with your key…
+vault_locked.no_ed25519 = This browser cannot sign with Ed25519 keys. Open {machine} in a newer browser, or in tTerm for Mac.
+# {key} is the key's name, or vault_locked.its_key.
+vault_locked.not_here = Your vault is open here, but {key} does not open in this browser. Add it again from its file in Settings › Keys.
+vault_locked.its_key = its key
+
+# ------------------------------------------------------------ vault_problem: what went wrong with the vault (vault/store.ts)
+vault_problem.no_vault = You have no vault yet.
+vault_problem.exists = You have a vault already: open it, then add the key.
+vault_problem.locked = Open your vault first.
+vault_problem.no_passkey = No passkey of your vault answered here. Approve this browser on your Mac, or use your recovery code.
+vault_problem.no_prf = This passkey cannot open your vault here. Approve this browser on your Mac, or use your recovery code.
+vault_problem.no_prf_here = This browser cannot keep your vault with a passkey: it stays open for this session only.
+vault_problem.lock_broken = This browser's lock does not open your vault any more. Use your recovery code, or approve it on your Mac.
+vault_problem.code_form = A recovery code is 24 letters and digits, in six groups of four.
+vault_problem.code_wrong = That recovery code does not open your vault. Check it, or approve this browser on your Mac.
+# In tTerm for Mac: the engine's answers, said by the page (the code window, Touch ID).
+vault_problem.code_wrong_app = That recovery code does not open your vault. Check it and try again.
+vault_problem.touch_failed = Touch ID or your Mac's password did not go through. Nothing changed.
+vault_problem.need_code = Type your recovery code now: this browser has no passkey of your vault.
+vault_problem.no_x25519 = This browser is too old for your Mac to approve it: use your recovery code, or a newer browser.
+vault_problem.pairing = The request did not go through. Ask again.
+vault_problem.passkey_exists = This browser has a passkey for tTerm already.
+vault_problem.no_passkey_here = This browser cannot make a passkey.
+vault_problem.something = Something went wrong. Try again.
+
+# ------------------------------------------------------------ ssh_strip: under a successful ssh in tTerm for Mac's terminals (SshStrip.tsx)
+# {alias} is the server's name as ssh knows it: droplet.
+ssh_strip.region = Keep {alias} in tTerm
+ssh_strip.title = {alias}: open it from anywhere
+# <code>…</code>: the address, root@203.0.113.7, and the key, ~/.ssh/id_ed25519.
+ssh_strip.text = tTerm Web, your phone, any computer you sign in on. <code>{address}</code>, your key <code>{key}</code>
+ssh_strip.text_no_key = tTerm Web, your phone, any computer you sign in on. <code>{address}</code>
+ssh_strip.save = Save my key
+ssh_strip.let_in = Let tTerm in
+ssh_strip.not_now = Not now
+ssh_strip.never = Don't ask for {alias}
+# <b>…</b> are the two buttons' names, as above.
+ssh_strip.explain = <b>Save my key:</b> it goes to your vault, which only your devices open; {alias} stays as it is. <b>Let tTerm in:</b> tTerm adds its own line on {alias}; your key stays on this Mac. More servers at once: Move to cloud in the account menu.
+ssh_strip.explain_pass = <b>Let tTerm in:</b> tTerm adds its own line on {alias}; your key stays on this Mac. More servers at once: Move to cloud in the account menu.
+ssh_strip.unreachable = tTerm Web cannot reach {alias} from the cloud: it opens through this Mac, while it is on.
+ssh_strip.through_mac = Open it through this Mac
+ssh_strip.saved_key = {alias} is in tTerm: it opens with your key, from anywhere.
+ssh_strip.saved_cert = {alias} is in tTerm: tTerm's own line is on it, and it opens from anywhere.
+ssh_strip.saved_mac = {alias} is in tTerm: it opens through this Mac, while it is on.
+
+# ------------------------------------------------------------ move: Move to cloud, in tTerm for Mac (MoveToCloud.tsx)
+move.title = Move to cloud
+move.text = The servers this Mac knows go to your account: open them from tTerm Web, your phone or any computer you sign in on. Nothing moves until you press Move.
+move.servers = Servers on this Mac
+# <code>…</code> are ssh's files: they stay as they are.
+move.servers_from = from <code>~/.ssh/config</code>, <code>known_hosts</code> and the ssh you ran here
+move.looking = Looking at ~/.ssh…
+move.no_servers = This Mac knows no servers yet: nothing in ~/.ssh/config or known_hosts, and no ssh run in its terminals.
+# For screen readers: the tick and the choice of each server.
+move.tick_server = Move {name}
+move.how = How {name} opens
+# The three ways, in the choice of each server and on the cards under the list.
+move.method_key = My key
+move.method_cert = tTerm's pass
+move.method_mac = Through this Mac
+move.way_key = The key goes to your vault; the server stays as it is. Opens in any browser after it unlocks your vault.
+move.way_cert = tTerm adds its own line on the server, your key stays here. Opens anywhere, also from Telegram.
+move.way_mac = Nothing moves: tTerm asks this Mac to connect, while it is on. For servers behind a VPN.
+# {address} is root@203.0.113.7, {jump} the bastion it goes through.
+move.addr_via = {address} via {jump}
+# After "~/.ssh/config · ": {ago} is "3 minutes ago".
+move.ran_ago = you ran ssh {alias} {ago}
+move.ran_here = you ran ssh {alias} here
+move.note_known = known to this Mac
+move.note_git = A git host: no terminal to open
+move.note_there = In tTerm already
+move.note_checking = Checking whether tTerm Web reaches it…
+move.note_jump = Behind bastion {jump}, which the cloud reaches: opens through it
+move.note_jump_far = Behind a bastion only your network reaches ({jump}): through this Mac
+move.note_far = tTerm Web cannot reach it from the cloud: through this Mac
+move.note_key_stays = Its key {key} cannot leave this Mac: through this Mac
+move.keys = Keys in ~/.ssh
+move.keys_note = only the ticked ones go to your vault
+# For screen readers.
+move.tick_key = Save {name} to your vault
+# {servers} is a server, or a list of them: droplet, staging and app-01.
+move.key_used_one = {servers} opens with it: goes to your vault
+move.key_used_many = {servers} open with it: goes to your vault
+move.key_unused = No server above uses it
+move.key_in_vault = In your vault already
+move.key_security = On a security key: it cannot leave it. Its servers go through this Mac
+move.key_agent = Only in an agent: it cannot be copied. Its servers go through this Mac
+move.key_type = A kind of key the vault does not keep yet. Its servers go through this Mac
+move.key_passphrase = has a passphrase
+move.vault_note = Your vault opens the way this Mac unlocks: Touch ID or your Mac's password. Only your devices can open it; tTerm cannot.
+move.go = one: Move {n} server | other: Move {n} servers
+
+# ------------------------------------------------------------ moved: what came of Move to cloud (MoveToCloud.tsx)
+moved.title = one: {ok} of {n} server is in tTerm | other: {ok} of {n} servers are in tTerm
+# {project} is where they are: Personal.
+moved.text = In {project}: open them from tTerm Web, your phone or any computer you sign in on.
+moved.key = Opens with your key
+moved.key_jump = Opens with your key, through {jump}
+moved.cert = Opens with tTerm's pass
+moved.cert_jump = Opens with tTerm's pass, through {jump}
+moved.mac = Through this Mac, while it is on
+moved.failed = It did not move.
+# {why} is what went wrong, as the Mac said it.
+moved.failed_text = {why} Nothing was saved for it.
+moved.open = Open a terminal
+moved.change = Change
+# <b>…</b> is the key's name, or a list of them.
+moved.keys_one = <b>{keys}</b> is in your vault, locked the way your devices unlock. Settings › Keys shows it everywhere.
+moved.keys_many = <b>{keys}</b> are in your vault, locked the way your devices unlock. Settings › Keys shows them everywhere.
+moved.no_keys = No key moved: your keys stay on this Mac.

@@ -10,6 +10,12 @@
 // The terminal lives in the core. Closing the tab, reloading the page or
 // losing the connection leaves it running; coming back attaches again. A
 // computer that sleeps leaves it waiting, away, until it is back.
+//
+// From 0.1.17 a server that opens with the person's own key waits, while
+// connecting, for a page or app that can sign with it (the terminal's
+// "vault"): the card of VaultLocked.tsx says how to open the vault here. In
+// tTerm for Mac a successful `ssh <host>` in this Mac's own terminals gets
+// the strip of SshStrip.tsx under its block.
 
 import { useEffect, useRef, useState } from "react";
 import { endTerminal, terminalInfo, type TerminalInfo,
@@ -18,6 +24,8 @@ import { shortPath } from "./BlockView";
 import { ClassicTerminal, type ViewEvents } from "./ClassicTerminal";
 import { FeedTerminal } from "./FeedTerminal";
 import { useFoundBlock, wentThere } from "./found";
+import { SshStrip } from "./SshStrip";
+import { VaultLocked } from "./VaultLocked";
 import { useT } from "./i18n";
 import { ModeToggle } from "./InputLine";
 import type { Shown } from "./theme";
@@ -69,6 +77,9 @@ interface Props {
   machineThere: (machineId: string) => boolean;
   /** A command search put here (0.1.7), for the line: not run. */
   paste: { text: string; n: number } | null;
+  /** In tTerm for Mac, a terminal of this very Mac (0.1.17): the strip
+   * after `ssh <host>` is for its blocks. */
+  here?: boolean;
 }
 
 export function TerminalView(props: Props) {
@@ -210,9 +221,14 @@ export function TerminalView(props: Props) {
             shownTheme={shownTheme} ended={isEnded} active={active}
             events={events} machine={machine} home={info?.home ?? ""}
             onClassic={() => choose("classic")} notify={props.notify}
-            paste={props.paste} />
+            paste={props.paste}
+            after={props.here ? (b, all) => <SshStrip block={b} blocks={all} /> : undefined} />
         )}
-        {state === "connecting" && !missing && (
+        {state === "connecting" && !missing && info?.vault && (
+          <VaultLocked machine={info.machine} fingerprint={info.vault.key}
+            keyName={info.vault.keyName} />
+        )}
+        {state === "connecting" && !missing && !info?.vault && (
           <div className="terminal-note" role="status">
             <span className="spinner" aria-hidden="true" />
             {machine === undefined ? t("terminal_view.connecting_unknown")

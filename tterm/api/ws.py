@@ -35,6 +35,21 @@ do damage nothing brings back is first answered with "confirm"; the page
 asks, and sends it again with "confirmed". A command the shell cannot take
 now (another one is running) is answered with "refused".
 
+From 0.1.17 the socket also carries the vault signing relay (core/vault.py).
+The page says which of the person's vault keys it can sign for now, and the
+core asks it to sign a login when a server opens with one of them:
+
+    page → core   {"op": "vault.can", "keys": ["SHA256:…", …]}
+    core → page   {"op": "vault.sign", "id": "…", "key": "SHA256:…",
+                   "alg": "ssh-ed25519"|"rsa-sha2-256"|…, "data": "<b64u>",
+                   "machine": "web-01", "keyName": "id_ed25519"}
+    page → core   {"op": "vault.signed", "id": "…", "sig": "<b64u raw>"}
+                  {"op": "vault.unable", "id": "…"}
+
+The core verifies the raw signature with the stored public key before a
+login uses it. The engine of tTerm for Mac sits on this socket and answers
+for its own keys itself, passing the rest through.
+
 The socket belongs to a session (see core/auth.py) and shows only that
 person's terminals. When the session ends, the socket closes with the code
 SIGNED_OUT_CLOSE and the page asks to sign in: at once on Sign out, Forget
@@ -52,13 +67,16 @@ import uuid
 import asyncpg
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-from ..core import auth, danger
+from ..core import auth, danger, vault
 from ..core.terminals import INPUT, Terminals, Watcher, clean_command
 
 log = logging.getLogger("tterm.ws")
 
 #: Channels one page may hold at once.
 MAX_CHANNELS = 64
+#: Vault key fingerprints one socket may say it can sign for: far more than
+#: anyone has, few enough that a bad message cannot grow the set unbounded.
+MAX_VAULT_KEYS = 256
 #: The close code that means "sign in again".
 SIGNED_OUT_CLOSE = 4401
 #: Seconds between the socket's checks that its session is still on.
@@ -69,17 +87,38 @@ TOUCH_EVERY = auth.TOUCH_EVERY.total_seconds()
 
 class PageSocket:
     def __init__(self, websocket: WebSocket, terminals: Terminals,
-                 session: auth.Session, pool: asyncpg.Pool) -> None:
+                 session: auth.Session, pool: asyncpg.Pool, relay=None,
+                 label: str = "") -> None:
         self.ws = websocket
         self.terminals = terminals
         self.session = session
         self.user_id = session.person.id
         self.pool = pool
+        #: The vault signing relay (core/vault.py); this socket is one of its
+        #: sources while it is open.
+        self.relay = relay
+        #: Which of the person's vault keys this socket can sign for now, by
+        #: fingerprint; empty means the vault is locked here.
+        self._vault_can: set[str] = set()
+        #: What the journal names as the signer of a login: this device.
+        self.label_text = label or ("tTerm for Mac" if session.method == "app"
+                                     else "a browser")
         self.watchers: dict[int, Watcher] = {}
         self._lock = asyncio.Lock()
         self._closing: set[asyncio.Task] = set()
         self._closed = False
         self._touched = 0.0
+
+    # The vault relay treats this socket as a signing source (core/vault.py).
+
+    def vault_can(self) -> set[str]:
+        return self._vault_can
+
+    def label(self) -> str:
+        return self.label_text
+
+    async def vault_sign(self, request: dict) -> None:
+        await self.json(request)
 
     async def send(self, message: bytes | str) -> None:
         async with self._lock:
@@ -133,6 +172,8 @@ class PageSocket:
 
     async def run(self) -> None:
         await self.ws.accept()
+        if self.relay is not None:
+            self.relay.join(self)
         checking = asyncio.create_task(self._keep_checking())
         try:
             while True:
@@ -149,6 +190,8 @@ class PageSocket:
             pass
         finally:
             checking.cancel()
+            if self.relay is not None:
+                self.relay.leave(self)
             await asyncio.gather(*(w.stop() for w in self.watchers.values()),
                                  return_exceptions=True)
             self.watchers.clear()
@@ -168,6 +211,9 @@ class PageSocket:
             ch = int(msg.get("ch", 0))
         except (ValueError, KeyError, TypeError):
             await self.json({"op": "error", "message": "Not understood."})
+            return
+        if op in ("vault.can", "vault.signed", "vault.unable"):
+            self._vault(op, msg)
             return
         watcher = self.watchers.get(ch)
         if op == "attach":
@@ -241,6 +287,35 @@ class PageSocket:
         watcher = self.watchers.pop(ch, None)
         if watcher is not None:
             await watcher.stop()
+
+    def _vault(self, op: str, msg: dict) -> None:
+        """The vault signing ops (core/vault.py). vault.can announces which
+        keys this socket can sign for; vault.signed/unable answer a request
+        the core made. A malformed signature counts as unable."""
+        if self.relay is None:
+            return
+        if op == "vault.can":
+            keys = msg.get("keys")
+            if not isinstance(keys, list):
+                return
+            self._vault_can = {k for k in keys[:MAX_VAULT_KEYS]
+                               if isinstance(k, str) and k.startswith("SHA256:")}
+            self.relay.announced()
+            return
+        request_id = msg.get("id")
+        if not isinstance(request_id, str):
+            return
+        if op == "vault.unable":
+            self.relay.answer(request_id, None)
+            return
+        try:
+            raw = vault.decode_b64u(msg.get("sig"), most=vault.RAW_SIG_MAX,
+                                    least=1, what="signature")
+        except vault.Refused:
+            # A signature that is not even base64url: as if it could not sign.
+            self.relay.answer(request_id, None)
+            return
+        self.relay.answer(request_id, raw)
 
 
 def _resize(terminal, msg: dict) -> None:

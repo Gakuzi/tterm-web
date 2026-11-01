@@ -10,14 +10,16 @@
 // Web and the phone open it (ThisComputer.tsx). In the app, signed in or
 // not (0.1.15), Updates: how tTerm for Mac takes its new versions
 // (Updates.tsx). Tabs stay above it; Close or Esc goes back. The language
-// is not here (0.1.16): it is in the account's menu, after Settings.
+// is not here (0.1.16): it is in the account's menu, after Settings. From
+// 0.1.17 Keys, before Devices: the vault of SSH keys (Keys.tsx).
 
 import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { loadAccount, type AccountInfo, type ProjectTint, type Theme } from "./api";
+import { loadAccount, type AccountInfo, type Project, type ProjectTint, type Theme } from "./api";
 import { PageHead, SUPPORT, useEscCloses } from "./Account";
 import { DevicesSection } from "./Devices";
 import { useT } from "./i18n";
 import { Monitor, Moon, Sun } from "./icons";
+import { KeysSection } from "./Keys";
 import { InApp } from "./local";
 import { ThisComputerSection } from "./ThisComputer";
 import { UpdatesSection } from "./Updates";
@@ -35,6 +37,8 @@ interface Props {
   onSignedOut: (note: string) => void;
   onClose: () => void;
   notify: (text: string) => void;
+  /** The projects, for the servers each key opens. */
+  projects: Project[];
 }
 
 const THEMES: { value: Theme; label: string; icon: ReactNode }[] = [
@@ -106,6 +110,8 @@ export function Settings(props: Props) {
       </section>
 
       {!local && props.here && <ThisComputerSection here={props.here} />}
+
+      {!local && <KeysSection projects={props.projects} notify={props.notify} />}
 
       {inApp && <UpdatesSection />}
 

@@ -931,6 +931,9 @@ class Session:
     method: str
     #: How long ago it began.
     age: dt.timedelta
+    #: The device as it signed in: "tTerm for Mac on MacBook-Pro-Denis" for
+    #: the app (from 0.1.17, for the journal of the vault's signatures).
+    label: str = ""
 
 
 async def session(pool: asyncpg.Pool, token: str | None, *,
@@ -942,7 +945,7 @@ async def session(pool: asyncpg.Pool, token: str | None, *,
         return None
     row = await pool.fetchrow(
         """
-        SELECT s.id, s.user_id, s.device_id, s.method,
+        SELECT s.id, s.user_id, s.device_id, s.method, s.label,
                now() - s.created_at AS age,
                s.last_seen_at < now() - $2::interval AS idle,
                s.last_seen_at < now() - $3::interval AS stale,
@@ -964,7 +967,18 @@ async def session(pool: asyncpg.Pool, token: str | None, *,
                            row["id"])
     person = Person(row["user_id"], row["name"], row["theme"], row["plan_id"],
                     row["email"])
-    return Session(row["id"], person, row["device_id"], row["method"], row["age"])
+    return Session(row["id"], person, row["device_id"], row["method"], row["age"],
+                   row["label"] or "")
+
+
+def socket_label(session: Session, user_agent: str) -> str:
+    """What the journal names as the device of a page socket (0.1.17): the
+    app by the device it signed in as, "tTerm for Mac on MacBook-Pro-Denis"
+    (its engine opens the socket without a browser's User-Agent); a browser
+    by its User-Agent, "Chrome on macOS"."""
+    if session.method == "app":
+        return session.label or "tTerm for Mac"
+    return device_label(user_agent)
 
 
 async def still_on(pool: asyncpg.Pool, session_id: uuid.UUID) -> bool:
@@ -1069,7 +1083,8 @@ async def sweep(pool: asyncpg.Pool) -> None:
     signed in with for DEVICE_DAYS (0.0.12), and from 0.1.6 the codes
     browsers gave apps, after a day. So does what is kept only
     for a while: commands with their output (30 days unless the project
-    says less) and the journal (a year)."""
+    says less), the journal (a year), and from 0.1.17 the vault's pairings
+    (a week; what they carried, an hour after they are over)."""
     await pool.execute("DELETE FROM login_codes "
                        "WHERE created_at < now() - interval '2 days'")
     # What browsers allowed apps: two minutes of use, a day for the record.
@@ -1094,3 +1109,14 @@ async def sweep(pool: asyncpg.Pool) -> None:
                                gone)
     await pool.execute("DELETE FROM blocks WHERE expires_at <= now()")
     await pool.execute("DELETE FROM journal WHERE expires_at <= now()")
+    # The vault's pairings (0.1.17): their keys and a sealed vault key are
+    # cleared once the outcome is seen (vault.py); those of a request over
+    # for an hour that nobody looked at go here, and the rows after a week.
+    await pool.execute(
+        "UPDATE vault_pairings SET pub_a = NULL, pub_b = NULL, sealed = NULL, "
+        "state = CASE WHEN state IN ('waiting', 'answered', 'revealed') "
+        "THEN 'expired' ELSE state END "
+        "WHERE expires_at < now() - interval '1 hour' "
+        "AND (pub_a IS NOT NULL OR pub_b IS NOT NULL OR sealed IS NOT NULL)")
+    await pool.execute("DELETE FROM vault_pairings "
+                       "WHERE created_at < now() - interval '7 days'")

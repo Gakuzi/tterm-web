@@ -23,6 +23,13 @@ The protocol, all of it on the one WebSocket (web 1):
     core → agent  text   open {ch, cmd, cols, rows, echo}, size {ch, cols,
                          rows}, close {ch}, run {id, script, timeout}, hb,
                          ping
+
+From 0.1.17 the open message may carry `exec` instead of `cmd`: a list of
+argv the agent runs directly (execvp), not through the login shell. It is
+for a terminal on the person's Mac that opens a server "from anywhere":
+`open {ch, exec: ["ssh", "--", "<target>"], cols, rows, echo}`. An agent too
+old to know `exec` ignores it and, finding no `cmd`, starts a plain login
+shell; the core only sends `exec` to the Mac's own engine, which knows it.
     core → agent  bytes  2, the channel in 4 bytes, keys
     agent → core  bytes  1, the channel in 4 bytes, output
     agent → core  text   exit {ch, code, error}, ran {id, code, out, err},
@@ -427,15 +434,23 @@ class AgentLink(Link):
         finally:
             self._scripts.pop(number, None)
 
-    async def open(self, command: str, cols: int, rows: int,
-                   echo: bool) -> Channel:
+    async def open(self, command: str, cols: int, rows: int, echo: bool,
+                   exec_argv: list[str] | None = None) -> Channel:
         if self.gone:
             raise ConnectionError(self.gone)
         ch = self._new_channel()
         channel = AgentChannel(self, ch, cols, rows)
         self._channels[ch] = channel
-        self.send_json({"t": "open", "ch": ch, "cmd": command, "cols": cols,
-                        "rows": rows, "echo": echo})
+        message = {"t": "open", "ch": ch, "cols": cols, "rows": rows,
+                   "echo": echo}
+        if exec_argv is not None:
+            # A terminal on the Mac that runs ssh to a target (a server
+            # opened "from anywhere" through the Mac): the argv runs
+            # directly, not through the login shell.
+            message["exec"] = list(exec_argv)
+        else:
+            message["cmd"] = command
+        self.send_json(message)
         return channel
 
     def _new_channel(self) -> int:

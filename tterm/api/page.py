@@ -26,7 +26,7 @@ from pydantic import BaseModel
 
 from .. import __version__
 from ..core import (accounts, auth, letters, machines, notes, photos,
-                    projects, search, ssh)
+                    projects, reach, search, ssh, vault)
 from ..core.mail import Mailer
 from ..core.terminals import NotAllowed, NotOpen, Terminal, Terminals
 from .connect import client_ip
@@ -192,6 +192,19 @@ NOT_OPEN = "The terminal is not open."
 #: A note's save, at most, in bytes: its blocks are kept to half that
 #: (notes.BODY_MAX), and JSON from the page escapes a little on the way.
 NOTE_SAVE_MAX = 1024 * 1024
+#: A vault request, at most: a sealed key is up to 16 KB, with the public
+#: key and the JSON around it there is room to spare.
+VAULT_BODY_MAX = 64 * 1024
+
+
+class ReachableBody(BaseModel):
+    host: str
+    port: int = 22
+
+
+class OwnLineBody(BaseModel):
+    project: uuid.UUID
+    name: str = ""
 
 
 class TooBig(Exception):
@@ -243,7 +256,7 @@ def _json(data, status: int = 200) -> Response:
 
 def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
                     connect_url: str, terminals: Terminals | None = None,
-                    agents=None, *, secret: bytes, mailer: Mailer,
+                    agents=None, relay=None, *, secret: bytes, mailer: Mailer,
                     legal: dict[str, str] | None = None):
     """The ASGI app for the page, wrapped in the page's guard. `legal` has
     the addresses the sign-in screens link to: the Terms of Service, the
@@ -289,6 +302,25 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         doomed = [s for s in sockets if ended(s.session)]
         await asyncio.gather(*(s.sign_out() for s in doomed),
                              return_exceptions=True)
+
+    async def vault_broadcast(user_id: uuid.UUID, message: dict, *,
+                              exclude_session: uuid.UUID | None = None) -> None:
+        """Sends a vault message to the person's open sockets (both sides of
+        a pairing, or every browser after a change), optionally not to the
+        session that caused it."""
+        targets = [s for s in sockets if s.user_id == user_id
+                   and (exclude_session is None
+                        or s.session.id != exclude_session)]
+        await asyncio.gather(*(s.json(message) for s in targets),
+                             return_exceptions=True)
+
+    async def vault_changed(user_id: uuid.UUID) -> None:
+        await vault_broadcast(user_id, {"op": "vault.changed"})
+
+    async def pairing_update(user_id: uuid.UUID, pairing_id: uuid.UUID,
+                             state: str) -> None:
+        await vault_broadcast(user_id, {"op": "vault.pairing.update",
+                                        "id": str(pairing_id), "state": state})
 
     def refused(exc: auth.Refused) -> Response:
         return _json({"error": str(exc), **exc.details}, exc.status)
@@ -1138,6 +1170,287 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         except notes.Refused as exc:
             return note_refused(exc)
 
+    # ------------------------------------------------ the vault (0.1.17)
+
+    def vault_refused(exc: vault.Refused) -> Response:
+        return _json({"error": str(exc)}, exc.status)
+
+    async def vault_body(request: Request) -> dict:
+        data = await small_json(request, VAULT_BODY_MAX)
+        if not isinstance(data, dict):
+            raise TooBig(422, "That is not a vault request.")
+        return data
+
+    @app.get("/api/vault")
+    async def get_vault(session: auth.Session = Depends(signed_in)) -> Response:
+        """The whole vault for its owner, or null when they have none."""
+        return _json({"vault": await vault.get_vault(
+            pool, session.person.id, session.device_id)})
+
+    @app.post("/api/vault")
+    async def create_vault(request: Request,
+                           session: auth.Session = Depends(signed_in)) -> Response:
+        """Makes the person's one vault, with its first lock and recovery
+        code; 409 if one is already there."""
+        try:
+            data = await vault_body(request)
+            created = await vault.create_vault(
+                pool, session.person.id, id=data.get("id"),
+                recovery_salt=data.get("recoverySalt"),
+                recovery_wrap=data.get("recoveryWrap"), lock=data.get("lock"),
+                device_id=session.device_id)
+        except TooBig as exc:
+            return _json({"error": str(exc)}, exc.status)
+        except vault.Refused as exc:
+            return vault_refused(exc)
+        await vault_changed(session.person.id)
+        return _json({"vault": created}, 201)
+
+    @app.get("/api/vault/recovery")
+    async def vault_recovery(session: auth.Session = Depends(signed_in)) -> Response:
+        try:
+            return _json(await vault.recovery(pool, session.person.id))
+        except vault.Refused as exc:
+            return vault_refused(exc)
+
+    @app.put("/api/vault/recovery")
+    async def set_vault_recovery(request: Request,
+                                 session: auth.Session = Depends(signed_in)) -> Response:
+        """Make a new recovery code: the one shown before stops working."""
+        try:
+            data = await vault_body(request)
+            await vault.set_recovery(
+                pool, session.person.id,
+                recovery_salt=data.get("recoverySalt"),
+                recovery_wrap=data.get("recoveryWrap"))
+        except TooBig as exc:
+            return _json({"error": str(exc)}, exc.status)
+        except vault.Refused as exc:
+            return vault_refused(exc)
+        return Response(status_code=204, headers=NO_STORE)
+
+    @app.post("/api/vault/locks")
+    async def add_vault_lock(request: Request,
+                             session: auth.Session = Depends(signed_in)) -> Response:
+        try:
+            data = await vault_body(request)
+            created = await vault.add_lock(pool, session.person.id, lock=data,
+                                           device_id=session.device_id)
+        except TooBig as exc:
+            return _json({"error": str(exc)}, exc.status)
+        except vault.Refused as exc:
+            return vault_refused(exc)
+        await vault_changed(session.person.id)
+        return _json({"vault": created}, 201)
+
+    @app.delete("/api/vault/locks/{lock_id}")
+    async def remove_vault_lock(lock_id: uuid.UUID,
+                                session: auth.Session = Depends(signed_in)) -> Response:
+        try:
+            await vault.remove_lock(pool, session.person.id, lock_id,
+                                    session.device_id)
+        except vault.Refused as exc:
+            return vault_refused(exc)
+        await vault_changed(session.person.id)
+        return Response(status_code=204, headers=NO_STORE)
+
+    @app.post("/api/vault/locks/{lock_id}/used")
+    async def vault_lock_used(lock_id: uuid.UUID,
+                              session: auth.Session = Depends(signed_in)) -> Response:
+        if not await vault.lock_used(pool, session.person.id, lock_id):
+            return _json({"error": "no such lock"}, 404)
+        return Response(status_code=204, headers=NO_STORE)
+
+    @app.post("/api/vault/keys")
+    async def add_vault_key(request: Request,
+                            session: auth.Session = Depends(signed_in)) -> Response:
+        """A key into the vault: the core checks the public key parses, its
+        type matches, and the fingerprint is its SHA256 one."""
+        try:
+            data = await vault_body(request)
+            created = await vault.add_key(
+                pool, session.person.id, id=data.get("id"),
+                name=data.get("name"), type=data.get("type"),
+                public_key=data.get("publicKey"),
+                fingerprint=data.get("fingerprint"), sealed=data.get("sealed"),
+                source=data.get("source"), source_label=data.get("sourceLabel"),
+                device_id=session.device_id)
+        except TooBig as exc:
+            return _json({"error": str(exc)}, exc.status)
+        except vault.Refused as exc:
+            return vault_refused(exc)
+        await vault_changed(session.person.id)
+        return _json({"vault": created}, 201)
+
+    @app.delete("/api/vault/keys/{key_id}")
+    async def remove_vault_key(key_id: uuid.UUID,
+                               session: auth.Session = Depends(signed_in)) -> Response:
+        try:
+            await vault.remove_key(pool, session.person.id, key_id,
+                                   session.device_id)
+        except vault.Refused as exc:
+            return vault_refused(exc)
+        await vault_changed(session.person.id)
+        return Response(status_code=204, headers=NO_STORE)
+
+    @app.post("/api/vault/pairings")
+    async def create_pairing(request: Request,
+                             session: auth.Session = Depends(signed_in)) -> Response:
+        """A new browser posts the commit to its X25519 public key. The
+        request goes to the person's other sockets (the Mac's side)."""
+        try:
+            data = await vault_body(request)
+            device = auth.device_label(request.headers.get("user-agent", ""))
+            made = await vault.create_pairing(
+                pool, session.person.id, session.id, commit=data.get("commit"),
+                device=device, ip=client_ip(request))
+        except TooBig as exc:
+            return _json({"error": str(exc)}, exc.status)
+        except vault.Refused as exc:
+            return vault_refused(exc)
+        await vault_broadcast(session.person.id, {
+            "op": "vault.pairing", "id": made["id"], "device": device,
+            "method": "code", "ip": client_ip(request),
+            "createdAt": made.get("createdAt")}, exclude_session=session.id)
+        return _json(made, 201)
+
+    @app.get("/api/vault/pairings/{pairing_id}")
+    async def get_pairing(pairing_id: uuid.UUID,
+                          session: auth.Session = Depends(signed_in)) -> Response:
+        # The new browser's own read of an approved pairing clears its keys
+        # and the sealed vault key (vault.pairing_view).
+        view = await vault.pairing_view(pool, session.person.id, pairing_id,
+                                        by_session=session.id)
+        if view is None:
+            return _json({"error": "no such pairing"}, 404)
+        return _json(view)
+
+    @app.post("/api/vault/pairings/{pairing_id}/answer")
+    async def answer_pairing(pairing_id: uuid.UUID, request: Request,
+                             session: auth.Session = Depends(signed_in)) -> Response:
+        try:
+            data = await vault_body(request)
+            state = await vault.answer_pairing(pool, session.person.id,
+                                               pairing_id, pub_a=data.get("pubA"))
+        except TooBig as exc:
+            return _json({"error": str(exc)}, exc.status)
+        except vault.Refused as exc:
+            return vault_refused(exc)
+        await pairing_update(session.person.id, pairing_id, state)
+        return Response(status_code=204, headers=NO_STORE)
+
+    @app.post("/api/vault/pairings/{pairing_id}/reveal")
+    async def reveal_pairing(pairing_id: uuid.UUID, request: Request,
+                             session: auth.Session = Depends(signed_in)) -> Response:
+        """Only the session that made the pairing reveals its public key."""
+        try:
+            data = await vault_body(request)
+            state = await vault.reveal_pairing(
+                pool, session.person.id, pairing_id, pub_b=data.get("pubB"),
+                by_session=session.id)
+        except TooBig as exc:
+            return _json({"error": str(exc)}, exc.status)
+        except vault.Refused as exc:
+            await pairing_update(session.person.id, pairing_id, "denied")
+            return vault_refused(exc)
+        await pairing_update(session.person.id, pairing_id, state)
+        return Response(status_code=204, headers=NO_STORE)
+
+    @app.post("/api/vault/pairings/{pairing_id}/approve")
+    async def approve_pairing(pairing_id: uuid.UUID, request: Request,
+                              session: auth.Session = Depends(signed_in)) -> Response:
+        try:
+            data = await vault_body(request)
+            state = await vault.approve_pairing(pool, session.person.id,
+                                                pairing_id,
+                                                sealed=data.get("sealed"))
+        except TooBig as exc:
+            return _json({"error": str(exc)}, exc.status)
+        except vault.Refused as exc:
+            return vault_refused(exc)
+        await pairing_update(session.person.id, pairing_id, state)
+        return Response(status_code=204, headers=NO_STORE)
+
+    @app.post("/api/vault/pairings/{pairing_id}/deny")
+    async def deny_pairing(pairing_id: uuid.UUID,
+                           session: auth.Session = Depends(signed_in)) -> Response:
+        """"It's not me": the new browser's session ends and its sockets
+        close the way sign-out does."""
+        try:
+            ended = await vault.deny_pairing(pool, session.person.id, pairing_id)
+        except vault.Refused as exc:
+            return vault_refused(exc)
+        if ended is not None:
+            await cut(lambda s: s.id == ended)
+        await pairing_update(session.person.id, pairing_id, "denied")
+        return Response(status_code=204, headers=NO_STORE)
+
+    # ------------------------ servers the person adds themselves (0.1.17)
+
+    @app.post("/api/machines/own/line")
+    async def own_line(body: OwnLineBody,
+                       session: auth.Session = Depends(signed_in)) -> Response:
+        """For a 'cert' server: a principal and the CA line for the person's
+        own authorized_keys on it."""
+        if terminals is None:
+            return _json({"error": "the signer is not running"}, 503)
+        try:
+            return _json(await machines.own_line(pool, terminals.signer,
+                                                 session.person.id,
+                                                 body.project))
+        except machines.OwnRefused as exc:
+            return _json({"error": str(exc)}, exc.status)
+        except (ssh.SignerUnavailable, ssh.SignerRefused):
+            return _json({"error": "tTerm Web cannot sign certificates right "
+                          "now. Try again in a minute."}, 503)
+
+    @app.post("/api/machines/own")
+    async def add_own(request: Request,
+                      session: auth.Session = Depends(signed_in)) -> Response:
+        """A server the person adds: with their vault key, a certificate, or
+        through their Mac."""
+        if terminals is None:
+            return _json({"error": "the signer is not running"}, 503)
+        try:
+            data = await vault_body(request)
+        except TooBig as exc:
+            return _json({"error": str(exc)}, exc.status)
+        try:
+            project_id = uuid.UUID(str(data.get("project")))
+        except (TypeError, ValueError):
+            return _json({"error": "Say which project the server is in."}, 422)
+        try:
+            made = await machines.add_own(
+                pool, terminals.signer, relay, session.person.id,
+                project_id=project_id, name=data.get("name"),
+                host=data.get("host"), port=data.get("port"),
+                login=data.get("login"), host_keys=data.get("hostKeys"),
+                method=data.get("method"), key_id=data.get("keyId"),
+                principal=data.get("principal"), jump=data.get("jump"),
+                via=data.get("via"), target=data.get("target"),
+                who_name=session.person.name)
+        except machines.OwnRefused as exc:
+            return _json({"error": str(exc)}, exc.status)
+        except (ssh.SignerUnavailable, ssh.SignerRefused):
+            return _json({"error": "tTerm Web cannot sign certificates right "
+                          "now. Try again in a minute."}, 503)
+        return _json(made, 201)
+
+    @app.post("/api/machines/reachable")
+    async def reachable(body: ReachableBody,
+                        session: auth.Session = Depends(signed_in)) -> Response:
+        """Whether the core can open a TCP connection to a host the person
+        typed, after the address checks. Rate-limited per person."""
+        limiter = relay.limiter if relay is not None else None
+        try:
+            if limiter is not None:
+                limiter.check(session.person.id)
+        except reach.TooSoon as exc:
+            return _json({"error": str(exc)}, 429)
+        if not 1 <= body.port <= 65535:
+            return _json({"ok": False})
+        return _json({"ok": await reach.reachable(body.host, body.port)})
+
     @app.websocket("/api/ws")
     async def socket(websocket: WebSocket) -> None:
         if terminals is None:
@@ -1152,7 +1465,9 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
             await websocket.accept()
             await websocket.close(code=SIGNED_OUT_CLOSE)
             return
-        page_socket = PageSocket(websocket, terminals, session, pool)
+        page_socket = PageSocket(
+            websocket, terminals, session, pool, relay,
+            label=auth.socket_label(session, websocket.headers.get("user-agent", "")))
         sockets.add(page_socket)
         try:
             await page_socket.run()

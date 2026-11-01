@@ -18,7 +18,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import {
-  useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode,
+  Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode,
 } from "react";
 import {
   blockOutput, loadFeed, loadHistory, type StoredBlock, type TerminalInfo,
@@ -157,6 +157,9 @@ interface Props {
   notify: (text: string) => void;
   /** A command search put here, for the line (0.1.7): not run. */
   paste: { text: string; n: number } | null;
+  /** What goes under a finished block (0.1.17): in tTerm for Mac, the strip
+   * after a successful `ssh <host>`. */
+  after?: (block: FeedBlock, blocks: FeedBlock[]) => ReactNode;
 }
 
 /** How many pages of earlier blocks a block found by search is looked for
@@ -1032,7 +1035,8 @@ export function FeedTerminal(props: Props) {
             </p>
           )}
           {shown.map((b) => (
-            <BlockView key={b.key} block={b} home={home}
+            <Fragment key={b.key}>
+            <BlockView block={b} home={home}
               live={b.key === liveKey && !fullscreen}
               clipRef={b.key === liveKey ? clipRef : undefined}
               clipHeight={Math.ceil(clipRows * cellHeight)}
@@ -1051,6 +1055,8 @@ export function FeedTerminal(props: Props) {
               }}
               onShowAll={(x) => void showAll(x)}
               onStop={() => chan.current?.input("\x03")} />
+            {b.state === "done" && props.after?.(b, shown)}
+            </Fragment>
           ))}
         </div>
       </div>

@@ -75,11 +75,16 @@ class Link:
         when it could not run at all."""
         raise NotImplementedError
 
-    async def open(self, command: str, cols: int, rows: int,
-                   echo: bool) -> Channel:
+    async def open(self, command: str, cols: int, rows: int, echo: bool,
+                   exec_argv: list[str] | None = None) -> Channel:
         """Starts the shell command in a new terminal of this size. Echo
         off at the start keeps the one-time key from showing; the shell's
-        scripts turn it back on once they have read it."""
+        scripts turn it back on once they have read it.
+
+        `exec_argv` (from 0.1.17, agent only) runs that argument list
+        directly instead of the login shell with `command`: a terminal on
+        the person's Mac that runs `ssh -- <target>` for a server opened
+        "from anywhere" through the Mac."""
         raise NotImplementedError
 
     def release(self) -> None:
@@ -133,8 +138,10 @@ class SshLink(Link):
         err = result.stderr if isinstance(result.stderr, bytes) else b""
         return result.exit_status, out, err
 
-    async def open(self, command: str, cols: int, rows: int,
-                   echo: bool) -> Channel:
+    async def open(self, command: str, cols: int, rows: int, echo: bool,
+                   exec_argv: list[str] | None = None) -> Channel:
+        # Only a computer's terminal (the agent) runs exec_argv; a server
+        # reached over SSH always starts the login shell with `command`.
         proc = await self.conn.create_process(
             command, term_type="xterm-256color", term_size=(cols, rows),
             term_modes={} if echo else {asyncssh.PTY_ECHO: 0},
@@ -144,3 +151,9 @@ class SshLink(Link):
     def release(self) -> None:
         with contextlib.suppress(Exception):
             self.conn.close()
+        # A server reached through a bastion carries its jump connection
+        # (ssh.connect_own); it goes with the connection that rode it.
+        jump = getattr(self.conn, "_tterm_jump", None)
+        if jump is not None:
+            with contextlib.suppress(Exception):
+                jump.close()

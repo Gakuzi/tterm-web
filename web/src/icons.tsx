@@ -403,3 +403,63 @@ export const Output = (p: Props) => (
 export const Bolt = (p: Props) => (
   <Stroke {...p}><path d="M13 3L5 14h6l-1 7 8-11h-6l1-7z" /></Stroke>
 );
+
+/** A key: one's own SSH key, from the vault (0.1.17). */
+export const Key = (p: Props) => (
+  <Stroke {...p}>
+    <circle cx="7.5" cy="15.5" r="4.5" />
+    <path d="M10.7 12.3L20 3M16 7l3 3M14 9l2 2" />
+  </Stroke>
+);
+
+/** Touch ID, Windows Hello, a passkey: the way a device unlocks. */
+export const Fingerprint = (p: Props) => (
+  <Stroke {...p}>
+    <path d="M12 11c0 3.5-.5 6-2 8.5" />
+    <path d="M8.6 6.6A6 6 0 0 1 18 11c0 2-.2 4.2-.9 6.5" />
+    <path d="M6.2 9.4A6 6 0 0 0 6 11c0 2-.4 3.6-1.1 5" />
+    <path d="M9 11a3 3 0 0 1 6 0c0 2.6-.4 5.2-1.4 7.6" />
+  </Stroke>
+);
+
+/** Move to cloud: up into the cloud. */
+export const CloudUp = (p: Props) => (
+  <Stroke {...p}>
+    <path d="M16 16l-4-4-4 4" />
+    <path d="M12 12v9" />
+    <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+  </Stroke>
+);
+
+export const Cloud = (p: Props) => (
+  <Stroke {...p}><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" /></Stroke>
+);
+
+export const Download = (p: Props) => (
+  <Stroke {...p}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <path d="M7 10l5 5 5-5" />
+    <path d="M12 15V3" />
+  </Stroke>
+);
+
+/** A browser somewhere: a new one asking for the keys. */
+export const Globe = (p: Props) => (
+  <Stroke {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+  </Stroke>
+);
+
+/** The vault open in this browser: the lock's bow lifted. */
+export const Unlock = (p: Props) => (
+  <Stroke {...p}>
+    <rect x="5" y="11" width="14" height="10" rx="2" />
+    <path d="M8 11V7a4 4 0 0 1 7.9-1" />
+  </Stroke>
+);
+
+/** Something to look at again: an exclamation mark. */
+export const Alert = (p: Props) => (
+  <Stroke {...p} width={2.6}><path d="M12 7v6M12 17h.01" /></Stroke>
+);
