@@ -141,10 +141,11 @@ account_menu.sign_out = Se déconnecter
 # Only in tTerm for Mac, right under Settings: the servers and keys of this
 # Mac to the account (0.1.17). The second line is small, under the first.
 account_menu.move = Passer au cloud
-account_menu.move_note = Les serveurs et les clés de ce Mac, partout
-# Only in a browser: the app for a Mac. "tTerm for Mac" is the app's name.
+account_menu.move_note = Les serveurs et les clés de ce Mac
+# Only in a Mac's browser, until the person has signed in with the app
+# (0.1.18): the app for a Mac. "tTerm for Mac" is the app's name.
 account_menu.download = Télécharger tTerm pour Mac
-account_menu.download_note = Les terminaux de votre Mac, même hors ligne
+account_menu.download_note = Un terminal local sur votre Mac
 # The item after Settings, and the title of the list of languages.
 language.item = Langue
 

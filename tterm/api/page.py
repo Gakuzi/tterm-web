@@ -684,6 +684,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
                 "email": me.email,
                 # One's own photo (0.1.7), or null for the initials.
                 "photo": await photos.url_of(pool, me.id),
+                # Signed in with tTerm for Mac (0.1.18): no Download in the menu.
+                "appSignedIn": await auth.app_signed_in(pool, me.id),
             },
             "projects": listed,
             "terminals": ([t.describe() for t in terminals.live(me.id)]

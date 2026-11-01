@@ -35,6 +35,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Machine, Me, Project, TerminalInfo } from "./api";
 import { colorClass, terminalName } from "./colors";
 import { LANGUAGES, useT, type Lang } from "./i18n";
+import { macBrowser } from "./platform";
 import {
   Check, ChevronDown, ChevronLeft, ChevronRight, Close, CloudOff, CloudUp, Computer, Doc,
   Download, Folder as FolderIcon, FolderOpen, Gear, Key, Languages, Logo, Moon, People, Person,
@@ -115,7 +116,8 @@ interface Props {
 export type AccountPage = "settings" | "account" | "move";
 
 /** tTerm for Mac (0.1.17): Download in the menu opens the site's download
- * page in the language shown. It has the latest release's dmg and says how
+ * page in the language shown; from 0.1.18 only in a Mac's browser, and until
+ * the person has signed in with the app. It has the latest release's dmg and says how
  * to open an app signed with tTerm's own certificate, not Apple's, which
  * macOS does not open with a double click the first time. The site keeps
  * English at the root, Portuguese in pt and Chinese in zh. */
@@ -752,7 +754,7 @@ function AccountPlace(props: {
               {languageItem}
               <MenuItem icon={<Person size={15} />} text={t("account.title")}
                 current={props.page === "account"} onClick={pick(props.onAccount)} />
-              {!props.inApp && (
+              {!props.inApp && macBrowser() && !me.appSignedIn && (
                 <OfferItem icon={<Download size={16} />} text={t("account_menu.download")}
                   note={t("account_menu.download_note")} href={macDownload(props.language)}
                   onClick={() => setOpen(false)} />

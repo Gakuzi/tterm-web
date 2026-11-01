@@ -207,6 +207,9 @@ export interface Me {
   /** In the app (0.6.0): the system's language, when it is one of the
    * twelve; the page takes it until one is chosen. tTerm Web sends none. */
   systemLanguage?: string | null;
+  /** Signed in with tTerm for Mac at least once, on a device not forgotten
+   * (0.1.18): the menu no longer offers to download it. */
+  appSignedIn?: boolean;
 }
 
 export type TerminalState = "connecting" | "open" | "ended" | "gone";

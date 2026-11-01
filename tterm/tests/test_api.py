@@ -35,6 +35,22 @@ async def test_state_has_owner_and_personal(h):
                 for p in state["projects"]] == [("Personal", "P", "owner", [])]
 
 
+async def test_the_state_says_whether_the_app_signed_in(h):
+    """The account menu offers tTerm for Mac until the person has signed in
+    with it (0.1.18): a device of the app, not forgotten."""
+    async with h.core() as core:
+        async def signed_in() -> bool:
+            return (await request(core.page_port, "GET", "/api/state")).json()["me"]["appSignedIn"]
+        assert await signed_in() is False
+        device = await core.pool.fetchval(
+            "INSERT INTO devices (user_id, kind, key_hash, pin_hash, label) "
+            "VALUES ($1, 'app', 'k', NULL, 'tTerm for Mac on MacBook-Pro-Denis') RETURNING id",
+            core.owner.id)
+        assert await signed_in() is True
+        await core.pool.execute("UPDATE devices SET forgotten_at = now() WHERE id = $1", device)
+        assert await signed_in() is False
+
+
 async def test_theme_change_needs_the_page_header(h):
     async with h.core() as core:
         body = json.dumps({"theme": "light"}).encode()

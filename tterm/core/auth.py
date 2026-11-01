@@ -971,6 +971,14 @@ async def session(pool: asyncpg.Pool, token: str | None, *,
                    row["label"] or "")
 
 
+async def app_signed_in(pool: asyncpg.Pool, user_id: uuid.UUID) -> bool:
+    """Whether the person has signed in with tTerm for Mac (0.1.18): a device
+    of the app, not forgotten. The account menu stops offering the app then."""
+    return bool(await pool.fetchval(
+        "SELECT EXISTS (SELECT 1 FROM devices WHERE user_id = $1 "
+        "AND kind = 'app' AND forgotten_at IS NULL)", user_id))
+
+
 def socket_label(session: Session, user_agent: str) -> str:
     """What the journal names as the device of a page socket (0.1.17): the
     app by the device it signed in as, "tTerm for Mac on MacBook-Pro-Denis"

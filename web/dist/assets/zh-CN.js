@@ -141,10 +141,11 @@ account_menu.sign_out = 退出登录
 # Only in tTerm for Mac, right under Settings: the servers and keys of this
 # Mac to the account (0.1.17). The second line is small, under the first.
 account_menu.move = 迁移到云端
-account_menu.move_note = 这台 Mac 的服务器和密钥，随处可用
-# Only in a browser: the app for a Mac. "tTerm for Mac" is the app's name.
+account_menu.move_note = 这台 Mac 的服务器和密钥
+# Only in a Mac's browser, until the person has signed in with the app
+# (0.1.18): the app for a Mac. "tTerm for Mac" is the app's name.
 account_menu.download = 下载 tTerm Mac 版
-account_menu.download_note = 你 Mac 上的终端，没有网络也能用
+account_menu.download_note = 你 Mac 上的本地终端
 # The item after Settings, and the title of the list of languages.
 language.item = 语言
 
