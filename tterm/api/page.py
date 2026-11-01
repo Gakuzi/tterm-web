@@ -11,6 +11,7 @@ the page gets index.html, so that addresses inside the page survive a reload.
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import html
 import json
 import re
@@ -25,8 +26,8 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 from .. import __version__
-from ..core import (accounts, auth, letters, machines, notes, photos,
-                    projects, reach, search, ssh, vault)
+from ..core import (accounts, auth, letters, logs, machines, notes,
+                    photos, projects, reach, search, ssh, vault)
 from ..core.mail import Mailer
 from ..core.terminals import NotAllowed, NotOpen, Terminal, Terminals
 from .connect import client_ip
@@ -207,6 +208,19 @@ class OwnLineBody(BaseModel):
     name: str = ""
 
 
+class LogNoteBody(BaseModel):
+    """A note under a line of a machine's log (0.1.20): the line by its id,
+    or, from a terminal's feed, by the terminal and the block's number."""
+    text: str
+    entry: int | None = None
+    terminalId: uuid.UUID | None = None
+    seq: int | None = None
+
+
+class RedactBody(BaseModel):
+    reason: str
+
+
 class TooBig(Exception):
     """A request's body over what its route takes, or without a length."""
 
@@ -252,6 +266,18 @@ def _with_nonce(page: str, nonce: str) -> str:
 
 def _json(data, status: int = 200) -> Response:
     return JSONResponse(data, status_code=status, headers=NO_STORE)
+
+
+#: A moment the page names, in milliseconds since 1970: from then to 5138.
+MOMENT_MAX = 10 ** 14
+
+
+def _moment(ms: int | None) -> dt.datetime | None:
+    """A moment from the page (its midnight, for the machines' logs), or
+    None if it is not one."""
+    if ms is None or not 0 <= ms < MOMENT_MAX:
+        return None
+    return dt.datetime.fromtimestamp(ms / 1000, dt.UTC)
 
 
 def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
@@ -1171,6 +1197,70 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
                                                  note_id))
         except notes.Refused as exc:
             return note_refused(exc)
+
+    # ------------------------------------------- machines' logs (0.1.20)
+
+    def log_refused(exc: logs.Refused) -> Response:
+        return _json({"error": str(exc)}, exc.status)
+
+    @app.get("/api/logs/today")
+    async def logs_today(since: int,
+                         session: auth.Session = Depends(signed_in)) -> Response:
+        """How many commands each machine ran since `since`, the page's
+        midnight: the Logs folder of the sidebar. Apart from /api/state,
+        which the app answers itself before signing in."""
+        midnight = _moment(since)
+        if midnight is None:
+            return _json({"error": "Say since when: the page's midnight."}, 422)
+        return _json({"counts": await logs.counts(pool, session.person.id,
+                                                  midnight)})
+
+    @app.get("/api/machines/{machine_id}/log")
+    async def machine_log(machine_id: uuid.UUID, start: int, end: int,
+                          session: auth.Session = Depends(signed_in)) -> Response:
+        """A day of the machine's log, from the page's midnight to the next:
+        its lines, each command with its notes."""
+        a, b = _moment(start), _moment(end)
+        if a is None or b is None:
+            return _json({"error": "Say which day: from one midnight to the "
+                                   "next."}, 422)
+        try:
+            return _json(await logs.day(pool, session.person.id, machine_id,
+                                        a, b))
+        except logs.Refused as exc:
+            return log_refused(exc)
+
+    @app.post("/api/log/notes")
+    async def log_note(body: LogNoteBody,
+                       session: auth.Session = Depends(signed_in)) -> Response:
+        """A note under a line: what stays in the log as written."""
+        try:
+            note = await logs.add_note(pool, session.person.id, body.text,
+                                       entry_id=body.entry,
+                                       terminal_id=body.terminalId,
+                                       seq=body.seq)
+        except logs.Refused as exc:
+            return log_refused(exc)
+        return _json(note, 201)
+
+    @app.post("/api/log/{entry_id}/redact")
+    async def log_redact(entry_id: int, body: RedactBody,
+                         session: auth.Session = Depends(signed_in)) -> Response:
+        """The words of a line or a note go for good, by the project's owner
+        or an admin; the log keeps who, when and why. A command's go from
+        every line of the project with the same words, and the terminals
+        of those that are running forget them too."""
+        try:
+            done = await logs.redact(pool, session.person.id, entry_id,
+                                     body.reason)
+        except logs.Refused as exc:
+            return log_refused(exc)
+        if terminals is not None and done["what"] == "command":
+            for line in [done, *done["also"]]:
+                if line["terminalId"] and line["seq"] is not None:
+                    terminals.forget(uuid.UUID(line["terminalId"]), line["seq"],
+                                     line["seqEnd"], done["redacted"])
+        return _json(done)
 
     # ------------------------------------------------ the vault (0.1.17)
 

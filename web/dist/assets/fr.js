@@ -1239,6 +1239,8 @@ block.state_running = {command}, en cours
 block.state_failed = {command}, a échoué avec le code de retour {code}
 block.state_finished = {command}, terminée
 block.state_ended = {command}, interrompue
+# A command redacted in the machine's log (0.1.20): its words are gone.
+block.state_redacted = Une commande biffée
 # On a block search opened: the words found are marked in it.
 block.found = Trouvé
 # A command the shell has not started; Stop is the button (block.stop).
@@ -1310,6 +1312,102 @@ danger.user_lost = Ses fichiers et ses accès disparaissent avec lui.
 # Under it, for rm -rf aimed at / or ~.
 feed.everything = <strong>Elle vise la machine entière.</strong> Rien n’y survivrait.
 feed.run_it = Exécuter
+
+# ------------------------------------------------------------ log: the log of a machine, in the Logs folder of a project's notes (LogView.tsx, LogNotes.tsx)
+# The folder in the sidebar, before a project's folders of notes, and the
+# small label after it with its tip.
+log.folder = Journaux
+log.by_tterm = par tTerm
+log.by_tterm_title = C’est tTerm qui les écrit\xA0: personne ne peut les modifier
+# After a machine's name in the folder: commands run on it today.
+log.today_count = {n} aujourd’hui
+# A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
+log.tab = {machine}\xA0: journal
+log.tab_title = Journal de la machine {machine}
+log.close_tab = Fermer le journal
+# The ⋯ over the page, and its one item.
+log.menu = Menu du journal
+log.copy_markdown = Copier en Markdown
+# Under the title. {lines} and {output} are log.keep_year or log.keep_days.
+log.lead = Ce qui a été exécuté sur {machine} via tTerm. tTerm tient ce journal et personne ne peut le modifier. Les lignes sont conservées {lines}, la sortie des commandes {output}.
+log.keep_year = un an
+log.keep_days = one: {n} jour | other: {n} jours
+# Going from day to day.
+log.day_before = Jour précédent
+log.day_after = Jour suivant
+log.today = Aujourd’hui
+log.pick_day = Choisir un jour
+# The day over its lines: Today, Thursday 29 October. {day} is the date, as the language writes it with the day of the week.
+log.day_today = Aujourd’hui, {day}
+log.day_yesterday = Hier, {day}
+# What the day holds, on the right of it: 9 commands · 1 failed · 3 notes.
+log.commands = one: {n} commande | other: {n} commandes
+log.failed = one: {n} échec | other: {n} échecs
+# A day with nothing in it.
+log.nothing_day = Rien n’a été exécuté sur {machine} via tTerm ce jour-là.
+log.nothing_yet = Rien n’a encore été exécuté sur {machine} via tTerm. Les commandes de ses terminaux arrivent ici dès qu’elles se terminent.
+log.cut = Seules les {n} premières lignes de ce jour sont affichées ici.
+# A terminal opened or ended. {name} is a terminal's name: terminal 1, or the name it was given; {who} a person's first name.
+log.opened_you = Vous avez ouvert {name}
+log.opened = {who} a ouvert {name}
+log.ended_you = Vous avez mis fin à {name}
+log.ended = {who} a mis fin à {name}
+# A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
+log.ended_why = {name} a pris fin\xA0: {why}
+# A command's line under the mouse.
+log.output = Sortie
+log.output_title = Ouvrir dans son terminal
+log.output_gone = sortie non conservée
+# {days} is log.keep_days or log.keep_year.
+log.output_gone_title = La sortie d’une commande est conservée {days}
+log.add_note = Ajouter une note
+log.add_note_title = Ajouter une note sur cette commande
+log.line_menu = Plus d’options
+log.copy_command = Copier la commande
+log.copy_link = Copier le lien vers cette ligne
+log.redact = Biffer…
+# Under Redact in the menu.
+log.redact_note = Pour un mot de passe ou un jeton qui s’y est glissé. Le texte disparaît définitivement\xA0; le journal indique qui l’a biffé, quand et pourquoi.
+# In place of redacted words: Redacted by You · 09:23 · a password. {at} is when, {reason} why, as the person wrote it.
+log.redacted_by_you = Texte biffé par vous · {at} · {reason}
+log.redacted_by = Texte biffé par {who} · {at} · {reason}
+log.redacted_by_someone = Texte biffé · {at} · {reason}
+# Who wrote a note: You, or a person's first name; an AI on someone's behalf: AI for You, AI for Anna. "AI" may be the language's own short word for it.
+log.you = Vous
+log.someone = Quelqu’un
+log.ai_for_you = IA pour vous
+log.ai_for = IA pour {who}
+log.reply = Répondre
+# Writing a note. <k>…</k> are keys on the keyboard.
+log.note_label = Une note sur la commande
+log.reply_label = Une réponse
+log.note_placeholder = Pourquoi, le résultat, la suite
+log.reply_placeholder = Votre réponse
+log.edit_hint = Le texte restera tel quel dans le journal · <k>Enter</k> pour enregistrer · <k>Esc</k> pour annuler
+# {why} is what tTerm Web said, as it said it.
+log.no_note = La note n’a pas été enregistrée\xA0: {why}
+log.note_menu = Plus d’options
+log.copy_note = Copier le texte
+# Redacting: the window that asks why. Under its title: web-01 · today, 09:20 · terminal 1.
+log.redact_command_title = Biffer cette commande\xA0?
+log.redact_note_title = Biffer cette note\xA0?
+log.redact_where = {machine} · {when} · {name}
+# {when} above: today, 09:20; another day with its date. {time} is the time, {day} the date with the day of the week.
+log.when_today = aujourd’hui à {time}
+log.when_on = {day} à {time}
+log.redact_command_text = Son texte disparaît définitivement de tTerm\xA0: du journal, des blocs du terminal et de la recherche. Le journal garde une trace\xA0: une commande était là, qui l’a biffée, quand et pourquoi.
+log.redact_note_text = Son texte disparaît définitivement de tTerm. Le journal garde une trace\xA0: une note était là, qui l’a biffée, quand et pourquoi.
+log.why = Pourquoi
+log.why_placeholder = un mot de passe, un jeton
+log.redact_button = Biffer
+# After a command is redacted, when the same command was run elsewhere in the project too: those go with it.
+log.redacted_also = one: La même commande a été exécutée {n} fois de plus dans ce projet : elle y est biffée aussi. | other: La même commande a été exécutée {n} fois de plus dans ce projet : elle y est biffée aussi.
+# Over a day whose commands' output is no longer kept. {output} and {lines} are log.keep_days or log.keep_year.
+log.old_banner = <b>La sortie de ces commandes n’est plus disponible\xA0:</b> elle est conservée {output}, les lignes du journal {lines}. Les offres payantes garderont les deux plus longtemps.
+# {why} is what went wrong, as tTerm Web said it.
+log.no_open = Impossible d’ouvrir le journal\xA0: {why}
+log.gone_title = Ce journal n’est plus là
+log.gone_text = Sa machine a été retirée, ou déplacée vers un projet dont vous ne faites pas partie.
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.

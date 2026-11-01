@@ -432,7 +432,13 @@ async def test_a_terminal_runs_over_ssh_and_keeps_blocks(h):
             kinds = [r["kind"] for r in await core.pool.fetch(
                 "SELECT kind FROM journal WHERE terminal_id = $1 ORDER BY id",
                 t.id)]
-            assert kinds == ["terminal.opened", "terminal.closed"], kinds
+            # Each command that ended is a line of the machine's log
+            # (0.1.20), between the terminal's opening and its end.
+            assert kinds[0] == "terminal.opened", kinds
+            assert kinds[-1] == "terminal.closed", kinds
+            assert set(kinds[1:-1]) <= {"command.ran"}, kinds
+            if full:
+                assert kinds.count("command.ran") >= 3, kinds
             assert second.reason == "Closed."
     finally:
         shutil.rmtree(home, ignore_errors=True)

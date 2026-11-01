@@ -1239,6 +1239,8 @@ block.state_running = {command}, running
 block.state_failed = {command}, failed with exit code {code}
 block.state_finished = {command}, finished
 block.state_ended = {command}, ended
+# A command redacted in the machine's log (0.1.20): its words are gone.
+block.state_redacted = A redacted command
 # On a block search opened: the words found are marked in it.
 block.found = Found
 # A command the shell has not started; Stop is the button (block.stop).
@@ -1310,6 +1312,102 @@ danger.user_lost = Their files and access go with them.
 # Under it, for rm -rf aimed at / or ~.
 feed.everything = <strong>This points at the whole machine.</strong> Nothing on it would survive.
 feed.run_it = Run it
+
+# ------------------------------------------------------------ log: the log of a machine, in the Logs folder of a project's notes (LogView.tsx, LogNotes.tsx)
+# The folder in the sidebar, before a project's folders of notes, and the
+# small label after it with its tip.
+log.folder = Logs
+log.by_tterm = by tTerm
+log.by_tterm_title = tTerm writes these: nobody can change them
+# After a machine's name in the folder: commands run on it today.
+log.today_count = {n} today
+# A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
+log.tab = {machine} log
+log.tab_title = Log of {machine}
+log.close_tab = Close the log
+# The ⋯ over the page, and its one item.
+log.menu = Log menu
+log.copy_markdown = Copy as Markdown
+# Under the title. {lines} and {output} are log.keep_year or log.keep_days.
+log.lead = What was run on {machine} through tTerm. tTerm writes it, nobody can change it. Lines are kept {lines}, what commands printed {output}.
+log.keep_year = a year
+log.keep_days = one: a day | other: {n} days
+# Going from day to day.
+log.day_before = The day before
+log.day_after = The day after
+log.today = Today
+log.pick_day = Pick a day
+# The day over its lines: Today, Thursday 29 October. {day} is the date, as the language writes it with the day of the week.
+log.day_today = Today, {day}
+log.day_yesterday = Yesterday, {day}
+# What the day holds, on the right of it: 9 commands · 1 failed · 3 notes.
+log.commands = one: {n} command | other: {n} commands
+log.failed = one: {n} failed | other: {n} failed
+# A day with nothing in it.
+log.nothing_day = Nothing was run on {machine} through tTerm this day.
+log.nothing_yet = Nothing was run on {machine} through tTerm yet. Commands from its terminals come here as they end.
+log.cut = Only the first {n} lines of this day are shown here.
+# A terminal opened or ended. {name} is a terminal's name: terminal 1, or the name it was given; {who} a person's first name.
+log.opened_you = You opened {name}
+log.opened = {who} opened {name}
+log.ended_you = You ended {name}
+log.ended = {who} ended {name}
+# A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
+log.ended_why = {name} ended: {why}
+# A command's line under the mouse.
+log.output = Output
+log.output_title = Open it in its terminal
+log.output_gone = output not kept
+# {days} is log.keep_days or log.keep_year.
+log.output_gone_title = What it printed is kept {days}
+log.add_note = Add a note
+log.add_note_title = Add a note after this command
+log.line_menu = More
+log.copy_command = Copy command
+log.copy_link = Copy link to this line
+log.redact = Redact…
+# Under Redact in the menu.
+log.redact_note = For a password or a token that got in. Its text goes for good; the log keeps who redacted it, when and why.
+# In place of redacted words: Redacted by You · 09:23 · a password. {at} is when, {reason} why, as the person wrote it.
+log.redacted_by_you = Redacted by You · {at} · {reason}
+log.redacted_by = Redacted by {who} · {at} · {reason}
+log.redacted_by_someone = Redacted · {at} · {reason}
+# Who wrote a note: You, or a person's first name; an AI on someone's behalf: AI for You, AI for Anna. "AI" may be the language's own short word for it.
+log.you = You
+log.someone = Someone
+log.ai_for_you = AI for You
+log.ai_for = AI for {who}
+log.reply = Reply
+# Writing a note. <k>…</k> are keys on the keyboard.
+log.note_label = A note after the command
+log.reply_label = A reply
+log.note_placeholder = Why, what came out, what next
+log.reply_placeholder = Your reply
+log.edit_hint = Stays in the log as written · <k>Enter</k> saves · <k>Esc</k> cancels
+# {why} is what tTerm Web said, as it said it.
+log.no_note = The note was not saved: {why}
+log.note_menu = More
+log.copy_note = Copy text
+# Redacting: the window that asks why. Under its title: web-01 · today, 09:20 · terminal 1.
+log.redact_command_title = Redact this command?
+log.redact_note_title = Redact this note?
+log.redact_where = {machine} · {when} · {name}
+# {when} above: today, 09:20; another day with its date. {time} is the time, {day} the date with the day of the week.
+log.when_today = today, {time}
+log.when_on = {day}, {time}
+log.redact_command_text = Its text goes from tTerm for good: from the log, the terminal's feed and search. The log keeps that a command was here, who redacted it, when and why.
+log.redact_note_text = Its text goes from tTerm for good. The log keeps that a note was here, who redacted it, when and why.
+log.why = Why
+log.why_placeholder = a password, a token
+log.redact_button = Redact
+# After a command is redacted, when the same command was run elsewhere in the project too: those go with it.
+log.redacted_also = one: The same command, run once more in this project, is redacted there too. | other: The same command, run {n} more times in this project, is redacted there too.
+# Over a day whose commands' output is no longer kept. {output} and {lines} are log.keep_days or log.keep_year.
+log.old_banner = <b>What these commands printed is no longer kept:</b> output stays {output}, the lines of the log {lines}. Paid plans will keep both longer.
+# {why} is what went wrong, as tTerm Web said it.
+log.no_open = The log did not open: {why}
+log.gone_title = This log is not here
+log.gone_text = Its machine was removed, or moved to a project you are not in.
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.

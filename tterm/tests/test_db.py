@@ -9,7 +9,7 @@ TABLES = {"plans", "users", "sign_in_methods", "projects", "project_members",
           "cas", "machines", "install_tokens", "terminals", "blocks",
           "journal", "schema_migrations", "note_folders", "notes",
           "note_versions", "vaults", "vault_locks", "vault_keys",
-          "vault_pairings"}
+          "vault_pairings", "log_texts"}
 
 
 async def test_migrations_apply_once(h):

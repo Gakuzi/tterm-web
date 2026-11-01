@@ -1239,6 +1239,8 @@ block.state_running = {command}, en ejecución
 block.state_failed = {command}, falló con el código de salida {code}
 block.state_finished = {command}, completado
 block.state_ended = {command}, finalizado
+# A command redacted in the machine's log (0.1.20): its words are gone.
+block.state_redacted = Un comando censurado
 # On a block search opened: the words found are marked in it.
 block.found = Encontrado
 # A command the shell has not started; Stop is the button (block.stop).
@@ -1310,6 +1312,102 @@ danger.user_lost = Sus archivos y su acceso se pierden con ella.
 # Under it, for rm -rf aimed at / or ~.
 feed.everything = <strong>Esto apunta a toda la máquina.</strong> No quedaría nada en ella.
 feed.run_it = Ejecutarlo
+
+# ------------------------------------------------------------ log: the log of a machine, in the Logs folder of a project's notes (LogView.tsx, LogNotes.tsx)
+# The folder in the sidebar, before a project's folders of notes, and the
+# small label after it with its tip.
+log.folder = Bitácoras
+log.by_tterm = por tTerm
+log.by_tterm_title = Las escribe tTerm: nadie puede cambiarlas
+# After a machine's name in the folder: commands run on it today.
+log.today_count = {n} hoy
+# A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
+log.tab = {machine}: bitácora
+log.tab_title = Bitácora de {machine}
+log.close_tab = Cerrar la bitácora
+# The ⋯ over the page, and its one item.
+log.menu = Menú de la bitácora
+log.copy_markdown = Copiar como Markdown
+# Under the title. {lines} and {output} are log.keep_year or log.keep_days.
+log.lead = Lo que se ejecutó en {machine} a través de tTerm. tTerm lleva esta bitácora y nadie puede cambiarla. Las líneas se guardan {lines}; la salida de los comandos, {output}.
+log.keep_year = un año
+log.keep_days = one: un día | other: {n} días
+# Going from day to day.
+log.day_before = Día anterior
+log.day_after = Día siguiente
+log.today = Hoy
+log.pick_day = Elegir un día
+# The day over its lines: Today, Thursday 29 October. {day} is the date, as the language writes it with the day of the week.
+log.day_today = Hoy, {day}
+log.day_yesterday = Ayer, {day}
+# What the day holds, on the right of it: 9 commands · 1 failed · 3 notes.
+log.commands = one: {n} comando | other: {n} comandos
+log.failed = one: {n} fallido | other: {n} fallidos
+# A day with nothing in it.
+log.nothing_day = Ese día no se ejecutó nada en {machine} a través de tTerm.
+log.nothing_yet = Todavía no se ejecutó nada en {machine} a través de tTerm. Los comandos de sus terminales aparecen aquí cuando terminan.
+log.cut = Aquí solo se muestran las primeras {n} líneas de este día.
+# A terminal opened or ended. {name} is a terminal's name: terminal 1, or the name it was given; {who} a person's first name.
+log.opened_you = Abriste {name}
+log.opened = {who} abrió {name}
+log.ended_you = Finalizaste {name}
+log.ended = {who} finalizó {name}
+# A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
+log.ended_why = {name} finalizó: {why}
+# A command's line under the mouse.
+log.output = Salida
+log.output_title = Abrir en su terminal
+log.output_gone = salida no conservada
+# {days} is log.keep_days or log.keep_year.
+log.output_gone_title = La salida de un comando se guarda {days}
+log.add_note = Añadir una nota
+log.add_note_title = Añadir una nota sobre este comando
+log.line_menu = Más
+log.copy_command = Copiar comando
+log.copy_link = Copiar enlace a esta línea
+log.redact = Censurar…
+# Under Redact in the menu.
+log.redact_note = Para una contraseña o un token que se haya colado. Su texto desaparece para siempre; la bitácora deja constancia de quién lo censuró, cuándo y por qué.
+# In place of redacted words: Redacted by You · 09:23 · a password. {at} is when, {reason} why, as the person wrote it.
+log.redacted_by_you = Texto censurado por ti · {at} · {reason}
+log.redacted_by = Texto censurado por {who} · {at} · {reason}
+log.redacted_by_someone = Texto censurado · {at} · {reason}
+# Who wrote a note: You, or a person's first name; an AI on someone's behalf: AI for You, AI for Anna. "AI" may be the language's own short word for it.
+log.you = Tú
+log.someone = Alguien
+log.ai_for_you = IA en tu nombre
+log.ai_for = IA en nombre de {who}
+log.reply = Responder
+# Writing a note. <k>…</k> are keys on the keyboard.
+log.note_label = Una nota sobre el comando
+log.reply_label = Una respuesta
+log.note_placeholder = Por qué, qué salió, qué sigue
+log.reply_placeholder = Tu respuesta
+log.edit_hint = Queda en la bitácora tal cual · <k>Enter</k> guarda · <k>Esc</k> cancela
+# {why} is what tTerm Web said, as it said it.
+log.no_note = La nota no se guardó: {why}
+log.note_menu = Más
+log.copy_note = Copiar texto
+# Redacting: the window that asks why. Under its title: web-01 · today, 09:20 · terminal 1.
+log.redact_command_title = ¿Censurar este comando?
+log.redact_note_title = ¿Censurar esta nota?
+log.redact_where = {machine} · {when} · {name}
+# {when} above: today, 09:20; another day with its date. {time} is the time, {day} the date with the day of the week.
+log.when_today = hoy, {time}
+log.when_on = {day}, {time}
+log.redact_command_text = Su texto desaparece para siempre de tTerm: de la bitácora, de los bloques de la terminal y de la búsqueda. La bitácora deja constancia de que aquí hubo un comando, de quién lo censuró, cuándo y por qué.
+log.redact_note_text = Su texto desaparece para siempre de tTerm. La bitácora deja constancia de que aquí hubo una nota, de quién la censuró, cuándo y por qué.
+log.why = Por qué
+log.why_placeholder = una contraseña, un token
+log.redact_button = Censurar
+# After a command is redacted, when the same command was run elsewhere in the project too: those go with it.
+log.redacted_also = one: El mismo comando se ejecutó una vez más en este proyecto y también quedó censurado allí. | other: El mismo comando se ejecutó {n} veces más en este proyecto y también quedó censurado allí.
+# Over a day whose commands' output is no longer kept. {output} and {lines} are log.keep_days or log.keep_year.
+log.old_banner = <b>Lo que imprimieron estos comandos ya no se conserva:</b> la salida se guarda {output}; las líneas de la bitácora, {lines}. Los planes de pago guardarán ambas cosas por más tiempo.
+# {why} is what went wrong, as tTerm Web said it.
+log.no_open = No se pudo abrir la bitácora: {why}
+log.gone_title = Esta bitácora ya no está aquí
+log.gone_text = Su máquina se quitó o se movió a un proyecto del que no formas parte.
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.

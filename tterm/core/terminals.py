@@ -48,7 +48,8 @@ from typing import Awaitable, Callable
 import asyncpg
 import asyncssh
 
-from . import accounts, complete, search, shell, ssh, transport, trust, vault
+from . import (accounts, complete, logs, search, shell, ssh, transport, trust,
+               vault)
 from .accounts import Person
 from .signer_client import SignerClient
 from .transport import LinkError
@@ -122,7 +123,9 @@ class NotOpen(Exception):
 @dataclass
 class Event:
     seq: int
-    #: "out" is bytes for the screen; "ev" is a marker, as a dict.
+    #: "out" is bytes for the screen; "ev" is a marker, as a dict; "red", a
+    #: command of it redacted in the machine's log (0.1.20), as a dict:
+    #: pages hear it as an op of its own, which those from before ignore.
     kind: str
     data: bytes | dict
 
@@ -680,24 +683,35 @@ class Terminal:
             # What it printed as text, for search (0.1.7): a megabyte of
             # output is work, not for the event loop.
             text = await asyncio.to_thread(search.plain, output)
-            await self.pool.execute(
-                """
-                INSERT INTO blocks (terminal_id, kind, seq_start, seq_end,
-                                    command, started_by, started_at,
-                                    finished_at, exit_code, cwd, branch,
-                                    output, output_cut, cols, expires_at,
-                                    output_text)
-                VALUES ($1, 'command', $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                        $11, $12, $14,
-                        now() + make_interval(days => (
-                            SELECT output_days FROM projects WHERE id = $13)),
-                        $15)
-                """,
-                self.id, block.seq_start, seq_end, block.command,
-                self.owner.id, block.started_at, finished_at, exit_code,
-                block.cwd or None, block.branch or None,
-                zlib.compress(output, 6), cut, self.machine.project_id,
-                block.cols, text)
+            # The block and its line in the machine's log (0.1.20) go in
+            # together: a line is never without its block while the block
+            # is kept, nor a block without its line.
+            async with self.pool.acquire() as conn, conn.transaction():
+                await conn.execute(
+                    """
+                    INSERT INTO blocks (terminal_id, kind, seq_start, seq_end,
+                                        command, started_by, started_at,
+                                        finished_at, exit_code, cwd, branch,
+                                        output, output_cut, cols, expires_at,
+                                        output_text)
+                    VALUES ($1, 'command', $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                            $11, $12, $14,
+                            now() + make_interval(days => (
+                                SELECT output_days FROM projects WHERE id = $13)),
+                            $15)
+                    """,
+                    self.id, block.seq_start, seq_end, block.command,
+                    self.owner.id, block.started_at, finished_at, exit_code,
+                    block.cwd or None, block.branch or None,
+                    zlib.compress(output, 6), cut, self.machine.project_id,
+                    block.cols, text)
+                await logs.command_ran(
+                    conn, project_id=self.machine.project_id,
+                    user_id=self.owner.id, machine_id=self.machine.id,
+                    terminal_id=self.id, command=block.command,
+                    seq=block.seq_start, started_at=block.started_at,
+                    finished_at=finished_at, exit_code=exit_code,
+                    cwd=block.cwd, branch=block.branch, home=self.home)
         except Exception:               # noqa: BLE001 - the screen goes on
             log.exception("could not save a block of terminal %s", self.id)
 
@@ -887,6 +901,35 @@ class Terminal:
         if start < 0:
             raise LookupError("no longer kept")
         return list(itertools.islice(self.events, start, None))
+
+    def forget(self, seq_start: int, seq_end: int | None,
+               redacted: dict) -> None:
+        """A command of this terminal was redacted (0.1.20, logs.redact):
+        what was typed and what it printed leave its memory too. All that is
+        kept up to the command's end goes, as when a flood pushes it out, so
+        a page that comes back starts over from what is left; the pages
+        watching now hear it (op "redacted") and draw the block so."""
+        end = seq_end
+        for entry in self._recent:
+            if entry["seqStart"] == seq_start:
+                entry["command"] = ""
+                # Its block expired meanwhile: where it ended, as kept here.
+                if end is None:
+                    end = entry["seqEnd"]
+        if end is None:
+            end = seq_start
+        while self.events and self.events[0].seq <= end:
+            old = self.events.popleft()
+            self.first_seq = old.seq + 1
+            self.trimmed = True
+            if old.kind == "out":
+                assert isinstance(old.data, bytes)
+                self._kept -= len(old.data)
+                self._base_modes.feed(old.data)
+        self.last_seq += 1
+        self.events.append(Event(self.last_seq, "red",
+                                 {"block": seq_start, **redacted}))
+        self._changed()
 
     # ------------------------------------------------------------ end
 
@@ -1207,6 +1250,15 @@ class Terminals:
         rows = list(reversed(rows[:limit]))
         # Unpacking a few megabytes is work: not in the event loop.
         blocks = await asyncio.to_thread(lambda: [_block_json(r) for r in rows])
+        # Each block's line in the machine's log (0.1.20): the notes under
+        # it, and who redacted it if someone did.
+        lines = await logs.of_blocks(self.pool, terminal_id, user_id,
+                                     [r["seq_start"] for r in rows])
+        for b in blocks:
+            line = lines.get(b["seqStart"])
+            b.update(line if line is not None else
+                     {"entry": None, "notes": [], "redacted": None,
+                      "canNote": False})
         return {"blocks": blocks, "more": more}
 
     async def block_output(self, terminal_id: uuid.UUID, user_id: uuid.UUID,
@@ -1286,6 +1338,14 @@ class Terminals:
                 t.machine.code = code
                 t.machine.name = name
                 t._changed()
+
+    def forget(self, terminal_id: uuid.UUID, seq_start: int,
+               seq_end: int | None, redacted: dict) -> None:
+        """A command was redacted in the log: if its terminal is in memory,
+        it forgets the command too (Terminal.forget)."""
+        t = self._live.get(terminal_id)
+        if t is not None:
+            t.forget(seq_start, seq_end, redacted)
 
     def recode(self, project_id: uuid.UUID, code: str) -> None:
         """The project's code changed: its terminals' labels follow."""
@@ -1470,7 +1530,8 @@ class Watcher:
                                                   b"".join(run)))
                     self.sent = seq
                     run, size = [], 0
-                await self._json({"op": "ev", "ch": self.channel, "seq": e.seq,
+                op = "redacted" if e.kind == "red" else "ev"
+                await self._json({"op": op, "ch": self.channel, "seq": e.seq,
                                   **e.data})
                 seq = self.sent = e.seq
         if run:

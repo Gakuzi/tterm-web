@@ -1,15 +1,21 @@
 // One block of the feed: the command, how it ended, how long it took, where
 // it ran, and its output. A finished block's output is text (see render.ts);
-// the running one shows the live terminal in its place.
+// the running one shows the live terminal in its place. From 0.1.20 the
+// notes under it, as the machine's log has them, and Add a note; a command
+// redacted in the log says who redacted it, when and why, in its place.
 
 import {
   useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject,
 } from "react";
+import type { LogNote, Me, Redaction } from "./api";
 import { useBriefly } from "./briefly";
 import { useT } from "./i18n";
 import {
-  Branch, Check, Close, Collapse, Copy, CopyText, Cross, Expand, Link, Rerun, Stop,
+  Branch, Check, Close, Collapse, Copy, CopyText, Cross, Expand, Link, NoteAdd, Rerun,
+  Stop,
 } from "./icons";
+import { plainly } from "./logday";
+import { RedactedMark, Thread } from "./LogNotes";
 import { markIn, marked } from "./marks";
 import type { Rendered } from "./render";
 
@@ -40,6 +46,13 @@ export interface FeedBlock {
   stored: boolean;
   expanded: boolean;
   collapsed: boolean;
+  /** Its line in the machine's log (0.1.20), once the core has it; the
+   * notes under it; who redacted it, if someone did; and whether notes may
+   * be written under it (not for blocks from before the log). */
+  entry: number | null;
+  notes: LogNote[];
+  redacted: Redaction | null;
+  canNote: boolean;
 }
 
 /** What a block's copy buttons copy. */
@@ -64,6 +77,9 @@ interface Props {
   onToggle: (block: FeedBlock) => void;
   onShowAll: (block: FeedBlock) => void;
   onStop: () => void;
+  me: Me;
+  /** A note under the block (0.1.20): whether it was saved. */
+  onNote: (block: FeedBlock, text: string) => Promise<boolean>;
 }
 
 export function shortPath(cwd: string, home?: string): string {
@@ -145,6 +161,10 @@ export function BlockView(props: Props) {
   const [copied, showCopied] = useBriefly<{ what: Copied; ok: boolean }>();
   const [turned, showTurn] = useBriefly<number>();
   const turns = useRef(0);
+  // A note being written under it (0.1.20).
+  const [writing, setWriting] = useState(false);
+  const redacted = block.redacted;
+  const notable = block.canNote && block.seqStart >= 0 && block.stored;
   const copy = (what: Copied, done: Promise<boolean>) => {
     void done.then((ok) => showCopied({ what, ok }));
   };
@@ -155,7 +175,8 @@ export function BlockView(props: Props) {
     copied?.what === what && !copied.ok ? "copy-failed" : undefined;
 
   const command = block.command;
-  const what = block.state === "input" ? t("block.state_input", { command })
+  const what = redacted ? t("block.state_redacted")
+    : block.state === "input" ? t("block.state_input", { command })
     : running ? t("block.state_running", { command })
     : failed ? t("block.state_failed", { command, code: String(block.exitCode) })
     : block.exitCode === 0 ? t("block.state_finished", { command })
@@ -178,11 +199,16 @@ export function BlockView(props: Props) {
       aria-label={what}>
       <div className="block-head">
         {mark}
-        <code className="block-command">
-          {found ? marked(block.command, found, "found-mark") : block.command}
-        </code>
+        {redacted ? <RedactedMark redacted={redacted} me={props.me} /> : (
+          <code className="block-command">
+            {found ? marked(plainly(block.command), found, "found-mark")
+              : plainly(block.command)}
+          </code>
+        )}
         <span className="block-meta">
-          {found && <span className="found-pill">{t("block.found")}</span>}
+          {found && found.length > 0 && (
+            <span className="found-pill">{t("block.found")}</span>
+          )}
           {block.state === "input" && (
             <span className="amber" title={t("block.not_started_title")}>
               {t("block.not_started")}
@@ -210,6 +236,25 @@ export function BlockView(props: Props) {
             {/* i18n-ignore */}
             <kbd>⌃C</kbd>
           </button>
+        ) : redacted ? (
+          <div role="group" aria-label={t("block.actions")}
+            className={"block-actions" + (copied ? " acted" : "")}>
+            {notable && (
+              <button type="button" aria-label={t("log.add_note")}
+                title={t("log.add_note_title")} className={writing ? "on" : undefined}
+                onClick={() => setWriting(true)}>
+                <NoteAdd size={15} />
+              </button>
+            )}
+            <button type="button" aria-label={t("block.copy_link")}
+              title={t("block.copy_link")} className={failedHere("link")}
+              onClick={() => copy("link", props.onCopyLink(block))}>
+              {icon("link", <Link size={15} />)}
+            </button>
+            <span className="visually-hidden" role="status">
+              {copied ? (copied.ok ? t("common.copied") : t("block.not_copied")) : ""}
+            </span>
+          </div>
         ) : (
           <div role="group" aria-label={t("block.actions")}
             className={"block-actions" + (copied || turned !== null ? " acted" : "")}>
@@ -237,6 +282,13 @@ export function BlockView(props: Props) {
               onClick={() => copy("link", props.onCopyLink(block))}>
               {icon("link", <Link size={15} />)}
             </button>
+            {notable && (
+              <button type="button" aria-label={t("log.add_note")}
+                title={t("log.add_note_title")} className={writing ? "on" : undefined}
+                onClick={() => setWriting(true)}>
+                <NoteAdd size={15} />
+              </button>
+            )}
             <button type="button"
               aria-label={block.collapsed ? t("block.expand") : t("block.collapse")}
               title={block.collapsed ? t("block.expand") : t("block.collapse")}
@@ -252,7 +304,7 @@ export function BlockView(props: Props) {
       {live ? (
         <div className="live-clip" ref={props.clipRef}
           style={{ height: props.clipHeight ?? 0 }} />
-      ) : block.collapsed ? (
+      ) : redacted ? null : block.collapsed ? (
         lines.length > 0 && (
           <button type="button" className="block-folded"
             onClick={() => props.onToggle(block)}>
@@ -276,6 +328,17 @@ export function BlockView(props: Props) {
             <span className="block-pending" aria-hidden="true">…</span>
           )}
         </>
+      )}
+      {!live && (
+        <Thread notes={block.notes} me={props.me} canWrite={notable}
+          writing={writing} onWrite={() => setWriting(true)}
+          onCancel={() => setWriting(false)}
+          onSave={async (text) => {
+            const saved = await props.onNote(block, text);
+            if (saved) setWriting(false);
+            return saved;
+          }}
+          className="block-note" />
       )}
     </section>
   );

@@ -5,23 +5,25 @@
 // can be opened again.
 //
 // A terminal's tab is its id, as before 0.1.0, so that the tabs a browser
-// kept then are still there; a note's is n:<id>, a project's page p:<id>.
+// kept then are still there; a note's is n:<id>, a project's page p:<id>,
+// and from 0.1.20 a machine's log l:<id of the machine>.
 //
 // And the page's own shortcuts: Cmd on a Mac, Ctrl+Shift elsewhere. Plain
 // Ctrl stays the terminal's: Ctrl+C, Ctrl+R and Ctrl+K belong to the shell.
 
 const TABS_KEY = "tterm.tabs";
 const ID = /^[0-9a-f-]{36}$/;
-const TAB = /^(?:[np]:)?[0-9a-f-]{36}$/;
+const TAB = /^(?:[npl]:)?[0-9a-f-]{36}$/;
 /** Tabs at once, at most: each terminal is on the page's one connection,
  * which takes 64. */
 export const TABS_MAX = 32;
 
-export type TabKind = "terminal" | "note" | "project";
+export type TabKind = "terminal" | "note" | "project" | "log";
 
 export function tabKind(tab: string): TabKind {
   if (tab.startsWith("n:")) return "note";
   if (tab.startsWith("p:")) return "project";
+  if (tab.startsWith("l:")) return "log";
   return "terminal";
 }
 
@@ -32,15 +34,17 @@ export function tabTarget(tab: string): string {
 
 export const noteTab = (id: string) => `n:${id}`;
 export const projectTab = (id: string) => `p:${id}`;
+export const logTab = (machineId: string) => `l:${machineId}`;
 
-/** The address of a tab: /t/<id>, /n/<id>, /p/<id>. */
+/** The address of a tab: /t/<id>, /n/<id>, /p/<id>, /l/<id>. */
 export function tabPath(tab: string): string {
   const kind = tabKind(tab);
   const id = tabTarget(tab);
-  return kind === "note" ? `/n/${id}` : kind === "project" ? `/p/${id}` : `/t/${id}`;
+  return kind === "note" ? `/n/${id}` : kind === "project" ? `/p/${id}`
+    : kind === "log" ? `/l/${id}` : `/t/${id}`;
 }
 
-const PATH = /^\/([tnp])\/([0-9a-f-]{36})\/?$/;
+const PATH = /^\/([tnpl])\/([0-9a-f-]{36})\/?$/;
 
 /** The tab an address shows, if it shows one. */
 export function tabOfPath(path: string): string | null {
@@ -75,14 +79,15 @@ export function isTerminalTab(tab: string): boolean {
 /** Not "tterm.folded": that one is the feed's folded blocks (0.0.8). */
 const FOLDED_KEY = "tterm.sidebar";
 
-/** What is folded in the sidebar: projects (p:), machines (m:) and folders
- * of notes (f:) by id. Everything else is unfolded. */
+/** What is folded in the sidebar: projects (p:), machines (m:), folders
+ * of notes (f:) and from 0.1.20 the Logs folder of a project (l:) by id.
+ * Everything else is unfolded. */
 export function rememberedFolds(): Set<string> {
   try {
     const raw: unknown = JSON.parse(localStorage.getItem(FOLDED_KEY) ?? "[]");
     if (!Array.isArray(raw)) return new Set();
     return new Set(raw.filter((x): x is string =>
-      typeof x === "string" && /^[pmf]:[0-9a-f-]{36}$/.test(x)).slice(0, 2000));
+      typeof x === "string" && /^[pmfl]:[0-9a-f-]{36}$/.test(x)).slice(0, 2000));
   } catch {
     return new Set();
   }

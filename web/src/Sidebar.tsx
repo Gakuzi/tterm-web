@@ -29,7 +29,9 @@
 // with the person's own key has a key after its name, and one that goes
 // through their Mac says "via Mac", with the Mac's dot; in the app the
 // menu has Move to cloud, in a Mac's browser Download tTerm for Mac: from
-// 0.1.19 at the bottom, right above Sign out.
+// 0.1.19 at the bottom, right above Sign out. From 0.1.20 a project's notes
+// start with Logs, written by tTerm: the log of each of its machines, with
+// how many commands ran there today.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Machine, Me, Project, TerminalInfo } from "./api";
@@ -38,8 +40,8 @@ import { LANGUAGES, useT, type Lang } from "./i18n";
 import { macBrowser } from "./platform";
 import {
   Check, ChevronDown, ChevronLeft, ChevronRight, Close, CloudOff, CloudUp, Computer, Doc,
-  Download, Folder as FolderIcon, FolderOpen, Gear, Key, Languages, Logo, Moon, People, Person,
-  Pin, Plus, Server, SignIn, SignOut, Sun,
+  Download, Folder as FolderIcon, FolderOpen, Gear, History, Key, Languages, Lock, Logo, Moon,
+  People, Person, Pin, Plus, Server, SignIn, SignOut, Sun,
 } from "./icons";
 import { hereWord, onMac } from "./local";
 import { NameInput } from "./NameInput";
@@ -48,13 +50,15 @@ import { Face } from "./Face";
 import { titled } from "./noteText";
 import { manages, ROLE_KEY, writes } from "./rights";
 import type { Dot } from "./TabBar";
-import { noteTab, projectTab } from "./tabs";
+import { logTab, noteTab, projectTab } from "./tabs";
 import type { Shown } from "./theme";
 import { lastSeen } from "./time";
 
 interface Props {
   me: Me;
   projects: Project[];
+  /** Commands each machine ran today, by its id (0.1.20). */
+  logToday: Record<string, number>;
   /** Above the account: a new version of the app ready (0.1.15). */
   updateCard?: ReactNode;
   pinned: boolean;
@@ -65,7 +69,7 @@ interface Props {
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   /** What is folded: p:, m: and f: with the id of a project, a machine or a
-   * folder. */
+   * folder; l: with a project's, its Logs (0.1.20). */
   folded: Set<string>;
   onFold: (key: string) => void;
   /** The tab in front. */
@@ -88,6 +92,8 @@ interface Props {
   onNewFolder: (project: Project) => void;
   onNewNote: (folderId: string) => void;
   onOpenNote: (noteId: string) => void;
+  /** A machine's log (0.1.20). */
+  onOpenLog: (machineId: string) => void;
   onNewProject: () => void;
   /** The machines page. */
   onHome: () => void;
@@ -277,6 +283,47 @@ export function Sidebar(props: Props) {
     );
   };
 
+  // The project's Logs (0.1.20): a log for each of its machines, written by
+  // tTerm, with the commands run there today.
+  const logRows = (project: Project) => {
+    if (local || !project.machines.length) return null;
+    const key = `l:${project.id}`;
+    const open = !folded.has(key);
+    const label = t("log.folder");
+    return (
+      <div className="sb-group sb-logs">
+        <div className="sb-row">
+          <Chevron open={open} onClick={() => onFold(key)} />
+          <button type="button" className="sb-name" aria-expanded={open}
+            title={t(open ? "sidebar.fold" : "sidebar.unfold", { name: label })}
+            onClick={() => onFold(key)}>
+            <History size={14} />
+            <span className="sb-text">{label}</span>
+          </button>
+          <span className="sb-tag" title={t("log.by_tterm_title")}>
+            <Lock size={11} />{t("log.by_tterm")}
+          </span>
+        </div>
+        {open && project.machines.map((m) => (
+          <button key={m.id} type="button" className="sb-leaf"
+            aria-current={current === logTab(m.id) ? "page" : undefined}
+            title={t("log.tab_title", { machine: m.name })}
+            onClick={() => props.onOpenLog(m.id)}>
+            <span className="sb-leaf-icon" aria-hidden="true">
+              {m.kind === "computer" ? <Computer size={14} /> : <Server size={14} />}
+            </span>
+            <span className="sb-text">{m.name}</span>
+            {!!props.logToday[m.id] && (
+              <span className="sb-progress">
+                {t("log.today_count", { n: props.logToday[m.id] })}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   const folderRows = (project: Project) => project.folders.map((f) => {
     const key = `f:${f.id}`;
     const open = !folded.has(key);
@@ -377,6 +424,7 @@ export function Sidebar(props: Props) {
                     title: t("sidebar.new_folder"),
                     onClick: () => props.onNewFolder(project),
                   } : undefined} />
+                  {logRows(project)}
                   {project.folders.length === 0 && (
                     <div className="sb-none">
                       {writes(project) ? t("sidebar.no_notes_writes")

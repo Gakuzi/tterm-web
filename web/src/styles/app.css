@@ -7528,3 +7528,613 @@ mark.found-mark {
     font-size: 20px;
   }
 }
+
+/* ------------------------------------------- the log of a machine (0.1.20) */
+
+/* The Logs folder of a project's notes: written by tTerm, the lock says. */
+.sb-tag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px 0 4px;
+  font: 500 11px var(--font-ui);
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+/* The page: a note's, wider, for the lines. */
+.log-page {
+  max-width: 940px;
+}
+
+.log-title {
+  margin: 4px 0 0;
+  font: 800 32px/1.2 var(--font-ui);
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.log-lead {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--faint);
+}
+
+.log-lead svg {
+  flex: none;
+  margin-top: 3px;
+}
+
+.log-day {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 6px;
+}
+
+.log-day .icon-button.small {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+}
+
+.log-day .icon-button.small:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.log-day-name {
+  margin: 0 4px 0 6px;
+  font: 700 15px var(--font-ui);
+  color: var(--ink);
+}
+
+.log-day-count {
+  margin-left: auto;
+  font: 500 12px var(--font-ui);
+  color: var(--faint);
+}
+
+.log-chip {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dim);
+  font: 600 12px var(--font-ui);
+  cursor: pointer;
+}
+
+.log-chip:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* Pick a day: the browser's own calendar opens from a date field under the
+ * chip; where it cannot be opened that way, the field shows instead. */
+.log-pick {
+  position: relative;
+  display: inline-flex;
+}
+
+.log-pick input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.log-pick.open .log-chip {
+  visibility: hidden;
+}
+
+.log-pick.open input {
+  width: auto;
+  min-width: 100%;
+  padding: 0 8px;
+  border: 1px solid var(--amber);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 500 12px var(--font-ui);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.log-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+}
+
+.log-empty {
+  margin: 10px 0;
+  font-size: 13px;
+  color: var(--faint);
+}
+
+/* A line: when, who, how it ended, the command, and on the right how long
+ * it took, where, the terminal; under the mouse, what can be done. */
+.log-line {
+  display: grid;
+  grid-template-columns: 44px 18px 12px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  min-height: 36px;
+  margin: 0 -12px;
+  padding: 0 12px;
+  border-radius: 8px;
+}
+
+.log-line:hover,
+.log-line:focus-within,
+.log-line.writing,
+.log-line:has(.menu-button.open) {
+  background: var(--surface);
+}
+
+.log-line.lit,
+.log-event.lit {
+  box-shadow: 0 0 0 2px var(--amber-ring);
+}
+
+.log-event.lit {
+  margin: 0 -12px;
+  padding: 0 12px;
+  border-radius: 8px;
+}
+
+.log-time {
+  font: 400 12px var(--font-mono);
+  color: var(--faint);
+}
+
+.log-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--red);
+}
+
+.log-mark .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.log-cmd {
+  min-width: 0;
+  overflow: hidden;
+  font: 500 13.5px var(--font-mono);
+  color: var(--ink);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  outline: none;
+}
+
+.log-side {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font: 400 12px var(--font-mono);
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.log-side .red {
+  color: var(--red-ink);
+}
+
+.log-side .br {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.log-term {
+  font: 500 11.5px var(--font-ui);
+  color: var(--faint);
+}
+
+.log-acts {
+  display: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.log-line:hover .log-acts,
+.log-line:focus-within .log-acts,
+.log-line.writing .log-acts,
+.log-line:has(.menu-button.open) .log-acts {
+  display: flex;
+}
+
+.log-line:hover .log-term,
+.log-line:focus-within .log-term,
+.log-line.writing .log-term,
+.log-line:has(.menu-button.open) .log-term {
+  display: none;
+}
+
+.log-act {
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--dim);
+  font: 600 12px var(--font-ui);
+  cursor: pointer;
+}
+
+.log-act:hover,
+.log-act.on {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.log-gone {
+  padding: 0 6px;
+  font: 500 12px var(--font-ui);
+  color: var(--faint);
+}
+
+.log-more .icon-button.small {
+  width: 26px;
+  height: 26px;
+}
+
+/* The menus open inside a line of monospace on one line: they have their
+ * own font, and their note wraps. */
+.log-more .menu,
+.lmsg-more .menu {
+  width: 260px;
+  font-family: var(--font-ui);
+  white-space: normal;
+}
+
+/* A terminal opened or ended. */
+.log-event {
+  display: grid;
+  grid-template-columns: 44px 18px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+  min-height: 32px;
+  font: 500 12.5px var(--font-ui);
+  color: var(--faint);
+}
+
+.log-event svg {
+  justify-self: center;
+  color: var(--faint);
+}
+
+/* Words redacted, in their place: who, when, why. */
+.log-redacted {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font: italic 500 12.5px var(--font-ui);
+  color: var(--faint);
+}
+
+.log-redacted svg {
+  flex: none;
+}
+
+.log-redacted span {
+  overflow: hidden;
+  /* The slant of the last letter stays in. */
+  padding-right: 2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The notes under a line: a thread on a surface, Reply at its foot. */
+.log-note {
+  margin: 2px 0 10px 110px;
+  padding: 2px 14px 4px;
+  border-radius: 10px;
+  background: var(--surface);
+  font: 400 14px/1.5 var(--font-ui);
+  color: var(--ink);
+}
+
+.lmsg {
+  padding: 9px 0 7px;
+}
+
+.lmsg + .lmsg {
+  border-top: 1px solid var(--raised);
+}
+
+.lmsg-by {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  font: 500 12px var(--font-ui);
+  color: var(--faint);
+}
+
+.lmsg-who {
+  color: var(--dim);
+  font-weight: 700;
+}
+
+.lmsg-text {
+  margin: 3px 0 0 26px;
+  font: 400 14px/1.5 var(--font-ui);
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lmsg-text.red-out {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--faint);
+  font-style: italic;
+}
+
+.lmsg-text.red-out svg {
+  flex: none;
+}
+
+/* A note's ⋯, for the owner and admins: only under the mouse. */
+.lmsg-more {
+  margin-left: auto;
+  opacity: 0;
+}
+
+.lmsg:hover .lmsg-more,
+.lmsg:focus-within .lmsg-more,
+.lmsg-more:has(.menu-button.open) {
+  opacity: 1;
+}
+
+.lmsg-more .icon-button.small {
+  width: 24px;
+  height: 24px;
+}
+
+.lnote-foot {
+  display: flex;
+  padding: 0 0 4px 20px;
+}
+
+.lnote-reply {
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dim);
+  font: 600 12px var(--font-ui);
+  cursor: pointer;
+}
+
+.lnote-reply:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* An AI's note: its own badge, a spark in blue. */
+.avatar.ai-av {
+  background: var(--blue-tint);
+  color: var(--blue-ink);
+}
+
+/* Writing a note or a reply: amber, as a field being typed in. Alone
+ * under a line, the box of the notes it starts is not drawn yet. */
+.log-note.empty,
+.block-note.empty {
+  padding: 0;
+  background: none;
+}
+
+.note-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--amber);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--amber-ring);
+}
+
+.log-note.empty .note-edit {
+  margin: 4px 0 12px;
+}
+
+.block-note.empty .note-edit {
+  margin: 8px 0 0;
+}
+
+.log-note:not(.empty) .note-edit,
+.block-note:not(.empty) .note-edit {
+  margin: 4px 0 8px 26px;
+  box-shadow: none;
+}
+
+.note-edit textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 48px;
+  max-height: 320px;
+  padding: 2px 4px;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--ink);
+  caret-color: var(--amber-ink);
+  font: 400 14px/1.5 var(--font-ui);
+}
+
+.note-edit textarea::placeholder {
+  color: var(--faint);
+}
+
+.note-edit-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.note-edit-hint {
+  margin-right: auto;
+  font: 500 12px var(--font-ui);
+  color: var(--faint);
+}
+
+.note-edit-hint kbd {
+  font: 600 11px var(--font-ui);
+  color: var(--dim);
+}
+
+.note-edit .button-accent {
+  height: 30px;
+}
+
+.note-edit .button-plain {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+/* An old day: what its commands printed is gone, the lines stay. */
+.log-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 4px 0 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+.log-banner svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--faint);
+}
+
+.log-banner b {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* Redacting: the words, in full, above why. */
+.confirm-body code.ask-code {
+  display: block;
+  max-height: 160px;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--ground);
+  font: 400 12.5px var(--font-mono);
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.confirm-body .field-label {
+  display: block;
+  margin: 4px 0 -4px;
+}
+
+/* In a terminal's feed: the notes under a block, and Add a note. */
+.block-note {
+  max-width: 760px;
+  margin: 6px 0 0 18px;
+  padding: 2px 14px 4px;
+  border-radius: 10px;
+  background: var(--surface);
+  font: 400 14px/1.5 var(--font-ui);
+  color: var(--ink);
+}
+
+.block:not(.live):hover .block-note:not(.empty),
+.block:not(.live):focus-within .block-note:not(.empty) {
+  background: var(--raised);
+}
+
+.block:not(.live):hover .block-note .lmsg + .lmsg,
+.block:not(.live):focus-within .block-note .lmsg + .lmsg {
+  border-top-color: var(--line);
+}
+
+.block-actions button.on {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.block .log-redacted {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 720px) {
+  .log-line {
+    grid-template-columns: 40px 18px 12px minmax(0, 1fr);
+    row-gap: 2px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .log-side {
+    grid-column: 4;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+
+  .log-acts {
+    display: flex;
+  }
+
+  .log-line:hover .log-term,
+  .log-line:focus-within .log-term {
+    display: inline;
+  }
+
+  .log-event {
+    grid-template-columns: 40px 18px minmax(0, 1fr);
+  }
+
+  .log-note {
+    margin-left: 0;
+  }
+
+  .log-day-count {
+    width: 100%;
+    margin-left: 0;
+  }
+}

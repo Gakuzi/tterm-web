@@ -16,7 +16,9 @@
 // is held open even with no terminal on the page, so that the core can ask
 // it to sign a login.
 
-import { signedOutNow, type RunningCommand, type TerminalInfo } from "./api";
+import {
+  signedOutNow, type Redaction, type RunningCommand, type TerminalInfo,
+} from "./api";
 
 const OUTPUT = 1;
 const INPUT = 2;
@@ -58,6 +60,9 @@ export interface ChannelHandlers {
   confirm?: (ask: Confirm) => void;
   /** A command from run() the shell could not take. */
   refused?: (command: string, reason: string) => void;
+  /** A command of the terminal redacted in its machine's log (0.1.20):
+   * `block` is the block's number. */
+  redacted?: (block: number, redacted: Redaction) => void;
 }
 
 export interface Channel {
@@ -75,6 +80,9 @@ export interface Channel {
   resume: () => void;
   close: () => void;
   detach: () => void;
+  /** Everything kept again, from a clean screen: after a command of the
+   * terminal was redacted (0.1.20), what the screen showed of it goes. */
+  replay: () => void;
 }
 
 interface Open {
@@ -205,6 +213,10 @@ class Socket {
         this.channels.delete(ch);
         this.json({ op: "detach", ch });
       },
+      replay: () => {
+        open.lastSeq = null;
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) this.sendAttach(ch, open);
+      },
     };
   }
 
@@ -311,6 +323,14 @@ class Socket {
         break;
       case "refused":
         h.refused?.(String(msg.command ?? ""), String(msg.reason ?? ""));
+        break;
+      case "redacted":
+        open.lastSeq = msg.seq as number;
+        h.redacted?.(msg.block as number, {
+          by: (msg.by as Redaction["by"]) ?? null,
+          at: msg.at as number,
+          reason: String(msg.reason ?? ""),
+        });
         break;
       case "state":
         h.state(msg.terminal as TerminalInfo);

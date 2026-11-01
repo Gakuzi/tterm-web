@@ -80,6 +80,10 @@ export function ClassicTerminal(props: Props) {
     // asked long ago (the cursor position, the colours); those answers must
     // not be typed into the shell now.
     let replaying = false;
+    // A command redacted in the log (0.1.20) while this page was away: the
+    // screen is drawn again once the catching up is over.
+    let resuming = false;
+    let redrawAfter = false;
     const cleanups: (() => void)[] = [];
 
     const start = async () => {
@@ -129,6 +133,7 @@ export function ClassicTerminal(props: Props) {
         attached: (terminal, resumed) => {
           // Back after a moment away: what was missed is old news too, up
           // to `replayed`.
+          resuming = resumed;
           if (resumed) {
             replaying = true;
             ready.current = false;
@@ -139,6 +144,7 @@ export function ClassicTerminal(props: Props) {
           x.reset();
           pending = 0;
           replaying = true;
+          resuming = false;
           ready.current = false;
         },
         replayed: () => {
@@ -147,6 +153,10 @@ export function ClassicTerminal(props: Props) {
             ready.current = true;
             pasteWaiting.current();
           });
+          if (redrawAfter) {
+            redrawAfter = false;
+            channel?.replay();
+          }
         },
         output: (data) => {
           pending += data.length;
@@ -164,6 +174,14 @@ export function ClassicTerminal(props: Props) {
         gone: (terminal) => {
           stop();
           events.current.gone(terminal);
+        },
+        // A command of it redacted in the log (0.1.20): the screen is drawn
+        // again from what the core kept, which no longer has it. A redaction
+        // in a replay from a clean screen is old news, that screen has it
+        // no more; one in a catching up after a moment away was not seen.
+        redacted: () => {
+          if (!replaying) channel?.replay();
+          else if (resuming) redrawAfter = true;
         },
       });
       x.onData((data) => {

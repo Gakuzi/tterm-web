@@ -274,6 +274,12 @@ export interface StoredBlock {
   size: number;
   /** Base64. */
   output: string;
+  /** Its line in the machine's log (0.1.20), the notes under it, and who
+   * redacted it if someone did. Blocks from before 0.1.20 have no line. */
+  entry: number | null;
+  notes: LogNote[];
+  redacted: Redaction | null;
+  canNote: boolean;
 }
 
 export interface Feed {
@@ -981,6 +987,146 @@ export async function listBranches(id: string): Promise<BranchList> {
   const response = await fetch(`/api/terminals/${id}/branches`,
     change("POST", {}));
   return (await check(response)).json();
+}
+
+// ------------------------------------------------- machines' logs (0.1.20)
+
+/** Someone in a machine's log: who ran a command, wrote a note, redacted. */
+export interface LogPerson extends Who {
+  photo: string | null;
+  me: boolean;
+}
+
+/** Words redacted: who did it, when, and why. */
+export interface Redaction {
+  by: LogPerson | null;
+  at: number;
+  reason: string;
+}
+
+/** A note under a line, by a person or by an AI on a person's behalf
+ * (`by`); its words, or null once redacted. */
+export interface LogNote {
+  id: number;
+  at: number;
+  by: LogPerson | null;
+  author: "person" | "ai" | "tterm";
+  ai: string | null;
+  text: string | null;
+  redacted: Redaction | null;
+}
+
+export type LogKind = "terminal.opened" | "command.ran" | "terminal.closed";
+
+/** A line of the log: a terminal opened or ended, or a command that ran,
+ * with how it ended, where, and the notes under it. */
+export interface LogEntry {
+  id: number;
+  kind: LogKind;
+  at: number;
+  by: LogPerson | null;
+  author: string;
+  ai: string | null;
+  terminal: { id: string; name: string } | null;
+  command?: string | null;
+  redacted?: Redaction | null;
+  exit?: number | null;
+  ms?: number | null;
+  cwd?: string;
+  home?: string;
+  branch?: string;
+  seq?: number;
+  /** What it printed is still kept, in the person's own terminal. */
+  output?: boolean;
+  notes?: LogNote[];
+  canNote?: boolean;
+  canRedact?: boolean;
+  /** Why a terminal ended. */
+  reason?: string;
+}
+
+export interface LogDay {
+  machine: {
+    id: string; name: string; kind: MachineKind; projectId: string;
+    code: string; project: string;
+  };
+  role: Role;
+  /** Days the project keeps lines, and what commands printed. */
+  keep: { lines: number; output: number };
+  from: number;
+  to: number;
+  /** The nearest lines before the day and after it, if any. */
+  before: number | null;
+  after: number | null;
+  entries: LogEntry[];
+  /** More lines that day than are shown. */
+  cut: boolean;
+}
+
+export class LogGone extends CoreError {}
+
+/** Commands each machine ran since this browser's midnight, by its id: the
+ * Logs folder of the sidebar. */
+export async function loadLogToday(): Promise<Record<string, number>> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const response = await fetch(`/api/logs/today?since=${today.getTime()}`, {
+    headers: { accept: "application/json", ...BACKGROUND },
+    cache: "no-store",
+  });
+  return (await (await check(response)).json()).counts;
+}
+
+export async function loadLog(machineId: string, start: number,
+  end: number, background = false): Promise<LogDay> {
+  const response = await fetch(
+    `/api/machines/${machineId}/log?start=${start}&end=${end}`, {
+      headers: { accept: "application/json", ...(background ? BACKGROUND : {}) },
+      cache: "no-store",
+    });
+  if (response.status === 404) {
+    let why = "";
+    try {
+      why = (await response.json()).error ?? "";
+    } catch {
+      // The status says it.
+    }
+    throw new LogGone(why, 404);
+  }
+  return (await check(response)).json();
+}
+
+/** Where a note goes: under a line of the log, or, from a terminal's feed,
+ * under the line of a block. */
+export type NoteUnder = { entry: number } | { terminalId: string; seq: number };
+
+export interface NoteAdded {
+  entry: number;
+  terminalId: string;
+  seq: number;
+  note: LogNote;
+}
+
+export async function addLogNote(under: NoteUnder, text: string): Promise<NoteAdded> {
+  return (await check(await fetch("/api/log/notes",
+    change("POST", { ...under, text })))).json();
+}
+
+export interface Redacted {
+  id: number;
+  what: "command" | "note";
+  /** The line: the command's, or the one the note is under. */
+  entry: number;
+  terminalId: string | null;
+  seq: number | null;
+  redacted: Redaction;
+  /** Other lines of the project with the same command, redacted with it. */
+  also: { id: number; terminalId: string | null; seq: number | null }[];
+}
+
+export async function redactLog(id: number, reason: string): Promise<Redacted> {
+  return (await check(await fetch(`/api/log/${id}/redact`,
+    change("POST", { reason })))).json();
 }
 
 // ------------------------------------------------------- notes (0.1.0)

@@ -383,7 +383,9 @@ async def fill_texts(pool: asyncpg.Pool, pause: float = 0.2) -> int:
             return done
         texts = await asyncio.to_thread(
             lambda: [(r["id"], text_of(r["output"])) for r in rows])
+        # A block redacted meanwhile (0.1.20) keeps nothing to search.
         await pool.executemany(
-            "UPDATE blocks SET output_text = $2 WHERE id = $1", texts)
+            "UPDATE blocks SET output_text = $2 WHERE id = $1 "
+            "AND output IS NOT NULL", texts)
         done += len(rows)
         await asyncio.sleep(pause)

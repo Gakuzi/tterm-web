@@ -11,6 +11,11 @@
 // Finished blocks come from the database first; the stream goes on from the
 // last of them. So a reload shows the feed at once, and the command still
 // running is drawn again from what the core kept of it.
+//
+// From 0.1.20 each finished block is a line of its machine's log: the notes
+// under it come with it, and are written right there; a command redacted in
+// the log is drawn so here at once, from the log on this page or from the
+// core (the terminal's "redacted").
 
 import { FitAddon } from "@xterm/addon-fit";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
@@ -21,7 +26,8 @@ import {
   Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode,
 } from "react";
 import {
-  blockOutput, loadFeed, loadHistory, type StoredBlock, type TerminalInfo,
+  addLogNote, blockOutput, loadFeed, loadHistory, type LogNote, type Me, type Redaction,
+  type StoredBlock, type TerminalInfo,
 } from "./api";
 import { BlockView, shortPath, type FeedBlock } from "./BlockView";
 import { DANGER_KEYS } from "./danger";
@@ -32,6 +38,7 @@ import { useT } from "./i18n";
 import { Warning } from "./icons";
 import { InputLine, type Phase, type Prompt } from "./InputLine";
 import { keepKeys, typingElsewhere, type Home } from "./keys";
+import { logChanged, onLogChange } from "./logday";
 import { markOnLine } from "./marks";
 import {
   KEEP_LINES, fromBase64, plainText, readBuffer, renderOutput,
@@ -160,6 +167,8 @@ interface Props {
   /** What goes under a finished block (0.1.17): in tTerm for Mac, the strip
    * after a successful `ssh <host>`. */
   after?: (block: FeedBlock, blocks: FeedBlock[]) => ReactNode;
+  /** Who is looking: the notes under blocks say You (0.1.20). */
+  me: Me;
 }
 
 /** How many pages of earlier blocks a block found by search is looked for
@@ -185,6 +194,23 @@ function fromStored(b: StoredBlock, cols: number, folded = false): FeedBlock {
     stored: true,
     expanded: false,
     collapsed: folded,
+    entry: b.entry ?? null,
+    notes: b.notes ?? [],
+    redacted: b.redacted ?? null,
+    canNote: !!b.canNote,
+  };
+}
+
+/** A block of the stream, not in the database yet: the core writes its line
+ * in the log as it saves it, and a note can go under it then. */
+const NEW_LINE = { entry: null, notes: [] as LogNote[], redacted: null };
+
+/** A block whose command was redacted in the log: nothing of it is left to
+ * show but that. */
+function redactedBlock(b: FeedBlock, redacted: Redaction): FeedBlock {
+  return {
+    ...b, command: "", redacted, rendered: { lines: [], limited: false },
+    partial: false, cut: false, expanded: false,
   };
 }
 
@@ -458,7 +484,8 @@ export function FeedTerminal(props: Props) {
           cwd: st.prompt.cwd, branch: st.prompt.branch, startedAt: at,
           finishedAt: at, exitCode: code, state: "done", cols: xterm.cols,
           rendered: { lines, limited: false }, partial: false, cut: false,
-          stored: false, expanded: false, collapsed: false,
+          stored: false, expanded: false, collapsed: false, ...NEW_LINE,
+          canNote: false,
         }]);
       };
 
@@ -545,7 +572,7 @@ export function FeedTerminal(props: Props) {
               startedAt: r.at, finishedAt: null, exitCode: null,
               state: "running", cols: r.cols || xterm.cols, rendered: null,
               partial: true, cut: false, stored: false, expanded: false,
-              collapsed: false,
+              collapsed: false, ...NEW_LINE, canNote: !!r.command.trim(),
             });
           }
         },
@@ -593,7 +620,8 @@ export function FeedTerminal(props: Props) {
               cwd: st.prompt.cwd, branch: st.prompt.branch, startedAt: ev.at,
               finishedAt: null, exitCode: null, state: "running", cols: xterm.cols,
               rendered: null, partial: false, cut: false, stored: false,
-              expanded: false, collapsed: false,
+              expanded: false, collapsed: false, ...NEW_LINE,
+              canNote: !!ev.command.trim(),
             });
             if (again) {
               // Ringed in amber, as a block a link opens: the eye finds it.
@@ -639,6 +667,7 @@ export function FeedTerminal(props: Props) {
           notify.current(reason);
           putBack(command);
         },
+        redacted: (block, redacted) => forgetCommand.current(block, redacted),
       }, st.knownSeq >= 0 ? st.knownSeq : null);
       chan.current = channel;
 
@@ -834,7 +863,7 @@ export function FeedTerminal(props: Props) {
         cwd: st.prompt.cwd, branch: st.prompt.branch, startedAt: Date.now(),
         finishedAt: null, exitCode: null, state: "input", cols: xterm.cols,
         rendered: null, partial: false, cut: false, stored: false,
-        expanded: false, collapsed: false,
+        expanded: false, collapsed: false, ...NEW_LINE, canNote: false,
       }]);
       setLiveKey(key);
       setPhaseBoth("input");
@@ -844,6 +873,64 @@ export function FeedTerminal(props: Props) {
 
   const update = (key: string, change: Partial<FeedBlock>) =>
     setBlocks((bs) => bs.map((b) => (b.key === key ? { ...b, ...change } : b)));
+
+  /** A command redacted in the log: its block says so, and the line's
+   * history here has it no more: at once, and then as the core has it now,
+   * for the same command run elsewhere in the project went with it. */
+  const forgetCommand = useRef((seq: number | null, redacted: Redaction | null) => {
+    const was = blocksNow.current.find((b) => b.seqStart === seq && !b.redacted);
+    if (was && redacted) {
+      setBlocks((bs) => bs.map((b) => (b.seqStart === seq && !b.redacted
+        ? redactedBlock(b, redacted) : b)));
+      if (was.command) setHistory((h) => h.filter((x) => x !== was.command));
+    }
+    loadHistory(terminalId)
+      .then((h) => setHistory(h.map((e) => e.command)))
+      .catch(() => {});
+  });
+
+  // What changed in a log elsewhere on this page (0.1.20): a note under one
+  // of these blocks, words redacted.
+  useEffect(() => onLogChange((change) => {
+    if (change.kind === "redacted" && change.what === "command" &&
+        change.terminalId !== terminalId) {
+      // Another terminal's: the history of this one may have had it.
+      forgetCommand.current(null, null);
+      return;
+    }
+    if (change.terminalId !== terminalId || change.seq === null) return;
+    const seq = change.seq;
+    setBlocks((bs) => bs.map((b) => {
+      if (b.seqStart !== seq) return b;
+      if (change.kind === "note") {
+        return b.notes.some((n) => n.id === change.note.id) ? b
+          : { ...b, entry: change.entry, notes: [...b.notes, change.note] };
+      }
+      if (change.what === "command") return b;
+      return {
+        ...b, notes: b.notes.map((n) => (n.id === change.id
+          ? { ...n, text: null, redacted: change.redacted } : n)),
+      };
+    }));
+    if (change.kind === "redacted" && change.what === "command") {
+      forgetCommand.current(seq, change.redacted);
+    }
+  }), [terminalId]);
+
+  /** A note under a block: under its line in the log, by the block's
+   * number if the page does not know the line yet. */
+  const writeNote = async (b: FeedBlock, text: string): Promise<boolean> => {
+    try {
+      const added = await addLogNote(b.entry !== null ? { entry: b.entry }
+        : { terminalId, seq: b.seqStart }, text);
+      logChanged({ kind: "note", entry: added.entry, terminalId,
+        seq: b.seqStart, note: added.note });
+      return true;
+    } catch (e) {
+      props.notify(t("log.no_note", { why: (e as Error).message }));
+      return false;
+    }
+  };
 
   const copy = async (text: string): Promise<boolean> => {
     const ok = await toClipboard(text);
@@ -1054,7 +1141,8 @@ export function FeedTerminal(props: Props) {
                 }
               }}
               onShowAll={(x) => void showAll(x)}
-              onStop={() => chan.current?.input("\x03")} />
+              onStop={() => chan.current?.input("\x03")}
+              me={props.me} onNote={writeNote} />
             {b.state === "done" && props.after?.(b, shown)}
             </Fragment>
           ))}

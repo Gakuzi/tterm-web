@@ -18,7 +18,7 @@
 // the strip of SshStrip.tsx under its block.
 
 import { useEffect, useRef, useState } from "react";
-import { endTerminal, terminalInfo, type TerminalInfo,
+import { endTerminal, terminalInfo, type Me, type TerminalInfo,
   type TerminalState } from "./api";
 import { shortPath } from "./BlockView";
 import { ClassicTerminal, type ViewEvents } from "./ClassicTerminal";
@@ -33,6 +33,9 @@ import { since } from "./time";
 
 type Mode = "line" | "classic";
 const MODE_KEY = "tterm.mode";
+/** After the last of a run of commands ends, the lists are asked again:
+ * the Logs folder counts the commands of today. */
+const COUNT_MS = 2500;
 
 function rememberedMode(): Mode {
   try {
@@ -80,6 +83,8 @@ interface Props {
   /** In tTerm for Mac, a terminal of this very Mac (0.1.17): the strip
    * after `ssh <host>` is for its blocks. */
   here?: boolean;
+  /** Who is looking: notes under blocks (0.1.20). */
+  me: Me;
 }
 
 export function TerminalView(props: Props) {
@@ -93,6 +98,11 @@ export function TerminalView(props: Props) {
   const [, setTick] = useState(0);
   const changed = useRef(props.onChanged);
   changed.current = props.onChanged;
+  // A command that ended is a line of its machine's log (0.1.20): the
+  // sidebar's count of today follows a moment later, once it is saved, and
+  // once for a run of commands.
+  const counting = useRef(0);
+  useEffect(() => () => window.clearTimeout(counting.current), []);
 
   // A block search opened here (0.1.7) is shown in Line, where blocks are.
   // The mode chosen for other terminals stays as it was.
@@ -159,6 +169,8 @@ export function TerminalView(props: Props) {
       if (event.t === "P") {
         setInfo((now) => now && { ...now, cwd: event.cwd, home: event.home,
           branch: event.branch });
+        window.clearTimeout(counting.current);
+        counting.current = window.setTimeout(() => changed.current(), COUNT_MS);
       }
     },
     state: (terminal) => {
@@ -221,7 +233,7 @@ export function TerminalView(props: Props) {
             shownTheme={shownTheme} ended={isEnded} active={active}
             events={events} machine={machine} home={info?.home ?? ""}
             onClassic={() => choose("classic")} notify={props.notify}
-            paste={props.paste}
+            paste={props.paste} me={props.me}
             after={props.here ? (b, all) => <SshStrip block={b} blocks={all} /> : undefined} />
         )}
         {state === "connecting" && !missing && info?.vault && (

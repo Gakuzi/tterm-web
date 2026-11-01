@@ -4,7 +4,17 @@ tTerm in the browser: a real terminal with command blocks, for people who work
 with servers and for their teams. Projects, roles, a journal of who ran what,
 and watching a colleague's terminal, always with them knowing.
 
-**Status:** early development. Version 0.1.16 speaks the twelve languages
+**Status:** early development. Version 0.1.20 keeps a log of each
+machine: every command run on it through tTerm is a line, with who ran
+it, when, how it ended, how long it took and where, in the Logs folder of
+the project's notes, a day at a time. Under a command, notes, written
+from its block in the terminal or from the log, by a person or by an AI
+on a person's behalf; nothing written is changed, it is answered with
+Reply. The project's owner or an admin redacts a password or a token
+that got into a line or a note: its words go for good, from the log, the
+terminal's feed and search, and the log keeps who, when and why. Lines
+are kept a year, what the commands printed 30 days.
+Version 0.1.16 speaks the twelve languages
 of the site: English, Deutsch, Español, Français, Italiano, Polski,
 Português, Türkçe, Русский, 日本語, 한국어 and 简体中文. The account's menu
 has Language after Settings, the languages beside it, the one shown on top

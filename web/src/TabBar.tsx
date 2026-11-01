@@ -13,13 +13,16 @@
 // app signed in, a terminal of the computer it runs on has the same amber
 // square as in the sidebar; without the connection, a terminal of the
 // cloud says that it waits for it. From 0.1.15, in the app with a new
-// version ready, Restart to update before Search (Updates.tsx).
+// version ready, Restart to update before Search (Updates.tsx). From 0.1.20
+// a tab is a machine's log too: P/web-01 log, after a clock turning back.
 
 import { useRef, type ReactNode } from "react";
 import type { ProjectColor } from "./api";
 import { colorClass } from "./colors";
 import { useT } from "./i18n";
-import { Check, Close, CloudOff, Computer, Doc, ListCheck, Plus, Search } from "./icons";
+import {
+  Check, Close, CloudOff, Computer, Doc, History, ListCheck, Plus, Search,
+} from "./icons";
 import { NameInput } from "./NameInput";
 import { JUMP_KEYS, type TabKind } from "./tabs";
 
@@ -96,6 +99,7 @@ function Lead({ tab }: { tab: TabView }) {
     return tab.checklist ? <ListCheck size={14} className="tab-icon" />
       : <Doc size={14} className="tab-icon" />;
   }
+  if (tab.kind === "log") return <History size={14} className="tab-icon" />;
   return <span className="code-chip" aria-hidden="true">{tab.code}</span>;
 }
 

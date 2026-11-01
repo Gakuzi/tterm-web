@@ -1239,6 +1239,8 @@ block.state_running = {command}, 실행 중
 block.state_failed = {command}, 실패 (종료 코드 {code})
 block.state_finished = {command}, 완료
 block.state_ended = {command}, 종료됨
+# A command redacted in the machine's log (0.1.20): its words are gone.
+block.state_redacted = 지워진 명령
 # On a block search opened: the words found are marked in it.
 block.found = 검색 결과
 # A command the shell has not started; Stop is the button (block.stop).
@@ -1310,6 +1312,102 @@ danger.user_lost = 그 사용자의 파일과 접근 권한도 함께 사라져�
 # Under it, for rm -rf aimed at / or ~.
 feed.everything = <strong>머신 전체가 대상이에요.</strong> 머신에 있는 어떤 것도 남지 않아요.
 feed.run_it = 실행
+
+# ------------------------------------------------------------ log: the log of a machine, in the Logs folder of a project's notes (LogView.tsx, LogNotes.tsx)
+# The folder in the sidebar, before a project's folders of notes, and the
+# small label after it with its tip.
+log.folder = 로그
+log.by_tterm = tTerm이 기록
+log.by_tterm_title = tTerm이 기록하는 내용이라 아무도 바꿀 수 없어요
+# After a machine's name in the folder: commands run on it today.
+log.today_count = 오늘 {n}개
+# A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
+log.tab = {machine} 로그
+log.tab_title = {machine} 머신의 로그
+log.close_tab = 로그 닫기
+# The ⋯ over the page, and its one item.
+log.menu = 로그 메뉴
+log.copy_markdown = Markdown으로 복사
+# Under the title. {lines} and {output} are log.keep_year or log.keep_days.
+log.lead = tTerm을 통해 {machine}에서 실행된 내용이에요. tTerm이 기록하고, 아무도 바꿀 수 없어요. 로그 줄은 {lines} 동안, 명령이 출력한 내용은 {output} 동안 보관돼요.
+log.keep_year = 1년
+log.keep_days = other: {n}일
+# Going from day to day.
+log.day_before = 전날
+log.day_after = 다음 날
+log.today = 오늘
+log.pick_day = 날짜 선택
+# The day over its lines: Today, Thursday 29 October. {day} is the date, as the language writes it with the day of the week.
+log.day_today = 오늘, {day}
+log.day_yesterday = 어제, {day}
+# What the day holds, on the right of it: 9 commands · 1 failed · 3 notes.
+log.commands = other: 명령 {n}개
+log.failed = other: 실패 {n}개
+# A day with nothing in it.
+log.nothing_day = 이날은 tTerm을 통해 {machine}에서 실행된 것이 없어요.
+log.nothing_yet = 아직 tTerm을 통해 {machine}에서 실행된 것이 없어요. 이 머신의 터미널에서 실행된 명령은 끝나는 대로 여기에 나타나요.
+log.cut = 여기에는 이날의 처음 {n}줄만 표시돼요.
+# A terminal opened or ended. {name} is a terminal's name: terminal 1, or the name it was given; {who} a person's first name.
+log.opened_you = 내가 {name} 시작함
+log.opened = {who} 님이 {name} 시작함
+log.ended_you = 내가 {name} 종료함
+log.ended = {who} 님이 {name} 종료함
+# A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
+log.ended_why = {name} 종료됨: {why}
+# A command's line under the mouse.
+log.output = 출력
+log.output_title = 해당 터미널에서 열기
+log.output_gone = 출력 보관 안 됨
+# {days} is log.keep_days or log.keep_year.
+log.output_gone_title = 출력은 {days} 동안 보관돼요
+log.add_note = 노트 추가
+log.add_note_title = 이 명령에 노트 추가
+log.line_menu = 더 보기
+log.copy_command = 명령 복사
+log.copy_link = 이 줄의 링크 복사
+log.redact = 지우기…
+# Under Redact in the menu.
+log.redact_note = 실수로 들어간 비밀번호나 토큰을 지울 때 써요. 텍스트는 영구적으로 사라지고, 누가 언제 왜 지웠는지는 로그에 남아요.
+# In place of redacted words: Redacted by You · 09:23 · a password. {at} is when, {reason} why, as the person wrote it.
+log.redacted_by_you = 내가 지움 · {at} · {reason}
+log.redacted_by = {who} 님이 지움 · {at} · {reason}
+log.redacted_by_someone = 지워짐 · {at} · {reason}
+# Who wrote a note: You, or a person's first name; an AI on someone's behalf: AI for You, AI for Anna. "AI" may be the language's own short word for it.
+log.you = 나
+log.someone = 누군가
+log.ai_for_you = 내 AI
+log.ai_for = {who} 님의 AI
+log.reply = 답글
+# Writing a note. <k>…</k> are keys on the keyboard.
+log.note_label = 명령에 대한 노트
+log.reply_label = 답글
+log.note_placeholder = 이유, 결과, 다음에 할 일
+log.reply_placeholder = 답글을 입력하세요
+log.edit_hint = 쓴 그대로 로그에 남아요 · <k>Enter</k>로 저장 · <k>Esc</k>로 취소
+# {why} is what tTerm Web said, as it said it.
+log.no_note = 노트를 저장하지 못했어요: {why}
+log.note_menu = 더 보기
+log.copy_note = 텍스트 복사
+# Redacting: the window that asks why. Under its title: web-01 · today, 09:20 · terminal 1.
+log.redact_command_title = 이 명령을 지울까요?
+log.redact_note_title = 이 노트를 지울까요?
+log.redact_where = {machine} · {when} · {name}
+# {when} above: today, 09:20; another day with its date. {time} is the time, {day} the date with the day of the week.
+log.when_today = 오늘 {time}
+log.when_on = {day} {time}
+log.redact_command_text = 이 텍스트는 tTerm에서 영구적으로 사라져요. 로그, 터미널의 블록, 검색 어디에도 남지 않아요. 로그에는 여기에 명령이 있었다는 것과 누가 언제 왜 지웠는지가 남아요.
+log.redact_note_text = 이 텍스트는 tTerm에서 영구적으로 사라져요. 로그에는 여기에 노트가 있었다는 것과 누가 언제 왜 지웠는지가 남아요.
+log.why = 이유
+log.why_placeholder = 비밀번호, 토큰 등
+log.redact_button = 지우기
+# After a command is redacted, when the same command was run elsewhere in the project too: those go with it.
+log.redacted_also = other: 이 프로젝트에서 같은 명령이 {n}번 더 실행되어 함께 지웠어요.
+# Over a day whose commands' output is no longer kept. {output} and {lines} are log.keep_days or log.keep_year.
+log.old_banner = <b>이 명령들이 출력한 내용은 더 이상 보관되지 않아요.</b> 출력은 {output}, 로그 줄은 {lines} 동안 보관돼요. 유료 요금제에서는 둘 다 더 오래 보관할 예정이에요.
+# {why} is what went wrong, as tTerm Web said it.
+log.no_open = 로그를 열지 못했어요: {why}
+log.gone_title = 이 로그를 찾을 수 없어요
+log.gone_text = 이 로그의 머신이 제거됐거나, 내가 속하지 않은 프로젝트로 옮겨졌어요.
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.

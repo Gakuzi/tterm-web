@@ -1239,6 +1239,8 @@ block.state_running = {command}, выполняется
 block.state_failed = {command}, ошибка, код возврата {code}
 block.state_finished = {command}, выполнена
 block.state_ended = {command}, завершена
+# A command redacted in the machine's log (0.1.20): its words are gone.
+block.state_redacted = Стёртая команда
 # On a block search opened: the words found are marked in it.
 block.found = Найдено
 # A command the shell has not started; Stop is the button (block.stop).
@@ -1310,6 +1312,102 @@ danger.user_lost = Вместе с ней пропадут файлы и дос�
 # Under it, for rm -rf aimed at / or ~.
 feed.everything = <strong>Команда нацелена на всю машину.</strong> На ней ничего не уцелеет.
 feed.run_it = Выполнить
+
+# ------------------------------------------------------------ log: the log of a machine, in the Logs folder of a project's notes (LogView.tsx, LogNotes.tsx)
+# The folder in the sidebar, before a project's folders of notes, and the
+# small label after it with its tip.
+log.folder = Логи
+log.by_tterm = ведёт tTerm
+log.by_tterm_title = Их ведёт tTerm: изменить их никто не может
+# After a machine's name in the folder: commands run on it today.
+log.today_count = {n} сегодня
+# A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
+log.tab = {machine}: лог
+log.tab_title = Лог машины {machine}
+log.close_tab = Закрыть лог
+# The ⋯ over the page, and its one item.
+log.menu = Меню лога
+log.copy_markdown = Копировать как Markdown
+# Under the title. {lines} and {output} are log.keep_year or log.keep_days.
+log.lead = Здесь всё, что выполнялось на машине {machine} через tTerm. Лог ведёт сам tTerm, и изменить его никто не может. Строки хранятся {lines}, вывод команд хранится {output}.
+log.keep_year = год
+log.keep_days = one: {n} день | few: {n} дня | many: {n} дней
+# Going from day to day.
+log.day_before = Предыдущий день
+log.day_after = Следующий день
+log.today = Сегодня
+log.pick_day = Выбрать день
+# The day over its lines: Today, Thursday 29 October. {day} is the date, as the language writes it with the day of the week.
+log.day_today = Сегодня, {day}
+log.day_yesterday = Вчера, {day}
+# What the day holds, on the right of it: 9 commands · 1 failed · 3 notes.
+log.commands = one: {n} команда | few: {n} команды | many: {n} команд
+log.failed = one: {n} с ошибкой | few: {n} с ошибкой | many: {n} с ошибкой
+# A day with nothing in it.
+log.nothing_day = В этот день на машине {machine} через tTerm ничего не выполнялось.
+log.nothing_yet = На машине {machine} через tTerm пока ничего не выполнялось. Команды из её терминалов попадают сюда, когда завершаются.
+log.cut = Здесь показаны не все строки этого дня, а только первые {n}.
+# A terminal opened or ended. {name} is a terminal's name: terminal 1, or the name it was given; {who} a person's first name.
+log.opened_you = {name} открыт тобой
+log.opened = {name} открыт: {who}
+log.ended_you = {name} завершён тобой
+log.ended = {name} завершён: {who}
+# A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
+log.ended_why = {name} завершился: {why}
+# A command's line under the mouse.
+log.output = Вывод
+log.output_title = Открыть в терминале
+log.output_gone = вывод не сохранился
+# {days} is log.keep_days or log.keep_year.
+log.output_gone_title = Вывод хранится {days}
+log.add_note = Добавить заметку
+log.add_note_title = Добавить заметку к этой команде
+log.line_menu = Ещё
+log.copy_command = Копировать команду
+log.copy_link = Копировать ссылку на эту строку
+log.redact = Стереть…
+# Under Redact in the menu.
+log.redact_note = Для пароля или токена, который сюда попал. Текст пропадёт навсегда, а в логе останется, кто его стёр, когда и почему.
+# In place of redacted words: Redacted by You · 09:23 · a password. {at} is when, {reason} why, as the person wrote it.
+log.redacted_by_you = Стёрто тобой · {at} · {reason}
+log.redacted_by = Стёрто: {who} · {at} · {reason}
+log.redacted_by_someone = Стёрто · {at} · {reason}
+# Who wrote a note: You, or a person's first name; an AI on someone's behalf: AI for You, AI for Anna. "AI" may be the language's own short word for it.
+log.you = Ты
+log.someone = Кто-то
+log.ai_for_you = Ты через ИИ
+log.ai_for = {who} через ИИ
+log.reply = Ответить
+# Writing a note. <k>…</k> are keys on the keyboard.
+log.note_label = Заметка к команде
+log.reply_label = Ответ
+log.note_placeholder = Зачем, что вышло, что дальше
+log.reply_placeholder = Твой ответ
+log.edit_hint = Останется в логе как написано · <k>Enter</k> сохраняет · <k>Esc</k> отменяет
+# {why} is what tTerm Web said, as it said it.
+log.no_note = Заметка не сохранена: {why}
+log.note_menu = Ещё
+log.copy_note = Копировать текст
+# Redacting: the window that asks why. Under its title: web-01 · today, 09:20 · terminal 1.
+log.redact_command_title = Стереть эту команду?
+log.redact_note_title = Стереть эту заметку?
+log.redact_where = {machine} · {when} · {name}
+# {when} above: today, 09:20; another day with its date. {time} is the time, {day} the date with the day of the week.
+log.when_today = сегодня, {time}
+log.when_on = {day}, {time}
+log.redact_command_text = Её текст навсегда пропадёт из tTerm: из лога, из ленты терминала и из поиска. В логе останется, что здесь была команда, кто её стёр, когда и почему.
+log.redact_note_text = Её текст навсегда пропадёт из tTerm. В логе останется, что здесь была заметка, кто её стёр, когда и почему.
+log.why = Причина
+log.why_placeholder = пароль, токен
+log.redact_button = Стереть
+# After a command is redacted, when the same command was run elsewhere in the project too: those go with it.
+log.redacted_also = one: Та же команда запускалась в этом проекте ещё {n} раз: там она тоже стёрта. | few: Та же команда запускалась в этом проекте ещё {n} раза: там она тоже стёрта. | many: Та же команда запускалась в этом проекте ещё {n} раз: там она тоже стёрта.
+# Over a day whose commands' output is no longer kept. {output} and {lines} are log.keep_days or log.keep_year.
+log.old_banner = <b>Вывод этих команд больше не хранится:</b> вывод хранится {output}, строки лога хранятся {lines}. Платные тарифы будут хранить и то и другое дольше.
+# {why} is what went wrong, as tTerm Web said it.
+log.no_open = Лог не открылся: {why}
+log.gone_title = Этого лога здесь нет
+log.gone_text = Его машину удалили или перенесли в проект, где тебя нет.
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.

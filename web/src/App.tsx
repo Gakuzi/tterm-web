@@ -4,7 +4,7 @@ import { AddMachine } from "./AddMachine";
 import { AppLinkWindow, AppWelcome } from "./AppSignIn";
 import {
   CoreError, createFolder, createNote, createProject, deleteFolder, deleteNote,
-  deleteProject, editProject, endTerminal, loadNote, loadState, moveMachine,
+  deleteProject, editProject, endTerminal, loadLogToday, loadNote, loadState, moveMachine,
   moveNote, NoteGone, onSignedOut, openTerminal, removeMachine, renameFolder,
   renameTerminal, saveLanguage, saveProjectTint, saveTheme, SignedOut, signInApp, signOut,
   welcomeSeen, type Folder, type FoundBlock, type FoundNote,
@@ -26,6 +26,7 @@ import {
 } from "./i18n";
 import { hereWord, onMac } from "./local";
 import { InApp, LocalOnly } from "./local";
+import { LogView } from "./LogView";
 import { Machines } from "./Machines";
 import { MoveToCloud } from "./MoveToCloud";
 import { MoveContext, type MoveFrame } from "./SshStrip";
@@ -48,7 +49,7 @@ import { SignIn } from "./SignIn";
 import { socket } from "./socket";
 import { TabBar, type Dot, type SaveLine, type TabView } from "./TabBar";
 import {
-  isTerminalTab, noteTab, projectTab, rememberedFolds, rememberedTabs,
+  isTerminalTab, logTab, noteTab, projectTab, rememberedFolds, rememberedTabs,
   rememberFolds, rememberTabs, shortcut, tabKind, tabOfPath, tabPath,
   tabTarget, TABS_MAX,
 } from "./tabs";
@@ -247,6 +248,10 @@ function revealKeys(tab: string, state: State): string[] {
   const id = tabTarget(tab);
   const kind = tabKind(tab);
   if (kind === "project") return [`p:${id}`];
+  if (kind === "log") {
+    const project = state.projects.find((p) => p.machines.some((m) => m.id === id));
+    return project ? [`p:${project.id}`, `l:${project.id}`] : [];
+  }
   if (kind === "note") {
     const where = findNote(state.projects, id);
     return where ? [`p:${where.project.id}`, `f:${where.folder.id}`] : [];
@@ -287,6 +292,14 @@ function saveLine(state: SaveState | undefined, t: Translate): SaveLine | null {
 export function App() {
   const t = useT();
   const [state, setState] = useState<State | null>(null);
+  /** Commands each machine ran today, for the Logs folder (0.1.20): asked
+   * with the lists, apart from them, and not in the app before signing in,
+   * which has no logs. */
+  const [logToday, setLogToday] = useState<Record<string, number>>({});
+  const countToday = useCallback((local: boolean | undefined) => {
+    if (local) return;
+    loadLogToday().then(setLogToday).catch(() => {});
+  }, []);
   const [problem, setProblem] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>("system");
   /** How much of a project's color the sidebar shows (0.1.1). */
@@ -375,6 +388,7 @@ export function App() {
         }
         lastUser.current = loaded.me.id;
         setState(loaded);
+        countToday(loaded.local);
         void showLanguage(languageOf(loaded.me));
         setTheme(loaded.me.theme);
         setTint(loaded.me.projectTint ?? "badge");
@@ -386,11 +400,13 @@ export function App() {
           const notes = new Set(loaded.projects.flatMap((p) =>
             p.folders.flatMap((f) => f.notes.map((n) => n.id))));
           const projects = new Set(loaded.projects.map((p) => p.id));
+          const machines = new Set(loaded.projects.flatMap((p) => p.machines.map((m) => m.id)));
           const here = tabOfPath(location.pathname);
           setTabs((ts) => ts.filter((tab) => {
             if (tab === here) return true;
             const kind = tabKind(tab);
             if (kind === "terminal") return terminals.has(tab);
+            if (kind === "log") return machines.has(tabTarget(tab));
             return (kind === "note" ? notes : projects).has(tabTarget(tab));
           }));
         }
@@ -470,6 +486,7 @@ export function App() {
         // made, moved or deleted would come back from it for a while.
         if (mine !== asked.current) return;
         setState(loaded);
+        countToday(loaded.local);
         if (!done.length) return;
         for (const id of done) settled.current.delete(id);
         const open = new Set(shownRef.current.filter((tab) => tabKind(tab) === "note")
@@ -1062,6 +1079,15 @@ export function App() {
         closeTitle: t("app.tab.close_page"),
       };
     }
+    if (kind === "log") {
+      const project = projects.find((p) => p.machines.some((m) => m.id === id));
+      const machine = project?.machines.find((m) => m.id === id)?.name ?? "";
+      return {
+        id: tab, kind, code: project?.code ?? "", color: project?.color,
+        label: t("log.tab", { machine }), title: t("log.tab_title", { machine }),
+        closeTitle: t("log.close_tab"),
+      };
+    }
     const status = statuses[tab];
     const known = liveTerminals.find((t) => t.id === tab);
     const full = status?.label ?? known?.label ?? t("app.tab.terminal");
@@ -1644,7 +1670,7 @@ export function App() {
             shownTheme={shownTheme} onStatus={onStatus} onCloseTab={closeTab}
             onOpenNew={startTerminal} onChanged={refresh} notify={notYet}
             machineThere={(machineId) => machineIds.has(machineId)}
-            paste={paste?.terminalId === id ? paste : null}
+            paste={paste?.terminalId === id ? paste : null} me={state.me}
             here={hereIds.has(liveTerminals.find((x) => x.id === id)?.machineId ?? "")} />
         ))}
         {shownTabs.filter((tab) => tabKind(tab) === "note").map((tab) => (
@@ -1657,6 +1683,16 @@ export function App() {
             moved={movedHere[tabTarget(tab)]}
             onDelete={(noteId, noteTitle) => askDeleteNote(noteId, noteTitle)}
             onCloseTab={(tab, gone) => closeTabs([tab], gone)} notify={notYet} />
+        ))}
+        {shownTabs.filter((tab) => tabKind(tab) === "log").map((tab) => (
+          <LogView key={tab} machineId={tabTarget(tab)} active={tab === current}
+            me={state.me} projects={projects}
+            onOutput={(terminalId, seq) => {
+              // At its block, as search opens one, without words to mark.
+              foundBlock(terminalId, seq, [], false);
+              openTab(terminalId);
+            }}
+            onCloseTab={() => closeTabs([tab], true)} notify={notYet} />
         ))}
         {frontKind === "project" && (
           <div className="page-scroll">
@@ -1761,6 +1797,7 @@ export function App() {
         <Sidebar
           me={state.me}
           projects={projects}
+          logToday={logToday}
           updateCard={<UpdateCard />}
           pinned={pinned}
           shownTheme={shownTheme}
@@ -1802,6 +1839,7 @@ export function App() {
           onNewFolder={(project) => setNaming({ kind: "new", project })}
           onNewNote={(folderId) => away(() => newNote(folderId))()}
           onOpenNote={(noteId) => away(() => openTab(noteTab(noteId)))()}
+          onOpenLog={(machineId) => away(() => openTab(logTab(machineId)))()}
           onNewProject={() => away(startProject)()}
           local={local}
           cutOff={cutOff}

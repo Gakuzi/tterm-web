@@ -20,6 +20,11 @@ MIGRATIONS = Path(__file__).with_name("migrations")
 #: (the core and, from 0.0.3, the signer) never apply the same file twice.
 MIGRATION_LOCK = 0x7474_0001
 
+#: What a migration may take, and the wait for another process's: longer
+#: than the pool's 30 seconds a query, for a migration that rewrites much
+#: (0.1.20 makes lines of the log from a month of blocks).
+MIGRATE_TIMEOUT = 15 * 60
+
 
 class DatabaseUnavailable(Exception):
     """PostgreSQL cannot be used; the message says what to do about it."""
@@ -60,7 +65,8 @@ async def migrate(pool: asyncpg.Pool) -> list[str]:
     """Applies the migrations not applied yet; returns their names."""
     applied: list[str] = []
     async with pool.acquire() as conn:
-        await conn.execute("SELECT pg_advisory_lock($1)", MIGRATION_LOCK)
+        await conn.execute("SELECT pg_advisory_lock($1)", MIGRATION_LOCK,
+                           timeout=MIGRATE_TIMEOUT)
         try:
             await conn.execute(
                 "CREATE TABLE IF NOT EXISTS schema_migrations ("
@@ -72,7 +78,8 @@ async def migrate(pool: asyncpg.Pool) -> list[str]:
                 if path.stem in done:
                     continue
                 async with conn.transaction():
-                    await conn.execute(path.read_text(encoding="utf-8"))
+                    await conn.execute(path.read_text(encoding="utf-8"),
+                                       timeout=MIGRATE_TIMEOUT)
                     await conn.execute(
                         "INSERT INTO schema_migrations (version) VALUES ($1)",
                         path.stem)

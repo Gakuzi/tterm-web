@@ -16,6 +16,11 @@ interface Props {
   confirm: string;
   onConfirm: () => Promise<void> | void;
   onCancel: () => void;
+  /** What has the keys first, if not Cancel: a field to fill in (0.1.20,
+   * why something is redacted). */
+  start?: string;
+  /** The red button waits for that field. */
+  ready?: boolean;
 }
 
 export function Confirm(props: Props) {
@@ -26,8 +31,9 @@ export function Confirm(props: Props) {
   const cancel = useRef(props.onCancel);
   cancel.current = props.onCancel;
 
+  const start = props.start ?? ".confirm-cancel";
   useEffect(() => {
-    box.current?.querySelector<HTMLButtonElement>(".confirm-cancel")?.focus();
+    box.current?.querySelector<HTMLElement>(start)?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -36,7 +42,7 @@ export function Confirm(props: Props) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [start]);
 
   const go = async () => {
     setBusy(true);
@@ -66,7 +72,8 @@ export function Confirm(props: Props) {
         <div className="confirm-body">{props.children}</div>
         {problem && <div className="error-box" role="alert">{problem}</div>}
         <div className="button-row">
-          <button type="button" className="button-danger big" disabled={busy}
+          <button type="button" className="button-danger big"
+            disabled={busy || props.ready === false}
             onClick={() => void go()}>
             {props.confirm}
           </button>

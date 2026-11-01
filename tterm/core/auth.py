@@ -1091,8 +1091,9 @@ async def sweep(pool: asyncpg.Pool) -> None:
     signed in with for DEVICE_DAYS (0.0.12), and from 0.1.6 the codes
     browsers gave apps, after a day. So does what is kept only
     for a while: commands with their output (30 days unless the project
-    says less), the journal (a year), and from 0.1.17 the vault's pairings
-    (a week; what they carried, an hour after they are over)."""
+    says less), the journal (a year) with the words of the machines' logs,
+    and from 0.1.17 the vault's pairings (a week; what they carried, an
+    hour after they are over)."""
     await pool.execute("DELETE FROM login_codes "
                        "WHERE created_at < now() - interval '2 days'")
     # What browsers allowed apps: two minutes of use, a day for the record.
@@ -1117,6 +1118,10 @@ async def sweep(pool: asyncpg.Pool) -> None:
                                gone)
     await pool.execute("DELETE FROM blocks WHERE expires_at <= now()")
     await pool.execute("DELETE FROM journal WHERE expires_at <= now()")
+    # The words of the machine's log (0.1.20) go with their lines.
+    await pool.execute(
+        "DELETE FROM log_texts t WHERE t.expires_at <= now() "
+        "AND NOT EXISTS (SELECT 1 FROM journal j WHERE j.text_id = t.id)")
     # The vault's pairings (0.1.17): their keys and a sealed vault key are
     # cleared once the outcome is seen (vault.py); those of a request over
     # for an hour that nobody looked at go here, and the rows after a week.

@@ -463,3 +463,58 @@ export const Unlock = (p: Props) => (
 export const Alert = (p: Props) => (
   <Stroke {...p} width={2.6}><path d="M12 7v6M12 17h.01" /></Stroke>
 );
+
+// The log of a machine (0.1.20).
+
+/** A clock with an arrow back round it: the Logs folder, a log's tab. */
+export const History = (p: Props) => (
+  <Stroke {...p}>
+    <path d="M3 12a9 9 0 1 0 3-6.7" />
+    <path d="M3 4v5h5" />
+    <path d="M12 7.5V12l3 2" />
+  </Stroke>
+);
+
+/** Three lines: what a command printed, in its terminal. */
+export const Lines = (p: Props) => (
+  <Stroke {...p}><path d="M5 6h14M5 11h14M5 16h9" /></Stroke>
+);
+
+/** A note with its corner turned: a note after a command. */
+export const NoteAdd = (p: Props) => (
+  <Stroke {...p}>
+    <path d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9l-6 7H6a2 2 0 0 1-2-2z" />
+    <path d="M14 21v-5a2 2 0 0 1 2-2h4" />
+    <path d="M8 8h8M8 12h5" />
+  </Stroke>
+);
+
+/** A speech bubble: Reply. */
+export const Bubble = (p: Props) => (
+  <Stroke {...p}><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.6A8 8 0 1 1 21 12z" /></Stroke>
+);
+
+/** An eraser: Redact. */
+export const Erase = (p: Props) => (
+  <Stroke {...p}>
+    <path d="M7 21h10" />
+    <path d="M5.5 13.5l7-7a2 2 0 0 1 2.8 0l3.2 3.2a2 2 0 0 1 0 2.8L13 18H8.5z" />
+    <path d="M9 10l5 5" />
+  </Stroke>
+);
+
+/** Two sparks: written by an AI. */
+export const Spark = (p: Props) => (
+  <Stroke {...p}>
+    <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
+    <path d="M19 16l.6 1.4L21 18l-1.4.6L19 20l-.6-1.4L17 18l1.4-.6z" />
+  </Stroke>
+);
+
+/** A calendar: Pick a day. */
+export const Calendar = (p: Props) => (
+  <Stroke {...p}>
+    <rect x="3" y="5" width="18" height="16" rx="2" />
+    <path d="M3 10h18M8 3v4M16 3v4" />
+  </Stroke>
+);

@@ -1239,6 +1239,8 @@ block.state_running = {command}, çalışıyor
 block.state_failed = {command}, {code} çıkış koduyla başarısız oldu
 block.state_finished = {command}, tamamlandı
 block.state_ended = {command}, sonlandı
+# A command redacted in the machine's log (0.1.20): its words are gone.
+block.state_redacted = Metni silinmiş bir komut
 # On a block search opened: the words found are marked in it.
 block.found = Bulundu
 # A command the shell has not started; Stop is the button (block.stop).
@@ -1310,6 +1312,102 @@ danger.user_lost = Kullanıcının dosyaları ve erişimi de onunla birlikte gid
 # Under it, for rm -rf aimed at / or ~.
 feed.everything = <strong>Bu komut makinenin tamamını hedefliyor.</strong> Makinedeki hiçbir şey kurtulmaz.
 feed.run_it = Çalıştır
+
+# ------------------------------------------------------------ log: the log of a machine, in the Logs folder of a project's notes (LogView.tsx, LogNotes.tsx)
+# The folder in the sidebar, before a project's folders of notes, and the
+# small label after it with its tip.
+log.folder = Loglar
+log.by_tterm = tTerm yazar
+log.by_tterm_title = Bunları tTerm yazar: kimse değiştiremez
+# After a machine's name in the folder: commands run on it today.
+log.today_count = bugün {n}
+# A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
+log.tab = {machine} logu
+log.tab_title = {machine} makinesinin logu
+log.close_tab = Logu kapat
+# The ⋯ over the page, and its one item.
+log.menu = Log menüsü
+log.copy_markdown = Markdown olarak kopyala
+# Under the title. {lines} and {output} are log.keep_year or log.keep_days.
+log.lead = Burada {machine} makinesinde tTerm üzerinden çalıştırılan her şey var. Logu tTerm yazar, kimse değiştiremez. Satırlar {lines}, komutların çıktısı {output} saklanır.
+log.keep_year = bir yıl
+log.keep_days = one: bir gün | other: {n} gün
+# Going from day to day.
+log.day_before = Önceki gün
+log.day_after = Sonraki gün
+log.today = Bugün
+log.pick_day = Gün seç
+# The day over its lines: Today, Thursday 29 October. {day} is the date, as the language writes it with the day of the week.
+log.day_today = Bugün, {day}
+log.day_yesterday = Dün, {day}
+# What the day holds, on the right of it: 9 commands · 1 failed · 3 notes.
+log.commands = one: {n} komut | other: {n} komut
+log.failed = one: {n} başarısız | other: {n} başarısız
+# A day with nothing in it.
+log.nothing_day = Bu tarihte {machine} makinesinde tTerm üzerinden hiçbir şey çalıştırılmadı.
+log.nothing_yet = {machine} makinesinde tTerm üzerinden henüz hiçbir şey çalıştırılmadı. Terminallerindeki komutlar bittikçe buraya gelir.
+log.cut = Bu tarihteki satırların yalnızca ilk {n} tanesi burada gösteriliyor.
+# A terminal opened or ended. {name} is a terminal's name: terminal 1, or the name it was given; {who} a person's first name.
+log.opened_you = Sen açtın: {name}
+log.opened = {who} açtı: {name}
+log.ended_you = Sen sonlandırdın: {name}
+log.ended = {who} sonlandırdı: {name}
+# A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
+log.ended_why = {name} sonlandı: {why}
+# A command's line under the mouse.
+log.output = Çıktı
+log.output_title = Terminalinde aç
+log.output_gone = çıktı saklanmadı
+# {days} is log.keep_days or log.keep_year.
+log.output_gone_title = Çıktı {days} saklanır
+log.add_note = Not ekle
+log.add_note_title = Bu komuta not ekle
+log.line_menu = Diğer
+log.copy_command = Komutu kopyala
+log.copy_link = Bu satırın bağlantısını kopyala
+log.redact = Metni sil…
+# Under Redact in the menu.
+log.redact_note = Buraya karışmış bir parola ya da token için. Metni kalıcı olarak silinir; logda kimin, ne zaman ve neden sildiği kalır.
+# In place of redacted words: Redacted by You · 09:23 · a password. {at} is when, {reason} why, as the person wrote it.
+log.redacted_by_you = Sen sildin · {at} · {reason}
+log.redacted_by = {who} sildi · {at} · {reason}
+log.redacted_by_someone = Silindi · {at} · {reason}
+# Who wrote a note: You, or a person's first name; an AI on someone's behalf: AI for You, AI for Anna. "AI" may be the language's own short word for it.
+log.you = Sen
+log.someone = Biri
+log.ai_for_you = Senin adına YZ
+log.ai_for = {who} adına YZ
+log.reply = Yanıtla
+# Writing a note. <k>…</k> are keys on the keyboard.
+log.note_label = Komut için not
+log.reply_label = Yanıt
+log.note_placeholder = Neden, ne çıktı, sırada ne var
+log.reply_placeholder = Yanıtın
+log.edit_hint = Logda yazdığın gibi kalır · <k>Enter</k> kaydeder · <k>Esc</k> iptal eder
+# {why} is what tTerm Web said, as it said it.
+log.no_note = Not kaydedilmedi: {why}
+log.note_menu = Diğer
+log.copy_note = Metni kopyala
+# Redacting: the window that asks why. Under its title: web-01 · today, 09:20 · terminal 1.
+log.redact_command_title = Bu komutun metni silinsin mi?
+log.redact_note_title = Bu notun metni silinsin mi?
+log.redact_where = {machine} · {when} · {name}
+# {when} above: today, 09:20; another day with its date. {time} is the time, {day} the date with the day of the week.
+log.when_today = bugün, {time}
+log.when_on = {day}, {time}
+log.redact_command_text = Metni tTerm'den kalıcı olarak silinir: logdan, terminalin akışından ve aramadan. Logda burada bir komut olduğu, kimin, ne zaman ve neden sildiği kalır.
+log.redact_note_text = Metni tTerm'den kalıcı olarak silinir. Logda burada bir not olduğu, kimin, ne zaman ve neden sildiği kalır.
+log.why = Neden
+log.why_placeholder = parola, token
+log.redact_button = Metni sil
+# After a command is redacted, when the same command was run elsewhere in the project too: those go with it.
+log.redacted_also = one: Aynı komut bu projede bir kez daha çalıştırılmıştı; onun metni de silindi. | other: Aynı komut bu projede {n} kez daha çalıştırılmıştı; onların metni de silindi.
+# Over a day whose commands' output is no longer kept. {output} and {lines} are log.keep_days or log.keep_year.
+log.old_banner = <b>Bu komutların çıktısı artık saklanmıyor:</b> çıktı {output}, log satırları {lines} saklanır. Ücretli planlarda ikisi de daha uzun saklanacak.
+# {why} is what went wrong, as tTerm Web said it.
+log.no_open = Log açılamadı: {why}
+log.gone_title = Bu log burada değil
+log.gone_text = Makinesi kaldırıldı ya da üyesi olmadığın bir projeye taşındı.
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.

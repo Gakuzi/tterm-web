@@ -1239,6 +1239,8 @@ block.state_running = {command}，运行中
 block.state_failed = {command}，失败，退出码 {code}
 block.state_finished = {command}，已完成
 block.state_ended = {command}，已结束
+# A command redacted in the machine's log (0.1.20): its words are gone.
+block.state_redacted = 已抹除的命令
 # On a block search opened: the words found are marked in it.
 block.found = 搜索结果
 # A command the shell has not started; Stop is the button (block.stop).
@@ -1310,6 +1312,102 @@ danger.user_lost = 该用户的文件和访问权限都会随之消失。
 # Under it, for rm -rf aimed at / or ~.
 feed.everything = <strong>这条命令针对的是整台机器。</strong>机器上的所有内容都将不复存在。
 feed.run_it = 运行
+
+# ------------------------------------------------------------ log: the log of a machine, in the Logs folder of a project's notes (LogView.tsx, LogNotes.tsx)
+# The folder in the sidebar, before a project's folders of notes, and the
+# small label after it with its tip.
+log.folder = 日志
+log.by_tterm = 由 tTerm 记录
+log.by_tterm_title = 这些由 tTerm 记录：任何人都无法更改
+# After a machine's name in the folder: commands run on it today.
+log.today_count = 今天 {n} 条
+# A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
+log.tab = {machine} 日志
+log.tab_title = {machine} 的日志
+log.close_tab = 关闭日志
+# The ⋯ over the page, and its one item.
+log.menu = 日志菜单
+log.copy_markdown = 复制为 Markdown
+# Under the title. {lines} and {output} are log.keep_year or log.keep_days.
+log.lead = 这里记录了通过 tTerm 在 {machine} 上运行的内容。由 tTerm 写入，任何人都无法更改。日志行保留 {lines}，命令的输出保留 {output}。
+log.keep_year = 1 年
+log.keep_days = other: {n} 天
+# Going from day to day.
+log.day_before = 前一天
+log.day_after = 后一天
+log.today = 今天
+log.pick_day = 选择日期
+# The day over its lines: Today, Thursday 29 October. {day} is the date, as the language writes it with the day of the week.
+log.day_today = 今天，{day}
+log.day_yesterday = 昨天，{day}
+# What the day holds, on the right of it: 9 commands · 1 failed · 3 notes.
+log.commands = other: {n} 条命令
+log.failed = other: {n} 条失败
+# A day with nothing in it.
+log.nothing_day = 这一天没有通过 tTerm 在 {machine} 上运行任何内容。
+log.nothing_yet = 还没有通过 tTerm 在 {machine} 上运行过任何内容。这台机器上终端中的命令一结束，就会出现在这里。
+log.cut = 这里只显示这一天的前 {n} 行。
+# A terminal opened or ended. {name} is a terminal's name: terminal 1, or the name it was given; {who} a person's first name.
+log.opened_you = {name} 由你打开
+log.opened = {name} 由 {who} 打开
+log.ended_you = {name} 由你结束
+log.ended = {name} 由 {who} 结束
+# A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
+log.ended_why = {name} 已结束：{why}
+# A command's line under the mouse.
+log.output = 输出
+log.output_title = 在所属终端中打开
+log.output_gone = 输出未保留
+# {days} is log.keep_days or log.keep_year.
+log.output_gone_title = 输出保留 {days}
+log.add_note = 添加笔记
+log.add_note_title = 为这条命令添加笔记
+log.line_menu = 更多
+log.copy_command = 复制命令
+log.copy_link = 复制此行的链接
+log.redact = 抹除…
+# Under Redact in the menu.
+log.redact_note = 适用于不小心混入的密码或令牌。文本会被永久抹除，日志会记录是谁、在什么时候、为什么抹除了它。
+# In place of redacted words: Redacted by You · 09:23 · a password. {at} is when, {reason} why, as the person wrote it.
+log.redacted_by_you = 由你抹除 · {at} · {reason}
+log.redacted_by = 由 {who} 抹除 · {at} · {reason}
+log.redacted_by_someone = 已抹除 · {at} · {reason}
+# Who wrote a note: You, or a person's first name; an AI on someone's behalf: AI for You, AI for Anna. "AI" may be the language's own short word for it.
+log.you = 你
+log.someone = 某人
+log.ai_for_you = AI（代表你）
+log.ai_for = AI（代表 {who}）
+log.reply = 回复
+# Writing a note. <k>…</k> are keys on the keyboard.
+log.note_label = 关于这条命令的笔记
+log.reply_label = 回复
+log.note_placeholder = 原因、结果、下一步
+log.reply_placeholder = 写下你的回复
+log.edit_hint = 会按原样留在日志中 · <k>Enter</k> 保存 · <k>Esc</k> 取消
+# {why} is what tTerm Web said, as it said it.
+log.no_note = 笔记未保存：{why}
+log.note_menu = 更多
+log.copy_note = 复制文本
+# Redacting: the window that asks why. Under its title: web-01 · today, 09:20 · terminal 1.
+log.redact_command_title = 抹除这条命令？
+log.redact_note_title = 抹除这篇笔记？
+log.redact_where = {machine} · {when} · {name}
+# {when} above: today, 09:20; another day with its date. {time} is the time, {day} the date with the day of the week.
+log.when_today = 今天 {time}
+log.when_on = {day} {time}
+log.redact_command_text = 这段文本会从 tTerm 中永久抹除：日志、终端中的命令块和搜索里都不会再有。日志会记下这里曾有一条命令，以及是谁、在什么时候、为什么抹除了它。
+log.redact_note_text = 这段文本会从 tTerm 中永久抹除。日志会记下这里曾有一篇笔记，以及是谁、在什么时候、为什么抹除了它。
+log.why = 原因
+log.why_placeholder = 密码、令牌等
+log.redact_button = 抹除
+# After a command is redacted, when the same command was run elsewhere in the project too: those go with it.
+log.redacted_also = other: 同一条命令在本项目中还运行过 {n} 次，也一并抹除了。
+# Over a day whose commands' output is no longer kept. {output} and {lines} are log.keep_days or log.keep_year.
+log.old_banner = <b>这些命令的输出已不再保留。</b>输出保留 {output}，日志行保留 {lines}。付费方案会将两者都保留得更久。
+# {why} is what went wrong, as tTerm Web said it.
+log.no_open = 无法打开日志：{why}
+log.gone_title = 这份日志不存在
+log.gone_text = 它所属的机器已被移除，或被移到了你未加入的项目中。
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.

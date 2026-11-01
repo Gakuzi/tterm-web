@@ -1239,6 +1239,8 @@ block.state_running = {command}、実行中
 block.state_failed = {command}、終了コード {code} で失敗
 block.state_finished = {command}、完了
 block.state_ended = {command}、終了
+# A command redacted in the machine's log (0.1.20): its words are gone.
+block.state_redacted = 墨消しされたコマンド
 # On a block search opened: the words found are marked in it.
 block.found = 検索結果
 # A command the shell has not started; Stop is the button (block.stop).
@@ -1310,6 +1312,102 @@ danger.user_lost = そのユーザーのファイルとアクセス権も一緒�
 # Under it, for rm -rf aimed at / or ~.
 feed.everything = <strong>このコマンドはマシン全体を対象にしています。</strong>マシン上のものは何も残りません。
 feed.run_it = 実行する
+
+# ------------------------------------------------------------ log: the log of a machine, in the Logs folder of a project's notes (LogView.tsx, LogNotes.tsx)
+# The folder in the sidebar, before a project's folders of notes, and the
+# small label after it with its tip.
+log.folder = ログ
+log.by_tterm = tTerm が記録
+log.by_tterm_title = tTerm が記録するもので、誰も変更できません
+# After a machine's name in the folder: commands run on it today.
+log.today_count = 今日 {n} 件
+# A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
+log.tab = {machine} のログ
+log.tab_title = {machine} のログ
+log.close_tab = ログを閉じる
+# The ⋯ over the page, and its one item.
+log.menu = ログのメニュー
+log.copy_markdown = Markdown としてコピー
+# Under the title. {lines} and {output} are log.keep_year or log.keep_days.
+log.lead = tTerm を通じて {machine} で実行された内容です。tTerm が記録し、誰も変更できません。ログの行は {lines}、コマンドの出力は {output}保存されます。
+log.keep_year = 1 年間
+log.keep_days = other: {n} 日間
+# Going from day to day.
+log.day_before = 前日
+log.day_after = 翌日
+log.today = 今日
+log.pick_day = 日付を選択
+# The day over its lines: Today, Thursday 29 October. {day} is the date, as the language writes it with the day of the week.
+log.day_today = 今日、{day}
+log.day_yesterday = 昨日、{day}
+# What the day holds, on the right of it: 9 commands · 1 failed · 3 notes.
+log.commands = other: コマンド {n} 件
+log.failed = other: 失敗 {n} 件
+# A day with nothing in it.
+log.nothing_day = この日は、tTerm を通じて {machine} で実行されたものはありません。
+log.nothing_yet = tTerm を通じて {machine} で実行されたものは、まだありません。このマシンのターミナルで実行されたコマンドは、終了するとここに表示されます。
+log.cut = ここには、この日の最初の {n} 行だけを表示しています。
+# A terminal opened or ended. {name} is a terminal's name: terminal 1, or the name it was given; {who} a person's first name.
+log.opened_you = {name} をあなたが開きました
+log.opened = {name} を {who} が開きました
+log.ended_you = {name} をあなたが終了しました
+log.ended = {name} を {who} が終了しました
+# A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
+log.ended_why = {name} が終了しました：{why}
+# A command's line under the mouse.
+log.output = 出力
+log.output_title = ターミナルで開く
+log.output_gone = 出力は保存されていません
+# {days} is log.keep_days or log.keep_year.
+log.output_gone_title = 出力は {days}保存されます
+log.add_note = ノートを追加
+log.add_note_title = このコマンドにノートを追加
+log.line_menu = その他
+log.copy_command = コマンドをコピー
+log.copy_link = この行へのリンクをコピー
+log.redact = 墨消し…
+# Under Redact in the menu.
+log.redact_note = 紛れ込んだパスワードやトークンに使います。テキストは完全に消去され、誰が、いつ、なぜ墨消ししたかはログに残ります。
+# In place of redacted words: Redacted by You · 09:23 · a password. {at} is when, {reason} why, as the person wrote it.
+log.redacted_by_you = あなたが墨消し · {at} · {reason}
+log.redacted_by = {who} が墨消し · {at} · {reason}
+log.redacted_by_someone = 墨消し済み · {at} · {reason}
+# Who wrote a note: You, or a person's first name; an AI on someone's behalf: AI for You, AI for Anna. "AI" may be the language's own short word for it.
+log.you = あなた
+log.someone = 不明なユーザー
+log.ai_for_you = AI（あなたの代理）
+log.ai_for = AI（{who} の代理）
+log.reply = 返信
+# Writing a note. <k>…</k> are keys on the keyboard.
+log.note_label = コマンドへのノート
+log.reply_label = 返信
+log.note_placeholder = 理由、結果、次にすること
+log.reply_placeholder = 返信を入力
+log.edit_hint = 書いたとおりにログに残ります · <k>Enter</k> で保存 · <k>Esc</k> でキャンセル
+# {why} is what tTerm Web said, as it said it.
+log.no_note = ノートは保存されませんでした：{why}
+log.note_menu = その他
+log.copy_note = テキストをコピー
+# Redacting: the window that asks why. Under its title: web-01 · today, 09:20 · terminal 1.
+log.redact_command_title = このコマンドを墨消ししますか？
+log.redact_note_title = このノートを墨消ししますか？
+log.redact_where = {machine} · {when} · {name}
+# {when} above: today, 09:20; another day with its date. {time} is the time, {day} the date with the day of the week.
+log.when_today = 今日 {time}
+log.when_on = {day} {time}
+log.redact_command_text = このテキストは tTerm から完全に消去されます：ログ、ターミナルのブロック、検索のいずれにも残りません。ログには、ここにコマンドがあったことと、誰が、いつ、なぜ墨消ししたかが残ります。
+log.redact_note_text = このテキストは tTerm から完全に消去されます。ログには、ここにノートがあったことと、誰が、いつ、なぜ墨消ししたかが残ります。
+log.why = 理由
+log.why_placeholder = パスワード、トークンなど
+log.redact_button = 墨消し
+# After a command is redacted, when the same command was run elsewhere in the project too: those go with it.
+log.redacted_also = other: このプロジェクトでは同じコマンドがほかに {n} 回実行されていたため、それらも墨消ししました。
+# Over a day whose commands' output is no longer kept. {output} and {lines} are log.keep_days or log.keep_year.
+log.old_banner = <b>これらのコマンドの出力は、もう保存されていません。</b>出力は {output}、ログの行は {lines}保存されます。有料プランでは、どちらもより長く保存される予定です。
+# {why} is what went wrong, as tTerm Web said it.
+log.no_open = ログを開けませんでした：{why}
+log.gone_title = このログは見つかりません
+log.gone_text = このログのマシンが削除されたか、あなたがメンバーではないプロジェクトに移動されました。
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.

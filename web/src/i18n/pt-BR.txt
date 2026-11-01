@@ -1239,6 +1239,8 @@ block.state_running = {command}, rodando
 block.state_failed = {command}, falhou com código de retorno {code}
 block.state_finished = {command}, concluído
 block.state_ended = {command}, encerrado
+# A command redacted in the machine's log (0.1.20): its words are gone.
+block.state_redacted = Um comando apagado
 # On a block search opened: the words found are marked in it.
 block.found = Encontrado
 # A command the shell has not started; Stop is the button (block.stop).
@@ -1310,6 +1312,102 @@ danger.user_lost = Os arquivos e o acesso dessa conta vão junto.
 # Under it, for rm -rf aimed at / or ~.
 feed.everything = <strong>O alvo é a máquina inteira.</strong> Nada nela sobreviveria.
 feed.run_it = Executar
+
+# ------------------------------------------------------------ log: the log of a machine, in the Logs folder of a project's notes (LogView.tsx, LogNotes.tsx)
+# The folder in the sidebar, before a project's folders of notes, and the
+# small label after it with its tip.
+log.folder = Logs
+log.by_tterm = pelo tTerm
+log.by_tterm_title = Quem escreve estes logs é o tTerm: ninguém pode alterá-los
+# After a machine's name in the folder: commands run on it today.
+log.today_count = {n} hoje
+# A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
+log.tab = {machine}: log
+log.tab_title = Log da máquina {machine}
+log.close_tab = Fechar o log
+# The ⋯ over the page, and its one item.
+log.menu = Menu do log
+log.copy_markdown = Copiar como Markdown
+# Under the title. {lines} and {output} are log.keep_year or log.keep_days.
+log.lead = Aqui está tudo o que foi executado em {machine} via tTerm. Quem escreve o log é o tTerm, e ninguém pode alterá-lo. As linhas ficam guardadas por {lines}; o que os comandos imprimiram, por {output}.
+log.keep_year = um ano
+log.keep_days = one: {n} dia | other: {n} dias
+# Going from day to day.
+log.day_before = Dia anterior
+log.day_after = Dia seguinte
+log.today = Hoje
+log.pick_day = Escolher um dia
+# The day over its lines: Today, Thursday 29 October. {day} is the date, as the language writes it with the day of the week.
+log.day_today = Hoje, {day}
+log.day_yesterday = Ontem, {day}
+# What the day holds, on the right of it: 9 commands · 1 failed · 3 notes.
+log.commands = one: {n} comando | other: {n} comandos
+log.failed = one: {n} falhou | other: {n} falharam
+# A day with nothing in it.
+log.nothing_day = Nada foi executado em {machine} via tTerm neste dia.
+log.nothing_yet = Nada foi executado em {machine} via tTerm até agora. Os comandos dos terminais dela chegam aqui conforme terminam.
+log.cut = Aqui aparecem só as primeiras {n} linhas deste dia.
+# A terminal opened or ended. {name} is a terminal's name: terminal 1, or the name it was given; {who} a person's first name.
+log.opened_you = Você abriu o {name}
+log.opened = {who} abriu o {name}
+log.ended_you = Você encerrou o {name}
+log.ended = {who} encerrou o {name}
+# A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
+log.ended_why = O {name} foi encerrado: {why}
+# A command's line under the mouse.
+log.output = Saída
+log.output_title = Abrir no terminal
+log.output_gone = saída não guardada
+# {days} is log.keep_days or log.keep_year.
+log.output_gone_title = A saída fica guardada por {days}
+log.add_note = Adicionar nota
+log.add_note_title = Adicionar uma nota a este comando
+log.line_menu = Mais
+log.copy_command = Copiar comando
+log.copy_link = Copiar link desta linha
+log.redact = Apagar…
+# Under Redact in the menu.
+log.redact_note = Para uma senha ou um token que foi parar aqui. O texto some para sempre; o log guarda quem o apagou, quando e por quê.
+# In place of redacted words: Redacted by You · 09:23 · a password. {at} is when, {reason} why, as the person wrote it.
+log.redacted_by_you = Apagado por você · {at} · {reason}
+log.redacted_by = Apagado por {who} · {at} · {reason}
+log.redacted_by_someone = Apagado · {at} · {reason}
+# Who wrote a note: You, or a person's first name; an AI on someone's behalf: AI for You, AI for Anna. "AI" may be the language's own short word for it.
+log.you = Você
+log.someone = Alguém
+log.ai_for_you = IA em seu nome
+log.ai_for = IA em nome de {who}
+log.reply = Responder
+# Writing a note. <k>…</k> are keys on the keyboard.
+log.note_label = Nota sobre o comando
+log.reply_label = Resposta
+log.note_placeholder = Por quê, o que saiu, o que vem depois
+log.reply_placeholder = Sua resposta
+log.edit_hint = Fica no log exatamente como escrito · <k>Enter</k> salva · <k>Esc</k> cancela
+# {why} is what tTerm Web said, as it said it.
+log.no_note = A nota não foi salva: {why}
+log.note_menu = Mais
+log.copy_note = Copiar texto
+# Redacting: the window that asks why. Under its title: web-01 · today, 09:20 · terminal 1.
+log.redact_command_title = Apagar este comando?
+log.redact_note_title = Apagar esta nota?
+log.redact_where = {machine} · {when} · {name}
+# {when} above: today, 09:20; another day with its date. {time} is the time, {day} the date with the day of the week.
+log.when_today = hoje, {time}
+log.when_on = {day}, {time}
+log.redact_command_text = O texto dele sai do tTerm para sempre: do log, do feed do terminal e da busca. O log guarda que havia um comando aqui, quem o apagou, quando e por quê.
+log.redact_note_text = O texto dela sai do tTerm para sempre. O log guarda que havia uma nota aqui, quem a apagou, quando e por quê.
+log.why = Motivo
+log.why_placeholder = uma senha, um token
+log.redact_button = Apagar
+# After a command is redacted, when the same command was run elsewhere in the project too: those go with it.
+log.redacted_also = one: O mesmo comando foi executado mais {n} vez neste projeto e também foi apagado lá. | other: O mesmo comando foi executado mais {n} vezes neste projeto e também foi apagado lá.
+# Over a day whose commands' output is no longer kept. {output} and {lines} are log.keep_days or log.keep_year.
+log.old_banner = <b>O que esses comandos imprimiram não está mais guardado:</b> a saída fica guardada por {output}, e as linhas do log, por {lines}. Nos planos pagos, os dois prazos serão maiores.
+# {why} is what went wrong, as tTerm Web said it.
+log.no_open = Não foi possível abrir o log: {why}
+log.gone_title = Este log não está aqui
+log.gone_text = A máquina dele foi removida ou movida para um projeto do qual você não faz parte.
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.
