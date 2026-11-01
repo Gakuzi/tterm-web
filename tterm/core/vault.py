@@ -832,6 +832,28 @@ class VaultRelay:
         return [s for s in self._sources
                 if s.user_id == user_id and fingerprint in s.vault_can()]
 
+    async def wait_capable(self, user_id: uuid.UUID, fingerprint: str,
+                           waiting) -> None:
+        """Until a socket can sign with this key, saying meanwhile that the
+        terminal waits for the vault (`waiting`, as sign_blob does). A key
+        server's login waits here, before it dials (0.1.19): waiting inside
+        the SSH connection ran into its timeout (ssh.CONNECT_TIMEOUT, 12 s),
+        and the terminal ended with "No answer from SSH" while the person
+        was opening their vault (the app's checks, 01.11)."""
+        told = False
+        try:
+            while True:
+                tick = self._tick
+                if self._capable(user_id, fingerprint):
+                    return
+                if not told:
+                    waiting(True)
+                    told = True
+                await tick.wait()
+        finally:
+            if told:
+                waiting(False)
+
     def answer(self, request_id: str, raw: bytes | None) -> None:
         """A socket answered vault.signed (raw bytes) or vault.unable
         (None)."""

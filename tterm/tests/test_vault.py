@@ -20,7 +20,7 @@ import asyncpg
 import asyncssh
 from asyncssh.packet import SSHPacket
 
-from ..core import db, reach, vault
+from ..core import db, reach, ssh, vault
 from ..core.machines import remember_cas
 from .harness import page_socket, request, shell_server, sign_in_as, ssh_server
 from .test_auth import Browser, sign_in
@@ -648,11 +648,16 @@ async def test_a_key_server_waits_for_a_socket(h):
             fp = asyncssh.import_public_key(
                 priv.export_public_key().decode()).get_fingerprint()
             machine_id = await _key_machine(core, port, host_key, key_id)
-            # No capable socket yet: the terminal waits and says so.
+            # No capable socket yet: the terminal waits and says so, longer
+            # than a dial may take (0.1.19: the wait ran into the SSH
+            # connection's timeout, and the terminal ended).
+            ssh.CONNECT_TIMEOUT = 1
             t = await core.terminals.open(core.owner, machine_id, 80, 24)
             await _until(lambda: t.vault_wait is not None, what="the wait")
             assert t.vault_wait["key"] == fp and t.state == "connecting"
             assert t.describe()["vault"]["keyName"] == "id_ed25519"
+            await asyncio.sleep(2.5)
+            assert t.state == "connecting" and t.vault_wait is not None, t.reason
             # A socket announces the key; the login goes on by itself.
             async with page_socket(core.page_port) as ws:
                 page = FakePage(ws, priv)
@@ -664,6 +669,7 @@ async def test_a_key_server_waits_for_a_socket(h):
                 await t.close()
     finally:
         reach.ALLOW_PRIVATE = False
+        ssh.CONNECT_TIMEOUT = 12
         shutil.rmtree(home, ignore_errors=True)
 
 

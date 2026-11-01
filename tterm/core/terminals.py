@@ -524,6 +524,11 @@ class Terminal:
                     "login": m.jump_login or (m.login or trust.LOGIN),
                     "host_keys": m.jump_host_keys, "client_key": client_key()}
         limiter = self.relay.limiter if self.relay is not None else None
+        if m.login_method == "key" and self.relay is not None:
+            # A device that can sign first, however long the person takes to
+            # open their vault; then the dial, with its own timeout (0.1.19).
+            await self.relay.wait_capable(self.owner.id, m.vault_fingerprint,
+                                          self._set_vault_wait)
         return await ssh.connect_own(
             host=m.host, port=m.port or 22, login=m.login or trust.LOGIN,
             host_keys=m.host_keys, client_key=client_key(), who=who,

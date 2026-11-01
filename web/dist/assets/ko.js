@@ -138,8 +138,9 @@ account_menu.only_here = 이 컴퓨터에서만 사용
 account_menu.offline = 오프라인, 다시 시도하는 중
 account_menu.local_note = tTerm이 이 컴퓨터에서 작동하고 있어요. 서버, 프로젝트, 팀을 쓰려면 로그인하세요.
 account_menu.sign_out = 로그아웃
-# Only in tTerm for Mac, right under Settings: the servers and keys of this
-# Mac to the account (0.1.17). The second line is small, under the first.
+# Only in tTerm for Mac, right above Sign out (from 0.1.19): the servers and
+# keys of this Mac to the account (0.1.17). The second line is small, under
+# the first.
 account_menu.move = 클라우드로 옮기기
 account_menu.move_note = 이 Mac의 서버와 키
 # Only in a Mac's browser, until the person has signed in with the app

@@ -28,8 +28,8 @@
 // place, with an arrow back. From 0.1.17 (Vault.dc) a server that opens
 // with the person's own key has a key after its name, and one that goes
 // through their Mac says "via Mac", with the Mac's dot; in the app the
-// menu has Move to cloud right under Settings, in a browser Download tTerm
-// for Mac.
+// menu has Move to cloud, in a Mac's browser Download tTerm for Mac: from
+// 0.1.19 at the bottom, right above Sign out.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { Machine, Me, Project, TerminalInfo } from "./api";
@@ -746,14 +746,17 @@ function AccountPlace(props: {
               <div className="menu-line" role="separator" />
               <MenuItem icon={<Gear size={15} />} text={t("settings.title")}
                 current={props.page === "settings"} onClick={pick(props.onSettings)} />
+              {languageItem}
+              <MenuItem icon={<Person size={15} />} text={t("account.title")}
+                current={props.page === "account"} onClick={pick(props.onAccount)} />
+              {/* The offers, on their tint, at the bottom, right above Sign out
+                  (0.1.19, the owner's choice): Move to cloud in the app,
+                  Download tTerm for Mac in a Mac's browser. */}
               {props.inApp && (
                 <OfferItem icon={<CloudUp size={16} />} text={t("account_menu.move")}
                   note={t("account_menu.move_note")} current={props.page === "move"}
                   onClick={pick(props.onMove)} />
               )}
-              {languageItem}
-              <MenuItem icon={<Person size={15} />} text={t("account.title")}
-                current={props.page === "account"} onClick={pick(props.onAccount)} />
               {!props.inApp && macBrowser() && !me.appSignedIn && (
                 <OfferItem icon={<Download size={16} />} text={t("account_menu.download")}
                   note={t("account_menu.download_note")} href={macDownload(props.language)}

@@ -138,8 +138,9 @@ account_menu.only_here = 仅这台电脑
 account_menu.offline = 离线，正在重试
 account_menu.local_note = tTerm 目前只用于这台电脑。登录即可使用你的服务器、项目和团队。
 account_menu.sign_out = 退出登录
-# Only in tTerm for Mac, right under Settings: the servers and keys of this
-# Mac to the account (0.1.17). The second line is small, under the first.
+# Only in tTerm for Mac, right above Sign out (from 0.1.19): the servers and
+# keys of this Mac to the account (0.1.17). The second line is small, under
+# the first.
 account_menu.move = 迁移到云端
 account_menu.move_note = 这台 Mac 的服务器和密钥
 # Only in a Mac's browser, until the person has signed in with the app

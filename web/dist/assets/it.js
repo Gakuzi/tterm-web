@@ -138,8 +138,9 @@ account_menu.only_here = Solo questo computer
 account_menu.offline = Offline, nuovo tentativo in corso
 account_menu.local_note = tTerm funziona con questo computer. Accedi per i tuoi server, progetti e team.
 account_menu.sign_out = Esci
-# Only in tTerm for Mac, right under Settings: the servers and keys of this
-# Mac to the account (0.1.17). The second line is small, under the first.
+# Only in tTerm for Mac, right above Sign out (from 0.1.19): the servers and
+# keys of this Mac to the account (0.1.17). The second line is small, under
+# the first.
 account_menu.move = Sposta nel cloud
 account_menu.move_note = Server e chiavi di questo Mac
 # Only in a Mac's browser, until the person has signed in with the app
