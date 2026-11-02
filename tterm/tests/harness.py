@@ -22,6 +22,7 @@ import socket
 import struct
 import tempfile
 import termios
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
@@ -35,6 +36,10 @@ from ..core.config import Settings
 from ..core.signer_client import SignerClient
 from ..server import Core
 from ..signer.service import Signer, serve
+
+#: How long a test SSH server waits for the core's connections to close
+#: once a check is done (0.1.25).
+CLOSE_WAIT = 10
 
 #: What a small Ubuntu server answers to the passport script.
 PASSPORT_OUTPUT = """os=Ubuntu 24.04.1 LTS
@@ -71,9 +76,23 @@ class Sshd(asyncssh.SSHServer):
     def __init__(self, keys: Path) -> None:
         self.keys = keys
         self.conn: asyncssh.SSHServerConnection | None = None
+        self.made = time.monotonic()
+        self.closed = False
 
     def connection_made(self, conn: asyncssh.SSHServerConnection) -> None:
         self.conn = conn
+
+    def connection_lost(self, exc: Exception | None) -> None:
+        self.closed = True
+
+    def describe(self) -> str:
+        """For a check that failed on this connection: who, how old, how
+        many channels it still has."""
+        conn = self.conn
+        peer = conn.get_extra_info("peername") if conn is not None else None
+        channels = len(getattr(conn, "_channels", {}) or {})
+        return (f"from {peer}, {time.monotonic() - self.made:.1f} s old, "
+                f"{channels} channel(s) open")
 
     def begin_auth(self, username: str) -> bool:
         try:
@@ -134,17 +153,29 @@ async def ssh_server(ca_public_key: str, *, host_key=None,
         process.stderr.write(err.decode())
         process.exit(proc.returncode or 0)
 
+    made: list[Sshd] = []
+
+    def for_a_connection() -> Sshd:
+        sshd = Sshd(home / ".ssh" / "authorized_keys")
+        made.append(sshd)
+        return sshd
+
     server = await asyncssh.create_server(
-        lambda: Sshd(home / ".ssh" / "authorized_keys"), "127.0.0.1", 0,
+        for_a_connection, "127.0.0.1", 0,
         server_host_keys=[host_key], process_factory=handle, encoding="utf-8")
     port = server.sockets[0].getsockname()[1]
+    inside_failed = False
     try:
         yield port, host_key, sign_ins
+    except BaseException:
+        inside_failed = True
+        raise
     finally:
-        server.close()
-        await server.wait_closed()
-        if own_home:
-            shutil.rmtree(home, ignore_errors=True)
+        try:
+            await _close(server, made, inside_failed)
+        finally:
+            if own_home:
+                shutil.rmtree(home, ignore_errors=True)
 
 
 @contextlib.asynccontextmanager
@@ -167,6 +198,12 @@ async def shell_server(ca_public_key: str, home: Path, login_shell: str):
            "LOGNAME": "tterm",
            "PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin")}
     tasks: set[asyncio.Task] = set()
+    made: list[Sshd] = []
+
+    def for_a_connection() -> Sshd:
+        sshd = Sshd(home / ".ssh" / "authorized_keys")
+        made.append(sshd)
+        return sshd
 
     async def handle(process: asyncssh.SSHServerProcess) -> None:
         task = asyncio.current_task()
@@ -182,16 +219,43 @@ async def shell_server(ca_public_key: str, home: Path, login_shell: str):
                 tasks.discard(task)
 
     server = await asyncssh.create_server(
-        lambda: Sshd(home / ".ssh" / "authorized_keys"), "127.0.0.1", 0,
+        for_a_connection, "127.0.0.1", 0,
         server_host_keys=[host_key], process_factory=handle, encoding=None)
     port = server.sockets[0].getsockname()[1]
+    inside_failed = False
     try:
         yield port, host_key
+    except BaseException:
+        inside_failed = True
+        raise
     finally:
         server.close()
         for task in list(tasks):
             task.cancel()
-        await server.wait_closed()
+        await _close(server, made, inside_failed)
+
+
+async def _close(server: asyncssh.SSHAcceptor, made: list[Sshd],
+                 inside_failed: bool) -> None:
+    """Closes a test SSH server, which waits for its connections to close.
+    On 02.11 a check waited there for good, once on the owner's Mac and once
+    here, out of many runs: a connection of the core's that never closed.
+    Not for good any more (0.1.25): the connections still open are named,
+    closed, and the check fails saying so, unless it failed already."""
+    server.close()
+    try:
+        await asyncio.wait_for(asyncio.shield(server.wait_closed()), CLOSE_WAIT)
+    except asyncio.TimeoutError:
+        left = [s for s in made if not s.closed]
+        said = "; ".join(s.describe() for s in left) or "none of its own"
+        for s in left:
+            if s.conn is not None:
+                s.conn.close()
+        with contextlib.suppress(asyncio.TimeoutError):
+            await asyncio.wait_for(server.wait_closed(), CLOSE_WAIT)
+        if not inside_failed:
+            raise AssertionError("the core left SSH connections open after the "
+                                 f"check: {said}") from None
 
 
 async def _plain(process: asyncssh.SSHServerProcess, env: dict,

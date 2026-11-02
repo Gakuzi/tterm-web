@@ -4,7 +4,11 @@ tTerm in the browser: a real terminal with command blocks, for people who work
 with servers and for their teams. Projects, roles, a journal of who ran what,
 and watching a colleague's terminal, always with them knowing.
 
-**Status:** early development. Version 0.1.24 says why a terminal
+**Status:** early development. Version 0.1.25 puts help in the account's
+menu, now Settings, Account, Language, Get help, About us and Sign out: Get
+help has the documentation and Write to support, which mails what happened
+to support, and the answer comes to your address; About us has the site,
+the channel in Telegram and What's new. Version 0.1.24 says why a terminal
 ended when a release of tTerm Web ended it: "tTerm Web was updated to
 0.1.24", that open terminals end when it updates and that their commands
 and what they printed are in the machine's log, with What's new in that
@@ -35,7 +39,8 @@ are kept a year, what the commands printed 30 days.
 Version 0.1.16 speaks the twelve languages
 of the site: English, Deutsch, Español, Français, Italiano, Polski,
 Português, Türkçe, Русский, 日本語, 한국어 and 简体中文. The account's menu
-has Language after Settings, the languages beside it, the one shown on top
+has Language after Settings (from 0.1.25 after Account), the languages
+beside it, the one shown on top
 with a check; the one chosen is kept in the account, and until one is,
 the page speaks the browser's language when it is one of them, English
 otherwise. It comes with the app 0.6.0, whose own menus speak the same.
@@ -224,6 +229,7 @@ tterm/
   core/notes.py  notes in folders: saving, merging, ticks, who may do what
   core/mail.py   the emails, through Brevo or into the log
   core/letters.py  what the emails say, as HTML and as text
+  core/support.py  Write to support: the message, its limits, kept a year
   api/page.py    the page and its API, for people, each within a session
   api/ws.py      the page's socket: every terminal on the page goes through it
   api/connect.py where machines talk to us: installer, registration, and
@@ -444,6 +450,19 @@ the free plan, the only one for now. Plans and their limits live in the
 database, so a limit changes on a running server, without a release; every
 hour the core writes down how much it carries (`usage_stats`), to show
 when a limit needs another look.
+
+Get help in the account's menu has Write to support (0.1.25): what
+happened, in the person's own words, and while it is ticked one line of
+technical details, shown as it goes: where tTerm runs, the browser and its
+system, the plan, how many machines; never commands, what they printed or
+notes. The core mails it to support's address (`TTERM_SUPPORT_EMAIL`),
+answered to the person: signed in, to the account's address, where a copy
+of the message goes too; in tTerm for Mac before signing in, to the address
+typed, with no copy, as nobody has checked it; the letter says so first,
+above the message. Five messages an hour from a person; before signing
+in, three an hour from a network and thirty in all. They are kept a year
+(`support_messages`), the network of one written before signing in a day;
+a message whose email did not go is not kept.
 
 The page guards itself as well: it answers only when the browser asks for
 its own address (`TTERM_PAGE_URL`; on a laptop `localhost` or `127.0.0.1`

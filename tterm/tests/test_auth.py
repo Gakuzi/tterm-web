@@ -1210,6 +1210,11 @@ async def test_brevo_gets_the_email_as_its_api_wants_it():
         body = _Brevo.got[-1][2]
         assert body["htmlContent"] == "<p>Your code: 123456</p>", body
         assert body["textContent"] == "Your code: 123456", body
+        assert "replyTo" not in body
+        # A message to support is answered to its writer (0.1.25).
+        await mailer.send(mail.Email("support@tterm.net", "Support: Anna: hi",
+                                     "hi", reply_to="anna@example.com"))
+        assert _Brevo.got[-1][2]["replyTo"] == {"email": "anna@example.com"}
         _Brevo.status = 401
         try:
             await mailer.send(mail.Email("anna@example.com", "s", "t"))

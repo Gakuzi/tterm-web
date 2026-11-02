@@ -131,8 +131,8 @@ sidebar.via_title = {mac} üzerinden, açık olduğu sürece
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
 account_menu.free_plan = Free planı
-account_menu.title = Ayarlar, dil, hesap, çıkış yap
-account_menu.title_local = Ayarlar, dil, giriş yap
+account_menu.title = Ayarlar, hesap, dil, yardım, hakkımızda, çıkış yap
+account_menu.title_local = Ayarlar, dil, yardım, hakkımızda, giriş yap
 account_menu.not_signed_in = Giriş yapılmadı
 account_menu.only_here = Yalnızca bu bilgisayar
 account_menu.offline = Çevrimdışı, yeniden deneniyor
@@ -147,8 +147,53 @@ account_menu.move_note = Bu Mac'in sunucuları ve anahtarları
 # (0.1.18): the app for a Mac. "tTerm for Mac" is the app's name.
 account_menu.download = Mac için tTerm'i indir
 account_menu.download_note = Mac'inde yerel bir terminal
-# The item after Settings, and the title of the list of languages.
+# Get help and About us (0.1.25): items of the menu that open a list of
+# their own beside it, as Language does. Get help: the documentation, and
+# a window to write to support. About us: the site, the channel in
+# Telegram, What's new in the documentation. "tterm.net" and "Telegram"
+# stay as they are.
+account_menu.help = Yardım al
+account_menu.docs = Belgeler
+account_menu.write_support = Destek ekibine yaz
+account_menu.about = Hakkımızda
+account_menu.site = tterm.net sitesi
+account_menu.telegram = Telegram kanalı
+account_menu.whats_new = Yenilikler
+# An item of the menu, and the title of the list of languages.
 language.item = Dil
+
+# ------------------------------------------------------------ support: Get help › Write to support, a message to tTerm's support (SupportDialog.tsx)
+# The window's title, and under it where the answer comes: {email} is the
+# address of one's account.
+support.title = Destek ekibine yaz
+support.answer_to = <b>{email}</b> adresine yanıt vereceğiz.
+# In tTerm for Mac before signing in: the address is asked for below.
+support.answer_local = Yazacağın e-posta adresine yanıt vereceğiz.
+support.email = E-posta adresin
+# The field for the message, and what it shows while empty.
+support.text = Ne oldu
+support.placeholder = Neyin ters gittiğini anlat
+# Ticked at first: one line about where tTerm runs goes with the message,
+# shown under it as it will go (support.tech: {details} is that line).
+support.attach = Teknik bilgileri ekle
+support.tech = {details}. <b>Komutlar, çıktılar ve notlar eklenmez.</b>
+# The parts of that line, joined with " · ": tTerm Web 0.1.25 · Chrome 141,
+# macOS · Free plan · 3 machines. In tTerm for Mac before signing in:
+# tTerm for Mac 0.8.0 · macOS · not signed in. "tTerm Web" and "tTerm for
+# Mac" are the names, as elsewhere.
+support.tech_web = tTerm Web {version}
+support.tech_mac = Mac için tTerm {version}
+support.tech_local = giriş yapılmadı
+support.docs = Sık sorulan bir sorunun yanıtı <link>belgelerde</link> zaten olabilir.
+support.send = Gönder
+support.sending = Gönderiliyor…
+# What did not go: {address} is support's address, to write to by hand.
+support.too_many = Son bir saatte destek ekibine zaten birkaç mesaj gönderildi. Daha sonra yeniden dene ya da {address} adresine yaz.
+support.not_sent = Mesaj gönderilemedi. Birkaç dakika sonra yeniden dene ya da {address} adresine yaz.
+# Sent: the answer comes to {email}, where a copy of the message is
+# already. Before signing in no copy goes: then support.answer_to.
+support.sent_title = Mesaj gönderildi
+support.sent = <b>{email}</b> adresine yanıt vereceğiz. Mesajının bir kopyası zaten orada.
 
 # ------------------------------------------------------------ settings (Settings.tsx)
 # The page, and the item of the account's menu that opens it.

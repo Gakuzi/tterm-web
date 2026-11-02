@@ -1,5 +1,6 @@
 """Email: the codes for signing in, and the note about a sign-in from a
-device tTerm Web does not know. What they say and how they look: letters.py.
+device tTerm Web does not know; from 0.1.25 what people write to support,
+and its copy for them. What they say and how they look: letters.py.
 
 On the server it goes out through Brevo's API (TTERM_BREVO_KEY), as HTML
 with the plain text beside it (from 0.0.11). Without a key, as on the
@@ -34,6 +35,9 @@ class Email:
     text: str
     #: The same as HTML, for the mail apps that show it; empty: text only.
     html: str = ""
+    #: Where an answer goes, when not to the sender (0.1.25): a message to
+    #: support is answered to the person who wrote it.
+    reply_to: str = ""
 
 
 class Mailer:
@@ -52,7 +56,9 @@ class LogMailer(Mailer):
         del self.sent[:-KEPT]
         # A warning, so that it shows wherever the core runs: on the laptop
         # this is how the code reaches the person.
-        log.warning("email to %s: %s\n%s", email.to, email.subject, email.text)
+        log.warning("email to %s%s: %s\n%s", email.to,
+                    f" (reply to {email.reply_to})" if email.reply_to else "",
+                    email.subject, email.text)
 
 
 class BrevoMailer(Mailer):
@@ -73,6 +79,8 @@ class BrevoMailer(Mailer):
         if email.html:
             # Both go out as one email; the mail app picks what it shows.
             message["htmlContent"] = email.html
+        if email.reply_to:
+            message["replyTo"] = {"email": email.reply_to}
         body = json.dumps(message).encode()
 
         def post() -> int:

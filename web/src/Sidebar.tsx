@@ -33,17 +33,17 @@
 // start with Logs, written by tTerm: the log of each of its machines, with
 // how many commands ran there today.
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { Machine, Me, Project, TerminalInfo } from "./api";
 import { colorClass, terminalName } from "./colors";
 import { LANGUAGES, useT, type Lang } from "./i18n";
 import { macBrowser } from "./platform";
 import {
-  Check, ChevronDown, ChevronLeft, ChevronRight, Close, CloudOff, CloudUp, Computer, Doc,
-  Download, Folder as FolderIcon, FolderOpen, Gear, History, Key, Languages, Lock, Logo, Moon,
-  People, Person, Pin, Plus, Server, SignIn, SignOut, Sun,
+  Book, Check, ChevronDown, ChevronLeft, ChevronRight, Close, CloudOff, CloudUp, Computer, Doc,
+  Download, Folder as FolderIcon, FolderOpen, Gear, Globe, Help, History, Info, Key, Languages,
+  Lock, Logo, Mail, Moon, People, Person, Pin, Plane, Plus, Server, SignIn, SignOut, Spark, Sun,
 } from "./icons";
-import { folderOf } from "./links";
+import { docsPage, sitePage, TELEGRAM, whatsNewPage } from "./links";
 import { hereWord, onMac } from "./local";
 import { NameInput } from "./NameInput";
 import { Avatar, NoteIcon } from "./ProjectPage";
@@ -116,6 +116,8 @@ interface Props {
   /** In tTerm for Mac, signed in (0.1.17): Move to cloud in the menu. */
   inApp: boolean;
   onMove: () => void;
+  /** Get help > Write to support (0.1.25). */
+  onSupport: () => void;
 }
 
 /** The pages behind the menu of the account at the bottom (0.1.4); Move to
@@ -129,8 +131,7 @@ export type AccountPage = "settings" | "account" | "move";
  * macOS does not open with a double click the first time. The site keeps
  * its languages in folders (links.ts). */
 export function macDownload(lang: Lang): string {
-  const folder = folderOf(lang);
-  return folder ? `https://tterm.net/${folder}/download/` : "https://tterm.net/download/";
+  return sitePage(lang, "download/");
 }
 
 /** The ⌄ before a row: turned while folded. Only for the mouse: the row's
@@ -453,7 +454,7 @@ export function Sidebar(props: Props) {
           onSettings={props.onSettings} onAccount={props.onAccount}
           onSignOut={props.onSignOut} onSignIn={props.onSignIn}
           language={props.language} onLanguage={props.onLanguage}
-          inApp={props.inApp} onMove={props.onMove} />
+          inApp={props.inApp} onMove={props.onMove} onSupport={props.onSupport} />
         <button type="button" className="icon-button"
           aria-label={themeLabel} title={themeLabel}
           onClick={props.onToggleTheme}>
@@ -532,23 +533,49 @@ function OfferItem(props: {
   );
 }
 
-/** Where the languages show (0.1.16): beside the menu, where a mouse points
- * and there is room right of the sidebar; else in the menu's place. */
-type LanguageList = "shut" | "beside" | "inside";
+/** A link in a menu, to a page of tTerm's elsewhere (0.1.25): it opens
+ * beside the page, and the menu closes. */
+function MenuLink(props: { icon: ReactNode; text: string; href: string; onClick: () => void }) {
+  return (
+    <a role="menuitem" className="menu-item menu-link" href={props.href} target="_blank"
+      rel="noreferrer" onClick={props.onClick}>
+      {props.icon}
+      <span className="menu-text">{props.text}</span>
+    </a>
+  );
+}
 
-/** The list beside the menu, as wide as on the canvas, and the room it
- * wants right of the sidebar. */
-const LIST_WIDTH = 220;
-/** How long the list waits for the mouse on its way from Language to it. */
+/** The lists an item of the menu opens: Language (0.1.16), and from 0.1.25
+ * Get help and About us, as on the canvas of 02.11 (version 100). */
+type Sub = "language" | "help" | "about";
+
+/** Where such a list shows: beside the menu, where a mouse points and there
+ * is room right of the sidebar; else in the menu's place. */
+type Where = "beside" | "inside";
+
+/** The widest list beside the menu (Get help and About us), and so the
+ * room a list wants right of the sidebar. */
+const LIST_WIDTH = 250;
+/** How long the list waits for the mouse on its way from its item to it. */
 const LEAVE_MS = 250;
+/** How long the mouse rests on another item with a list before that list
+ * takes the place of the one beside the menu: on its way to the list, the
+ * mouse may cross the item under its own (0.1.25). */
+const SWITCH_MS = 180;
 
 /** The account at the bottom of the sidebar: the name and the plan, and in
  * the app before signing in Not signed in. A click opens its menu above it,
  * which closes on a choice, a click elsewhere, or Esc; the arrow keys walk
  * its items. It lights up under the mouse, and while one of its pages is
- * open. Its Language (0.1.16) shows the languages beside the menu while the
- * mouse is on it or on them; with the keys, → or Enter opens them and ← or
- * Esc goes back. */
+ * open.
+ *
+ * From 0.1.25 its items are, as the owner set them on 02.11 (13:24, 13:30):
+ * Settings, Account, Language ›, Get help › (Documentation, Write to
+ * support), About us › (tterm.net, the channel in Telegram, What's new),
+ * the offers where there are any, a line, Sign out; no lines between the
+ * items. An item with › shows its list beside the menu while the mouse is
+ * on it or on the list; with the keys, → or Enter opens it and ← or Esc goes
+ * back. */
 function AccountPlace(props: {
   me: Me;
   local: boolean;
@@ -563,22 +590,43 @@ function AccountPlace(props: {
   onLanguage: (lang: Lang) => void;
   inApp: boolean;
   onMove: () => void;
+  onSupport: () => void;
 }) {
   const { me, local } = props;
   const t = useT();
   const [open, setOpen] = useState(false);
-  const [list, setList] = useState<LanguageList>("shut");
+  const [sub, setSub] = useState<{ which: Sub; where: Where } | null>(null);
   const box = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLDivElement>(null);
   const leave = useRef(0);
+  const switching = useRef(0);
   const plan = me.plan === "free" ? t("account_menu.free_plan") : me.plan;
 
-  // The menu shut, its languages too.
+  // The menu shut, its lists too.
   useEffect(() => {
     if (open) return;
     window.clearTimeout(leave.current);
-    setList("shut");
+    window.clearTimeout(switching.current);
+    setSub(null);
   }, [open]);
-  useEffect(() => () => window.clearTimeout(leave.current), []);
+  useEffect(() => () => {
+    window.clearTimeout(leave.current);
+    window.clearTimeout(switching.current);
+  }, []);
+
+  // A list beside the menu ends level with the menu's bottom, as on the
+  // canvas; one short enough to end higher starts level with its item
+  // instead, so that the mouse goes straight across to it and passes no
+  // other item with a list on the way.
+  useLayoutEffect(() => {
+    const el = list.current;
+    const item = box.current?.querySelector<HTMLElement>(`[data-sub='${sub?.which}']`);
+    if (!el || !item) return;
+    el.style.transform = "";
+    const inset = el.clientTop + parseFloat(getComputedStyle(el).paddingTop);
+    const up = el.getBoundingClientRect().top - (item.getBoundingClientRect().top - inset);
+    if (up > 0) el.style.transform = `translateY(${-up}px)`; // i18n-ignore: CSS
+  }, [open, sub]);
 
   /** Focus on what matches, once it is drawn. */
   const focusOn = (selector: string) => {
@@ -591,21 +639,25 @@ function AccountPlace(props: {
     return !!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches &&
       window.innerWidth - right >= LIST_WIDTH + 12;
   };
-  const showList = (withKeys: boolean) => {
+  const showList = (which: Sub, withKeys: boolean) => {
     window.clearTimeout(leave.current);
     const where = roomBeside() ? "beside" : "inside";
-    setList(where);
-    if (withKeys || where === "inside") focusOn("[role='menuitemradio'][aria-checked='true']");
+    setSub({ which, where });
+    if (withKeys || where === "inside") {
+      focusOn(which === "language" ? "[role='menuitemradio'][aria-checked='true']"
+        : ".sub-list [role='menuitem'], .sub-inside [role='menuitem']");
+    }
   };
   const hideList = () => {
     window.clearTimeout(leave.current);
-    setList("shut");
-    focusOn(".lang-item");
+    const was = sub?.which;
+    setSub(null);
+    if (was) focusOn(`[data-sub='${was}']`);
   };
   const leaveSoon = () => {
     window.clearTimeout(leave.current);
     leave.current = window.setTimeout(
-      () => setList((was) => (was === "beside" ? "shut" : was)), LEAVE_MS);
+      () => setSub((was) => (was?.where === "beside" ? null : was)), LEAVE_MS);
   };
 
   useEffect(() => {
@@ -617,7 +669,7 @@ function AccountPlace(props: {
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
-        if (list !== "shut") {
+        if (sub) {
           hideList();
           return;
         }
@@ -626,8 +678,8 @@ function AccountPlace(props: {
         return;
       }
       if (!box.current?.contains(document.activeElement)) return;
-      const inList = !!box.current.querySelector(".lang-list")?.contains(document.activeElement);
-      if (event.key === "ArrowLeft" && (inList || list === "inside")) {
+      const inList = !!box.current.querySelector(".sub-list")?.contains(document.activeElement);
+      if (event.key === "ArrowLeft" && (inList || sub?.where === "inside")) {
         event.preventDefault();
         hideList();
         return;
@@ -635,13 +687,13 @@ function AccountPlace(props: {
       if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
       // The list beside, while the keys are in it; else the menu, which
       // is the list in its place.
-      const scope = inList ? box.current.querySelector(".lang-list")
+      const scope = inList ? box.current.querySelector(".sub-list")
         : box.current.querySelector(".menu.up");
-      const items = [...(scope?.querySelectorAll<HTMLButtonElement>(
+      const items = [...(scope?.querySelectorAll<HTMLElement>(
         "[role='menuitem'], [role='menuitemradio']") ?? [])];
       if (!items.length) return;
       event.preventDefault();
-      const at = items.indexOf(document.activeElement as HTMLButtonElement);
+      const at = items.indexOf(document.activeElement as HTMLElement);
       const next = event.key === "ArrowDown" ? (at + 1) % items.length
         : at < 0 ? items.length - 1 : (at - 1 + items.length) % items.length;
       items[next].focus();
@@ -659,12 +711,13 @@ function AccountPlace(props: {
       window.removeEventListener("keydown", keys, true);
       anchor?.removeEventListener("focusout", left);
     };
-  }, [open, list]);
+  }, [open, sub]);
 
   const pick = (then: () => void) => () => {
     setOpen(false);
     then();
   };
+  const shut = () => setOpen(false);
   const choose = (lang: Lang) => {
     setOpen(false);
     box.current?.querySelector<HTMLButtonElement>(".account")?.focus();
@@ -692,28 +745,78 @@ function AccountPlace(props: {
       ))}
     </>
   );
-  const languageItem = (
-    <button type="button" role="menuitem" aria-haspopup="menu"
-      aria-expanded={list === "beside"}
-      className={list === "beside" ? "menu-item lang-item open" : "menu-item lang-item"}
-      onMouseEnter={() => {
-        if (roomBeside()) showList(false);
-      }}
-      onMouseLeave={() => {
-        if (list === "beside") leaveSoon();
-      }}
-      // A click from the keys (Enter, Space) has no detail: the focus goes
-      // into the list.
-      onClick={(event) => showList(event.detail === 0)}
-      onKeyDown={(event) => {
-        if (event.key !== "ArrowRight") return;
-        event.preventDefault();
-        showList(true);
-      }}>
-      <Languages size={15} />
-      <span className="menu-text">{t("language.item")}</span>
-      <ChevronRight size={14} className="menu-more" />
-    </button>
+  // In tTerm for Mac, what is new in the app; in a browser, in tTerm Web.
+  const product = props.inApp || local ? "mac" : "web";
+  const lists: Record<Sub, { title: string; items: ReactNode }> = {
+    language: { title: t("language.item"), items: languages },
+    help: {
+      title: t("account_menu.help"),
+      items: (
+        <>
+          <MenuLink icon={<Book size={15} />} text={t("account_menu.docs")}
+            href={docsPage(props.language, "")} onClick={shut} />
+          <MenuItem icon={<Mail size={15} />} text={t("account_menu.write_support")}
+            onClick={pick(props.onSupport)} />
+        </>
+      ),
+    },
+    about: {
+      title: t("account_menu.about"),
+      items: (
+        <>
+          <MenuLink icon={<Globe size={15} />} text={t("account_menu.site")}
+            href={sitePage(props.language)} onClick={shut} />
+          <MenuLink icon={<Plane size={15} />} text={t("account_menu.telegram")}
+            href={TELEGRAM} onClick={shut} />
+          <MenuLink icon={<Spark size={15} />} text={t("account_menu.whats_new")}
+            href={whatsNewPage(props.language, product)} onClick={shut} />
+        </>
+      ),
+    },
+  };
+  /** An item with a list: Language, Get help, About us. */
+  const subItem = (which: Sub, icon: ReactNode) => {
+    const beside = sub?.which === which && sub.where === "beside";
+    return (
+      <button type="button" role="menuitem" aria-haspopup="menu" aria-expanded={beside}
+        data-sub={which}
+        className={beside ? "menu-item lang-item sub-item open" : "menu-item lang-item sub-item"}
+        onMouseEnter={() => {
+          window.clearTimeout(switching.current);
+          if (!roomBeside()) {
+            // Another item's list goes as the mouse comes here.
+            if (sub && sub.which !== which) setSub(null);
+          } else if (sub?.where === "beside" && sub.which !== which) {
+            // Another list is out: this one comes if the mouse stays.
+            switching.current = window.setTimeout(() => showList(which, false), SWITCH_MS);
+          } else {
+            showList(which, false);
+          }
+        }}
+        onMouseLeave={() => {
+          window.clearTimeout(switching.current);
+          if (beside) leaveSoon();
+        }}
+        // A click from the keys (Enter, Space) has no detail: the focus goes
+        // into the list.
+        onClick={(event) => showList(which, event.detail === 0)}
+        onKeyDown={(event) => {
+          if (event.key !== "ArrowRight") return;
+          event.preventDefault();
+          showList(which, true);
+        }}>
+        {icon}
+        <span className="menu-text">{lists[which].title}</span>
+        <ChevronRight size={14} className="menu-more" />
+      </button>
+    );
+  };
+  const helpItems = (
+    <>
+      {subItem("language", <Languages size={15} />)}
+      {subItem("help", <Help size={15} />)}
+      {subItem("about", <Info size={15} />)}
+    </>
   );
 
   return (
@@ -754,18 +857,18 @@ function AccountPlace(props: {
       {/* After the button, so that Tab goes from it into the menu. */}
       {open && (
         <div className="menu up" role="menu"
-          aria-labelledby={list === "inside" ? undefined : "account-menu-name"}
-          aria-label={list === "inside" ? t("language.item") : undefined}
-          aria-describedby={list !== "inside" && (local || me.email) ? "account-menu-note" : undefined}>
-          {list === "inside" ? (
+          aria-labelledby={sub?.where === "inside" ? undefined : "account-menu-name"}
+          aria-label={sub?.where === "inside" ? lists[sub.which].title : undefined}
+          aria-describedby={sub?.where !== "inside" && (local || me.email) ? "account-menu-note" : undefined}>
+          {sub?.where === "inside" ? (
             <>
               <button type="button" role="menuitem" className="menu-item lang-back"
                 title={t("common.back")} onClick={hideList}>
                 <ChevronLeft size={16} />
-                <span className="menu-text">{t("language.item")}</span>
+                <span className="menu-text">{lists[sub.which].title}</span>
               </button>
               <div className="menu-line" role="separator" />
-              {languages}
+              <div className="sub-inside">{lists[sub.which].items}</div>
             </>
           ) : local ? (
             <>
@@ -776,7 +879,7 @@ function AccountPlace(props: {
               <div className="menu-line" role="separator" />
               <MenuItem icon={<Gear size={15} />} text={t("settings.title")}
                 current={props.page === "settings"} onClick={pick(props.onSettings)} />
-              {languageItem}
+              {helpItems}
               <div className="menu-line" role="separator" />
               <MenuItem icon={<SignIn size={15} />} text={t("common.sign_in")} accent
                 onClick={pick(props.onSignIn)} />
@@ -793,9 +896,9 @@ function AccountPlace(props: {
               <div className="menu-line" role="separator" />
               <MenuItem icon={<Gear size={15} />} text={t("settings.title")}
                 current={props.page === "settings"} onClick={pick(props.onSettings)} />
-              {languageItem}
               <MenuItem icon={<Person size={15} />} text={t("account.title")}
                 current={props.page === "account"} onClick={pick(props.onAccount)} />
+              {helpItems}
               {/* The offers, on their tint, at the bottom, right above Sign out
                   (0.1.19, the owner's choice): Move to cloud in the app,
                   Download tTerm for Mac in a Mac's browser. */}
@@ -816,11 +919,16 @@ function AccountPlace(props: {
           )}
         </div>
       )}
-      {open && list === "beside" && (
-        <div className="menu lang-list" role="menu" aria-label={t("language.item")}
-          onMouseEnter={() => window.clearTimeout(leave.current)}
+      {open && sub?.where === "beside" && (
+        <div ref={list}
+          className={sub.which === "language" ? "menu lang-list sub-list" : "menu lang-list sub-list help-list"}
+          role="menu" aria-label={lists[sub.which].title}
+          onMouseEnter={() => {
+            window.clearTimeout(leave.current);
+            window.clearTimeout(switching.current);
+          }}
           onMouseLeave={leaveSoon}>
-          {languages}
+          {lists[sub.which].items}
         </div>
       )}
     </div>

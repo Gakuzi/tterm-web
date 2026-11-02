@@ -131,8 +131,8 @@ sidebar.via_title = 通过 {mac}，在它开机时可用
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
 account_menu.free_plan = Free 方案
-account_menu.title = 设置、语言、账号、退出登录
-account_menu.title_local = 设置、语言、登录
+account_menu.title = 设置、账号、语言、帮助、关于我们、退出登录
+account_menu.title_local = 设置、语言、帮助、关于我们、登录
 account_menu.not_signed_in = 未登录
 account_menu.only_here = 仅这台电脑
 account_menu.offline = 离线，正在重试
@@ -147,8 +147,53 @@ account_menu.move_note = 这台 Mac 的服务器和密钥
 # (0.1.18): the app for a Mac. "tTerm for Mac" is the app's name.
 account_menu.download = 下载 tTerm Mac 版
 account_menu.download_note = 你 Mac 上的本地终端
-# The item after Settings, and the title of the list of languages.
+# Get help and About us (0.1.25): items of the menu that open a list of
+# their own beside it, as Language does. Get help: the documentation, and
+# a window to write to support. About us: the site, the channel in
+# Telegram, What's new in the documentation. "tterm.net" and "Telegram"
+# stay as they are.
+account_menu.help = 获取帮助
+account_menu.docs = 文档
+account_menu.write_support = 联系支持团队
+account_menu.about = 关于我们
+account_menu.site = tterm.net 网站
+account_menu.telegram = Telegram 频道
+account_menu.whats_new = 更新内容
+# An item of the menu, and the title of the list of languages.
 language.item = 语言
+
+# ------------------------------------------------------------ support: Get help › Write to support, a message to tTerm's support (SupportDialog.tsx)
+# The window's title, and under it where the answer comes: {email} is the
+# address of one's account.
+support.title = 联系支持团队
+support.answer_to = 我们会回复到 <b>{email}</b>。
+# In tTerm for Mac before signing in: the address is asked for below.
+support.answer_local = 我们会回复到你填写的邮箱。
+support.email = 你的邮箱
+# The field for the message, and what it shows while empty.
+support.text = 发生了什么
+support.placeholder = 描述一下出了什么问题
+# Ticked at first: one line about where tTerm runs goes with the message,
+# shown under it as it will go (support.tech: {details} is that line).
+support.attach = 附上技术信息
+support.tech = {details}。<b>不含命令、输出和笔记。</b>
+# The parts of that line, joined with " · ": tTerm Web 0.1.25 · Chrome 141,
+# macOS · Free plan · 3 machines. In tTerm for Mac before signing in:
+# tTerm for Mac 0.8.0 · macOS · not signed in. "tTerm Web" and "tTerm for
+# Mac" are the names, as elsewhere.
+support.tech_web = tTerm Web {version}
+support.tech_mac = tTerm Mac 版 {version}
+support.tech_local = 未登录
+support.docs = 常见问题的答案可能已经在<link>文档</link>里了。
+support.send = 发送
+support.sending = 正在发送…
+# What did not go: {address} is support's address, to write to by hand.
+support.too_many = 过去一小时内已经向支持团队发送了好几条消息。请稍后再试，或写信至 {address}。
+support.not_sent = 消息没能发出。请几分钟后再试，或写信至 {address}。
+# Sent: the answer comes to {email}, where a copy of the message is
+# already. Before signing in no copy goes: then support.answer_to.
+support.sent_title = 消息已发送
+support.sent = 我们会回复到 <b>{email}</b>。你的消息副本已经发到这个邮箱。
 
 # ------------------------------------------------------------ settings (Settings.tsx)
 # The page, and the item of the account's menu that opens it.

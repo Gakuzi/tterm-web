@@ -131,8 +131,8 @@ sidebar.via_title = A través de {mac}, mientras esté encendida
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
 account_menu.free_plan = Plan Free
-account_menu.title = Configuración, idioma, cuenta, cerrar sesión
-account_menu.title_local = Configuración, idioma, iniciar sesión
+account_menu.title = Configuración, cuenta, idioma, ayuda, sobre nosotros, cerrar sesión
+account_menu.title_local = Configuración, idioma, ayuda, sobre nosotros, iniciar sesión
 account_menu.not_signed_in = Sin iniciar sesión
 account_menu.only_here = Solo esta computadora
 account_menu.offline = Sin conexión, reintentando
@@ -147,8 +147,53 @@ account_menu.move_note = Servidores y claves de esta Mac
 # (0.1.18): the app for a Mac. "tTerm for Mac" is the app's name.
 account_menu.download = Descargar tTerm para Mac
 account_menu.download_note = Una terminal local en tu Mac
-# The item after Settings, and the title of the list of languages.
+# Get help and About us (0.1.25): items of the menu that open a list of
+# their own beside it, as Language does. Get help: the documentation, and
+# a window to write to support. About us: the site, the channel in
+# Telegram, What's new in the documentation. "tterm.net" and "Telegram"
+# stay as they are.
+account_menu.help = Obtener ayuda
+account_menu.docs = Documentación
+account_menu.write_support = Escribir a soporte
+account_menu.about = Sobre nosotros
+account_menu.site = Sitio web tterm.net
+account_menu.telegram = Canal de Telegram
+account_menu.whats_new = Novedades
+# An item of the menu, and the title of the list of languages.
 language.item = Idioma
+
+# ------------------------------------------------------------ support: Get help › Write to support, a message to tTerm's support (SupportDialog.tsx)
+# The window's title, and under it where the answer comes: {email} is the
+# address of one's account.
+support.title = Escribir a soporte
+support.answer_to = Te responderemos en <b>{email}</b>.
+# In tTerm for Mac before signing in: the address is asked for below.
+support.answer_local = Te responderemos en el correo que indiques.
+support.email = Tu correo
+# The field for the message, and what it shows while empty.
+support.text = Lo que pasó
+support.placeholder = Describe qué salió mal
+# Ticked at first: one line about where tTerm runs goes with the message,
+# shown under it as it will go (support.tech: {details} is that line).
+support.attach = Adjuntar datos técnicos
+support.tech = {details}. <b>Sin comandos, salida ni notas.</b>
+# The parts of that line, joined with " · ": tTerm Web 0.1.25 · Chrome 141,
+# macOS · Free plan · 3 machines. In tTerm for Mac before signing in:
+# tTerm for Mac 0.8.0 · macOS · not signed in. "tTerm Web" and "tTerm for
+# Mac" are the names, as elsewhere.
+support.tech_web = tTerm Web {version}
+support.tech_mac = tTerm para Mac {version}
+support.tech_local = sin iniciar sesión
+support.docs = La respuesta a una pregunta frecuente puede estar ya en la <link>documentación</link>.
+support.send = Enviar
+support.sending = Enviando…
+# What did not go: {address} is support's address, to write to by hand.
+support.too_many = En la última hora ya se enviaron varios mensajes a soporte. Inténtalo más tarde o escribe a {address}.
+support.not_sent = No se pudo enviar el mensaje. Inténtalo de nuevo en unos minutos o escribe a {address}.
+# Sent: the answer comes to {email}, where a copy of the message is
+# already. Before signing in no copy goes: then support.answer_to.
+support.sent_title = Mensaje enviado
+support.sent = Te responderemos en <b>{email}</b>. Allí ya tienes una copia de tu mensaje.
 
 # ------------------------------------------------------------ settings (Settings.tsx)
 # The page, and the item of the account's menu that opens it.

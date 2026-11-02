@@ -8535,3 +8535,129 @@ mark.log-hit {
     width: auto;
   }
 }
+
+/* Get help > Write to support (0.1.25), as on the canvas of 02.11 (version
+ * 100): what happened, the technical details as they will go, a word on
+ * the documentation; then Message sent. */
+.help-dialog {
+  max-width: 560px;
+}
+
+.help-dialog .dialog-note b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.help-form {
+  display: contents;
+}
+
+.help-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.help-body .field-label {
+  display: block;
+  margin: 0 0 -4px;
+  font: 600 13px var(--font-ui);
+  color: var(--dim);
+}
+
+.text-input.help-text {
+  height: 132px;
+  padding: 12px 14px;
+  resize: vertical;
+  font: 500 15px/1.5 var(--font-ui);
+}
+
+.help-tech {
+  margin: -4px 0 0 28px;
+  font: 500 12.5px/1.5 var(--font-ui);
+  color: var(--faint);
+}
+
+.help-tech b {
+  font-weight: 600;
+  color: var(--dim);
+}
+
+/* Not ticked: what would have gone, faded. */
+.help-tech.off {
+  opacity: 0.45;
+}
+
+.help-docs {
+  margin: 0;
+  font: 500 13px/1.5 var(--font-ui);
+  color: var(--dim);
+}
+
+.help-docs a {
+  color: var(--amber-ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.help-docs a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.help-error {
+  margin: 0;
+  font: 500 13px/1.5 var(--font-ui);
+  color: var(--red-ink);
+}
+
+.help-sent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.help-sent .ok {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--green-tint);
+  color: var(--green-ink);
+}
+
+.help-sent p {
+  margin: 0;
+  font: 500 14px/1.55 var(--font-ui);
+  color: var(--dim);
+}
+
+.help-sent p b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* A long address breaks rather than pushes the window wider on a phone. */
+.help-dialog .dialog-note,
+.help-sent p {
+  overflow-wrap: anywhere;
+}
+
+/* A link among the items (0.1.25: Documentation, the site, the channel,
+ * What's new) looks as they do: no link's color or line. */
+.menu-link,
+.menu-link:hover {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+/* Get help and About us beside the menu (0.1.25): a little wider than
+ * Language, so that the longest item, Polish Write to support, fits; a
+ * list that ends higher than the menu's bottom starts level with its item
+ * instead (Sidebar.tsx). */
+.menu.lang-list.help-list {
+  width: 250px;
+}

@@ -1,6 +1,7 @@
-"""The two emails tTerm Web sends, in the look approved on 17.10.2026: the
+"""The emails tTerm Web sends, in the look approved on 17.10.2026: the
 code for signing in, and the note about a sign-in from a browser tTerm Web
-did not know.
+did not know. From 0.1.25 also what someone wrote to support from the page,
+plain text for support, and the copy for them in the same look.
 
 Each goes as HTML and, beside it, the same words as plain text: for mail
 apps that show only that, and for the log on the laptop, where the code is
@@ -171,6 +172,64 @@ def sign_in_email(*, to: str, label: str, ip: str, at: dt.datetime,
           '</td></tr></table>'
           '</td></tr></table>')
     return Email(to=to, subject=subject, text=text,
+                 html=_page(subject=subject, preheader=lead, body=body,
+                            note=note, page_url=page_url, support=support))
+
+
+def support_letter(*, to: str, email: str, name: str, text: str,
+                   details: str, account: str, at: dt.datetime) -> Email:
+    """What someone wrote to support from the page (0.1.25): plain text,
+    for support's mailbox; an answer goes to them (Reply-To). `account` is
+    their account's id, empty before signing in; `details` what they chose
+    to attach, as the page showed it to them.
+
+    What tTerm knows comes first, the message under a line: whatever the
+    message says, it cannot pass for that. Before signing in the address
+    is only what was typed, and the subject and the first line say so."""
+    first = next((line.strip() for line in text.splitlines() if line.strip()), "")
+    if len(first) > 70:
+        first = first[:69].rstrip() + "…"
+    if account:
+        head = "Support"
+        facts = [f"From: {name} <{email}>, account {account}, signed in"]
+    else:
+        head = "Support (not signed in)"
+        facts = ["NOT SIGNED IN: the address was typed, nobody has checked "
+                 "that it is theirs.",
+                 f"From: {email}"]
+    who = name or email
+    subject = f"{head}: {who}: {first}" if first else f"{head}: {who}"
+    facts += [f"Technical details: {details or 'not attached'}",
+              f"Sent: {when(at)}",
+              f"Answer this email: the answer goes to {email}."]
+    body = "\n".join(facts) + "\n\n" + "-" * 60 + "\n\n" + text + "\n"
+    return Email(to=to, subject=subject, text=body, reply_to=email)
+
+
+def support_copy(*, to: str, text: str, page_url: str,
+                 support: str = SUPPORT) -> Email:
+    """The copy of a message to support, for the person who wrote it, at
+    their account's address (0.1.25)."""
+    subject = "Your message to tTerm support"
+    lead = f"We got it and will answer at {to}. This is what you wrote."
+    note = ("tTerm sends this copy to the address of the account the "
+            "message was written from.")
+    plain = ("We got your message\n\n"
+             f"{lead}\n\n"
+             + "".join(f"> {line}\n" for line in text.splitlines())
+             + f"\n{note}\n\n{_footer_text(page_url, support)}\n")
+    body = (
+        _title("We got your message")
+        + _lead(escape(lead))
+        + _gap(20)
+        + '<table role="presentation" width="100%" cellpadding="0" '
+          f'cellspacing="0" border="0" style="'
+          f'background:{GROUND};border-radius:12px;"><tr>'
+          f'<td style="padding:16px 20px;font-family:{FONT};font-size:14px;'
+          f'line-height:1.6;color:{INK};white-space:pre-wrap;'
+          f'word-break:break-word;">{escape(text)}</td>'
+          '</tr></table>')
+    return Email(to=to, subject=subject, text=plain,
                  html=_page(subject=subject, preheader=lead, body=body,
                             note=note, page_url=page_url, support=support))
 

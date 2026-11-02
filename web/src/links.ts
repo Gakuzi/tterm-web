@@ -24,3 +24,18 @@ export function docsPage(lang: Lang, path: string): string {
 export function whatsNew(lang: Lang, version: string): string {
   return docsPage(lang, `whats-new/web/#${version.replace(/[^0-9]/g, "")}`);
 }
+
+/** A page of the site, tterm.net: `path` as "download/". */
+export function sitePage(lang: Lang, path = ""): string {
+  const folder = folderOf(lang);
+  return `https://tterm.net/${folder ? `${folder}/` : ""}${path}`;
+}
+
+/** tTerm's channel in Telegram, @tTermBlog. */
+export const TELEGRAM = "https://t.me/tTermBlog";
+
+/** What's new in the documentation (0.1.25, About us in the account's
+ * menu): tTerm Web's page in a browser, tTerm for Mac's in the app. */
+export function whatsNewPage(lang: Lang, product: "web" | "mac"): string {
+  return docsPage(lang, `whats-new/${product}/`);
+}

@@ -526,3 +526,45 @@ export const Order = (p: Props) => (
     <path d="M16 19V5M13 8l3-3 3 3" />
   </Stroke>
 );
+
+/** A question in a circle: Get help in the account's menu (0.1.25). */
+export const Help = (p: Props) => (
+  <Stroke {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.6 9.3a2.5 2.5 0 0 1 4.8 1c0 1.7-2.4 2.2-2.4 3.7" />
+    <path d="M12 17.2h.01" />
+  </Stroke>
+);
+
+/** An i in a circle: About us (0.1.25). */
+export const Info = (p: Props) => (
+  <Stroke {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 11v5.5" />
+    <path d="M12 7.8h.01" />
+  </Stroke>
+);
+
+/** An open book: the documentation (0.1.25). */
+export const Book = (p: Props) => (
+  <Stroke {...p}>
+    <path d="M3 5h6a3 3 0 0 1 3 3v12a2.5 2.5 0 0 0-2.5-2.5H3z" />
+    <path d="M21 5h-6a3 3 0 0 0-3 3v12a2.5 2.5 0 0 1 2.5-2.5H21z" />
+  </Stroke>
+);
+
+/** An envelope: Write to support (0.1.25). */
+export const Mail = (p: Props) => (
+  <Stroke {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M3.5 7l8.5 6 8.5-6" />
+  </Stroke>
+);
+
+/** A paper plane: the channel in Telegram (0.1.25). */
+export const Plane = (p: Props) => (
+  <Stroke {...p}>
+    <path d="M21 4L3 11l6.5 2.5L12 20z" />
+    <path d="M9.5 13.5L21 4" />
+  </Stroke>
+);

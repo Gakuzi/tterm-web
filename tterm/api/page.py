@@ -27,7 +27,7 @@ from pydantic import BaseModel, Field
 
 from .. import __version__
 from ..core import (accounts, auth, letters, logs, machines, notes,
-                    photos, projects, reach, search, ssh, vault)
+                    photos, projects, reach, search, ssh, support, vault)
 from ..core.mail import Mailer
 from ..core.terminals import NotAllowed, NotOpen, Terminal, Terminals
 from .connect import client_ip
@@ -144,6 +144,14 @@ class TerminalRequest(BaseModel):
     #: ended starts where it was. One the shell cannot be told is ignored
     #: (shell.start_in); the limit is only one for the size of the request.
     cwd: str = Field("", max_length=65536)
+
+
+class SupportBody(BaseModel):
+    """A message to support (0.1.25). The email only before signing in,
+    from tTerm for Mac; signed in, the account's address is used."""
+    text: str = Field(..., max_length=20000)
+    details: str | None = Field(None, max_length=4000)
+    email: str | None = Field(None, max_length=400)
 
 
 class CompleteRequest(BaseModel):
@@ -292,8 +300,9 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     the addresses the sign-in screens link to: the Terms of Service, the
     Privacy Policy, and support's email."""
     legal = dict(legal or {})
-    # Support's address, at the bottom of the emails too.
-    support = legal.get("support") or letters.SUPPORT
+    # Support's address, at the bottom of the emails too, and where the
+    # page's messages to support go (0.1.25).
+    support_address = legal.get("support") or letters.SUPPORT
     # The cookies: on https with the __Host- prefix, which a browser takes
     # only from this very host, over https, for the whole site. On the
     # laptop's plain http that prefix is not accepted, so they go without.
@@ -395,7 +404,7 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         try:
             await auth.ask_code(pool, secret, mailer, email=email,
                                 browser=browser, ip=client_ip(request),
-                                page_url=page_url, support=support)
+                                page_url=page_url, support=support_address)
         except auth.Refused as exc:
             return refused(exc)
         response = _json({"sent": True, "email": email,
@@ -419,7 +428,7 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
                 pool, secret, mailer, email=email, code=code, browser=browser,
                 ip=client_ip(request),
                 label=auth.device_label(request.headers.get("user-agent", "")),
-                page_url=page_url, support=support)
+                page_url=page_url, support=support_address)
         except auth.Refused as exc:
             return refused(exc)
         if isinstance(signed, auth.SignUp):
@@ -625,7 +634,7 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         try:
             signed = await auth.exchange_app(
                 pool, mailer, code=body.code, verifier=body.verifier,
-                ip=client_ip(request), page_url=page_url, support=support)
+                ip=client_ip(request), page_url=page_url, support=support_address)
         except auth.Refused as exc:
             return refused(exc)
         return _json({
@@ -907,6 +916,29 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
             terminals.retag(machine_id, body.projectId, moved["code"],
                             moved["name"])
         return _json(moved)
+
+    @app.post("/api/support")
+    async def write_to_support(body: SupportBody, request: Request) -> Response:
+        """Get help > Write to support (0.1.25): the message goes to
+        support's address by email, answered to the person. Signed in, to
+        the account's address, with a copy there; before signing in (tTerm
+        for Mac passes it on) to the address typed, without a copy, and
+        with tighter limits. See core/support.py. A session that has ended
+        asks to sign in again, as everywhere: its message is not one from
+        someone who never signed in."""
+        token = cookie(request, auth.SESSION_COOKIE)
+        session = await auth.session(pool, token)
+        if token and session is None:
+            raise SignedOut()
+        try:
+            result = await support.write(
+                pool, mailer, person=session.person if session else None,
+                email=body.email, text=body.text, details=body.details,
+                ip=client_ip(request), support=support_address,
+                page_url=page_url)
+        except support.Refused as exc:
+            return _json({"error": str(exc)}, exc.status)
+        return _json(result)
 
     @app.post("/api/terminals")
     async def open_terminal(request: TerminalRequest,

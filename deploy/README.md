@@ -41,7 +41,8 @@ certificate for both names; sets up nginx; keeps the system's logs 30 days;
 and opens the firewall to SSH, 80 and 443 only. Running it again is safe.
 
 Then open `https://app.example.com` and sign in. Until there is an email
-key (below), the codes go to the core's log:
+key (below), the codes go to the core's log, and so does what people
+write to support:
 
 ```bash
 journalctl -u tterm-web -n 20 --no-pager
@@ -59,7 +60,11 @@ sh /opt/tterm-web/deploy/brevo-key.sh
 ```
 
 It asks for the key without showing it, puts it in the settings and
-restarts the core. The sender is `TTERM_MAIL_FROM` in the settings.
+restarts the core. The sender is `TTERM_MAIL_FROM` in the settings. Write
+to support (0.1.25) sends through the same key to `TTERM_SUPPORT_EMAIL`
+(support@tterm.net unless set), with the person's address to answer to:
+that address must take mail (on tterm.net, Cloudflare's Email Routing
+forwards it).
 
 ## Updating
 

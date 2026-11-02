@@ -131,8 +131,8 @@ sidebar.via_title = {mac} 경유, 켜져 있는 동안 열려요
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
 account_menu.free_plan = Free 요금제
-account_menu.title = 설정, 언어, 계정, 로그아웃
-account_menu.title_local = 설정, 언어, 로그인
+account_menu.title = 설정, 계정, 언어, 도움말, 소개, 로그아웃
+account_menu.title_local = 설정, 언어, 도움말, 소개, 로그인
 account_menu.not_signed_in = 로그인하지 않음
 account_menu.only_here = 이 컴퓨터에서만 사용
 account_menu.offline = 오프라인, 다시 시도하는 중
@@ -147,8 +147,53 @@ account_menu.move_note = 이 Mac의 서버와 키
 # (0.1.18): the app for a Mac. "tTerm for Mac" is the app's name.
 account_menu.download = Mac용 tTerm 다운로드
 account_menu.download_note = 내 Mac의 로컬 터미널
-# The item after Settings, and the title of the list of languages.
+# Get help and About us (0.1.25): items of the menu that open a list of
+# their own beside it, as Language does. Get help: the documentation, and
+# a window to write to support. About us: the site, the channel in
+# Telegram, What's new in the documentation. "tterm.net" and "Telegram"
+# stay as they are.
+account_menu.help = 도움 받기
+account_menu.docs = 문서
+account_menu.write_support = 지원팀에 문의하기
+account_menu.about = tTerm 소개
+account_menu.site = tterm.net 사이트
+account_menu.telegram = Telegram 채널
+account_menu.whats_new = 새 소식
+# An item of the menu, and the title of the list of languages.
 language.item = 언어
+
+# ------------------------------------------------------------ support: Get help › Write to support, a message to tTerm's support (SupportDialog.tsx)
+# The window's title, and under it where the answer comes: {email} is the
+# address of one's account.
+support.title = 지원팀에 문의하기
+support.answer_to = <b>{email}</b> 주소로 답장해 드릴게요.
+# In tTerm for Mac before signing in: the address is asked for below.
+support.answer_local = 입력하신 이메일 주소로 답장해 드릴게요.
+support.email = 이메일 주소
+# The field for the message, and what it shows while empty.
+support.text = 문제 내용
+support.placeholder = 어떤 문제가 있었는지 적어 주세요
+# Ticked at first: one line about where tTerm runs goes with the message,
+# shown under it as it will go (support.tech: {details} is that line).
+support.attach = 기술 정보 첨부
+support.tech = {details}. <b>명령, 출력, 노트는 포함하지 않아요.</b>
+# The parts of that line, joined with " · ": tTerm Web 0.1.25 · Chrome 141,
+# macOS · Free plan · 3 machines. In tTerm for Mac before signing in:
+# tTerm for Mac 0.8.0 · macOS · not signed in. "tTerm Web" and "tTerm for
+# Mac" are the names, as elsewhere.
+support.tech_web = tTerm Web {version}
+support.tech_mac = Mac용 tTerm {version}
+support.tech_local = 로그인하지 않음
+support.docs = 자주 묻는 질문의 답은 <link>문서</link>에 이미 있을 수 있어요.
+support.send = 보내기
+support.sending = 보내는 중…
+# What did not go: {address} is support's address, to write to by hand.
+support.too_many = 지난 1시간 동안 이미 여러 메시지를 지원팀에 보냈어요. 나중에 다시 시도하거나 {address}으로 메일을 보내 주세요.
+support.not_sent = 메시지를 보내지 못했어요. 몇 분 뒤에 다시 시도하거나 {address}으로 메일을 보내 주세요.
+# Sent: the answer comes to {email}, where a copy of the message is
+# already. Before signing in no copy goes: then support.answer_to.
+support.sent_title = 메시지를 보냈어요
+support.sent = <b>{email}</b> 주소로 답장해 드릴게요. 보내신 메시지의 사본도 이미 그 주소로 보냈어요.
 
 # ------------------------------------------------------------ settings (Settings.tsx)
 # The page, and the item of the account's menu that opens it.

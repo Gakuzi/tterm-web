@@ -965,6 +965,18 @@ export async function installStatus(id: string): Promise<InstallStatus> {
   return (await check(response)).json();
 }
 
+/** A message to support (0.1.25): `details` the line shown under Attach
+ * technical details, null when not ticked; `email` only in the app before
+ * signing in. Where the answer goes, and whether a copy went there. */
+export async function sendSupport(message: {
+  text: string;
+  details: string | null;
+  email?: string;
+}): Promise<{ sent: boolean; email: string; copy: boolean }> {
+  const response = await fetch("/api/support", change("POST", message));
+  return (await check(response)).json();
+}
+
 /** `cwd` (0.1.24): the folder to start in, the one an ended terminal was
  * in; the core starts there if it can, and at home otherwise. */
 export async function openTerminal(machineId: string, cols: number,

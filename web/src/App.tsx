@@ -34,6 +34,7 @@ import { VaultDialogHost } from "./VaultDialogs";
 import { vaultStore } from "./vault/store";
 import { FolderDialog } from "./Menus";
 import { NeedAccount, type Need } from "./NeedAccount";
+import { forgetSupportDraft, SupportDialog } from "./SupportDialog";
 import { draftsOf, forgetDrafts, markDeleted } from "./drafts";
 import { NoteView, primeNote, type SaveState, type Typed } from "./NoteView";
 import { summary, titled, toMarkdown } from "./noteText";
@@ -328,6 +329,8 @@ export function App() {
   /** New project or Add machine before signing in (0.1.5): what signing in
    * brings, in place of their own windows. */
   const [needAccount, setNeedAccount] = useState<Need | null>(null);
+  /** Get help > Write to support, open (0.1.25). */
+  const [supporting, setSupporting] = useState(false);
   const [moving, setMoving] = useState<Machine | null>(null);
   const [deleting, setDeleting] = useState<Project | null>(null);
   /** The terminal being named, and where. */
@@ -457,6 +460,7 @@ export function App() {
     setRemoved(null);
     setPalette(false);
     setPicking(false);
+    setSupporting(false);
   }, []);
 
   useEffect(() => onSignedOut(() =>
@@ -949,8 +953,10 @@ export function App() {
    * (0.1.4): this browser forgets the person. */
   const signOutHere = useCallback(() => signOut()
     .then(() => {
-      // The browser forgets the person: their unsaved notes too.
+      // The browser forgets the person: their unsaved notes too, and what
+      // they began to write to support.
       forgetDrafts();
+      forgetSupportDraft();
       endSession(say("app.signed_out"));
     })
     .catch((error) => {
@@ -1020,14 +1026,14 @@ export function App() {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !pinned && !adding && !naming &&
         !projectWindow && !moving && !deleting && !renaming && !movingNote &&
-        !needAccount) {
+        !needAccount && !supporting) {
         setOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [pinned, adding, naming, projectWindow, moving, deleting, renaming,
-    movingNote, needAccount]);
+    movingNote, needAccount, supporting]);
 
   // The palette: Cmd+K on a Mac, Ctrl+Shift+K elsewhere, before the
   // terminal hears it.
@@ -1757,6 +1763,7 @@ export function App() {
               onSignedOut={(note) => {
                 // This device forgotten: nothing of the person stays here.
                 forgetDrafts();
+                forgetSupportDraft();
                 endSession(note);
               }} onClose={closePage}
               notify={notYet} projects={projects} />
@@ -1857,6 +1864,7 @@ export function App() {
           onLanguage={chooseLanguage}
           inApp={!!state.app && !local}
           onMove={() => openPage("move")}
+          onSupport={() => setSupporting(true)}
           onHome={away(() => navigate("/"))}
           notYet={notYet}
         />
@@ -1899,6 +1907,13 @@ export function App() {
       )}
 
       {linkWindow}
+
+      {supporting && (
+        <SupportDialog me={state.me} local={local} inApp={inAppNow}
+          version={state.version} appVersion={updates.update?.version ?? null}
+          machines={state.projects.reduce((n, p) => n + p.machines.length, 0)}
+          onClose={() => setSupporting(false)} />
+      )}
 
       {needAccount && (
         <NeedAccount key={needAccount} need={needAccount}
