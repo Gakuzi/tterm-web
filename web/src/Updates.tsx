@@ -20,6 +20,7 @@ import {
 } from "./api";
 import { useT, type Translate } from "./i18n";
 import { Check, Close, Restart, Warning } from "./icons";
+import { whatsNew } from "./links";
 import { hereWord, onMac } from "./local";
 import { ago, clock, onDay } from "./time";
 
@@ -133,9 +134,9 @@ export function UpdateCard() {
           onClick={restart}>
           {installing ? t("updates.restarting") : t("updates.restart")}
         </button>
-        {update.notes && (
-          <a href={update.notes} target="_blank" rel="noreferrer">{t("updates.whats_new")}</a>
-        )}
+        <a href={whatsNew(t.lang, version, "mac")} target="_blank" rel="noreferrer">
+          {t("updates.whats_new")}
+        </a>
       </div>
     </div>
   );
@@ -166,7 +167,9 @@ export function UpdatedToast() {
     <div className="update-toast" role="status">
       <span className="update-toast-mark" aria-hidden="true"><Check size={13} /></span>
       <strong>{t("updates.updated", { version: updated.to })}</strong>
-      <a href={updated.notes} target="_blank" rel="noreferrer">{t("updates.whats_new")}</a>
+      <a href={whatsNew(t.lang, updated.to, "mac")} target="_blank" rel="noreferrer">
+        {t("updates.whats_new")}
+      </a>
       <button type="button" className="icon-button tiny" aria-label={t("common.close")}
         onClick={done}>
         <Close size={13} />
@@ -303,8 +306,9 @@ function UpdateLine(props: {
                 ? t("updates.you_have_downloaded", { version: update.version,
                   day: onDay(update.readyAt, t), time: clock(update.readyAt) })
                 : t("updates.you_have", { version: update.version })}
-              {update.notes && (
-                <> <a href={update.notes} target="_blank" rel="noreferrer">{t("updates.whats_new")}</a></>
+              {update.next && (
+                <> <a href={whatsNew(t.lang, update.next, "mac")} target="_blank"
+                  rel="noreferrer">{t("updates.whats_new")}</a></>
               )}
             </span>
           </span>

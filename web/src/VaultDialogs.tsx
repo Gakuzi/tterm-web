@@ -1,42 +1,56 @@
-// The vault's windows (0.1.17), as on the canvas "Макеты tTerm Web" (the
-// rows of 29.10 and the clickable row of 01.11, Vault.dc):
+// The vault's windows (0.1.17, as on the canvas "Макеты tTerm Web", the rows
+// of 29.10 and 01.11, Vault.dc; the vault password from 0.1.26, the rows of
+// 02.11, VaultPass.dc, and vault-password-texts.md):
 //
-//   vault-new    Save your key to your vault: what the vault is, and Make
-//                my vault with Touch ID (in the app, and in a browser for a
-//                person without the Mac);
-//   recovery     Your recovery code, shown once, with Copy and Save as a
-//                file;
+//   password     Make up a vault password (a new vault: the Mac's Move to
+//                cloud and the strip after ssh, a browser's Add a key from
+//                a file), Set a vault password (a vault made before, with
+//                its recovery code) and Change the vault password: the
+//                password twice, Show/Hide, the 12-character rule, whether
+//                the two match; in a browser, where VK comes from for a set
+//                or a change (this browser's passkey, else the current
+//                password, else the recovery code);
+//   keep         Your keys are open in this browser: keep them here with
+//                Touch ID, or Only this time (after the password, the Mac's
+//                approval or a new vault in this browser);
 //   web-approve  Open your keys on this browser: the Mac asked, with the six
-//                digits both show, or the recovery code; then, where it can,
-//                whether this browser keeps a passkey lock;
+//                digits both show; Type the password instead (a vault made
+//                before 0.1.26 without a password: its recovery code here);
+//   forgot       Forgot your vault password?: where a new one can be set;
+//   app-password in the app, a vault this Mac has no lock of: opened here
+//                once with its password (app-code: with the recovery code,
+//                while the vault has no password);
 //   mac-approve  in the app, a new browser wants to open the keys: the same
 //                six digits, Allow with Touch ID or It's not me.
 //
 // One window at a time, opened from anywhere (vaultUi); App puts the host
-// on the page once.
+// on the page once. The field a closed vault is opened with in a browser
+// (PasswordOpen: the server's card and Settings › Keys) is here too.
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import {
+  useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject,
+} from "react";
 import { CoreError, type Vault } from "./api";
-import { PRESSED_MS, toClipboard, useBriefly } from "./briefly";
-import { list, useT, type Translate } from "./i18n";
-import { Check, Computer, Copy, Download, Fingerprint, Globe, Key, Lock } from "./icons";
+import { gap, list, useT, type Translate } from "./i18n";
+import { Check, Computer, Fingerprint, Globe, Key, Lock, Unlock } from "./icons";
 import { agoLong } from "./time";
+import { saidAt } from "./vault/answers";
 import { KeyFileError, type KeyFileProblem } from "./vault/keyfile";
 import { cancelled } from "./vault/passkey";
+import { passwordRule } from "./vault/password";
 import { VaultError, vaultStore, useVault } from "./vault/store";
-import { passkeysHere, unlockOf, type Unlock } from "./vault/support";
+import { unlockOf, type Unlock as UnlockKind } from "./vault/support";
 import { isRecoveryCode } from "./vault/crypto";
 
 // ------------------------------------------------------------- the words
 
 /** "Open with Touch ID", "…with Windows Hello", "…with a passkey". */
-const UNLOCK_WORDS: Record<"open" | "make" | "keep", Record<Unlock, string>> = {
+const UNLOCK_WORDS: Record<"open" | "keep", Record<UnlockKind, string>> = {
   open: { touch: "vault.open_touch", hello: "vault.open_hello", passkey: "vault.open_passkey" },
-  make: { touch: "vault_new.make_touch", hello: "vault_new.make_hello", passkey: "vault_new.make_passkey" },
   keep: { touch: "vault_open.keep_touch", hello: "vault_open.keep_hello", passkey: "vault_open.keep_passkey" },
 };
 
-export function unlockWord(t: Translate, which: "open" | "make" | "keep"): string {
+export function unlockWord(t: Translate, which: "open" | "keep"): string {
   return t(UNLOCK_WORDS[which][unlockOf()]);
 }
 
@@ -56,12 +70,22 @@ const KEYFILE_PROBLEMS: Record<KeyFileProblem, string> = {
 };
 
 /** What went wrong, in words of the page: null when the person cancelled
- * the system's own prompt (nothing to say then). */
-export function problemText(t: Translate, error: unknown): string | null {
+ * the system's own prompt (nothing to say then). A refusal of the core
+ * (or the engine) the store did not put in the page's words is said as it
+ * came, except where `coreSentences` is false: the vault password's
+ * windows and fields never show one (the security review's L5), only the
+ * page's own words. */
+export function problemText(t: Translate, error: unknown, coreSentences = true): string | null {
   if (cancelled(error)) return null;
-  if (error instanceof VaultError) return t(error.key);
+  if (error instanceof VaultError) {
+    const said = saidAt(error.key, error.values, error.at, t);
+    const first = t(said.key, said.values);
+    if (!error.then) return first;
+    const then = t(error.then.key, error.then.values);
+    return `${first}${gap(first, then, t.lang)}${then}`;
+  }
   if (error instanceof KeyFileError) return t(KEYFILE_PROBLEMS[error.problem]);
-  if (error instanceof CoreError) return error.message;
+  if (error instanceof CoreError) return coreSentences ? error.message : t("vault_problem.something");
   if (error instanceof DOMException && error.name === "InvalidStateError") {
     return t("vault_problem.passkey_exists");
   }
@@ -98,21 +122,35 @@ export function macLockHere(vault: Vault | null): boolean {
   return !!vault?.locks.some((l) => l.kind === "app" && l.thisDevice);
 }
 
+/** Whether a set or a change could not get VK through this browser's
+ * passkey (not a cancel): the window asks for the current password, or
+ * the code, instead. */
+function passkeyFailed(error: unknown): boolean {
+  if (error instanceof VaultError) {
+    return /^vault_problem\.(no_passkey|no_prf|lock_broken)/.test(error.key);
+  }
+  return error instanceof DOMException && !cancelled(error);
+}
+
 // --------------------------------------------------- one window at a time
+
+/** What the password window is for. */
+export type PasswordUse = "new-app" | "new-web" | "set" | "change";
 
 type Asked =
   | { kind: "open"; start: "mac" | "code" | null }
-  | { kind: "new"; where: "app" | "web"; keyName: string; server: string | null;
-      done: (made: boolean) => void }
-  | { kind: "recovery"; code: string; fresh: boolean; done: () => void }
+  | { kind: "password"; use: PasswordUse; keyName: string | null; done: (ok: boolean) => void }
+  | { kind: "forgot" }
   | { kind: "passphrase"; keyName: string; signIn: string | null;
       done: (passphrase: string | null) => void }
   | { kind: "app-code"; lost: boolean; done: (opened: boolean) => void }
-  | { kind: "new-recovery" };
+  | { kind: "app-password"; lost: boolean; done: (opened: boolean) => void };
 
 class Windows {
   private asked: Asked | null = null;
   private listeners = new Set<() => void>();
+  private wanted = 0;
+  private wantListeners = new Set<() => void>();
 
   get = (): Asked | null => this.asked;
 
@@ -128,19 +166,29 @@ class Windows {
     for (const listener of [...this.listeners]) listener();
   }
 
-  /** Open your keys on this browser: the Mac asked at once, or the code. */
+  /** Open your keys on this browser: the Mac asked at once, or (a vault
+   * with no password yet) the code. */
   openVault(start: "mac" | "code" | null): void {
     this.show({ kind: "open", start });
   }
 
-  /** Save your key to your vault, then its recovery code once: whether the
-   * vault was made. */
-  newVault(where: "app" | "web", keyName: string, server: string | null): Promise<boolean> {
-    return new Promise((resolve) => this.show({ kind: "new", where, keyName, server, done: resolve }));
+  /** Make up a vault password, for a new vault: in the app (`keyName` the
+   * key the strip saves; none for Move to cloud, which moves this Mac's
+   * keys), or in this browser (the key from a file). Whether the vault was
+   * made; in a browser the Keep question comes after it. */
+  newVault(where: "app" | "web", keyName: string | null): Promise<boolean> {
+    return new Promise((resolve) => this.show({ kind: "password", use: where === "app" ? "new-app" : "new-web",
+      keyName, done: resolve }));
   }
 
-  recovery(code: string, fresh: boolean): Promise<void> {
-    return new Promise((resolve) => this.show({ kind: "recovery", code, fresh, done: resolve }));
+  /** Set a vault password (a vault made before 0.1.26) or change it:
+   * whether it was. */
+  password(use: "set" | "change"): Promise<boolean> {
+    return new Promise((resolve) => this.show({ kind: "password", use, keyName: null, done: resolve }));
+  }
+
+  forgot(): void {
+    this.show({ kind: "forgot" });
   }
 
   /** A key's passphrase, in the app: for the vault (the key goes there),
@@ -151,32 +199,50 @@ class Windows {
   }
 
   /** In the app, a vault this Mac has no lock of (made in a browser or on
-   * another Mac; `lost`: this Mac's lock no longer opens it): its recovery
-   * code, once, and the engine opens it and gives this Mac its own lock.
-   * Whether it opened; false when the person stopped. */
+   * another Mac; `lost`: this Mac's lock no longer opens it), with no
+   * password yet: its recovery code, once, and the engine opens it and
+   * gives this Mac its own lock. Whether it opened; false when the person
+   * stopped. */
   appCode(lost = false): Promise<boolean> {
     return new Promise((resolve) => this.show({ kind: "app-code", lost, done: resolve }));
   }
 
-  newRecovery(): void {
-    this.show({ kind: "new-recovery" });
+  /** The same, for a vault with a password (0.1.26): the password, once. */
+  appPassword(lost = false): Promise<boolean> {
+    return new Promise((resolve) => this.show({ kind: "app-password", lost, done: resolve }));
   }
 
   close(): void {
     this.show(null);
   }
+
+  /** Back to the field a closed vault is opened with (Type the password
+   * instead): it takes the keys. */
+  wantPassword(): void {
+    this.wanted += 1;
+    for (const listener of [...this.wantListeners]) listener();
+  }
+
+  wantedNow = (): number => this.wanted;
+
+  subscribeWanted = (listener: () => void): (() => void) => {
+    this.wantListeners.add(listener);
+    return () => {
+      this.wantListeners.delete(listener);
+    };
+  };
 }
 
 export const vaultUi = new Windows();
 
 /** In tTerm for Mac: the vault opened on this Mac. With this Mac's own lock,
  * Touch ID or the Mac's password; a vault this Mac has no lock of opens
- * once with its recovery code (the engine then gives this Mac its lock),
- * and so does one whose lock here the engine cannot open (409: its keychain
- * item gone, or the lock taken off in a browser). False when the person
- * stopped; anything else the engine refuses (403: Touch ID did not go
- * through) is thrown, for the caller to show as it shows the engine's
- * other answers. */
+ * once with its password (with its recovery code while it has none; the
+ * engine then gives this Mac its lock), and so does one whose lock here the
+ * engine cannot open (409: its keychain item gone, or the lock taken off in
+ * a browser). False when the person stopped; anything else the engine
+ * refuses (403: Touch ID did not go through) is thrown, for the caller to
+ * show as it shows the engine's other answers. */
 export async function openOnMac(): Promise<boolean> {
   await vaultStore.refreshApp();
   let state = vaultStore.get();
@@ -185,12 +251,13 @@ export async function openOnMac(): Promise<boolean> {
     await vaultStore.reload();
     state = vaultStore.get();
   }
-  if (!macLockHere(state.vault)) return vaultUi.appCode(false);
+  const once = (lost: boolean) => (state.vault?.password ? vaultUi.appPassword(lost) : vaultUi.appCode(lost));
+  if (!macLockHere(state.vault)) return once(false);
   try {
     await vaultStore.appOpen();
     return true;
   } catch (error) {
-    if (error instanceof CoreError && error.status === 409 && state.vault) return vaultUi.appCode(true);
+    if (error instanceof CoreError && error.status === 409 && state.vault) return once(true);
     throw error;
   }
 }
@@ -215,23 +282,32 @@ function useWindow(onClose: () => void) {
   return box;
 }
 
-/** The host: whichever window is asked for, and the Mac's request. */
+/** The field takes the keys when the person comes back to it from a window
+ * (Type the password instead, Got it). */
+function usePasswordWanted(field: RefObject<HTMLInputElement | null>): void {
+  const wanted = useSyncExternalStore(vaultUi.subscribeWanted, vaultUi.wantedNow, vaultUi.wantedNow);
+  const seen = useRef(wanted);
+  useEffect(() => {
+    if (wanted === seen.current) return;
+    seen.current = wanted;
+    field.current?.focus();
+  }, [wanted, field]);
+}
+
+/** The host: whichever window is asked for, the Mac's request, and the Keep
+ * question once nothing else is up. */
 export function VaultDialogHost() {
   const asked = useSyncExternalStore(vaultUi.subscribe, vaultUi.get, vaultUi.get);
   const v = useVault();
   if (v.request) return <MacApprove />;
-  if (!asked) return null;
+  if (!asked) return v.offerPasskey && !v.app ? <KeepHere /> : null;
   switch (asked.kind) {
     case "open":
       return <OpenVault key="open" start={asked.start} />;
-    case "new":
-      return <VaultNew key="new" asked={asked} />;
-    case "recovery":
-      return <RecoveryCode key={asked.code} code={asked.code} fresh={asked.fresh}
-        onDone={() => {
-          vaultUi.close();
-          asked.done();
-        }} />;
+    case "password":
+      return <PasswordWindow key={`password-${asked.use}`} asked={asked} />;
+    case "forgot":
+      return <Forgot key="forgot" />;
     case "passphrase":
       return <Passphrase key="pass" keyName={asked.keyName} signIn={asked.signIn} onDone={(p) => {
         vaultUi.close();
@@ -242,157 +318,312 @@ export function VaultDialogHost() {
         vaultUi.close();
         asked.done(opened);
       }} />;
-    case "new-recovery":
-      return <NewRecovery key="new-recovery" />;
+    case "app-password":
+      return <AppPassword key="app-password" lost={asked.lost} onDone={(opened) => {
+        vaultUi.close();
+        asked.done(opened);
+      }} />;
   }
 }
 
-function Tile(props: { children: ReactNode }) {
-  return <span className="vault-tile" aria-hidden="true">{props.children}</span>;
+function Tile(props: { children: ReactNode; green?: boolean }) {
+  return <span className={props.green ? "vault-tile green" : "vault-tile"} aria-hidden="true">{props.children}</span>;
 }
 
-// ------------------------------------------------- Save your key to your vault
+const code = (inner: ReactNode) => <code className="vault-code-inline">{inner}</code>;
 
-function VaultNew(props: { asked: Extract<Asked, { kind: "new" }> }) {
+/** Show or Hide, next to a password field. */
+function ShowHide(props: { shown: boolean; onToggle: () => void; disabled?: boolean }) {
+  const t = useT();
+  return (
+    <button type="button" className="button-plain vault-show" disabled={props.disabled}
+      onClick={props.onToggle}>
+      {props.shown ? t("vault_password.hide") : t("vault_password.show")}
+    </button>
+  );
+}
+
+// ------------------------------------- Make up, set or change the password
+
+function PasswordWindow(props: { asked: Extract<Asked, { kind: "password" }> }) {
   const { asked } = props;
   const t = useT();
   const v = useVault();
+  const ids = useId();
+  const [first, setFirst] = useState("");
+  const [again, setAgain] = useState("");
+  const [current, setCurrent] = useState("");
+  const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [noPasskey, setNoPasskey] = useState(false);
+  const isNew = asked.use === "new-app" || asked.use === "new-web";
   const cancel = () => {
     if (busy) return;
     vaultUi.close();
     asked.done(false);
   };
   const box = useWindow(cancel);
-  const app = asked.where === "app";
-  const passkey = passkeysHere(v.support);
-  const code = (inner: ReactNode) => <code className="vault-code-inline">{inner}</code>;
+  const rule = passwordRule(first, again);
+  // In a browser, where VK's raw bytes come from for a set or a change: the
+  // engine has them in the app, and a new vault makes them.
+  const from: "passkey" | "password" | "code" | null = isNew || v.app ? null
+    : v.hereLock && !noPasskey ? "passkey" : v.vault?.password ? "password" : "code";
+  const fromReady = from === "password" ? current.length > 0 : from === "code" ? isRecoveryCode(current) : true;
+  const ready = rule.ok && fromReady && !busy;
 
-  const make = async () => {
+  const go = async () => {
+    if (!ready) return;
     setBusy(true);
     setProblem(null);
     try {
-      const recovery = app ? await vaultStore.appCreate() : await vaultStore.create();
-      // The code once; then what was asked goes on.
-      await vaultUi.recovery(recovery, false);
+      if (asked.use === "new-app") await vaultStore.appCreate(first);
+      else if (asked.use === "new-web") await vaultStore.create(first);
+      else {
+        await vaultStore.setPassword(first, from === "passkey" ? { passkey: true }
+          : from === "password" ? { password: current } : from === "code" ? { code: current } : null);
+      }
+      vaultUi.close();
       asked.done(true);
     } catch (error) {
       setBusy(false);
-      setProblem(problemText(t, error));
+      if (from === "passkey" && passkeyFailed(error)) setNoPasskey(true);
+      setProblem(problemText(t, error, false));
+    }
+  };
+
+  const title = isNew ? t("vault_password.title_new")
+    : asked.use === "set" ? t("vault_password.title_set") : t("vault_password.title_change");
+  const text = asked.use === "new-app"
+    ? (asked.keyName ? t.rich("vault_password.text_key", { key: asked.keyName, code }) : t("vault_password.text_mac"))
+    : asked.use === "new-web" ? t.rich("vault_password.text_web", { key: asked.keyName ?? "", code })
+    : asked.use === "set" ? t("vault_password.text_set") : t("vault_password.text_change");
+  const note = asked.use === "new-app" ? t("vault_password.note_mac")
+    : asked.use === "new-web" ? t("vault_password.note_web") : null;
+  const goWord = isNew ? t("vault_password.create")
+    : asked.use === "set" ? t("vault_password.set") : t("vault_password.change");
+  const type = shown ? "text" : "password";
+
+  return (
+    <div className="scrim">
+      <section ref={box} className="dialog vault-dialog wide" role="dialog" aria-modal="true"
+        aria-labelledby={`${ids}-title`} tabIndex={-1}>
+        {isNew && <Tile><Lock size={24} /></Tile>}
+        <h2 id={`${ids}-title`} className="vault-dialog-title">{title}</h2>
+        <p className="vault-dialog-text">{text}</p>
+        <form className="vault-pass-form" onSubmit={(e) => {
+          e.preventDefault();
+          void go();
+        }}>
+          {from === "password" && (
+            <div className="vault-field">
+              <label htmlFor={`${ids}-current`} className="vault-label">{t("vault_password.current")}</label>
+              <input id={`${ids}-current`} type={type} className="vault-input big" data-autofocus
+                autoComplete="current-password" spellCheck={false} autoCapitalize="off" value={current}
+                disabled={busy} aria-describedby={`${ids}-current-note`}
+                onChange={(e) => setCurrent(e.target.value)} />
+              <span id={`${ids}-current-note`} className="vault-field-note">{t("vault_password.current_hint")}</span>
+            </div>
+          )}
+          {from === "code" && (
+            <div className="vault-field">
+              <label htmlFor={`${ids}-code`} className="vault-label">{t("recovery.now_code")}</label>
+              <input id={`${ids}-code`} type="text" className="vault-input big mono" data-autofocus
+                placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" autoComplete="off" spellCheck={false}
+                autoCapitalize="characters" value={current} disabled={busy}
+                aria-describedby={`${ids}-code-note`} onChange={(e) => setCurrent(e.target.value)} />
+              <span id={`${ids}-code-note`} className="vault-field-note">{t("vault_password.code_hint")}</span>
+            </div>
+          )}
+          <div className="vault-field">
+            <label htmlFor={`${ids}-first`} className="vault-label">
+              {asked.use === "change" ? t("vault_password.label_new") : t("vault_password.label")}
+            </label>
+            <div className="vault-code-row">
+              <input id={`${ids}-first`} type={type} className="vault-input big"
+                data-autofocus={from === "password" || from === "code" ? undefined : true}
+                autoComplete="new-password" spellCheck={false} autoCapitalize="off" value={first}
+                disabled={busy} aria-describedby={`${ids}-under`}
+                onChange={(e) => setFirst(e.target.value)} />
+              <ShowHide shown={shown} disabled={busy} onToggle={() => setShown((was) => !was)} />
+            </div>
+            <span id={`${ids}-under`} className="vault-field-note">
+              {rule.under.kind === "short" ? t("vault_password.short", { n: rule.under.n }) : t("vault_password.hint")}
+              {rule.latin && <span className="vault-field-latin">{t("vault_password.latin")}</span>}
+            </span>
+          </div>
+          <div className="vault-field">
+            <label htmlFor={`${ids}-again`} className="vault-label">{t("vault_password.label_again")}</label>
+            <input id={`${ids}-again`} type={type} className="vault-input big" autoComplete="new-password"
+              spellCheck={false} autoCapitalize="off" value={again} disabled={busy}
+              aria-describedby={rule.match === null ? undefined : `${ids}-match`}
+              onChange={(e) => setAgain(e.target.value)} />
+            {rule.match !== null && (
+              <span id={`${ids}-match`} className={rule.match ? "vault-field-note green" : "vault-field-note amber"}>
+                {rule.match && <Check size={13} />}
+                {rule.match ? t("vault_password.match") : t("vault_password.no_match")}
+              </span>
+            )}
+          </div>
+          {note && <p className="vault-pass-note">{note}</p>}
+          {problem && <div className="error-box" role="alert">{problem}</div>}
+          <div className="vault-buttons">
+            <button type="button" className="button-plain" disabled={busy} onClick={cancel}>
+              {t("common.cancel")}
+            </button>
+            <button type="submit" className="button-accent big" disabled={!ready}>
+              {busy && <span className="spinner" aria-hidden="true" />}
+              {busy ? t("vault_password.working") : goWord}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+// ------------------- the field a closed vault opens with, in a browser (3a)
+
+/** The vault password, typed where a closed vault shows (a server's card,
+ * Settings › Keys; in the app, a Mac with no lock of the vault yet): Open
+ * the keys, and what goes under it (`links`). In a browser the keys open
+ * here for this session, and the Keep question follows; in the app the
+ * engine opens the vault and gives this Mac its lock. */
+export function PasswordOpen(props: { links?: ReactNode; autoFocus?: boolean }) {
+  const t = useT();
+  const v = useVault();
+  const id = useId();
+  const [value, setValue] = useState("");
+  const [shown, setShown] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const field = useRef<HTMLInputElement>(null);
+  usePasswordWanted(field);
+  useEffect(() => {
+    if (props.autoFocus) field.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const go = async () => {
+    if (busy || !value) return;
+    setBusy(true);
+    setProblem(null);
+    try {
+      if (v.app) await vaultStore.appOpen({ password: value });
+      else await vaultStore.openWithPassword(value);
+      setValue("");
+    } catch (error) {
+      setProblem(problemText(t, error, false));
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
-    <div className="scrim">
-      <section ref={box} className="dialog vault-dialog" role="dialog" aria-modal="true"
-        aria-labelledby="vn-title" tabIndex={-1}>
-        <Tile><Lock size={24} /></Tile>
-        <h2 id="vn-title" className="vault-dialog-title">{t("vault_new.title")}</h2>
-        <p className="vault-dialog-text">
-          {asked.server
-            ? t.rich("vault_new.text_server", { key: asked.keyName, server: asked.server, code })
-            : t.rich("vault_new.text", { key: asked.keyName, code })}
-        </p>
-        <ul className="vault-points">
-          {app ? (
-            <>
-              <li>{t("vault_new.point_mac_unlock")}</li>
-              <li>{t("vault_new.point_mac_locked")}</li>
-              <li>{t("vault_new.point_mac_browser")}</li>
-            </>
-          ) : (
-            <>
-              <li>{passkey ? t("vault_new.point_web_unlock") : t("vault_new.point_web_no_passkey")}</li>
-              <li>{t("vault_new.point_web_locked")}</li>
-              <li>{t("vault_new.point_web_browser")}</li>
-            </>
-          )}
-        </ul>
-        {problem && <div className="error-box" role="alert">{problem}</div>}
-        <div className="vault-buttons">
-          <button type="button" className="button-plain" disabled={busy} onClick={cancel}>
-            {t("common.cancel")}
-          </button>
-          <button type="button" className="button-accent big" data-autofocus disabled={busy}
-            onClick={() => void make()}>
-            {busy ? <span className="spinner" aria-hidden="true" /> : (app || passkey) && <Fingerprint size={17} />}
-            {app ? t("vault_new.make_touch") : passkey ? unlockWord(t, "make") : t("vault_new.make")}
-          </button>
+    <form className="vault-pass-open" onSubmit={(e) => {
+      e.preventDefault();
+      void go();
+    }}>
+      <div className="vault-field">
+        <label htmlFor={id} className="vault-label">{t("vault_password.label_vault")}</label>
+        <div className="vault-code-row">
+          <input ref={field} id={id} type={shown ? "text" : "password"} className="vault-input big strong"
+            autoComplete="current-password" spellCheck={false} autoCapitalize="off" value={value}
+            disabled={busy} onChange={(e) => setValue(e.target.value)} />
+          <ShowHide shown={shown} disabled={busy} onToggle={() => setShown((was) => !was)} />
         </div>
-      </section>
-    </div>
+      </div>
+      <button type="submit" className="button-accent big vault-pass-go" disabled={busy || !value}>
+        {busy ? <span className="spinner" aria-hidden="true" /> : <Unlock size={18} />}
+        {busy ? t("vault_password.opening") : t("vault_password.open")}
+      </button>
+      {problem && <div className="error-box" role="alert">{problem}</div>}
+      {props.links}
+    </form>
   );
 }
 
-// ------------------------------------------------------ the recovery code
+/** "or approve on MacBook-Pro-Denis · Forgot the password?": small links
+ * under the button, put together as the language writes them. */
+export function OrLinks(props: { links: { key: string; text: string; go: () => void }[] }) {
+  const t = useT();
+  if (!props.links.length) return null;
+  const or = t("vault_locked.or");
+  return (
+    <p className="vault-locked-links">
+      {or}{gap(or, props.links[0].text, t.lang)}
+      {props.links.map((l, i) => (
+        <span key={l.key}>
+          {i > 0 && " · "}
+          <button type="button" className="link-button" onClick={l.go}>{l.text}</button>
+        </span>
+      ))}
+    </p>
+  );
+}
 
-function RecoveryCode(props: { code: string; fresh: boolean; onDone: () => void }) {
+// ------------------------------- Keep the keys in this browser? (section 4)
+
+const KEEP_TEXT: Record<UnlockKind, string> = {
+  touch: "vault_open.keep_text.touch",
+  hello: "vault_open.keep_text.hello",
+  passkey: "vault_open.keep_text.passkey",
+};
+
+function KeepHere() {
   const t = useT();
   const v = useVault();
-  const [kept, setKept] = useState(false);
-  const [copied, showCopied] = useBriefly<true>();
-  const [saved, showSaved] = useBriefly<true>();
+  const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  // Closing it unsaved is no choice: Done, once the code is kept.
-  const box = useWindow(() => {});
-  const copy = async () => {
-    if (await toClipboard(props.code)) showCopied(true);
-    else setProblem(t("recovery.copy_failed"));
+  const onlyNow = () => {
+    if (!busy) vaultStore.skipPasskey();
   };
-  const save = () => {
-    const text = t("recovery.file_text", { code: props.code });
-    const url = URL.createObjectURL(new Blob([`${text}\n`], { type: "text/plain" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "tterm-recovery-code.txt";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), PRESSED_MS);
-    showSaved(true);
+  const box = useWindow(onlyNow);
+  const keep = async () => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      await vaultStore.keepWithPasskey();
+    } catch (error) {
+      // Cancelled: the question stays as it was, to try again.
+      const said = problemText(t, error, false);
+      if (said) {
+        const more = error instanceof VaultError && error.key === "vault_problem.no_prf_here"
+          ? "" : t("vault_open.kept_session");
+        setProblem(more ? `${said}${gap(said, more, t.lang)}${more}` : said);
+      }
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <div className="scrim">
-      <section ref={box} className="dialog vault-dialog wide" role="dialog" aria-modal="true"
-        aria-labelledby="rc-title" tabIndex={-1}>
-        <h2 id="rc-title" className="vault-dialog-title">
-          {props.fresh ? t("recovery.title_new") : t("recovery.title")}
-        </h2>
-        <p className="vault-dialog-text">
-          {props.fresh ? t("recovery.text_new") : t("recovery.text")}
-        </p>
-        <div className="recovery-box">
-          <code className="recovery-code" aria-label={t("recovery.code_label", { code: props.code })}>
-            {props.code}
-          </code>
-          <button type="button" className="button-plain small" onClick={() => void copy()}>
-            {copied ? <Check size={14} className="pressed-mark" /> : <Copy size={14} />}
-            {copied ? t("common.copied") : t("common.copy")}
-          </button>
-          <button type="button" className="button-plain small" onClick={save}>
-            {saved ? <Check size={14} className="pressed-mark" /> : <Download size={14} />}
-            {t("recovery.save_file")}
-          </button>
-        </div>
-        <label className="vault-check">
-          <input type="checkbox" checked={kept} data-autofocus
-            onChange={(e) => setKept(e.target.checked)} />
-          {v.app ? t("recovery.kept_mac") : t("recovery.kept_web")}
-        </label>
+      <section ref={box} className="dialog vault-dialog" role="dialog" aria-modal="true"
+        aria-labelledby="wk-title" aria-describedby="wk-text" tabIndex={-1}>
+        <Tile green><Unlock size={24} /></Tile>
+        <h2 id="wk-title" className="vault-dialog-title">{t("vault_open.opened_title")}</h2>
+        <p id="wk-text" className="vault-dialog-text ink">{t(KEEP_TEXT[unlockOf()])}</p>
+        <p className="vault-dialog-text small">{t("vault_open.keep_foreign")}</p>
         {problem && <div className="error-box" role="alert">{problem}</div>}
         <div className="vault-buttons">
-          <button type="button" className="button-accent big" disabled={!kept}
-            onClick={props.onDone}>
-            {t("common.done")}
+          <button type="button" className={v.canKeep ? "button-plain" : "button-accent big"} disabled={busy}
+            data-autofocus={v.canKeep ? undefined : true} onClick={onlyNow}>
+            {t("vault_open.only_now")}
           </button>
+          {v.canKeep && (
+            <button type="button" className="button-accent big" data-autofocus disabled={busy}
+              onClick={() => void keep()}>
+              {busy ? <span className="spinner" aria-hidden="true" /> : <Fingerprint size={17} />}
+              {unlockWord(t, "keep")}
+            </button>
+          )}
         </div>
       </section>
     </div>
   );
 }
 
-// ------------------------------------------ Open your keys on this browser
+// ------------------------------ Open your keys on this browser: the Mac
 
 function OpenVault(props: { start: "mac" | "code" | null }) {
   const t = useT();
@@ -400,11 +631,9 @@ function OpenVault(props: { start: "mac" | "code" | null }) {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [keeping, setKeeping] = useState(false);
   const field = useRef<HTMLInputElement>(null);
   const close = () => {
     vaultStore.endPairing();
-    vaultStore.skipPasskey();
     vaultUi.close();
   };
   const box = useWindow(close);
@@ -412,6 +641,9 @@ function OpenVault(props: { start: "mac" | "code" | null }) {
   const mac = macName(t, v.vault);
   const pairing = v.pairing;
   const canPair = macs.length > 0;
+  // A vault with a password opens with it, or with the Mac's approval; one
+  // made before 0.1.26 with no password yet, also with its recovery code.
+  const withPassword = !!v.vault?.password;
 
   // Asked from "approve on the Mac": the request goes at once.
   useEffect(() => {
@@ -420,11 +652,11 @@ function OpenVault(props: { start: "mac" | "code" | null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Open, and nothing more to ask: the window has done its part.
+  // Open: the window has done its part (the Keep question comes next).
   useEffect(() => {
-    if (v.open && !v.offerPasskey && !keeping) close();
+    if (v.open) close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [v.open, v.offerPasskey, keeping]);
+  }, [v.open]);
 
   const openWithCode = async () => {
     setBusy(true);
@@ -438,46 +670,6 @@ function OpenVault(props: { start: "mac" | "code" | null }) {
       setBusy(false);
     }
   };
-
-  const keep = async () => {
-    setKeeping(true);
-    setProblem(null);
-    try {
-      await vaultStore.keepWithPasskey();
-      close();
-    } catch (error) {
-      setProblem(problemText(t, error) ?? t("vault_open.kept_session"));
-      setKeeping(false);
-    }
-  };
-
-  if (v.open && (v.offerPasskey || keeping)) {
-    return (
-      <div className="scrim">
-        <section ref={box} className="dialog vault-dialog" role="dialog" aria-modal="true"
-          aria-labelledby="wk-title" tabIndex={-1}>
-          <Tile><Fingerprint size={24} /></Tile>
-          <h2 id="wk-title" className="vault-dialog-title">{t("vault_open.opened_title")}</h2>
-          <p className="vault-dialog-text">{t("vault_open.opened_text")}</p>
-          {problem && <div className="error-box" role="alert">{problem}</div>}
-          <div className="vault-buttons">
-            <button type="button" className="button-plain" disabled={keeping}
-              onClick={() => {
-                vaultStore.skipPasskey();
-                close();
-              }}>
-              {t("vault_open.only_now")}
-            </button>
-            <button type="button" className="button-accent big" data-autofocus disabled={keeping}
-              onClick={() => void keep()}>
-              {keeping ? <span className="spinner" aria-hidden="true" /> : <Fingerprint size={17} />}
-              {unlockWord(t, "keep")}
-            </button>
-          </div>
-        </section>
-      </div>
-    );
-  }
 
   const waiting = pairing && (pairing.state === "starting" || pairing.state === "waiting" ||
     pairing.state === "answered" || pairing.state === "revealed");
@@ -497,7 +689,7 @@ function OpenVault(props: { start: "mac" | "code" | null }) {
         aria-labelledby="wa-title" tabIndex={-1}>
         <h2 id="wa-title" className="vault-dialog-title">{t("vault_open.title")}</h2>
         <p className="vault-dialog-text">
-          {canPair ? t("vault_open.text") : t("vault_open.text_code")}
+          {withPassword ? t("vault_open.text_password") : canPair ? t("vault_open.text") : t("vault_open.text_code")}
         </p>
         {canPair && (
           <button type="button" className={waiting ? "vault-mac asked" : "vault-mac"}
@@ -509,7 +701,10 @@ function OpenVault(props: { start: "mac" | "code" | null }) {
             <Computer size={20} />
             <span className="vault-mac-text">
               <strong>{t("vault_open.mac_name", { mac, app: t("app_link.mac") })}</strong>
-              <span>{noX25519 ? t("vault_problem.no_x25519") : macLine}</span>
+              <span>
+                {noX25519 ? (withPassword ? t("vault_problem.no_x25519") : t("vault_problem.no_x25519_code"))
+                  : macLine}
+              </span>
             </span>
             {waiting && <span className="spinner" aria-hidden="true" />}
           </button>
@@ -520,27 +715,70 @@ function OpenVault(props: { start: "mac" | "code" | null }) {
             <code aria-label={t("vault.code_label", { code: pairing.sas })}>{pairing.sas}</code>
           </div>
         )}
-        {canPair && (
-          <div className="vault-or" aria-hidden="true"><span />{t("vault_open.or")}<span /></div>
+        {!withPassword && (
+          <>
+            {canPair && (
+              <div className="vault-or" aria-hidden="true"><span />{t("vault_open.or")}<span /></div>
+            )}
+            <label htmlFor="wa-code" className="vault-label">{t("vault_open.code")}</label>
+            <form className="vault-code-row" onSubmit={(e) => {
+              e.preventDefault();
+              void openWithCode();
+            }}>
+              <input id="wa-code" ref={field} type="text" className="vault-input mono"
+                placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" autoComplete="off" spellCheck={false}
+                autoCapitalize="characters" value={code} data-autofocus={props.start !== "mac" ? true : undefined}
+                onChange={(e) => setCode(e.target.value)} />
+              <button type="submit" className="button-plain" disabled={busy || !isRecoveryCode(code)}>
+                {busy ? <span className="spinner" aria-hidden="true" /> : null}
+                {t("vault_open.open")}
+              </button>
+            </form>
+          </>
         )}
-        <label htmlFor="wa-code" className="vault-label">{t("vault_open.code")}</label>
-        <form className="vault-code-row" onSubmit={(e) => {
-          e.preventDefault();
-          void openWithCode();
-        }}>
-          <input id="wa-code" ref={field} type="text" className="vault-input mono"
-            placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" autoComplete="off" spellCheck={false}
-            autoCapitalize="characters" value={code} data-autofocus={props.start !== "mac" ? true : undefined}
-            onChange={(e) => setCode(e.target.value)} />
-          <button type="submit" className="button-plain" disabled={busy || !isRecoveryCode(code)}>
-            {busy ? <span className="spinner" aria-hidden="true" /> : null}
-            {t("vault_open.open")}
-          </button>
-        </form>
         {problem && <div className="error-box" role="alert">{problem}</div>}
         <div className="vault-buttons">
-          <button type="button" className="button-ghost" onClick={close}>
-            {t("vault.not_now")}
+          {withPassword ? (
+            <button type="button" className="button-ghost" onClick={() => {
+              close();
+              vaultUi.wantPassword();
+            }}>
+              {t("vault_open.use_password")}
+            </button>
+          ) : (
+            <button type="button" className="button-ghost" onClick={close}>
+              {t("vault.not_now")}
+            </button>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ----------------------------------------- Forgot the password? (section 6)
+
+function Forgot() {
+  const t = useT();
+  const back = () => {
+    vaultUi.close();
+    vaultUi.wantPassword();
+  };
+  const box = useWindow(back);
+  return (
+    <div className="scrim">
+      <section ref={box} className="dialog vault-dialog wide" role="dialog" aria-modal="true"
+        aria-labelledby="vf-title" tabIndex={-1}>
+        <h2 id="vf-title" className="vault-dialog-title">{t("vault_forgot.title")}</h2>
+        <p className="vault-dialog-text">{t("vault_forgot.text")}</p>
+        <ul className="vault-points ink">
+          <li>{t("vault_forgot.mac")}</li>
+          <li>{t("vault_forgot.browser")}</li>
+        </ul>
+        <p className="vault-dialog-text small">{t.rich("vault_forgot.none", { code })}</p>
+        <div className="vault-buttons">
+          <button type="button" className="button-accent big" data-autofocus onClick={back}>
+            {t("vault_forgot.ok")}
           </button>
         </div>
       </section>
@@ -605,11 +843,11 @@ function AppCode(props: { lost: boolean; onDone: (opened: boolean) => void }) {
     setBusy(true);
     setProblem(null);
     try {
-      await vaultStore.appOpen(code);
+      await vaultStore.appOpen({ recoveryCode: code });
       props.onDone(true);
     } catch (error) {
       setBusy(false);
-      setProblem(problemText(t, error));
+      setProblem(problemText(t, error, false));
     }
   };
   return (
@@ -642,56 +880,65 @@ function AppCode(props: { lost: boolean; onDone: (opened: boolean) => void }) {
   );
 }
 
-// ------------------------------------------- Make a new recovery code
-
-function NewRecovery() {
+/** The same with the vault password (0.1.26): the engine derives it, asks
+ * tTerm for the wrap, and gives this Mac its own lock; no Touch ID, the
+ * person has just typed the password. A wrong one, or too many, is said in
+ * the page's words, and the window stays to try again. */
+function AppPassword(props: { lost: boolean; onDone: (opened: boolean) => void }) {
   const t = useT();
-  const v = useVault();
-  const [code, setCode] = useState("");
+  const id = useId();
+  const [value, setValue] = useState("");
+  const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const box = useWindow(() => vaultUi.close());
-  // Its raw key again: through this browser's passkey, else the code it has
-  // now; the app's engine has it open.
-  const withPasskey = v.app || !!v.hereLock;
+  const box = useWindow(() => {
+    if (!busy) props.onDone(false);
+  });
   const go = async () => {
+    if (busy || !value) return;
     setBusy(true);
     setProblem(null);
     try {
-      const made = await vaultStore.newRecoveryCode(withPasskey ? undefined : code);
-      await vaultUi.recovery(made, true);
+      await vaultStore.appOpen({ password: value });
+      props.onDone(true);
     } catch (error) {
-      setProblem(problemText(t, error));
       setBusy(false);
+      setProblem(problemText(t, error, false));
     }
   };
   return (
     <div className="scrim">
       <section ref={box} className="dialog vault-dialog" role="dialog" aria-modal="true"
-        aria-labelledby="nr-title" tabIndex={-1}>
-        <h2 id="nr-title" className="vault-dialog-title">{t("recovery.make_title")}</h2>
-        <p className="vault-dialog-text">{t("recovery.make_text")}</p>
-        {!withPasskey && (
-          <>
-            <label htmlFor="nr-code" className="vault-label">{t("recovery.now_code")}</label>
-            <input id="nr-code" type="text" className="vault-input mono" data-autofocus
-              placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX" autoComplete="off" spellCheck={false}
-              value={code} onChange={(e) => setCode(e.target.value)} />
-            <p className="hint">{t("recovery.now_code_hint")}</p>
-          </>
-        )}
-        {problem && <div className="error-box" role="alert">{problem}</div>}
-        <div className="vault-buttons">
-          <button type="button" className="button-plain" disabled={busy} onClick={() => vaultUi.close()}>
-            {t("common.cancel")}
-          </button>
-          <button type="button" className="button-accent big" disabled={busy || (!withPasskey && !isRecoveryCode(code))}
-            data-autofocus={withPasskey ? true : undefined} onClick={() => void go()}>
-            {busy ? <span className="spinner" aria-hidden="true" /> : withPasskey && <Fingerprint size={17} />}
-            {withPasskey ? (v.app ? t("recovery.make_touch") : t("recovery.make_go_passkey"))
-              : t("recovery.make_go")}
-          </button>
-        </div>
+        aria-labelledby="ap-title" tabIndex={-1}>
+        <Tile><Lock size={24} /></Tile>
+        <h2 id="ap-title" className="vault-dialog-title">{t("app_code.title")}</h2>
+        <p className="vault-dialog-text">
+          {props.lost ? t("app_code.text_lost_password") : t("app_code.text_password")}
+        </p>
+        <form className="vault-pass-form" onSubmit={(e) => {
+          e.preventDefault();
+          void go();
+        }}>
+          <div className="vault-field">
+            <label htmlFor={id} className="vault-label">{t("vault_password.label_vault")}</label>
+            <div className="vault-code-row">
+              <input id={id} type={shown ? "text" : "password"} className="vault-input big" data-autofocus
+                autoComplete="current-password" spellCheck={false} autoCapitalize="off" value={value}
+                disabled={busy} onChange={(e) => setValue(e.target.value)} />
+              <ShowHide shown={shown} disabled={busy} onToggle={() => setShown((was) => !was)} />
+            </div>
+          </div>
+          {problem && <div className="error-box" role="alert">{problem}</div>}
+          <div className="vault-buttons">
+            <button type="button" className="button-plain" disabled={busy} onClick={() => props.onDone(false)}>
+              {t("common.cancel")}
+            </button>
+            <button type="submit" className="button-accent big" disabled={busy || !value}>
+              {busy ? <span className="spinner" aria-hidden="true" /> : <Unlock size={17} />}
+              {busy ? t("vault_password.opening") : t("vault_password.open")}
+            </button>
+          </div>
+        </form>
       </section>
     </div>
   );

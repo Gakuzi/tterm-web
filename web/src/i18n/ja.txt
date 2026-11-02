@@ -1609,30 +1609,48 @@ vault.code_label = コード {code}
 
 # ------------------------------------------------------------ keys: Settings › Keys, the vault (Keys.tsx)
 keys.title = SSH 鍵
-keys.about = 保存した SSH 鍵の保管庫です。すべてのデバイスで使えます。保管庫を開けるのはあなたのデバイスだけで、それぞれのロック解除と同じ方法で開きます。tTerm には開けません。
+keys.about = 保存した SSH 鍵の保管庫です。鍵は暗号化されていて、開けるのはあなただけです。保管庫のパスワードで開けるほか、鍵を保存したデバイスではパスワードなしでも開けます。tTerm には開けません。
+# A vault made before 0.1.26 has a recovery code and no password: this
+# banner, above the vault's state, sets one (vault_password.title_set).
+keys.set_title = 保管庫のパスワードを設定
+keys.set_text = パスワードがあれば、Mac が手元になくても、どのブラウザーでも鍵を開けます。設定後はリカバリーコードが使えなくなり、パスワードがその代わりになります。
+keys.set_go = パスワードを設定
 keys.open_here = このブラウザーで開いています
 # How it opened, then when it locks again: one of these under "Open in this browser".
-keys.open_text.touch = Touch ID で開きました。8 時間何も操作しないか、tTerm Web を閉じるか、「ロック」を押すと、再びロックされます。
-keys.open_text.hello = Windows Hello で開きました。8 時間何も操作しないか、tTerm Web を閉じるか、「ロック」を押すと、再びロックされます。
-keys.open_text.passkey = パスキーで開きました。8 時間何も操作しないか、tTerm Web を閉じるか、「ロック」を押すと、再びロックされます。
-keys.open_text.recovery = リカバリーコードで開きました（このセッションのみ）。8 時間何も操作しないか、tTerm Web を閉じるか、「ロック」を押すと、再びロックされます。
-keys.open_text.pairing = Mac の承認で開きました（このセッションのみ）。8 時間何も操作しないか、tTerm Web を閉じるか、「ロック」を押すと、再びロックされます。
-keys.open_text.new = たった今、このブラウザーで作成しました。8 時間何も操作しないか、tTerm Web を閉じるか、「ロック」を押すと、再びロックされます。
+keys.open_text.touch = Touch ID で開きました。8 時間何も操作しないと自動で閉じます。tTerm Web を閉じたときや、「ロック」を押したときにも閉じます。Touch ID に 1 回タッチするだけで、また開けます。
+keys.open_text.hello = Windows Hello で開きました。8 時間何も操作しないと自動で閉じます。tTerm Web を閉じたときや、「ロック」を押したときにも閉じます。Windows Hello で、また開けます。
+keys.open_text.passkey = パスキーで開きました。8 時間何も操作しないと自動で閉じます。tTerm Web を閉じたときや、「ロック」を押したときにも閉じます。パスキーで、また開けます。
+keys.open_text.password = 保管庫のパスワードで開きました（このセッションのみ）。8 時間何も操作しないと自動で閉じます。タブを閉じたときや、「ロック」を押したときにも閉じます。
+keys.open_text.recovery = リカバリーコードで開きました（このセッションのみ）。8 時間何も操作しないと自動で閉じます。タブを閉じたときや、「ロック」を押したときにも閉じます。
+keys.open_text.pairing = Mac の承認で開きました（このセッションのみ）。8 時間何も操作しないと自動で閉じます。タブを閉じたときや、「ロック」を押したときにも閉じます。
+keys.open_text.new = たった今、このブラウザーで作成しました。8 時間何も操作しないと自動で閉じます。タブを閉じたときや、「ロック」を押したときにも閉じます。
 # In tTerm for Mac.
 keys.open_mac = この Mac で開いています
 keys.open_text.mac = Touch ID または Mac のパスワードで開きました。tTerm が動いているあいだ、「ロック」を押すかサインアウトするまで開いたままです。
 keys.lock = ロック
-keys.locked_here = このブラウザーではロックされています
-keys.locked_text = ここで鍵を使うには、保管庫を開いてください。このコンピューターのロック解除と同じ方法、Mac の承認、リカバリーコードのいずれかで開けます。
+# The vault closed in this browser. Where the keys were kept here with
+# Touch ID (or Windows Hello, a passkey), one of the three; else the
+# vault password opens them (keys.closed_text_password, with its field).
+keys.closed_here = 保管庫は閉じています
+keys.closed_text.touch = あなたの鍵でサーバーにログインするには、Touch ID で開いてください。
+keys.closed_text.hello = あなたの鍵でサーバーにログインするには、Windows Hello で開いてください。
+keys.closed_text.passkey = あなたの鍵でサーバーにログインするには、パスキーで開いてください。
+keys.closed_text_password = 鍵は暗号化されていて、開けるのは保管庫のパスワードだけです。パスワードを入力すると、鍵はこのブラウザーの中で開きます。パスワード自体は、どこにも送られません。
+# The vault password's row, under the vault's state: {day} is time.today,
+# time.yesterday or time.on_day ("on 2 Nov").
+keys.password_title = 保管庫のパスワード
+keys.password_text = どのブラウザーでも鍵を開けます。設定日：{day}。
+keys.password_change = パスワードを変更
 keys.locked_mac = この Mac ではロックされています
 keys.locked_mac_text = Touch ID または Mac のパスワードで開いてください。開くと、この Mac がサーバーへのログインを行います。
 keys.locked_mac_code = この Mac は、まだ保管庫を開けるように設定されていません。ここで一度リカバリーコードを使って開くと、以降は Touch ID または Mac のパスワードで開けます。
+keys.locked_mac_password = この Mac は、まだ保管庫を開けるように設定されていません。ここで一度保管庫のパスワードを使って開くと、以降はこの Mac が Touch ID だけで開けるようになります。
 keys.open = 開く
 keys.open_code = リカバリーコードで開く
 keys.none_title = 保管庫はまだありません
-keys.none_web = ファイルから鍵を追加すると、このブラウザーで保管庫が作成されます。あわせて、手元に保管しておくリカバリーコードも作成されます。
-keys.none_app = 「クラウドへ移行」か、ターミナルで ssh を実行したあとに表示されるバーから鍵を保存すると、そのときに Touch ID で保管庫が作成されます。
-keys.no_passkey_here = このブラウザーには、保管庫のパスキーを保存できません。ここでは、セッションごとにリカバリーコードか Mac の承認で開きます。
+keys.none_web = ファイルから鍵を追加すると、保管庫が作成されます。保管庫のパスワードは、そのときに自分で決めます。
+keys.none_app = 「クラウドへ移行」か、ターミナルで ssh を実行したあとに表示されるバーから鍵を保存すると、保管庫が作成されます。保管庫のパスワードは、そのときに自分で決めます。
+keys.no_passkey_here = このブラウザーでは、パスキーを使って鍵を保存できません。ここでは、セッションごとに保管庫のパスワードか Mac の承認で開きます。
 keys.no_ed25519_here = このブラウザーは Ed25519 鍵で署名できません。Ed25519 鍵で開くサーバーは、より新しいブラウザーか Mac 版 tTerm で開いてください。
 # {servers} is a list of servers: droplet and staging; web-01 in Client X.
 keys.opens = 開けるサーバー：{servers}
@@ -1649,9 +1667,10 @@ keys.cannot_ed25519 = このブラウザーは Ed25519 鍵で署名できませ�
 keys.cannot_open = ここでは開けません：ファイルからもう一度追加してください
 keys.remove = 削除
 keys.add_file = ファイルから鍵を追加
-keys.new_recovery = 新しいリカバリーコードを作成
 # {places} is where the vault opens: "MacBook-Pro-Denis · tTerm for Mac, Chrome on macOS".
-keys.opens_on = 開けるデバイス：{places}。
+keys.opens_on = パスワードなしで保管庫を開けるデバイス：{places}。ほかのどのブラウザーでも、保管庫のパスワードで開けます。
+keys.opens_password_only = 保管庫は、パスワードでのみ開けます。鍵を保存したデバイスは、まだありません。
+keys.opens_on_old = パスワードなしで保管庫を開けるデバイス：{places}。パスワードを設定するまでは、ほかのブラウザーではリカバリーコードか Mac の承認で開きます。
 keys.opens_on_code = リカバリーコードでのみ開けます。
 keys.place_mac = {mac} · {app}
 keys.place_browser = ブラウザー
@@ -1671,7 +1690,6 @@ add_key.passphrase_hint = この鍵は暗号化されています。パスフレ
 add_key.open_key = 鍵を開く
 add_key.reading = 鍵を読み込んでいます…
 add_key.name = 名前
-add_key.sealed_here = 鍵は、このブラウザーの外に出る前に、ここでロックされます。開けるのはあなたのデバイスだけで、tTerm には開けません。
 add_key.add = 保管庫に追加
 add_key.next = 次へ
 add_key.added = {name} を保管庫に追加しました
@@ -1691,50 +1709,81 @@ add_key.problem_encrypted_pem = この鍵ファイルは、古い PEM 方式で�
 add_key.problem_ed25519 = このブラウザーは、この形式の Ed25519 鍵を読み込めません。より新しいブラウザーを使うか、OpenSSH の形式の鍵をお試しください。
 add_key.problem_several = このファイルには複数の鍵が含まれています。1 つずつ追加してください。
 
-# ------------------------------------------------------------ vault_new: Save your key to your vault (VaultDialogs.tsx)
-vault_new.title = 鍵を保管庫に保存
-# <code>…</code> is the key's name: id_ed25519. {server} is the server's name.
-vault_new.text_server = <code>{key}</code> を保管庫に保存すると、tTerm Web、スマートフォン、サインインしたどのコンピューターからでも、この鍵で {server} を開けます。
-vault_new.text = <code>{key}</code> を保管庫に保存すると、この鍵で開くサーバーを、tTerm Web、スマートフォン、サインインしたどのコンピューターからでも開けます。
-# In tTerm for Mac.
-vault_new.point_mac_unlock = 保管庫は、この Mac のロック解除と同じ方法で開きます：Touch ID または Mac のパスワードです。新しく覚えるものはありません。
-vault_new.point_mac_locked = 鍵は、この Mac の外に出る前にロックされます。開けるのはあなたのデバイスだけで、tTerm には開けません。
-vault_new.point_mac_browser = 新しいブラウザーでは、ここで承認するか、リカバリーコードを使うと保管庫を開けます。
-# In a browser.
-vault_new.point_web_unlock = 保管庫は、このコンピューターのロック解除と同じ方法で開きます：Touch ID、Windows Hello、またはスマートフォンの画面ロックです。新しく覚えるものはありません。
-vault_new.point_web_no_passkey = このブラウザーには、保管庫のパスキーを保存できません。ここでは、セッションごとにリカバリーコードで開きます。
-vault_new.point_web_locked = 鍵は、このブラウザーの外に出る前にロックされます。開けるのはあなたのデバイスだけで、tTerm には開けません。
-vault_new.point_web_browser = ほかのブラウザーでは、リカバリーコードを使うか、Mac 版 tTerm で承認すると保管庫を開けます。
-vault_new.make_touch = Touch ID で保管庫を作成
-vault_new.make_hello = Windows Hello で保管庫を作成
-vault_new.make_passkey = パスキーで保管庫を作成
-vault_new.make = 保管庫を作成
+# ------------------------------------------------------------ vault_password: the vault password (VaultDialogs.tsx, 0.1.26)
+# Make up a vault password: a new vault, made on the Mac (Move to cloud;
+# the strip after ssh, vault_password.text_key) or in a browser (Add a key
+# from a file, vault_password.text_web). <code>…</code> is the key's name:
+# id_ed25519.
+vault_password.title_new = 保管庫のパスワードを作成
+vault_password.text_mac = この Mac の鍵は、暗号化されてクラウドの保管庫に入ります。このパスワードがあれば、Mac が手元になくても、どのブラウザーでも鍵を開けます。
+vault_password.text_key = <code>{key}</code> は、暗号化されてクラウドの保管庫に入ります。このパスワードがあれば、Mac が手元になくても、どのブラウザーでもこの鍵を開けます。
+vault_password.text_web = <code>{key}</code> は、このブラウザーの中で暗号化されて保管庫に入ります。このパスワードがあれば、どのブラウザーでもこの鍵を開けます。
+vault_password.label = パスワード
+# The second field: the same password once more.
+vault_password.label_again = パスワード（確認用）
+# Next to the field: the password shown as it is typed, or hidden again.
+vault_password.show = 表示
+vault_password.hide = 非表示
+# Under the first field; while it has 1 to 11 characters, vault_password.short
+# instead. vault_password.latin when it has a character beyond plain Latin.
+vault_password.hint = 12 文字以上。いくつかの単語をつなげたフレーズがいちばん簡単です。
+vault_password.short = other: あと {n} 文字
+vault_password.latin = 半角英数字・記号以外の文字が含まれています。海外のコンピューターでは、キーボードの設定によっては入力できないことがあります。
+# Under the second field.
+vault_password.match = 一致しています
+vault_password.no_match = 上のパスワードと一致しません
+# In a dashed box under the fields: on the Mac, and in a browser.
+vault_password.note_mac = tTerm はこのパスワードを知らず、復元することもできません。パスワードマネージャーに保存しておいてください。忘れた場合は、この Mac で新しいパスワードを設定してください。
+vault_password.note_web = tTerm はこのパスワードを知らず、復元することもできません。パスワードマネージャーに保存しておいてください。
+vault_password.create = 保管庫を作成
+# On the button, while the password becomes the key (a second; a few on a phone).
+vault_password.working = 暗号化中…
+# Settings › Keys: Set a vault password (a vault made before 0.1.26, with a
+# recovery code), or Change it.
+vault_password.title_set = 保管庫のパスワードを設定
+vault_password.text_set = このパスワードがあれば、Mac が手元になくても、どのブラウザーでも鍵を開けます。tTerm はこのパスワードを知らず、復元することもできません。設定後は、リカバリーコードが使えなくなります。
+vault_password.set = パスワードを設定
+vault_password.title_change = 保管庫のパスワードを変更
+vault_password.text_change = 新しいパスワードは、すぐに古いパスワードと置き換わります。古いパスワードでは、鍵を開けなくなります。お使いの Mac と、鍵を保存したブラウザーでは、これまでどおり開けます。
+vault_password.label_new = 新しいパスワード
+vault_password.change = パスワードを変更
+# In a browser where the keys are not kept: what opens the vault for the
+# change (the current password), or for setting it (the recovery code,
+# recovery.now_code).
+vault_password.current = 現在のパスワード
+vault_password.current_hint = このブラウザーには鍵が保存されていないため、変更するには現在のパスワードが必要です。
+vault_password.code_hint = このブラウザーには鍵が保存されていないため、パスワードを設定するにはリカバリーコードが必要です。
+# Said once done.
+vault_password.done_set = 保管庫のパスワードを設定しました。リカバリーコードでは、保管庫を開けなくなりました。
+vault_password.done_change = 保管庫のパスワードを変更しました。
+# A closed vault, in a browser with no lock of it: the field it opens with,
+# in a server's card and in Settings › Keys.
+vault_password.label_vault = 保管庫のパスワード
+vault_password.open = 鍵を開く
+vault_password.opening = 開いています…
+vault_password.forgot = パスワードをお忘れですか？
 
-# ------------------------------------------------------------ recovery: the recovery code, shown once (VaultDialogs.tsx)
-recovery.title = リカバリーコード
-recovery.text = 万一、保管庫を開けるデバイスをすべて失った場合、鍵を取り戻す方法はこのコードだけです。tTerm が代わりに鍵を復元することはできません。このコードは一度しか表示されません。
-recovery.title_new = 新しいリカバリーコード
-recovery.text_new = 以前のコードでは、もう保管庫を開けません。万一、保管庫を開けるデバイスをすべて失った場合、鍵を取り戻す方法はこの新しいコードだけです。このコードは一度しか表示されません。
-# For screen readers.
-recovery.code_label = リカバリーコード {code}
-recovery.save_file = ファイルとして保存
-recovery.copy_failed = コピーできませんでした：コードを選択して手動でコピーしてください。
-# What the file saved holds.
-recovery.file_text = tTerm の保管庫のリカバリーコード：{code}\nどのデバイスでも保管庫を開けなくなったときに、このコードで開けます。デバイスとは別の安全な場所に保管してください。
-recovery.kept_mac = この Mac 以外の安全な場所にも保管しました
-recovery.kept_web = このコンピューター以外の安全な場所にも保管しました
-recovery.make_title = 新しいリカバリーコードを作成しますか？
-recovery.make_text = 現在のコードは使えなくなり、新しいコードは一度だけ表示されます。鍵とデバイスはそのままです。
+# ------------------------------------------------------------ vault_forgot: Forgot your vault password? (VaultDialogs.tsx, 0.1.26)
+vault_forgot.title = 保管庫のパスワードをお忘れですか？
+vault_forgot.text = tTerm からパスワードをお伝えすることはできません。パスワードを知っているのは、あなただけです。ただし、パスワードなしで保管庫を開けるデバイスでは、新しいパスワードを設定できます：
+# Two points under the text: where a new password can be set.
+vault_forgot.mac = お使いの Mac：Mac 版 tTerm で「設定」の「SSH 鍵」を開き、「パスワードを変更」を押して Touch ID で確認します。
+vault_forgot.browser = 鍵を保存したブラウザー：そこでも「設定」から変更できます。
+# <code>…</code> is the folder of the keys: it stays as it is.
+vault_forgot.none = そのようなデバイスがない場合、保管庫にある鍵はもう開けません。鍵そのものは、通常はお使いの Mac の <code>~/.ssh</code> に残っています。
+vault_forgot.ok = OK
+
+# ------------------------------------------------------------ recovery: the recovery code of a vault made before 0.1.26 (VaultDialogs.tsx)
 recovery.now_code = 現在のリカバリーコード
-recovery.now_code_hint = このブラウザーには保管庫のパスキーがないため、新しいコードは現在のコードを使って作成します。なくしてしまった場合は、Mac 版 tTerm で新しいコードを作成してください。
-recovery.make_go = 新しいコードを作成
-recovery.make_go_passkey = パスキーで作成
-recovery.make_touch = Touch ID で作成
 
 # ------------------------------------------------------------ vault_open: Open your keys on this browser (VaultDialogs.tsx)
 vault_open.title = このブラウザーで鍵を開く
 vault_open.text = このブラウザーで保管庫を開くのは初めてです。保管庫をすでに開けるデバイスで、このブラウザーを承認してください。
 vault_open.text_code = リカバリーコードを使って、このブラウザーで保管庫を開いてください。
+# A vault with a password: the Mac's approval is the second way, and the
+# button at the bottom goes back to the password field.
+vault_open.text_password = お使いの Mac で、このブラウザーを承認してください。ほかの人のコンピューターを使うときに便利です。そのコンピューターで保管庫のパスワードを入力せずに済みます。
+vault_open.use_password = 代わりにパスワードを入力
 # {mac} is the Mac's name, {app} is app_link.mac: "MacBook-Pro-Denis · tTerm for Mac".
 vault_open.mac_name = {mac} · {app}
 vault_open.mac_ask = ここで保管庫を開けるよう依頼
@@ -1747,9 +1796,13 @@ vault_open.sas_text = Mac にもコードが表示されます。同じ場合の
 vault_open.or = または
 vault_open.code = リカバリーコード
 vault_open.open = 開く
-# Once open with the recovery code or the Mac's approval: whether this browser keeps a passkey.
+# Once open with the password, the Mac's approval or the recovery code, or just made in this browser: whether to keep the keys here with a passkey.
 vault_open.opened_title = このブラウザーで鍵を開きました
-vault_open.opened_text = 次回からこのコンピューターのロック解除と同じ方法で開けるように、ここにパスキーを保存しますか？自分のものではないコンピューターでは、「今回のみ」を選んでください。
+vault_open.keep_text.touch = Touch ID で、このブラウザーに鍵を保存しますか？次回からこのブラウザーでは Touch ID だけで済み、パスワードは不要です。
+vault_open.keep_text.hello = Windows Hello で、このブラウザーに鍵を保存しますか？次回からこのブラウザーでは Windows Hello だけで済み、パスワードは不要です。
+vault_open.keep_text.passkey = パスキーで、このブラウザーに鍵を保存しますか？次回からこのブラウザーではパスキーだけで済み、パスワードは不要です。
+# Small, under the question.
+vault_open.keep_foreign = ほかの人のコンピューターなら、「今回のみ」を選んでください。タブを閉じると鍵も閉じます。しばらく使わなかった場合も、自動で閉じます。
 vault_open.keep_touch = Touch ID で保存
 vault_open.keep_hello = Windows Hello で保存
 vault_open.keep_passkey = パスキーを保存
@@ -1761,6 +1814,9 @@ app_code.title = この Mac で保管庫を開く
 app_code.text = この Mac は、まだ保管庫を開けるように設定されていません。ここで一度リカバリーコードを使って開くと、以降はこの Mac で Touch ID を使って開けます。
 # When this Mac's lock is there but no longer opens the vault (taken off in a browser, or gone from the keychain).
 app_code.text_lost = この Mac で保管庫を開くための設定が無効になりました。ここで一度リカバリーコードを使って開くと、設定し直され、再び Touch ID を使って開けるようになります。
+# A vault with a password (0.1.26): opened here once with it.
+app_code.text_password = この Mac は、まだ保管庫を開けるように設定されていません。ここで一度保管庫のパスワードを使って開くと、以降はこの Mac で Touch ID を使って開けます。
+app_code.text_lost_password = この Mac で保管庫を開くための設定が無効になりました。ここで一度保管庫のパスワードを使って開くと、設定し直され、再び Touch ID を使って開けるようになります。
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1789,8 +1845,21 @@ mac_approve.not_me_note = 「心当たりがない」を押すと、そのサイ
 # ------------------------------------------------------------ vault_locked: a server with your key, the vault locked here (VaultLocked.tsx)
 vault_locked.title = {machine} はあなたの鍵で開きます
 vault_locked.text = このブラウザーでは、保管庫がロックされています。このコンピューターのロック解除と同じ方法で開くと、tTerm が {machine} にログインします。鍵がこのブラウザーの外に出ることはありません。
+# A vault with a password, in a browser that keeps no lock of it: the
+# password field comes under it.
+vault_locked.text_password = 鍵は暗号化された状態でクラウドにあり、開けるのは保管庫のパスワードだけです。パスワードを入力すると、鍵はこのブラウザーの中で開き、tTerm が {machine} にログインします。パスワード自体は、どこにも送られません。
+# Where the keys were kept with Touch ID (or Windows Hello, a passkey):
+# one of the three, the button, and a link to type the password instead.
+vault_locked.closed_title = 保管庫は閉じています
+vault_locked.closed_text.touch = あなたの鍵で {machine} にログインするには、Touch ID で開いてください。
+vault_locked.closed_text.hello = あなたの鍵で {machine} にログインするには、Windows Hello で開いてください。
+vault_locked.closed_text.passkey = あなたの鍵で {machine} にログインするには、パスキーで開いてください。
+vault_locked.use_password = または、保管庫のパスワードを入力
+# Small, at the card's bottom.
+vault_locked.closes_itself = しばらく使わないと、保管庫は自動で閉じます。コンピューターから離れたときに備えるためです。
 vault_locked.text_app = この Mac では、保管庫がロックされています。Touch ID または Mac のパスワードで開くと、この Mac が {machine} にログインします。
 vault_locked.text_app_code = この Mac は、まだ保管庫を開けるように設定されていません。ここで一度リカバリーコードを使って開くと、この Mac が {machine} にログインします。
+vault_locked.text_app_password = この Mac は、まだ保管庫を開けるように設定されていません。ここで一度保管庫のパスワードを使って開くと、この Mac が {machine} にログインします。
 # Small links under the button: "or approve on MacBook-Pro-Denis · use the recovery code".
 vault_locked.or = または
 vault_locked.approve_on = {mac} で承認
@@ -1807,17 +1876,32 @@ vault_locked.its_key = このサーバーの鍵
 vault_problem.no_vault = 保管庫はまだありません。
 vault_problem.exists = 保管庫はすでにあります。保管庫を開いてから、鍵を追加してください。
 vault_problem.locked = 先に保管庫を開いてください。
-vault_problem.no_passkey = ここでは、保管庫のパスキーを使えませんでした。Mac でこのブラウザーを承認するか、リカバリーコードを使ってください。
-vault_problem.no_prf = このパスキーでは、ここで保管庫を開けません。Mac でこのブラウザーを承認するか、リカバリーコードを使ってください。
+# The vault password: {n} tries left (shown when 3 or fewer), {time} a
+# time of day, as the page shows times ("14:05").
+vault_problem.password_wrong = このパスワードでは保管庫を開けません。キーボード配列と Caps Lock を確認してください。
+vault_problem.password_left = other: あと {n} 回間違えると、1 時間試せなくなります。
+vault_problem.password_paused = パスワードを間違えた回数が多すぎます。{time} 以降に、もう一度お試しください。
+# The same pause, when it ends another day (thirty wrong ones in a day):
+# {day} is the date as the page writes it ("3 Nov"), {time} the time.
+vault_problem.password_paused_day = パスワードを間違えた回数が多すぎます。{day} {time} 以降に、もう一度お試しください。
+vault_problem.no_password = 保管庫にはまだパスワードがありません。お使いの Mac で、「設定」の「SSH 鍵」から設定してください。
+vault_problem.password_short = パスワードは 12 文字以上にしてください。
+vault_problem.no_wasm = このブラウザーでは、保管庫のパスワードを使えません。Mac の承認で鍵を開くか、より新しいブラウザーで開いてください。
+vault_problem.no_passkey = ここでは、保管庫のパスキーを使えませんでした。保管庫のパスワードを入力するか、Mac でこのブラウザーを承認してください。
+vault_problem.no_passkey_code = ここでは、保管庫のパスキーを使えませんでした。Mac でこのブラウザーを承認するか、リカバリーコードを使ってください。
+vault_problem.no_prf = このパスキーでは、ここで保管庫を開けません。保管庫のパスワードを入力するか、Mac でこのブラウザーを承認してください。
+vault_problem.no_prf_code = このパスキーでは、ここで保管庫を開けません。Mac でこのブラウザーを承認するか、リカバリーコードを使ってください。
 vault_problem.no_prf_here = このブラウザーには、保管庫のパスキーを保存できません。保管庫が開いているのは、このセッションのあいだだけです。
-vault_problem.lock_broken = このブラウザーのロックでは、保管庫を開けなくなりました。リカバリーコードを使うか、Mac でこのブラウザーを承認してください。
+vault_problem.lock_broken = このブラウザーのロックでは、保管庫を開けなくなりました。保管庫のパスワードを入力するか、Mac でこのブラウザーを承認してください。
+vault_problem.lock_broken_code = このブラウザーのロックでは、保管庫を開けなくなりました。リカバリーコードを使うか、Mac でこのブラウザーを承認してください。
 vault_problem.code_form = リカバリーコードは、4 文字ずつ 6 組に分かれた 24 文字の英数字です。
 vault_problem.code_wrong = このリカバリーコードでは保管庫を開けません。コードを確認するか、Mac でこのブラウザーを承認してください。
 # In tTerm for Mac: the engine's answers, said by the page (the code window, Touch ID).
 vault_problem.code_wrong_app = このリカバリーコードでは保管庫を開けません。コードを確認して、もう一度お試しください。
 vault_problem.touch_failed = Touch ID または Mac のパスワードによる確認ができませんでした。何も変更されていません。
 vault_problem.need_code = ここでリカバリーコードを入力してください。このブラウザーには保管庫のパスキーがありません。
-vault_problem.no_x25519 = このブラウザーは古いため、Mac で承認できません。リカバリーコードを使うか、より新しいブラウザーをお使いください。
+vault_problem.no_x25519 = このブラウザーは古いため、Mac で承認できません。保管庫のパスワードを入力するか、より新しいブラウザーをお使いください。
+vault_problem.no_x25519_code = このブラウザーは古いため、Mac で承認できません。リカバリーコードを使うか、より新しいブラウザーをお使いください。
 vault_problem.pairing = 依頼を完了できませんでした。もう一度依頼してください。
 vault_problem.passkey_exists = このブラウザーには、tTerm のパスキーがすでにあります。
 vault_problem.no_passkey_here = このブラウザーではパスキーを作成できません。
@@ -1835,7 +1919,7 @@ ssh_strip.let_in = tTerm を許可
 ssh_strip.not_now = 今はしない
 ssh_strip.never = {alias} は今後確認しない
 # <b>…</b> are the two buttons' names, as above.
-ssh_strip.explain = <b>鍵を保存：</b>鍵は保管庫に入り、保管庫を開けるのはあなたのデバイスだけです。{alias} はそのままです。<b>tTerm を許可：</b>tTerm が {alias} に専用の行を追加します。鍵はこの Mac に残ります。複数のサーバーをまとめて移すには、アカウントメニューの「クラウドへ移行」を使ってください。
+ssh_strip.explain = <b>鍵を保存：</b>鍵は暗号化されて保管庫に入り、どのブラウザーでも保管庫のパスワードで開けます。{alias} はそのままです。<b>tTerm を許可：</b>tTerm が {alias} に専用の行を追加します。鍵はこの Mac に残ります。複数のサーバーをまとめて移すには、アカウントメニューの「クラウドへ移行」を使ってください。
 ssh_strip.explain_pass = <b>tTerm を許可：</b>tTerm が {alias} に専用の行を追加します。鍵はこの Mac に残ります。複数のサーバーをまとめて移すには、アカウントメニューの「クラウドへ移行」を使ってください。
 ssh_strip.unreachable = tTerm Web はクラウドから {alias} に接続できません。この Mac がオンラインのあいだ、この Mac 経由で開きます。
 ssh_strip.through_mac = この Mac 経由で開く
@@ -1858,7 +1942,7 @@ move.how = {name} を開く方法
 move.method_key = 自分の鍵
 move.method_cert = tTerm のアクセス権
 move.method_mac = この Mac 経由
-move.way_key = 鍵は保管庫に入り、サーバーはそのままです。どのブラウザーでも、保管庫のロックを解除すれば開けます。
+move.way_key = 鍵は保管庫に入り、サーバーはそのままです。どのブラウザーでも、保管庫のパスワードで開けます。
 move.way_cert = tTerm がサーバーに専用の行を追加し、鍵はここに残ります。どこからでも開け、Telegram からも使えます。
 move.way_mac = 何も移しません。この Mac がオンラインのあいだ、tTerm がこの Mac に接続を依頼します。VPN の内側にあるサーバー向けです。
 # {address} is root@203.0.113.7, {jump} the bastion it goes through.
@@ -1887,7 +1971,7 @@ move.key_security = セキュリティキーの中にあり、取り出せませ
 move.key_agent = SSH エージェントの中にしかなく、コピーできません。この鍵を使うサーバーは、この Mac 経由になります
 move.key_type = 保管庫にまだ保存できない種類の鍵です。この鍵を使うサーバーは、この Mac 経由になります
 move.key_passphrase = パスフレーズあり
-move.vault_note = 保管庫は、この Mac のロック解除と同じ方法で開きます：Touch ID または Mac のパスワードです。開けるのはあなたのデバイスだけで、tTerm には開けません。
+move.vault_note = 鍵は、この Mac の中で暗号化されます。保管庫は、ここでは Touch ID で開き、どのブラウザーでも保管庫のパスワードで開けます。tTerm には開けません。
 move.go = other: サーバー {n} 台を移行
 
 # ------------------------------------------------------------ moved: what came of Move to cloud (MoveToCloud.tsx)
@@ -1904,7 +1988,17 @@ moved.failed = 移行できませんでした。
 moved.failed_text = {why} このサーバーについては何も保存されていません。
 moved.open = ターミナルを開く
 moved.change = 変更
+# How to open them from another computer: when a server moved with My
+# key. {site} is the address of tTerm Web; <b>…</b> is bold.
+moved.how_title = ほかのコンピューターから開くには
+moved.how_1 = 任意のブラウザーで <b>{site}</b> を開き、いつもどおりメールのコードでサインインします。
+moved.how_2 = サーバーを開くと、tTerm が<b>保管庫のパスワード</b>を求めます。鍵はそのブラウザーの中で開き、Mac は必要ありません。
+moved.how_3 = 自分のコンピューターでは「Touch ID で保存」を押します。以降はそこで Touch ID だけで済み、パスワードは求められません。ほかの人のコンピューターでは「今回のみ」を選びます。
+# Under the steps, for the servers that moved Through this Mac: one
+# server, or several ("db-internal and nas").
+moved.how_mac_one = <b>{servers}</b> は、この Mac 経由でのみ開けます（この Mac が起動していて、tTerm が動いているあいだ）。
+moved.how_mac_many = <b>{servers}</b> は、この Mac 経由でのみ開けます（この Mac が起動していて、tTerm が動いているあいだ）。
 # <b>…</b> is the key's name, or a list of them.
-moved.keys_one = <b>{keys}</b> は保管庫に入りました。デバイスのロック解除と同じ方法で開くようにロックされています。「設定」の「SSH 鍵」に、どのデバイスでも表示されます。
-moved.keys_many = <b>{keys}</b> は保管庫に入りました。デバイスのロック解除と同じ方法で開くようにロックされています。「設定」の「SSH 鍵」に、どのデバイスでも表示されます。
+moved.keys_one = <b>{keys}</b> は暗号化されて保管庫に入りました。保管庫のパスワードで開けるほか、この Mac では Touch ID でも開けます。どのデバイスでも、「設定」の「SSH 鍵」に表示されます。
+moved.keys_many = <b>{keys}</b> は暗号化されて保管庫に入りました。保管庫のパスワードで開けるほか、この Mac では Touch ID でも開けます。どのデバイスでも、「設定」の「SSH 鍵」に表示されます。
 moved.no_keys = 移行した鍵はありません。鍵はこの Mac に残ります。

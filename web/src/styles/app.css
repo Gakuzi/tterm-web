@@ -7153,6 +7153,272 @@ mark.found-mark {
   text-align: left;
 }
 
+/* ------------------------------------------- the vault password (0.1.26)
+ * As on the canvas (VaultPass.dc, the rows of 02.11): the password twice
+ * with Show/Hide and a line under each field, the note in a dashed box;
+ * the field a closed vault opens with, in a server's card and in Settings ›
+ * Keys; the Keep question; Settings' banner and the password's row; and
+ * Move to cloud's "How to open them from another computer". */
+
+.vault-tile.green {
+  background: var(--green-tint);
+  color: var(--green-ink);
+}
+
+.vault-dialog-text.ink {
+  color: var(--ink);
+}
+
+.vault-points.ink {
+  gap: 8px;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.vault-pass-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.vault-pass-form .vault-field,
+.vault-pass-open .vault-field {
+  gap: 6px;
+}
+
+.vault-input.big {
+  height: 42px;
+  padding: 0 14px;
+  font-size: 15px;
+}
+
+.vault-input.big.mono {
+  font-size: 14px;
+}
+
+.vault-input:disabled {
+  opacity: 0.7;
+}
+
+.button-plain.vault-show {
+  flex: none;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 10px;
+  color: var(--dim);
+}
+
+.vault-field-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--faint);
+}
+
+.vault-field-note.green,
+.vault-field-note.amber {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.vault-field-note.green {
+  color: var(--green-ink);
+}
+
+.vault-field-note.amber,
+.vault-field-latin {
+  color: var(--amber-ink);
+}
+
+.vault-field-note.green svg {
+  flex: none;
+}
+
+.vault-pass-note {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px dashed var(--sep);
+  border-radius: 10px;
+  background: var(--ground);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--dim);
+}
+
+.vault-pass-form .vault-buttons {
+  margin-top: 4px;
+}
+
+/* A closed vault's field: in the card, as wide as the card. */
+.vault-pass-open {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.vault-locked-card .vault-pass-open {
+  margin-top: 4px;
+}
+
+.vault-locked-card .vault-input.big,
+.vault-locked-card .button-plain.vault-show {
+  height: 44px;
+}
+
+.vault-input.strong {
+  border-color: var(--amber-ring);
+}
+
+.vault-locked-card .button-accent.big.vault-pass-go {
+  align-self: stretch;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 0;
+}
+
+.vault-locked-card .vault-pass-open .vault-locked-links {
+  text-align: center;
+}
+
+.vault-pass-open .error-box {
+  text-align: left;
+}
+
+.vault-locked-foot {
+  align-self: stretch;
+  margin: 6px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--faint);
+}
+
+/* Settings › Keys: the field and the links take their own line. */
+.vault-state .vault-pass-open,
+.vault-state > .vault-locked-links {
+  flex: 1 1 100%;
+}
+
+.vault-state .vault-pass-open {
+  max-width: 520px;
+  margin-left: 34px;
+}
+
+.vault-state > .vault-locked-links {
+  margin-left: 34px;
+}
+
+.vault-state .button-accent.vault-pass-go {
+  align-self: flex-start;
+}
+
+.vault-banner {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--amber-ring);
+  background: var(--amber-tint);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+.vault-banner .vault-state-icon {
+  color: var(--amber-ink);
+}
+
+.vault-banner .vault-state-text {
+  gap: 3px;
+}
+
+.vault-banner .button-accent {
+  align-self: center;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 9px;
+  font-size: 13px;
+}
+
+/* Move to cloud: how to open them from another computer. */
+.move-how {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 22px;
+  border: 1px solid var(--amber-ring);
+  border-radius: 14px;
+  background: var(--amber-tint);
+}
+
+.move-how h2 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 700 17px var(--font-ui);
+}
+
+.move-how h2 svg {
+  flex: none;
+  color: var(--amber-ink);
+}
+
+.move-how ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.move-how li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.move-how li strong {
+  font-weight: 700;
+}
+
+.move-step {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--amber);
+  color: var(--on-accent);
+  font: 800 12px var(--font-ui);
+}
+
+.move-how-mac {
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--amber-ring);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+.move-how-mac strong {
+  font-weight: 600;
+  color: var(--ink);
+}
+
 /* The sidebar: a key server's key, and "via Mac". */
 .sb-key {
   flex: none;
@@ -7554,6 +7820,15 @@ mark.found-mark {
 
   .vault-sas code {
     font-size: 20px;
+  }
+
+  .vault-state .vault-pass-open,
+  .vault-state > .vault-locked-links {
+    margin-left: 0;
+  }
+
+  .move-how {
+    padding: 18px;
   }
 }
 

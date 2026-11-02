@@ -20,9 +20,11 @@ export function docsPage(lang: Lang, path: string): string {
 }
 
 /** What's new in a version of tTerm Web: the documentation has an entry
- * for each, #0124 for 0.1.24. */
-export function whatsNew(lang: Lang, version: string): string {
-  return docsPage(lang, `whats-new/web/#${version.replace(/[^0-9]/g, "")}`);
+ * for each, #0124 for 0.1.24. From 0.1.26 tTerm for Mac's too (`mac`, #080
+ * for 0.8.0): its What's new after an update goes there, no longer to the
+ * release on GitHub (the owner, 02.11, 12:37). */
+export function whatsNew(lang: Lang, version: string, product: "web" | "mac" = "web"): string {
+  return docsPage(lang, `whats-new/${product}/#${version.replace(/[^0-9]/g, "")}`);
 }
 
 /** A page of the site, tterm.net: `path` as "download/". */

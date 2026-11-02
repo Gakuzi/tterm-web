@@ -58,8 +58,10 @@ commands run count as something done, and keep the session from ending.
 """
 from __future__ import annotations
 
+import array
 import asyncio
 import contextlib
+import itertools
 import json
 import logging
 import uuid
@@ -83,6 +85,45 @@ SIGNED_OUT_CLOSE = 4401
 RECHECK = 60.0
 #: Seconds between two notes that something was done, at most.
 TOUCH_EVERY = auth.TOUCH_EVERY.total_seconds()
+#: How deep the page's JSON may nest arrays and objects (0.1.26). No request
+#: of the page's and no message on its socket goes past a few levels. How
+#: deep Python's own parser goes differs between versions: 3.12 and 3.13
+#: count the calls and stop near 10000 levels, 3.14 measures the stack and
+#: goes past 40000 with 8 MB of it; the core keeps a limit of its own, the
+#: same on every Python.
+PAGE_JSON_DEPTH = 64
+#: Every byte but the brackets of arrays and objects.
+_NOT_BRACKETS = bytes(b for b in range(256) if b not in b"[]{}")
+#: An opening bracket as 1, a closing one as -1 (0xff, as a signed byte).
+_STEPS = bytes.maketrans(b"[{]}", b"\x01\x01\xff\xff")
+
+
+def page_json(text: str | bytes):
+    """JSON from the page, in a request's body or on its socket. ValueError
+    for what is not JSON, and arrays and objects nested deeper than
+    PAGE_JSON_DEPTH are not, however deep Python's parser goes."""
+    if isinstance(text, (bytes, bytearray)):
+        # As json.loads decodes it.
+        text = text.decode(json.detect_encoding(text), "surrogatepass")
+    try:
+        value = json.loads(text)
+    except RecursionError:
+        raise ValueError("nested deeper than the parser goes") from None
+    if text.count("[") + text.count("{") > PAGE_JSON_DEPTH:
+        # How deep, from the text, now that it is known to be JSON: escaped
+        # backslashes and quotes are only inside strings, and without them
+        # every other quote begins one; outside strings all is ASCII, and
+        # the steps into and out of arrays and objects add up to how deep.
+        # All of it runs in C: a walk down the value in Python takes ten
+        # times as long as the parsing, for a body of empty arrays.
+        outside = "".join(text.replace("\\\\", "").replace('\\"', "")
+                          .split('"')[0::2])
+        steps = outside.encode("ascii", "ignore").translate(_STEPS,
+                                                            _NOT_BRACKETS)
+        if max(itertools.accumulate(array.array("b", steps)),
+               default=0) > PAGE_JSON_DEPTH:
+            raise ValueError(f"nested deeper than {PAGE_JSON_DEPTH} levels")
+    return value
 
 
 class PageSocket:
@@ -206,7 +247,9 @@ class PageSocket:
 
     async def _command(self, text: str) -> None:
         try:
-            msg = json.loads(text)
+            # Nested too deep is not JSON either (page_json): not
+            # understood, rather than the end of the socket.
+            msg = page_json(text)
             op = msg["op"]
             ch = int(msg.get("ch", 0))
         except (ValueError, KeyError, TypeError):

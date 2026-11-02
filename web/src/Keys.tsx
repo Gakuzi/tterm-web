@@ -1,21 +1,26 @@
-// Settings › Keys (0.1.17), as on the canvas (Vault.dc, web-keys): the
-// person's vault, the SSH keys they saved, on all their devices. How it is
-// here (open in this browser, with how it opened and when it locks again,
-// and Lock; or locked, and Open); each key with its type and fingerprint,
-// the servers it opens, where it came from and when it was last used, and
-// Remove; Add a key from a file, also with a passphrase; Make a new
-// recovery code; and where the vault opens. In tTerm for Mac the vault
-// opens in the app itself (Touch ID or the Mac's password), and keys come
-// from ~/.ssh with Move to cloud.
+// Settings › Keys (0.1.17, as on the canvas, Vault.dc, web-keys; the vault
+// password from 0.1.26, VaultPass.dc, web-keys and app-keys): the person's
+// vault, the SSH keys they saved, on all their devices. In this order: what
+// the vault is; for a vault made before 0.1.26 with no password yet, Set a
+// vault password; how it is here (open, with how it opened and when it
+// closes again, and Lock; or closed, and how to open it: Touch ID where the
+// keys were kept here, else the vault password, else the Mac's approval or
+// the recovery code); the vault password, with Change the password; each
+// key with its type and fingerprint, the servers it opens, where it came
+// from and when it was last used, and Remove; Add a key from a file, also
+// with a passphrase; and where the vault opens without the password. In
+// tTerm for Mac the vault opens in the app itself (Touch ID or the Mac's
+// password), and keys come from ~/.ssh with Move to cloud.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { type Project, type VaultKey } from "./api";
+import { type Project, type Vault, type VaultKey } from "./api";
 import { Confirm } from "./Confirm";
 import { gap, list, useT, type Translate } from "./i18n";
-import { Fingerprint, Key, Lock, Plus, Unlock } from "./icons";
+import { Fingerprint, Globe, Key, Lock, Password, Plus, Unlock } from "./icons";
 import { agoLong, onDay } from "./time";
 import {
-  macLockHere, macsOf, openOnMac, problemText, serversText, unlockWord, vaultUi,
+  macLockHere, macName, macsOf, openOnMac, OrLinks, PasswordOpen, problemText, serversText, unlockWord,
+  vaultUi,
 } from "./VaultDialogs";
 import { needsPassphrase, readKeyFile, type ReadKey } from "./vault/keyfile";
 import { rsaBits, shortFingerprint } from "./vault/ssh";
@@ -61,9 +66,17 @@ const OPENED: Record<string, string> = {
   touch: "keys.open_text.touch",
   hello: "keys.open_text.hello",
   passkey: "keys.open_text.passkey",
+  password: "keys.open_text.password",
   recovery: "keys.open_text.recovery",
   pairing: "keys.open_text.pairing",
   new: "keys.open_text.new",
+};
+
+/** While closed, where this browser keeps the keys with Touch ID. */
+const CLOSED: Record<string, string> = {
+  touch: "keys.closed_text.touch",
+  hello: "keys.closed_text.hello",
+  passkey: "keys.closed_text.passkey",
 };
 
 /** Where a key came from and when it was used: "Saved from MacBook-Pro on
@@ -75,6 +88,30 @@ function fromText(t: Translate, key: VaultKey): string {
     : t("keys.from_file", { day });
   const used = key.lastUsedAt ? t("keys.used", { ago: agoLong(key.lastUsedAt, t) }) : t("keys.unused");
   return `${where} · ${used}`;
+}
+
+/** When the password was set, as a time the page can show. */
+function setAt(vault: Vault): number | null {
+  const at = vault.password?.setAt;
+  if (typeof at === "number") return at;
+  if (typeof at === "string") {
+    const ms = Date.parse(at);
+    return Number.isFinite(ms) ? ms : null;
+  }
+  return null;
+}
+
+/** Where the vault opens without the password: "MacBook-Pro-Denis · tTerm
+ * for Mac, Chrome on macOS", in the sentence for a vault with a password,
+ * or for one with its recovery code still. */
+function placesText(t: Translate, vault: Vault): string {
+  const names = vault.locks.map((l) => {
+    const mac = /^tTerm for Mac on (.+)$/.exec(l.label)?.[1];
+    return mac ? t("keys.place_mac", { mac, app: t("app_link.mac") }) : l.label || t("keys.place_browser");
+  });
+  const places = list([...new Set(names)], t.lang);
+  if (vault.password) return names.length ? t("keys.opens_on", { places }) : t("keys.opens_password_only");
+  return names.length ? t("keys.opens_on_old", { places }) : t("keys.opens_on_code");
 }
 
 interface Props {
@@ -89,11 +126,20 @@ export function KeysSection(props: Props) {
   const [busy, setBusy] = useState(false);
   const [removing, setRemoving] = useState<VaultKey | null>(null);
   const [adding, setAdding] = useState<{ name: string; text: string } | null>(null);
+  // "or type the vault password": this browser's lock aside, the field.
+  const [typing, setTyping] = useState(false);
+  // Once the vault opens, the field has done its part: closed again, a
+  // browser that keeps its lock shows Open with Touch ID (3b), not the field.
+  useEffect(() => {
+    if (v.open) setTyping(false);
+  }, [v.open]);
   const file = useRef<HTMLInputElement>(null);
   const personal = props.projects.find((p) => p.personal)?.name ?? null;
   const vault = v.vault;
   const macs = macsOf(vault);
+  const mac = macName(t, vault);
   const passkey = passkeysHere(v.support);
+  const withPassword = !!vault?.password;
 
   const act = (what: () => Promise<unknown>) => async () => {
     setBusy(true);
@@ -107,16 +153,28 @@ export function KeysSection(props: Props) {
     }
   };
 
-  /** Open, the way this browser can: its passkey; else the window with the
-   * Mac's approval and the recovery code. In the app: this Mac's lock, or
-   * once the recovery code where this Mac has none yet. */
+  /** Open, the way this browser can: its passkey; else the vault password
+   * (the field in the card, which takes the keys); else, for a vault with
+   * no password yet, the window with the Mac's approval and the recovery
+   * code. In the app: this Mac's lock, or once the password (the recovery
+   * code) where this Mac has none yet. */
   const openHere = act(async () => {
     if (v.app) await openOnMac();
-    else if (v.hereLock) await vaultStore.openWithPasskey();
+    else if (v.hereLock && !typing) await vaultStore.openWithPasskey();
+    else if (withPassword) vaultUi.wantPassword();
     else vaultUi.openVault(macs.length ? null : "code");
   });
-  /** In the app, a vault this Mac has no lock of: it opens with the code. */
-  const codeOnMac = v.app && !macLockHere(vault);
+  /** In the app, a vault this Mac has no lock of: it opens with the
+   * password, or the code. */
+  const onceOnMac = v.app && !macLockHere(vault);
+
+  /** Set a vault password, or a new one: the toast says which. */
+  const setPassword = (use: "set" | "change") => async () => {
+    setProblem(null);
+    if (await vaultUi.password(use)) {
+      props.notify(use === "set" ? t("vault_password.done_set") : t("vault_password.done_change"));
+    }
+  };
 
   const pickFile = () => {
     setProblem(null);
@@ -127,14 +185,9 @@ export function KeysSection(props: Props) {
     file.current?.click();
   };
 
-  const placesText = (): string => {
-    if (!vault?.locks.length) return t("keys.opens_on_code");
-    const names = vault.locks.map((l) => {
-      const mac = /^tTerm for Mac on (.+)$/.exec(l.label)?.[1];
-      return mac ? t("keys.place_mac", { mac, app: t("app_link.mac") }) : l.label || t("keys.place_browser");
-    });
-    return t("keys.opens_on", { places: list([...new Set(names)], t.lang) });
-  };
+  const approve = { key: "mac", text: t("vault_locked.approve_on", { mac }), go: () => vaultUi.openVault("mac") };
+  const useCode = { key: "code", text: t("vault_locked.use_code"), go: () => vaultUi.openVault("code") };
+  const forgot = { key: "forgot", text: t("vault_password.forgot"), go: () => vaultUi.forgot() };
 
   let card;
   if (!v.ready) {
@@ -167,20 +220,76 @@ export function KeysSection(props: Props) {
         </button>
       </div>
     );
-  } else {
+  } else if (v.app) {
     card = (
       <div className="account-card vault-state">
         <Lock size={20} className="vault-state-icon" />
         <span className="vault-state-text">
-          <strong>{v.app ? t("keys.locked_mac") : t("keys.locked_here")}</strong>
+          <strong>{t("keys.locked_mac")}</strong>
           <span>
-            {codeOnMac ? t("keys.locked_mac_code") : v.app ? t("keys.locked_mac_text") : t("keys.locked_text")}
+            {!onceOnMac ? t("keys.locked_mac_text")
+              : withPassword ? t("keys.locked_mac_password") : t("keys.locked_mac_code")}
           </span>
         </span>
+        {onceOnMac && withPassword ? <PasswordOpen /> : (
+          <button type="button" className="button-accent" disabled={busy} onClick={() => void openHere()}>
+            {!onceOnMac && <Fingerprint size={15} />}
+            {onceOnMac ? t("keys.open_code") : t("vault.open_touch")}
+          </button>
+        )}
+      </div>
+    );
+  } else if (v.hereLock && !typing) {
+    // The keys are kept in this browser: Touch ID opens them.
+    card = (
+      <div className="account-card vault-state">
+        <Lock size={20} className="vault-state-icon" />
+        <span className="vault-state-text">
+          <strong>{t("keys.closed_here")}</strong>
+          <span>{t(CLOSED[unlockOf()])}</span>
+        </span>
         <button type="button" className="button-accent" disabled={busy} onClick={() => void openHere()}>
-          {((v.app && !codeOnMac) || (!v.app && v.hereLock)) && <Fingerprint size={15} />}
-          {codeOnMac ? t("keys.open_code") : v.app ? t("vault.open_touch")
-            : v.hereLock ? unlockWord(t, "open") : t("keys.open")}
+          <Fingerprint size={15} />
+          {unlockWord(t, "open")}
+        </button>
+        {withPassword ? (
+          <p className="vault-locked-links">
+            <button type="button" className="link-button" onClick={() => {
+              setProblem(null);
+              setTyping(true);
+            }}>
+              {t("vault_locked.use_password")}
+            </button>
+          </p>
+        ) : (
+          <OrLinks links={[...(macs.length ? [approve] : []), useCode]} />
+        )}
+      </div>
+    );
+  } else if (withPassword) {
+    // Not kept here: the vault password opens them, for this session.
+    card = (
+      <div className="account-card vault-state">
+        <Lock size={20} className="vault-state-icon" />
+        <span className="vault-state-text">
+          <strong>{t("keys.closed_here")}</strong>
+          <span>{t("keys.closed_text_password")}</span>
+        </span>
+        <PasswordOpen autoFocus={typing}
+          links={<OrLinks links={[...(macs.length ? [approve] : []), forgot]} />} />
+      </div>
+    );
+  } else {
+    // A vault with no password yet, not kept here: the Mac's approval or
+    // the recovery code (the banner above offers the password).
+    card = (
+      <div className="account-card vault-state">
+        <Lock size={20} className="vault-state-icon" />
+        <span className="vault-state-text">
+          <strong>{t("keys.closed_here")}</strong>
+        </span>
+        <button type="button" className="button-accent" disabled={busy} onClick={() => void openHere()}>
+          {t("keys.open")}
         </button>
       </div>
     );
@@ -188,8 +297,9 @@ export function KeysSection(props: Props) {
 
   const ed25519 = vault?.keys.some((k) => k.type === "ssh-ed25519") && v.support?.ed25519 === false;
   // Two sentences side by side: no space between them in Chinese and Japanese.
-  const places = vault ? placesText() : "";
+  const places = vault ? placesText(t, vault) : "";
   const more = v.app ? t("keys.more_app") : t("keys.more_web");
+  const passwordDay = vault ? onDay(setAt(vault), t) : "";
 
   return (
     <section className="account-section" aria-labelledby="st-keys" id="st-keys-section">
@@ -197,7 +307,31 @@ export function KeysSection(props: Props) {
         <h2 id="st-keys" className="with-icon"><Key size={17} />{t("keys.title")}</h2>
         <p>{t("keys.about")}</p>
       </div>
+      {vault && !vault.password && (
+        <div className="account-card vault-banner">
+          <Globe size={20} className="vault-state-icon" />
+          <span className="vault-state-text">
+            <strong>{t("keys.set_title")}</strong>
+            <span>{t("keys.set_text")}</span>
+          </span>
+          <button type="button" className="button-accent" onClick={() => void setPassword("set")()}>
+            {t("keys.set_go")}
+          </button>
+        </div>
+      )}
       {card}
+      {vault?.password && (
+        <div className="account-card vault-state">
+          <Password size={20} className="vault-state-icon" />
+          <span className="vault-state-text">
+            <strong>{t("keys.password_title")}</strong>
+            <span>{t("keys.password_text", { day: passwordDay })}</span>
+          </span>
+          <button type="button" className="button-plain small" onClick={() => void setPassword("change")()}>
+            {t("keys.password_change")}
+          </button>
+        </div>
+      )}
       {!v.app && v.ready && v.support && !passkey && (
         <p className="vault-note">{t("keys.no_passkey_here")}</p>
       )}
@@ -233,31 +367,25 @@ export function KeysSection(props: Props) {
           ))}
         </ul>
       )}
-      <div className="button-row">
-        {!v.app && (
+      {!v.app && (
+        <div className="button-row">
           <button type="button" className="button-plain with-icon" disabled={busy || !v.ready}
             onClick={pickFile}>
             <Plus size={14} />{t("keys.add_file")}
           </button>
-        )}
-        {vault && (
-          <button type="button" className="button-ghost" disabled={busy}
-            onClick={() => vaultUi.newRecovery()}>
-            {t("keys.new_recovery")}
-          </button>
-        )}
-        <input ref={file} type="file" hidden onChange={(event) => {
-          const chosen = event.target.files?.[0];
-          event.target.value = "";
-          if (!chosen) return;
-          if (chosen.size > 64 * 1024) {
-            setProblem(t("add_key.problem_big"));
-            return;
-          }
-          void chosen.text().then((text) => setAdding({ name: chosen.name, text }))
-            .catch(() => setProblem(t("add_key.problem_read")));
-        }} />
-      </div>
+          <input ref={file} type="file" hidden onChange={(event) => {
+            const chosen = event.target.files?.[0];
+            event.target.value = "";
+            if (!chosen) return;
+            if (chosen.size > 64 * 1024) {
+              setProblem(t("add_key.problem_big"));
+              return;
+            }
+            void chosen.text().then((text) => setAdding({ name: chosen.name, text }))
+              .catch(() => setProblem(t("add_key.problem_read")));
+          }} />
+        </div>
+      )}
       {problem && <div className="error-box" role="alert">{problem}</div>}
       {vault && (
         <p className="vault-places">{places}{gap(places, more, t.lang)}{more}</p>
@@ -298,7 +426,8 @@ function nameOf(fileName: string): string {
 }
 
 /** Add a key from a file: the passphrase when it has one, the key as read,
- * its name; with no vault yet, Save your key to your vault first. */
+ * its name; with no vault yet, Make up a vault password first, and the Keep
+ * question after it, then the key goes in. */
 function AddKey(props: {
   fileName: string;
   text: string;
@@ -314,9 +443,11 @@ function AddKey(props: {
   const [problem, setProblem] = useState<string | null>(null);
   const wantsPassphrase = needsPassphrase(props.text);
   const box = useRef<HTMLElement>(null);
-  // Save your key to your vault and the recovery code come over it: it
-  // waits behind them, out of sight.
-  const covered = useSyncExternalStore(vaultUi.subscribe, vaultUi.get, vaultUi.get) !== null;
+  // The password window and the Keep question come over it: it waits
+  // behind them, out of sight.
+  const v = useVault();
+  const covered = useSyncExternalStore(vaultUi.subscribe, vaultUi.get, vaultUi.get) !== null ||
+    v.offerPasskey;
 
   const readIt = async () => {
     setBusy(true);
@@ -342,11 +473,12 @@ function AddKey(props: {
     setProblem(null);
     try {
       if (!props.hasVault) {
-        const made = await vaultUi.newVault("web", name, null);
+        const made = await vaultUi.newVault("web", name.trim());
         if (!made) {
           setBusy(false);
           return;
         }
+        await vaultStore.keepAnswered();
       }
       await vaultStore.addKey(read, name.trim(), props.fileName);
       props.onAdded(name.trim());
@@ -407,7 +539,6 @@ function AddKey(props: {
               <input id="ak-name" type="text" className="vault-input" maxLength={64}
                 value={name} autoFocus onChange={(e) => setName(e.target.value)} />
             </div>
-            <p className="vault-dialog-text small">{t("add_key.sealed_here")}</p>
           </>
         )}
         {problem && <div className="error-box" role="alert">{problem}</div>}

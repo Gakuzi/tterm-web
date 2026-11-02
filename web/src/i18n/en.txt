@@ -1609,30 +1609,48 @@ vault.code_label = Code {code}
 
 # ------------------------------------------------------------ keys: Settings › Keys, the vault (Keys.tsx)
 keys.title = Keys
-keys.about = Your vault: the SSH keys you saved, on all your devices. Only your devices open it, the way they unlock; tTerm cannot.
+keys.about = Your vault: the SSH keys you saved. They are encrypted, and only you open them: with your vault password, and without it where you kept them. tTerm cannot.
+# A vault made before 0.1.26 has a recovery code and no password: this
+# banner, above the vault's state, sets one (vault_password.title_set).
+keys.set_title = Set a vault password
+keys.set_text = With it you open your keys in any browser, even when your Mac stays at home. The recovery code stops working after this: the password replaces it.
+keys.set_go = Set the password
 keys.open_here = Open in this browser
 # How it opened, then when it locks again: one of these under "Open in this browser".
-keys.open_text.touch = Opened with Touch ID. It locks again after 8 hours without anything done, when you close tTerm Web, or when you press Lock.
-keys.open_text.hello = Opened with Windows Hello. It locks again after 8 hours without anything done, when you close tTerm Web, or when you press Lock.
-keys.open_text.passkey = Opened with your passkey. It locks again after 8 hours without anything done, when you close tTerm Web, or when you press Lock.
-keys.open_text.recovery = Opened with your recovery code, for this session. It locks again after 8 hours without anything done, when you close tTerm Web, or when you press Lock.
-keys.open_text.pairing = Opened with your Mac's approval, for this session. It locks again after 8 hours without anything done, when you close tTerm Web, or when you press Lock.
-keys.open_text.new = Made in this browser just now. It locks again after 8 hours without anything done, when you close tTerm Web, or when you press Lock.
+keys.open_text.touch = Opened with Touch ID. It closes by itself after 8 hours with nothing done, and when you close tTerm Web or press Lock. Opening it again is one touch of Touch ID.
+keys.open_text.hello = Opened with Windows Hello. It closes by itself after 8 hours with nothing done, and when you close tTerm Web or press Lock. Windows Hello opens it again.
+keys.open_text.passkey = Opened with your passkey. It closes by itself after 8 hours with nothing done, and when you close tTerm Web or press Lock. Your passkey opens it again.
+keys.open_text.password = Opened with your vault password, for this session only. It closes by itself after 8 hours with nothing done, and when you close the tab or press Lock.
+keys.open_text.recovery = Opened with your recovery code, for this session only. It closes by itself after 8 hours with nothing done, and when you close the tab or press Lock.
+keys.open_text.pairing = Opened with your Mac's approval, for this session only. It closes by itself after 8 hours with nothing done, and when you close the tab or press Lock.
+keys.open_text.new = Made in this browser just now. It closes by itself after 8 hours with nothing done, and when you close the tab or press Lock.
 # In tTerm for Mac.
 keys.open_mac = Open on this Mac
 keys.open_text.mac = Opened with Touch ID or your Mac's password. It stays open while tTerm runs, until you press Lock or sign out.
 keys.lock = Lock
-keys.locked_here = Locked in this browser
-keys.locked_text = Open it to use your keys here: the way this computer unlocks, your Mac's approval, or your recovery code.
+# The vault closed in this browser. Where the keys were kept here with
+# Touch ID (or Windows Hello, a passkey), one of the three; else the
+# vault password opens them (keys.closed_text_password, with its field).
+keys.closed_here = Your vault is closed
+keys.closed_text.touch = Open it with Touch ID to sign in to servers with your key.
+keys.closed_text.hello = Open it with Windows Hello to sign in to servers with your key.
+keys.closed_text.passkey = Open it with your passkey to sign in to servers with your key.
+keys.closed_text_password = Your keys are encrypted, and only your vault password opens them. Type it: the keys open right in this browser. The password itself goes nowhere.
+# The vault password's row, under the vault's state: {day} is time.today,
+# time.yesterday or time.on_day ("on 2 Nov").
+keys.password_title = Vault password
+keys.password_text = Opens your keys in any browser. Set {day}.
+keys.password_change = Change the password
 keys.locked_mac = Locked on this Mac
 keys.locked_mac_text = Open it with Touch ID or your Mac's password: then this Mac signs your servers in.
 keys.locked_mac_code = This Mac has no lock on your vault yet. Open it here once with your recovery code: after that, Touch ID or your Mac's password opens it.
+keys.locked_mac_password = This Mac has no lock on your vault yet. Open it here once with your vault password: after that this Mac opens it by itself, with Touch ID.
 keys.open = Open
 keys.open_code = Open with the recovery code
 keys.none_title = No vault yet
-keys.none_web = Add a key from a file: your vault is made then, in this browser, with a recovery code you keep.
-keys.none_app = Save a key with Move to cloud, or with the strip after ssh in a terminal: your vault is made then, with Touch ID.
-keys.no_passkey_here = This browser cannot keep your vault with a passkey: here it opens with your recovery code or your Mac's approval, for one session at a time.
+keys.none_web = Add a key from a file: your vault is made then, with a vault password you make up.
+keys.none_app = Save a key with Move to cloud, or with the strip after ssh in a terminal: your vault is made then, with a vault password you make up.
+keys.no_passkey_here = This browser cannot keep your keys with a passkey: here they open with your vault password or your Mac's approval, for one session at a time.
 keys.no_ed25519_here = This browser cannot sign with Ed25519 keys. Open those servers in a newer browser, or in tTerm for Mac.
 # {servers} is a list of servers: droplet and staging; web-01 in Client X.
 keys.opens = Opens {servers}
@@ -1649,9 +1667,10 @@ keys.cannot_ed25519 = This browser cannot sign with Ed25519 keys
 keys.cannot_open = It does not open here: add it again from its file
 keys.remove = Remove
 keys.add_file = Add a key from a file
-keys.new_recovery = Make a new recovery code
 # {places} is where the vault opens: "MacBook-Pro-Denis · tTerm for Mac, Chrome on macOS".
-keys.opens_on = Opens on: {places}.
+keys.opens_on = Without the password your vault opens on: {places}. In any other browser, with the vault password.
+keys.opens_password_only = Your vault opens with its password only: no device keeps it yet.
+keys.opens_on_old = Without the password your vault opens on: {places}. Until it has a password, other browsers open it with the recovery code or your Mac's approval.
 keys.opens_on_code = Opens with your recovery code only.
 keys.place_mac = {mac} · {app}
 keys.place_browser = a browser
@@ -1671,7 +1690,6 @@ add_key.passphrase_hint = The key is encrypted. Its passphrase opens it here, in
 add_key.open_key = Open the key
 add_key.reading = Reading the key…
 add_key.name = Name
-add_key.sealed_here = It is locked here, before it leaves this browser. Only your devices can open it; tTerm cannot.
 add_key.add = Add to your vault
 add_key.next = Next
 add_key.added = {name} is in your vault
@@ -1691,50 +1709,81 @@ add_key.problem_encrypted_pem = This key file is encrypted the old PEM way. Turn
 add_key.problem_ed25519 = This browser cannot read Ed25519 keys in this format. Try a newer browser, or the key in OpenSSH's format.
 add_key.problem_several = The file has more than one key: add them one by one.
 
-# ------------------------------------------------------------ vault_new: Save your key to your vault (VaultDialogs.tsx)
-vault_new.title = Save your key to your vault
-# <code>…</code> is the key's name: id_ed25519. {server} is the server's name.
-vault_new.text_server = <code>{key}</code> goes to your vault, and {server} opens with it from tTerm Web, your phone or any computer you sign in on.
-vault_new.text = <code>{key}</code> goes to your vault: the servers that open with it open from tTerm Web, your phone or any computer you sign in on.
-# In tTerm for Mac.
-vault_new.point_mac_unlock = It opens the way this Mac unlocks: Touch ID or your Mac's password. Nothing new to remember.
-vault_new.point_mac_locked = It is locked before it leaves this Mac. Only your devices can open it; tTerm cannot.
-vault_new.point_mac_browser = A new browser opens it once you approve it here, or with your recovery code.
-# In a browser.
-vault_new.point_web_unlock = It opens the way this computer unlocks: Touch ID, Windows Hello or your phone's lock. Nothing new to remember.
-vault_new.point_web_no_passkey = This browser cannot keep it with a passkey: here it opens with your recovery code, one session at a time.
-vault_new.point_web_locked = It is locked before it leaves this browser. Only your devices can open it; tTerm cannot.
-vault_new.point_web_browser = Another browser opens it with your recovery code, or once you approve it in tTerm for Mac.
-vault_new.make_touch = Make my vault with Touch ID
-vault_new.make_hello = Make my vault with Windows Hello
-vault_new.make_passkey = Make my vault with a passkey
-vault_new.make = Make my vault
+# ------------------------------------------------------------ vault_password: the vault password (VaultDialogs.tsx, 0.1.26)
+# Make up a vault password: a new vault, made on the Mac (Move to cloud;
+# the strip after ssh, vault_password.text_key) or in a browser (Add a key
+# from a file, vault_password.text_web). <code>…</code> is the key's name:
+# id_ed25519.
+vault_password.title_new = Make up a vault password
+vault_password.text_mac = The keys of this Mac go to your vault in the cloud, encrypted. With this password you open them in any browser, even when your Mac stays at home.
+vault_password.text_key = <code>{key}</code> goes to your vault in the cloud, encrypted. With this password you open it in any browser, even when your Mac stays at home.
+vault_password.text_web = <code>{key}</code> goes to your vault, encrypted in this browser. With this password you open it in any browser.
+vault_password.label = Password
+# The second field: the same password once more.
+vault_password.label_again = Again
+# Next to the field: the password shown as it is typed, or hidden again.
+vault_password.show = Show
+vault_password.hide = Hide
+# Under the first field; while it has 1 to 11 characters, vault_password.short
+# instead. vault_password.latin when it has a character beyond plain Latin.
+vault_password.hint = At least 12 characters. A phrase of a few words is easiest.
+vault_password.short = one: {n} more character | other: {n} more characters
+vault_password.latin = It has letters other than A to Z: a computer abroad may have no keyboard layout for them.
+# Under the second field.
+vault_password.match = Matches
+vault_password.no_match = Not the same as above
+# In a dashed box under the fields: on the Mac, and in a browser.
+vault_password.note_mac = tTerm does not know this password and cannot recover it. Keep it in your password manager. If you forget it, set a new one here, on this Mac.
+vault_password.note_web = tTerm does not know this password and cannot recover it. Keep it in your password manager.
+vault_password.create = Make the vault
+# On the button, while the password becomes the key (a second; a few on a phone).
+vault_password.working = Encrypting…
+# Settings › Keys: Set a vault password (a vault made before 0.1.26, with a
+# recovery code), or Change it.
+vault_password.title_set = Set a vault password
+vault_password.text_set = With it you open your keys in any browser, even when your Mac stays at home. tTerm does not know this password and cannot recover it. The recovery code stops working after this.
+vault_password.set = Set the password
+vault_password.title_change = Change the vault password
+vault_password.text_change = The new password replaces the old one at once: the old one no longer opens your keys. Your Mac and the browsers where your keys are kept open them as before.
+vault_password.label_new = New password
+vault_password.change = Change the password
+# In a browser where the keys are not kept: what opens the vault for the
+# change (the current password), or for setting it (the recovery code,
+# recovery.now_code).
+vault_password.current = Current password
+vault_password.current_hint = Your keys are not kept in this browser, so the current password is needed to change it.
+vault_password.code_hint = Your keys are not kept in this browser, so your recovery code is needed to set the password.
+# Said once done.
+vault_password.done_set = The vault password is set. The recovery code no longer opens your vault.
+vault_password.done_change = The vault password is changed.
+# A closed vault, in a browser with no lock of it: the field it opens with,
+# in a server's card and in Settings › Keys.
+vault_password.label_vault = Vault password
+vault_password.open = Open the keys
+vault_password.opening = Opening…
+vault_password.forgot = Forgot the password?
 
-# ------------------------------------------------------------ recovery: the recovery code, shown once (VaultDialogs.tsx)
-recovery.title = Your recovery code
-recovery.text = If you ever lose every device that opens your vault, this code is the only way back to your keys. tTerm cannot recover them for you. You see it once.
-recovery.title_new = Your new recovery code
-recovery.text_new = The code you had before does not open your vault any more. If you ever lose every device that opens your vault, this one is the only way back to your keys. You see it once.
-# For screen readers.
-recovery.code_label = Recovery code {code}
-recovery.save_file = Save as a file
-recovery.copy_failed = Could not copy: select the code and copy it by hand.
-# What the file saved holds.
-recovery.file_text = tTerm vault recovery code: {code}\nIt opens your vault when no device of yours does. Keep it somewhere safe, away from your devices.
-recovery.kept_mac = I have kept it somewhere safe, not on this Mac only
-recovery.kept_web = I have kept it somewhere safe, not on this computer only
-recovery.make_title = Make a new recovery code?
-recovery.make_text = The code you have now stops working, and the new one is shown once. Your keys and devices stay as they are.
+# ------------------------------------------------------------ vault_forgot: Forgot your vault password? (VaultDialogs.tsx, 0.1.26)
+vault_forgot.title = Forgot your vault password?
+vault_forgot.text = tTerm cannot remind you of it: only you know the password. But you can set a new one where your vault opens without it:
+# Two points under the text: where a new password can be set.
+vault_forgot.mac = on your Mac, in tTerm for Mac: Settings › Keys › Change the password, with Touch ID;
+vault_forgot.browser = in a browser where your keys are kept: there too, in Settings.
+# <code>…</code> is the folder of the keys: it stays as it is.
+vault_forgot.none = If there is no such device, the keys in your vault cannot be opened any more. The keys themselves usually stay on your Mac, in <code>~/.ssh</code>.
+vault_forgot.ok = Got it
+
+# ------------------------------------------------------------ recovery: the recovery code of a vault made before 0.1.26 (VaultDialogs.tsx)
 recovery.now_code = Your recovery code now
-recovery.now_code_hint = This browser has no passkey of your vault, so the code you have now makes the new one. Lost it? Make the new one in tTerm for Mac.
-recovery.make_go = Make a new code
-recovery.make_go_passkey = Make it with your passkey
-recovery.make_touch = Make it with Touch ID
 
 # ------------------------------------------------------------ vault_open: Open your keys on this browser (VaultDialogs.tsx)
 vault_open.title = Open your keys on this browser
 vault_open.text = This browser is new to your vault. Approve it on a device that already opens it.
 vault_open.text_code = Open your vault on this browser with your recovery code.
+# A vault with a password: the Mac's approval is the second way, and the
+# button at the bottom goes back to the password field.
+vault_open.text_password = Approve this browser on your Mac. Handy on someone else's computer: no need to type the vault password there.
+vault_open.use_password = Type the password instead
 # {mac} is the Mac's name, {app} is app_link.mac: "MacBook-Pro-Denis · tTerm for Mac".
 vault_open.mac_name = {mac} · {app}
 vault_open.mac_ask = Ask it to open your vault here
@@ -1747,9 +1796,13 @@ vault_open.sas_text = Your Mac shows a code too. Allow there only if it is the s
 vault_open.or = or
 vault_open.code = Recovery code
 vault_open.open = Open
-# Once open with the recovery code or the Mac's approval: whether this browser keeps a passkey.
+# Once open with the password, the Mac's approval or the recovery code, or just made in this browser: whether to keep the keys here with a passkey.
 vault_open.opened_title = Your keys are open in this browser
-vault_open.opened_text = Keep a passkey here, so that they open the way this computer unlocks next time? On a computer that is not yours, choose Only this time.
+vault_open.keep_text.touch = Keep them here with Touch ID? Then next time Touch ID is enough in this browser, no password needed.
+vault_open.keep_text.hello = Keep them here with Windows Hello? Then next time Windows Hello is enough in this browser, no password needed.
+vault_open.keep_text.passkey = Keep them here with a passkey? Then next time the passkey is enough in this browser, no password needed.
+# Small, under the question.
+vault_open.keep_foreign = Someone else's computer? Choose Only this time: the keys close when you close the tab, or by themselves when they are not used for a while.
 vault_open.keep_touch = Keep with Touch ID
 vault_open.keep_hello = Keep with Windows Hello
 vault_open.keep_passkey = Keep with a passkey
@@ -1761,6 +1814,9 @@ app_code.title = Open your vault on this Mac
 app_code.text = This Mac has no lock on your vault yet. Open it here once with your recovery code: then this Mac opens it with Touch ID.
 # When this Mac's lock is there but no longer opens the vault (taken off in a browser, or gone from the keychain).
 app_code.text_lost = This Mac's lock no longer opens your vault. Open it here once with your recovery code: then this Mac gets a new lock, and Touch ID opens it again.
+# A vault with a password (0.1.26): opened here once with it.
+app_code.text_password = This Mac has no lock on your vault yet. Open it here once with your vault password: then this Mac opens it with Touch ID.
+app_code.text_lost_password = This Mac's lock no longer opens your vault. Open it here once with your vault password: then this Mac gets a new lock, and Touch ID opens it again.
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1789,8 +1845,21 @@ mac_approve.not_me_note = It's not me: that sign-in ends, and Settings › Devic
 # ------------------------------------------------------------ vault_locked: a server with your key, the vault locked here (VaultLocked.tsx)
 vault_locked.title = {machine} opens with your key
 vault_locked.text = Your keys are locked in this browser. Open them the way this computer unlocks; tTerm then signs {machine} in, and your key never leaves this browser.
+# A vault with a password, in a browser that keeps no lock of it: the
+# password field comes under it.
+vault_locked.text_password = Your keys are encrypted in the cloud, and only your vault password opens them. Type it: the keys open right in this browser, and tTerm signs in to {machine}. The password itself goes nowhere.
+# Where the keys were kept with Touch ID (or Windows Hello, a passkey):
+# one of the three, the button, and a link to type the password instead.
+vault_locked.closed_title = Your vault is closed
+vault_locked.closed_text.touch = Open it with Touch ID to sign in to {machine} with your key.
+vault_locked.closed_text.hello = Open it with Windows Hello to sign in to {machine} with your key.
+vault_locked.closed_text.passkey = Open it with your passkey to sign in to {machine} with your key.
+vault_locked.use_password = or type the vault password
+# Small, at the card's bottom.
+vault_locked.closes_itself = Your vault closes by itself when you have not used it for a while: in case you stepped away from the computer.
 vault_locked.text_app = Your keys are locked on this Mac. Open them with Touch ID or your Mac's password; then this Mac signs {machine} in.
 vault_locked.text_app_code = This Mac has no lock on your vault yet. Open it here once with your recovery code; then this Mac signs {machine} in.
+vault_locked.text_app_password = This Mac has no lock on your vault yet. Open it here once with your vault password; then this Mac signs in to {machine}.
 # Small links under the button: "or approve on MacBook-Pro-Denis · use the recovery code".
 vault_locked.or = or
 vault_locked.approve_on = approve on {mac}
@@ -1807,17 +1876,32 @@ vault_locked.its_key = its key
 vault_problem.no_vault = You have no vault yet.
 vault_problem.exists = You have a vault already: open it, then add the key.
 vault_problem.locked = Open your vault first.
-vault_problem.no_passkey = No passkey of your vault answered here. Approve this browser on your Mac, or use your recovery code.
-vault_problem.no_prf = This passkey cannot open your vault here. Approve this browser on your Mac, or use your recovery code.
+# The vault password: {n} tries left (shown when 3 or fewer), {time} a
+# time of day, as the page shows times ("14:05").
+vault_problem.password_wrong = That password does not open your vault. Check the keyboard layout and Caps Lock.
+vault_problem.password_left = one: {n} try left before a pause of an hour. | other: {n} tries left before a pause of an hour.
+vault_problem.password_paused = Too many wrong passwords. Try again at {time}.
+# The same pause, when it ends another day (thirty wrong ones in a day):
+# {day} is the date as the page writes it ("3 Nov"), {time} the time.
+vault_problem.password_paused_day = Too many wrong passwords. Try again on {day} at {time}.
+vault_problem.no_password = Your vault has no password yet: set it in Settings › Keys on your Mac.
+vault_problem.password_short = The password needs at least 12 characters.
+vault_problem.no_wasm = This browser cannot open a vault password. Open your keys with your Mac's approval, or in a newer browser.
+vault_problem.no_passkey = No passkey of your vault answered here. Type your vault password, or approve this browser on your Mac.
+vault_problem.no_passkey_code = No passkey of your vault answered here. Approve this browser on your Mac, or use your recovery code.
+vault_problem.no_prf = This passkey cannot open your vault here. Type your vault password, or approve this browser on your Mac.
+vault_problem.no_prf_code = This passkey cannot open your vault here. Approve this browser on your Mac, or use your recovery code.
 vault_problem.no_prf_here = This browser cannot keep your vault with a passkey: it stays open for this session only.
-vault_problem.lock_broken = This browser's lock does not open your vault any more. Use your recovery code, or approve it on your Mac.
+vault_problem.lock_broken = This browser's lock does not open your vault any more. Type your vault password, or approve this browser on your Mac.
+vault_problem.lock_broken_code = This browser's lock does not open your vault any more. Use your recovery code, or approve it on your Mac.
 vault_problem.code_form = A recovery code is 24 letters and digits, in six groups of four.
 vault_problem.code_wrong = That recovery code does not open your vault. Check it, or approve this browser on your Mac.
 # In tTerm for Mac: the engine's answers, said by the page (the code window, Touch ID).
 vault_problem.code_wrong_app = That recovery code does not open your vault. Check it and try again.
 vault_problem.touch_failed = Touch ID or your Mac's password did not go through. Nothing changed.
 vault_problem.need_code = Type your recovery code now: this browser has no passkey of your vault.
-vault_problem.no_x25519 = This browser is too old for your Mac to approve it: use your recovery code, or a newer browser.
+vault_problem.no_x25519 = This browser is too old for your Mac to approve it: type your vault password, or use a newer browser.
+vault_problem.no_x25519_code = This browser is too old for your Mac to approve it: use your recovery code, or a newer browser.
 vault_problem.pairing = The request did not go through. Ask again.
 vault_problem.passkey_exists = This browser has a passkey for tTerm already.
 vault_problem.no_passkey_here = This browser cannot make a passkey.
@@ -1835,7 +1919,7 @@ ssh_strip.let_in = Let tTerm in
 ssh_strip.not_now = Not now
 ssh_strip.never = Don't ask for {alias}
 # <b>…</b> are the two buttons' names, as above.
-ssh_strip.explain = <b>Save my key:</b> it goes to your vault, which only your devices open; {alias} stays as it is. <b>Let tTerm in:</b> tTerm adds its own line on {alias}; your key stays on this Mac. More servers at once: Move to cloud in the account menu.
+ssh_strip.explain = <b>Save my key:</b> it goes to your vault, encrypted: it opens with your vault password in any browser; {alias} stays as it is. <b>Let tTerm in:</b> tTerm adds its own line on {alias}; your key stays on this Mac. More servers at once: Move to cloud in the account menu.
 ssh_strip.explain_pass = <b>Let tTerm in:</b> tTerm adds its own line on {alias}; your key stays on this Mac. More servers at once: Move to cloud in the account menu.
 ssh_strip.unreachable = tTerm Web cannot reach {alias} from the cloud: it opens through this Mac, while it is on.
 ssh_strip.through_mac = Open it through this Mac
@@ -1858,7 +1942,7 @@ move.how = How {name} opens
 move.method_key = My key
 move.method_cert = tTerm's pass
 move.method_mac = Through this Mac
-move.way_key = The key goes to your vault; the server stays as it is. Opens in any browser after it unlocks your vault.
+move.way_key = The key goes to your vault; the server stays as it is. Opens in any browser with your vault password.
 move.way_cert = tTerm adds its own line on the server, your key stays here. Opens anywhere, also from Telegram.
 move.way_mac = Nothing moves: tTerm asks this Mac to connect, while it is on. For servers behind a VPN.
 # {address} is root@203.0.113.7, {jump} the bastion it goes through.
@@ -1887,7 +1971,7 @@ move.key_security = On a security key: it cannot leave it. Its servers go throug
 move.key_agent = Only in an agent: it cannot be copied. Its servers go through this Mac
 move.key_type = A kind of key the vault does not keep yet. Its servers go through this Mac
 move.key_passphrase = has a passphrase
-move.vault_note = Your vault opens the way this Mac unlocks: Touch ID or your Mac's password. Only your devices can open it; tTerm cannot.
+move.vault_note = The keys are encrypted here, on this Mac. Here your vault opens with Touch ID; in any browser, with your vault password. tTerm cannot open it.
 move.go = one: Move {n} server | other: Move {n} servers
 
 # ------------------------------------------------------------ moved: what came of Move to cloud (MoveToCloud.tsx)
@@ -1904,7 +1988,17 @@ moved.failed = It did not move.
 moved.failed_text = {why} Nothing was saved for it.
 moved.open = Open a terminal
 moved.change = Change
+# How to open them from another computer: when a server moved with My
+# key. {site} is the address of tTerm Web; <b>…</b> is bold.
+moved.how_title = How to open them from another computer
+moved.how_1 = Open <b>{site}</b> in any browser and sign in as usual, with the code from your email.
+moved.how_2 = Open a server: tTerm asks for your <b>vault password</b>. The keys open right in that browser; your Mac is not needed for it.
+moved.how_3 = On your own computer press Keep with Touch ID: after that Touch ID is enough there, no password asked. On someone else's, choose Only this time.
+# Under the steps, for the servers that moved Through this Mac: one
+# server, or several ("db-internal and nas").
+moved.how_mac_one = <b>{servers}</b> opens only through this Mac: while it is on and tTerm runs on it.
+moved.how_mac_many = <b>{servers}</b> open only through this Mac: while it is on and tTerm runs on it.
 # <b>…</b> is the key's name, or a list of them.
-moved.keys_one = <b>{keys}</b> is in your vault, locked the way your devices unlock. Settings › Keys shows it everywhere.
-moved.keys_many = <b>{keys}</b> are in your vault, locked the way your devices unlock. Settings › Keys shows them everywhere.
+moved.keys_one = <b>{keys}</b> is in your vault now, encrypted: it opens with your vault password, and on this Mac with Touch ID. Settings › Keys shows it on every device.
+moved.keys_many = <b>{keys}</b> are in your vault now, encrypted: they open with your vault password, and on this Mac with Touch ID. Settings › Keys shows them on every device.
 moved.no_keys = No key moved: your keys stay on this Mac.

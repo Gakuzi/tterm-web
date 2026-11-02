@@ -28,8 +28,12 @@ ASGIApp = Callable[[Scope, Receive, Send], Awaitable[None]]
 REQUEST_HEADER = "x-tterm"
 
 #: The page's security policy. Scripts, styles and fonts only from the
-#: page's own files; no inline scripts, no eval, no frames.
-CSP = ("default-src 'self'; script-src 'self'; style-src 'self'{nonce}; "
+#: page's own files; no inline scripts, no eval, no frames. From 0.1.26 the
+#: page may compile WebAssembly ('wasm-unsafe-eval'): the vault password's
+#: Argon2id runs as WebAssembly that comes inside the page's own script.
+#: That allows compiling WebAssembly only; eval of JavaScript stays refused.
+CSP = ("default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; "
+       "style-src 'self'{nonce}; "
        "font-src 'self'; img-src 'self' data:; connect-src 'self'; "
        "frame-ancestors 'none'; base-uri 'none'; form-action 'self'; "
        "object-src 'none'")

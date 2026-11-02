@@ -4,7 +4,12 @@ tTerm in the browser: a real terminal with command blocks, for people who work
 with servers and for their teams. Projects, roles, a journal of who ran what,
 and watching a colleague's terminal, always with them knowing.
 
-**Status:** early development. Version 0.1.25 puts help in the account's
+**Status:** early development. Version 0.1.26 opens the vault of SSH
+keys with a vault password, in any browser and with no Mac: the person
+makes it up when the vault is made, tTerm never sees it and gives its
+encrypted lock only to a device that proves it knows the password, ten
+tries an hour and thirty a day; a browser may keep the keys with Touch
+ID after it, and the recovery code goes. Version 0.1.25 puts help in the account's
 menu, now Settings, Account, Language, Get help, About us and Sign out: Get
 help has the documentation and Write to support, which mails what happened
 to support, and the answer comes to your address; About us has the site,

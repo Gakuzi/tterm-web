@@ -1609,30 +1609,48 @@ vault.code_label = Код {code}
 
 # ------------------------------------------------------------ keys: Settings › Keys, the vault (Keys.tsx)
 keys.title = Ключи
-keys.about = Твоё хранилище: сохранённые тобой SSH-ключи на всех твоих устройствах. Открыть его могут только твои устройства, так же, как они разблокируются; tTerm этого не может.
+keys.about = Твоё хранилище: сохранённые тобой SSH-ключи. Они зашифрованы, и открыть их можешь только ты: паролем хранилища, а там, где ты их сохранил, и без него. tTerm этого не может.
+# A vault made before 0.1.26 has a recovery code and no password: this
+# banner, above the vault's state, sets one (vault_password.title_set).
+keys.set_title = Задай пароль хранилища
+keys.set_text = С ним ты откроешь ключи в любом браузере, даже если Mac останется дома. Код восстановления после этого перестанет действовать: его заменит пароль.
+keys.set_go = Задать пароль
 keys.open_here = Открыто в этом браузере
 # How it opened, then when it locks again: one of these under "Open in this browser".
-keys.open_text.touch = Открыто с Touch ID. Снова заблокируется, если 8 часов ничего не делать, закрыть tTerm Web или нажать «Заблокировать».
-keys.open_text.hello = Открыто с Windows Hello. Снова заблокируется, если 8 часов ничего не делать, закрыть tTerm Web или нажать «Заблокировать».
-keys.open_text.passkey = Открыто ключом доступа. Снова заблокируется, если 8 часов ничего не делать, закрыть tTerm Web или нажать «Заблокировать».
-keys.open_text.recovery = Открыто кодом восстановления, на этот сеанс. Снова заблокируется, если 8 часов ничего не делать, закрыть tTerm Web или нажать «Заблокировать».
-keys.open_text.pairing = Открыто по подтверждению на Mac, на этот сеанс. Снова заблокируется, если 8 часов ничего не делать, закрыть tTerm Web или нажать «Заблокировать».
-keys.open_text.new = Только что создано в этом браузере. Снова заблокируется, если 8 часов ничего не делать, закрыть tTerm Web или нажать «Заблокировать».
+keys.open_text.touch = Открыто с Touch ID. Закроется само, если 8 часов ничего не делать, а также когда закроешь tTerm Web или нажмёшь «Заблокировать». Снова открыть – одно касание Touch ID.
+keys.open_text.hello = Открыто с Windows Hello. Закроется само, если 8 часов ничего не делать, а также когда закроешь tTerm Web или нажмёшь «Заблокировать». Снова откроет Windows Hello.
+keys.open_text.passkey = Открыто ключом доступа. Закроется само, если 8 часов ничего не делать, а также когда закроешь tTerm Web или нажмёшь «Заблокировать». Снова откроет ключ доступа.
+keys.open_text.password = Открыто паролем хранилища, только на этот сеанс. Закроется само, если 8 часов ничего не делать, а также когда закроешь вкладку или нажмёшь «Заблокировать».
+keys.open_text.recovery = Открыто кодом восстановления, только на этот сеанс. Закроется само, если 8 часов ничего не делать, а также когда закроешь вкладку или нажмёшь «Заблокировать».
+keys.open_text.pairing = Открыто по подтверждению на Mac, только на этот сеанс. Закроется само, если 8 часов ничего не делать, а также когда закроешь вкладку или нажмёшь «Заблокировать».
+keys.open_text.new = Только что создано в этом браузере. Закроется само, если 8 часов ничего не делать, а также когда закроешь вкладку или нажмёшь «Заблокировать».
 # In tTerm for Mac.
 keys.open_mac = Открыто на этом Mac
 keys.open_text.mac = Открыто с Touch ID или паролем Mac. Остаётся открытым, пока работает tTerm: до нажатия «Заблокировать» или выхода из аккаунта.
 keys.lock = Заблокировать
-keys.locked_here = Заблокировано в этом браузере
-keys.locked_text = Открой хранилище, чтобы пользоваться ключами здесь: так же, как разблокируешь этот компьютер, по подтверждению на Mac или кодом восстановления.
+# The vault closed in this browser. Where the keys were kept here with
+# Touch ID (or Windows Hello, a passkey), one of the three; else the
+# vault password opens them (keys.closed_text_password, with its field).
+keys.closed_here = Хранилище закрыто
+keys.closed_text.touch = Открой его с Touch ID, чтобы входить на серверы своим ключом.
+keys.closed_text.hello = Открой его с Windows Hello, чтобы входить на серверы своим ключом.
+keys.closed_text.passkey = Открой его ключом доступа, чтобы входить на серверы своим ключом.
+keys.closed_text_password = Ключи зашифрованы, открыть их можно только паролем хранилища. Введи его: ключи откроются прямо в этом браузере. Сам пароль никуда не уходит.
+# The vault password's row, under the vault's state: {day} is time.today,
+# time.yesterday or time.on_day ("on 2 Nov").
+keys.password_title = Пароль хранилища
+keys.password_text = Открывает ключи в любом браузере. Задан {day}.
+keys.password_change = Сменить пароль
 keys.locked_mac = Заблокировано на этом Mac
 keys.locked_mac_text = Открой хранилище с Touch ID или паролем Mac: тогда этот Mac будет входить на твои серверы.
 keys.locked_mac_code = Этот Mac пока не может сам открыть хранилище. Открой его здесь один раз кодом восстановления: после этого оно будет открываться с Touch ID или паролем Mac.
+keys.locked_mac_password = Этот Mac пока не может сам открыть хранилище. Открой его здесь один раз паролем хранилища: дальше этот Mac будет открывать его сам, с Touch ID.
 keys.open = Открыть
 keys.open_code = Открыть кодом восстановления
 keys.none_title = Хранилища пока нет
-keys.none_web = Добавь ключ из файла: тогда в этом браузере и появится хранилище, с кодом восстановления, который останется у тебя.
-keys.none_app = Сохрани ключ через «Перенести в облако» или с плашки под командой ssh в терминале: тогда и появится хранилище, с Touch ID.
-keys.no_passkey_here = Этот браузер не умеет открывать хранилище ключом доступа: здесь оно открывается кодом восстановления или по подтверждению на Mac, каждый раз на один сеанс.
+keys.none_web = Добавь ключ из файла: тогда и появится хранилище, с паролем, который ты придумаешь.
+keys.none_app = Сохрани ключ через «Перенести в облако» или с плашки под командой ssh в терминале: тогда и появится хранилище, с паролем, который ты придумаешь.
+keys.no_passkey_here = Этот браузер не умеет сохранять ключи с ключом доступа: здесь они открываются паролем хранилища или по подтверждению на Mac, каждый раз на один сеанс.
 keys.no_ed25519_here = Этот браузер не умеет подписывать ключами Ed25519. Открывай такие серверы в более новом браузере или в tTerm для Mac.
 # {servers} is a list of servers: droplet and staging; web-01 in Client X.
 keys.opens = Открывает {servers}
@@ -1649,9 +1667,10 @@ keys.cannot_ed25519 = Этот браузер не умеет подписыва
 keys.cannot_open = Здесь не открывается: добавь его снова из файла
 keys.remove = Удалить
 keys.add_file = Добавить ключ из файла
-keys.new_recovery = Создать новый код восстановления
 # {places} is where the vault opens: "MacBook-Pro-Denis · tTerm for Mac, Chrome on macOS".
-keys.opens_on = Хранилище открывается на устройствах: {places}.
+keys.opens_on = Без пароля хранилище открывается: {places}. В любом другом браузере – паролем хранилища.
+keys.opens_password_only = Хранилище открывается только паролем: ни одно устройство его пока не сохранило.
+keys.opens_on_old = Без пароля хранилище открывается: {places}. Пока пароля нет, другие браузеры открывают его кодом восстановления или по подтверждению на Mac.
 keys.opens_on_code = Хранилище открывается только кодом восстановления.
 keys.place_mac = {mac} · {app}
 keys.place_browser = браузер
@@ -1671,7 +1690,6 @@ add_key.passphrase_hint = Ключ зашифрован. Парольная фр
 add_key.open_key = Открыть ключ
 add_key.reading = Читаем ключ…
 add_key.name = Имя
-add_key.sealed_here = Ключ шифруется здесь, ещё до того, как покинет этот браузер. Открыть его могут только твои устройства, а tTerm – нет.
 add_key.add = Добавить в хранилище
 add_key.next = Далее
 add_key.added = Ключ {name} теперь в хранилище
@@ -1691,50 +1709,81 @@ add_key.problem_encrypted_pem = Этот файл ключа зашифрова�
 add_key.problem_ed25519 = Этот браузер не умеет читать ключи Ed25519 в таком формате. Попробуй более новый браузер или ключ в формате OpenSSH.
 add_key.problem_several = В файле больше одного ключа: добавляй их по одному.
 
-# ------------------------------------------------------------ vault_new: Save your key to your vault (VaultDialogs.tsx)
-vault_new.title = Сохранить ключ в хранилище
-# <code>…</code> is the key's name: id_ed25519. {server} is the server's name.
-vault_new.text_server = <code>{key}</code> попадёт в хранилище, и {server} будет открываться этим ключом из tTerm Web, с телефона или с любого компьютера, где ты входишь в аккаунт.
-vault_new.text = <code>{key}</code> попадёт в хранилище, и серверы с этим ключом будут открываться из tTerm Web, с телефона или с любого компьютера, где ты входишь в аккаунт.
-# In tTerm for Mac.
-vault_new.point_mac_unlock = Хранилище открывается так же, как разблокируется этот Mac: Touch ID или пароль Mac. Ничего нового запоминать не нужно.
-vault_new.point_mac_locked = Оно шифруется ещё до того, как покинет этот Mac. Открыть его могут только твои устройства, а tTerm – нет.
-vault_new.point_mac_browser = Новый браузер откроет его после твоего подтверждения здесь или с кодом восстановления.
-# In a browser.
-vault_new.point_web_unlock = Хранилище открывается так же, как разблокируется этот компьютер: Touch ID, Windows Hello или блокировка экрана телефона. Ничего нового запоминать не нужно.
-vault_new.point_web_no_passkey = Этот браузер не умеет открывать хранилище ключом доступа: здесь оно открывается кодом восстановления, каждый раз на один сеанс.
-vault_new.point_web_locked = Оно шифруется ещё до того, как покинет этот браузер. Открыть его могут только твои устройства, а tTerm – нет.
-vault_new.point_web_browser = Другой браузер откроет его с кодом восстановления или после твоего подтверждения в tTerm для Mac.
-vault_new.make_touch = Создать хранилище с Touch ID
-vault_new.make_hello = Создать хранилище с Windows Hello
-vault_new.make_passkey = Создать хранилище с ключом доступа
-vault_new.make = Создать хранилище
+# ------------------------------------------------------------ vault_password: the vault password (VaultDialogs.tsx, 0.1.26)
+# Make up a vault password: a new vault, made on the Mac (Move to cloud;
+# the strip after ssh, vault_password.text_key) or in a browser (Add a key
+# from a file, vault_password.text_web). <code>…</code> is the key's name:
+# id_ed25519.
+vault_password.title_new = Придумай пароль хранилища
+vault_password.text_mac = Ключи этого Mac попадут в хранилище в облаке, зашифрованными. С этим паролем ты откроешь их в любом браузере, даже если Mac остался дома.
+vault_password.text_key = <code>{key}</code> попадёт в хранилище в облаке, зашифрованным. С этим паролем ты откроешь его в любом браузере, даже если Mac остался дома.
+vault_password.text_web = <code>{key}</code> попадёт в хранилище, зашифрованным ещё в этом браузере. С этим паролем ты откроешь его в любом браузере.
+vault_password.label = Пароль
+# The second field: the same password once more.
+vault_password.label_again = Ещё раз
+# Next to the field: the password shown as it is typed, or hidden again.
+vault_password.show = Показать
+vault_password.hide = Скрыть
+# Under the first field; while it has 1 to 11 characters, vault_password.short
+# instead. vault_password.latin when it has a character beyond plain Latin.
+vault_password.hint = Не короче 12 символов. Удобнее всего фраза из нескольких слов.
+vault_password.short = one: Ещё {n} символ | few: Ещё {n} символа | many: Ещё {n} символов
+vault_password.latin = В пароле есть не латинские буквы: на чужом компьютере может не оказаться нужной раскладки.
+# Under the second field.
+vault_password.match = Совпадает
+vault_password.no_match = Не совпадает с паролем выше
+# In a dashed box under the fields: on the Mac, and in a browser.
+vault_password.note_mac = tTerm этот пароль не знает и восстановить не сможет. Сохрани его в менеджере паролей. Забудешь – задашь новый здесь, на этом Mac.
+vault_password.note_web = tTerm этот пароль не знает и восстановить не сможет. Сохрани его в менеджере паролей.
+vault_password.create = Создать хранилище
+# On the button, while the password becomes the key (a second; a few on a phone).
+vault_password.working = Шифруем…
+# Settings › Keys: Set a vault password (a vault made before 0.1.26, with a
+# recovery code), or Change it.
+vault_password.title_set = Задай пароль хранилища
+vault_password.text_set = С ним ты откроешь ключи в любом браузере, даже если Mac останется дома. tTerm этот пароль не знает и восстановить не сможет. Код восстановления после этого перестанет действовать.
+vault_password.set = Задать пароль
+vault_password.title_change = Сменить пароль хранилища
+vault_password.text_change = Новый пароль сразу заменит старый: старым ключи больше не откроются. Твой Mac и браузеры, где ключи сохранены, будут открывать их как раньше.
+vault_password.label_new = Новый пароль
+vault_password.change = Сменить пароль
+# In a browser where the keys are not kept: what opens the vault for the
+# change (the current password), or for setting it (the recovery code,
+# recovery.now_code).
+vault_password.current = Текущий пароль
+vault_password.current_hint = В этом браузере ключи не сохранены, поэтому для смены нужен текущий пароль.
+vault_password.code_hint = В этом браузере ключи не сохранены, поэтому, чтобы задать пароль, нужен код восстановления.
+# Said once done.
+vault_password.done_set = Пароль хранилища задан. Код восстановления больше не открывает хранилище.
+vault_password.done_change = Пароль хранилища изменён.
+# A closed vault, in a browser with no lock of it: the field it opens with,
+# in a server's card and in Settings › Keys.
+vault_password.label_vault = Пароль хранилища
+vault_password.open = Открыть ключи
+vault_password.opening = Открываем…
+vault_password.forgot = Забыл пароль?
 
-# ------------------------------------------------------------ recovery: the recovery code, shown once (VaultDialogs.tsx)
-recovery.title = Твой код восстановления
-recovery.text = Если ты когда-нибудь потеряешь все устройства, которые открывают хранилище, вернуть ключи можно будет только этим кодом. tTerm не сможет восстановить их за тебя. Код показывается только один раз.
-recovery.title_new = Твой новый код восстановления
-recovery.text_new = Прежний код больше не открывает хранилище. Если ты когда-нибудь потеряешь все устройства, которые его открывают, вернуть ключи можно будет только этим кодом. Он показывается только один раз.
-# For screen readers.
-recovery.code_label = Код восстановления {code}
-recovery.save_file = Сохранить в файл
-recovery.copy_failed = Не удалось скопировать: выдели код и скопируй его вручную.
-# What the file saved holds.
-recovery.file_text = Код восстановления хранилища tTerm: {code}\\nОн открывает хранилище, когда этого не может ни одно из твоих устройств. Храни его в надёжном месте, отдельно от своих устройств.
-recovery.kept_mac = Код у меня в надёжном месте, а не только на этом Mac
-recovery.kept_web = Код у меня в надёжном месте, а не только на этом компьютере
-recovery.make_title = Создать новый код восстановления?
-recovery.make_text = Текущий код перестанет действовать, а новый будет показан один раз. Ключи и устройства останутся как есть.
+# ------------------------------------------------------------ vault_forgot: Forgot your vault password? (VaultDialogs.tsx, 0.1.26)
+vault_forgot.title = Забыл пароль хранилища?
+vault_forgot.text = Напомнить его tTerm не может: пароль знаешь только ты. Но задать новый можно там, где хранилище открывается без пароля:
+# Two points under the text: where a new password can be set.
+vault_forgot.mac = на твоём Mac, в tTerm для Mac: Настройки › Ключи › «Сменить пароль», с Touch ID;
+vault_forgot.browser = в браузере, где ключи сохранены: там же, в Настройках.
+# <code>…</code> is the folder of the keys: it stays as it is.
+vault_forgot.none = Если такого устройства нет, ключи из хранилища уже не открыть. Сами ключи при этом обычно остаются на твоём Mac, в <code>~/.ssh</code>.
+vault_forgot.ok = Понятно
+
+# ------------------------------------------------------------ recovery: the recovery code of a vault made before 0.1.26 (VaultDialogs.tsx)
 recovery.now_code = Текущий код восстановления
-recovery.now_code_hint = В этом браузере нет ключа доступа к хранилищу, поэтому для нового кода нужен текущий. Текущего кода нет? Создай новый в tTerm для Mac.
-recovery.make_go = Создать новый код
-recovery.make_go_passkey = Создать с ключом доступа
-recovery.make_touch = Создать с Touch ID
 
 # ------------------------------------------------------------ vault_open: Open your keys on this browser (VaultDialogs.tsx)
 vault_open.title = Открыть ключи в этом браузере
 vault_open.text = Хранилище ещё не знает этот браузер. Подтверди его на устройстве, которое уже открывает хранилище.
 vault_open.text_code = Открой хранилище в этом браузере кодом восстановления.
+# A vault with a password: the Mac's approval is the second way, and the
+# button at the bottom goes back to the password field.
+vault_open.text_password = Подтверди этот браузер на своём Mac. Удобно на чужом компьютере: пароль хранилища здесь вводить не нужно.
+vault_open.use_password = Ввести пароль вместо этого
 # {mac} is the Mac's name, {app} is app_link.mac: "MacBook-Pro-Denis · tTerm for Mac".
 vault_open.mac_name = {mac} · {app}
 vault_open.mac_ask = Попросить открыть хранилище здесь
@@ -1747,13 +1796,17 @@ vault_open.sas_text = Твой Mac тоже показывает код. Раз�
 vault_open.or = или
 vault_open.code = Код восстановления
 vault_open.open = Открыть
-# Once open with the recovery code or the Mac's approval: whether this browser keeps a passkey.
+# Once open with the password, the Mac's approval or the recovery code, or just made in this browser: whether to keep the keys here with a passkey.
 vault_open.opened_title = Ключи открыты в этом браузере
-vault_open.opened_text = Сохранить здесь ключ доступа, чтобы в следующий раз они открывались так же, как разблокируется этот компьютер? На чужом компьютере выбери «Только в этот раз».
+vault_open.keep_text.touch = Сохранить их здесь с Touch ID? Тогда в следующий раз в этом браузере хватит Touch ID, пароль не понадобится.
+vault_open.keep_text.hello = Сохранить их здесь с Windows Hello? Тогда в следующий раз в этом браузере хватит Windows Hello, пароль не понадобится.
+vault_open.keep_text.passkey = Сохранить их здесь с ключом доступа? Тогда в следующий раз в этом браузере хватит ключа доступа, пароль не понадобится.
+# Small, under the question.
+vault_open.keep_foreign = Чужой компьютер? Выбери «Только сейчас»: ключи закроются, когда ты закроешь вкладку, или сами, если долго ими не пользоваться.
 vault_open.keep_touch = Сохранить с Touch ID
 vault_open.keep_hello = Сохранить с Windows Hello
 vault_open.keep_passkey = Сохранить ключ доступа
-vault_open.only_now = Только в этот раз
+vault_open.only_now = Только сейчас
 vault_open.kept_session = Ключи останутся открытыми только на этот сеанс.
 
 # ------------------------------------------------------------ app_code: in tTerm for Mac, a vault this Mac has no lock of (VaultDialogs.tsx)
@@ -1761,6 +1814,9 @@ app_code.title = Открыть хранилище на этом Mac
 app_code.text = Этот Mac пока не может сам открыть хранилище. Открой его здесь один раз кодом восстановления, и дальше этот Mac будет открывать его с Touch ID.
 # When this Mac's lock is there but no longer opens the vault (taken off in a browser, or gone from the keychain).
 app_code.text_lost = Этот Mac больше не может сам открыть хранилище. Открой его здесь один раз кодом восстановления: тогда этот Mac снова будет открывать его с Touch ID.
+# A vault with a password (0.1.26): opened here once with it.
+app_code.text_password = Этот Mac пока не может сам открыть хранилище. Открой его здесь один раз паролем хранилища, и дальше этот Mac будет открывать его с Touch ID.
+app_code.text_lost_password = Этот Mac больше не может сам открыть хранилище. Открой его здесь один раз паролем хранилища: тогда этот Mac снова будет открывать его с Touch ID.
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1789,8 +1845,21 @@ mac_approve.not_me_note = «Это не я»: сеанс того браузер
 # ------------------------------------------------------------ vault_locked: a server with your key, the vault locked here (VaultLocked.tsx)
 vault_locked.title = {machine} открывается твоим ключом
 vault_locked.text = Твои ключи в этом браузере заблокированы. Открой их так же, как разблокируешь этот компьютер: тогда tTerm войдёт на {machine}, а твой ключ никогда не покинет этот браузер.
+# A vault with a password, in a browser that keeps no lock of it: the
+# password field comes under it.
+vault_locked.text_password = Ключи в облаке зашифрованы, открыть их можно только паролем хранилища. Введи его: ключи откроются прямо в этом браузере, и tTerm войдёт на {machine}. Сам пароль никуда не уходит.
+# Where the keys were kept with Touch ID (or Windows Hello, a passkey):
+# one of the three, the button, and a link to type the password instead.
+vault_locked.closed_title = Хранилище закрыто
+vault_locked.closed_text.touch = Открой его с Touch ID, чтобы войти на {machine} своим ключом.
+vault_locked.closed_text.hello = Открой его с Windows Hello, чтобы войти на {machine} своим ключом.
+vault_locked.closed_text.passkey = Открой его ключом доступа, чтобы войти на {machine} своим ключом.
+vault_locked.use_password = или ввести пароль хранилища
+# Small, at the card's bottom.
+vault_locked.closes_itself = Хранилище закрывается само, если долго им не пользоваться: на случай, если ты отошёл от компьютера.
 vault_locked.text_app = Твои ключи на этом Mac заблокированы. Открой их с Touch ID или паролем Mac, и этот Mac войдёт на {machine}.
 vault_locked.text_app_code = Этот Mac пока не может сам открыть хранилище. Открой его здесь один раз кодом восстановления, и этот Mac войдёт на {machine}.
+vault_locked.text_app_password = Этот Mac пока не может сам открыть хранилище. Открой его здесь один раз паролем хранилища, и этот Mac войдёт на {machine}.
 # Small links under the button: "or approve on MacBook-Pro-Denis · use the recovery code".
 vault_locked.or = или
 vault_locked.approve_on = подтвердить на {mac}
@@ -1807,17 +1876,32 @@ vault_locked.its_key = нужный ключ
 vault_problem.no_vault = У тебя пока нет хранилища.
 vault_problem.exists = У тебя уже есть хранилище: открой его, затем добавь ключ.
 vault_problem.locked = Сначала открой хранилище.
-vault_problem.no_passkey = Здесь не откликнулся ни один ключ доступа к твоему хранилищу. Подтверди этот браузер на своём Mac или введи код восстановления.
-vault_problem.no_prf = Этот ключ доступа не может открыть хранилище здесь. Подтверди этот браузер на своём Mac или введи код восстановления.
+# The vault password: {n} tries left (shown when 3 or fewer), {time} a
+# time of day, as the page shows times ("14:05").
+vault_problem.password_wrong = Этот пароль не открывает хранилище. Проверь раскладку и Caps Lock.
+vault_problem.password_left = one: Осталась {n} попытка до паузы на час. | few: Осталось {n} попытки до паузы на час. | many: Осталось {n} попыток до паузы на час.
+vault_problem.password_paused = Слишком много неверных паролей. Попробуй снова в {time}.
+# The same pause, when it ends another day (thirty wrong ones in a day):
+# {day} is the date as the page writes it ("3 Nov"), {time} the time.
+vault_problem.password_paused_day = Слишком много неверных паролей. Попробуй снова {day} в {time}.
+vault_problem.no_password = У хранилища пока нет пароля: задай его на своём Mac, в Настройках, в разделе «Ключи».
+vault_problem.password_short = В пароле должно быть не меньше 12 символов.
+vault_problem.no_wasm = Этот браузер не умеет открывать пароль хранилища. Открой ключи по подтверждению на Mac или в более новом браузере.
+vault_problem.no_passkey = Здесь не откликнулся ни один ключ доступа к твоему хранилищу. Введи пароль хранилища или подтверди этот браузер на своём Mac.
+vault_problem.no_passkey_code = Здесь не откликнулся ни один ключ доступа к твоему хранилищу. Подтверди этот браузер на своём Mac или введи код восстановления.
+vault_problem.no_prf = Этот ключ доступа не может открыть хранилище здесь. Введи пароль хранилища или подтверди этот браузер на своём Mac.
+vault_problem.no_prf_code = Этот ключ доступа не может открыть хранилище здесь. Подтверди этот браузер на своём Mac или введи код восстановления.
 vault_problem.no_prf_here = Этот браузер не умеет открывать хранилище ключом доступа: оно останется открытым только на этот сеанс.
-vault_problem.lock_broken = Ключ доступа этого браузера больше не открывает хранилище. Введи код восстановления или подтверди браузер на своём Mac.
+vault_problem.lock_broken = Ключ доступа этого браузера больше не открывает хранилище. Введи пароль хранилища или подтверди браузер на своём Mac.
+vault_problem.lock_broken_code = Ключ доступа этого браузера больше не открывает хранилище. Введи код восстановления или подтверди браузер на своём Mac.
 vault_problem.code_form = Код восстановления – это 24 буквы и цифры: шесть групп по четыре.
 vault_problem.code_wrong = Этот код восстановления не открывает хранилище. Проверь его или подтверди этот браузер на своём Mac.
 # In tTerm for Mac: the engine's answers, said by the page (the code window, Touch ID).
 vault_problem.code_wrong_app = Этот код восстановления не открывает хранилище. Проверь его и попробуй снова.
 vault_problem.touch_failed = Подтверждение с Touch ID или паролем Mac не прошло. Ничего не изменилось.
 vault_problem.need_code = Введи сейчас код восстановления: в этом браузере нет ключа доступа к хранилищу.
-vault_problem.no_x25519 = Этот браузер слишком старый, чтобы его можно было подтвердить на Mac: введи код восстановления или используй более новый браузер.
+vault_problem.no_x25519 = Этот браузер слишком старый, чтобы его можно было подтвердить на Mac: введи пароль хранилища или используй более новый браузер.
+vault_problem.no_x25519_code = Этот браузер слишком старый, чтобы его можно было подтвердить на Mac: введи код восстановления или используй более новый браузер.
 vault_problem.pairing = Запрос не прошёл. Попроси снова.
 vault_problem.passkey_exists = В этом браузере уже есть ключ доступа для tTerm.
 vault_problem.no_passkey_here = Этот браузер не умеет создавать ключи доступа.
@@ -1835,7 +1919,7 @@ ssh_strip.let_in = Впустить tTerm
 ssh_strip.not_now = Не сейчас
 ssh_strip.never = Не спрашивать про {alias}
 # <b>…</b> are the two buttons' names, as above.
-ssh_strip.explain = <b>Сохранить мой ключ:</b> ключ попадёт в хранилище, которое открывают только твои устройства, а {alias} останется как есть. <b>Впустить tTerm:</b> tTerm добавит на {alias} свою строку, а твой ключ останется на этом Mac. Несколько серверов сразу: «Перенести в облако» в меню аккаунта.
+ssh_strip.explain = <b>Сохранить мой ключ:</b> он попадёт в хранилище, зашифрованным: открывается паролем хранилища в любом браузере; {alias} останется как есть. <b>Впустить tTerm:</b> tTerm добавит на {alias} свою строку, а твой ключ останется на этом Mac. Несколько серверов сразу: «Перенести в облако» в меню аккаунта.
 ssh_strip.explain_pass = <b>Впустить tTerm:</b> tTerm добавит на {alias} свою строку, а твой ключ останется на этом Mac. Несколько серверов сразу: «Перенести в облако» в меню аккаунта.
 ssh_strip.unreachable = {alias} недоступен для tTerm Web из облака: он будет открываться через этот Mac, пока тот включён.
 ssh_strip.through_mac = Открывать через этот Mac
@@ -1858,7 +1942,7 @@ move.how = Как открывается {name}
 move.method_key = Мой ключ
 move.method_cert = Пропуск tTerm
 move.method_mac = Через этот Mac
-move.way_key = Ключ попадёт в хранилище, сервер останется как есть. Открывается в любом браузере, где открыто хранилище.
+move.way_key = Ключ попадёт в хранилище, сервер останется как есть. Открывается в любом браузере паролем хранилища.
 move.way_cert = tTerm добавит на сервер свою строку, твой ключ останется здесь. Открывается откуда угодно, в том числе из Telegram.
 move.way_mac = Ничего не переносится: tTerm просит этот Mac подключиться, пока тот включён. Для серверов за VPN.
 # {address} is root@203.0.113.7, {jump} the bastion it goes through.
@@ -1887,7 +1971,7 @@ move.key_security = Хранится на аппаратном ключе и н�
 move.key_agent = Есть только в SSH-агенте: его нельзя скопировать. Серверы с этим ключом пойдут через этот Mac
 move.key_type = Хранилище пока не принимает ключи такого типа. Серверы с этим ключом пойдут через этот Mac
 move.key_passphrase = с парольной фразой
-move.vault_note = Хранилище открывается так же, как разблокируется этот Mac: Touch ID или пароль Mac. Открыть его могут только твои устройства, а tTerm – нет.
+move.vault_note = Ключи зашифруются ещё на этом Mac. Здесь хранилище открывается с Touch ID, а в любом браузере – паролем хранилища. tTerm открыть его не может.
 move.go = one: Перенести {n} сервер | few: Перенести {n} сервера | many: Перенести {n} серверов
 
 # ------------------------------------------------------------ moved: what came of Move to cloud (MoveToCloud.tsx)
@@ -1904,8 +1988,18 @@ moved.failed = Перенести не удалось.
 moved.failed_text = {why} Для него ничего не сохранено.
 moved.open = Открыть терминал
 moved.change = Изменить
+# How to open them from another computer: when a server moved with My
+# key. {site} is the address of tTerm Web; <b>…</b> is bold.
+moved.how_title = Как открыть их с другого компьютера
+moved.how_1 = Открой <b>{site}</b> в любом браузере и войди, как обычно, кодом из письма.
+moved.how_2 = Открой сервер: tTerm попросит <b>пароль хранилища</b>. Ключи откроются прямо в этом браузере, Mac для этого не нужен.
+moved.how_3 = На своём компьютере нажми «Сохранить с Touch ID»: дальше там хватит Touch ID, пароль не спросят. На чужом выбери «Только сейчас».
+# Under the steps, for the servers that moved Through this Mac: one
+# server, or several ("db-internal and nas").
+moved.how_mac_one = <b>{servers}</b> открывается только через этот Mac: пока он включён и на нём запущен tTerm.
+moved.how_mac_many = <b>{servers}</b> открываются только через этот Mac: пока он включён и на нём запущен tTerm.
 # <b>…</b> is the key's name, or a list of them.
-moved.keys_one = <b>{keys}</b> теперь в хранилище, зашифрован и открывается так же, как разблокируются твои устройства. Его видно на любом устройстве в Настройках, в разделе «Ключи».
-moved.keys_many = <b>{keys}</b> теперь в хранилище, зашифрованы и открываются так же, как разблокируются твои устройства. Их видно на любом устройстве в Настройках, в разделе «Ключи».
+moved.keys_one = <b>{keys}</b> теперь в хранилище, зашифрован: открывается паролем хранилища, а на этом Mac с Touch ID. Его видно на любом устройстве в Настройках, в разделе «Ключи».
+moved.keys_many = <b>{keys}</b> теперь в хранилище, зашифрованы: открываются паролем хранилища, а на этом Mac с Touch ID. Их видно на любом устройстве в Настройках, в разделе «Ключи».
 moved.no_keys = Ни один ключ не перенесён: твои ключи остаются на этом Mac.
 `;export{e as default};

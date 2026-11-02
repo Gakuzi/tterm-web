@@ -6,15 +6,22 @@ The crypto the core checks is exercised with the shared test vectors
 signature blob and its verification. The core never sees a private key or
 the vault key in the clear, so the tests feed it what the page and the
 device would, and hold the private key themselves to stand in for the
-device over the socket.
+device over the socket. The vault password (0.1.26) is fed from the same
+file as the page and the engine read it (web/tests/vault-vectors.json,
+"password"): what a client derives from the password, and the check the
+core keeps.
 """
 from __future__ import annotations
 
 import asyncio
 import base64
+import datetime as dt
+import hashlib
 import json
+import os
 import shutil
 import uuid
+from pathlib import Path
 
 import asyncpg
 import asyncssh
@@ -23,10 +30,11 @@ from asyncssh.packet import SSHPacket
 from ..core import db, reach, ssh, vault
 from ..core.machines import remember_cas
 from .harness import page_socket, request, shell_server, sign_in_as, ssh_server
-from .test_auth import Browser, sign_in
+from .test_auth import CHROME_MAC, Browser, sign_in
 from .test_terminals import _ca_public, _home, _login_shell, _until
 
 CHANGE = {"x-tterm": "1", "content-type": "application/json"}
+LAST_LOCK = "That is the last lock of your vault: it stays."
 #: The parts of the shared test vectors (vault-vectors.json) the core
 #: computes itself: the pairing commit and SAS, and the raw signature with
 #: the public key it verifies against. Kept here so the check always runs.
@@ -236,7 +244,7 @@ async def test_locks_come_and_go(h):
         last = v["locks"][0]["id"]
         r = await request(core.page_port, "DELETE",
                           f"/api/vault/locks/{last}", headers=CHANGE)
-        assert r.status == 422 and "only lock" in r.json()["error"], r.text
+        assert r.status == 422 and r.json() == {"error": LAST_LOCK}, r.text
         # Last used.
         r = await request(core.page_port, "POST",
                           f"/api/vault/locks/{last}/used", headers=CHANGE)
@@ -513,7 +521,8 @@ async def _vault_with_key(core, user_id, priv) -> uuid.UUID:
     async with core.pool.acquire() as conn:
         vault_id = await conn.fetchval(
             "INSERT INTO vaults (id, user_id, prf_salt, recovery_salt, "
-            "recovery_wrap) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+            "recovery_wrap, recovery_at) VALUES ($1, $2, $3, $4, $5, now()) "
+            "RETURNING id",
             uuid.uuid4(), user_id, b"p" * 32, b"s" * 16, b"w" * 60)
         key_id = await conn.fetchval(
             "INSERT INTO vault_keys (id, vault_id, name, type, public_key, "
@@ -1300,3 +1309,808 @@ def test_the_journal_names_the_app_by_the_device_it_signed_in_as():
               "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36")
     browser = auth.Session(uuid.uuid4(), anna, None, "code", dt.timedelta(0))
     assert auth.socket_label(browser, chrome) == "Chrome on macOS"
+
+
+# ------------------------------------------- the vault password (0.1.26)
+
+#: The shared vectors, where the page and the engine read them too.
+VECTORS = (Path(__file__).resolve().parents[2] / "web" / "tests"
+           / "vault-vectors.json")
+WRONG = "That password does not open your vault."
+PAUSED = "Too many wrong passwords."
+HAS_PASSWORD = "This vault has a password: it has no recovery code any more."
+
+
+def _pw_vector(name: str = "default") -> dict:
+    """One of the vectors' passwords: what a client derives from it (the
+    salt, the parameters, auth, the wrap for the vectors' vault id) and the
+    check the core keeps."""
+    return json.loads(VECTORS.read_text(encoding="utf-8"))["password"][name]
+
+
+def _pw(name: str = "default", **change) -> dict:
+    """A vault password as a client sends it: the vectors', or with a part
+    changed."""
+    v = _pw_vector(name)
+    sent = {"salt": v["salt"], "kdf": dict(v["kdf"]), "auth": v["auth"],
+            "wrap": v["wrap"]}
+    sent.update(change)
+    return sent
+
+
+def _pw_made_up() -> dict:
+    """Another password, as a client sends one it made up: its own salt,
+    proof and wrap (random bytes here; the core cannot tell)."""
+    return {"salt": b64u(os.urandom(16)),
+            "kdf": {"alg": "argon2id", "m": 65536, "t": 3, "p": 1},
+            "auth": b64u(os.urandom(32)), "wrap": b64u(os.urandom(60))}
+
+
+def _pw_body(lock: dict | None = None) -> dict:
+    """A new vault as 0.1.26 makes it, with the vectors' password: under the
+    vectors' vault id (the wrap's aad), and no recovery code."""
+    body = {"id": _pw_vector()["vault_id"], "password": _pw()}
+    if lock is not None:
+        body["lock"] = lock
+    return body
+
+
+async def _details(core, kind: str) -> list[dict]:
+    """What the journal says of each `kind`, oldest first."""
+    rows = await core.pool.fetch(
+        "SELECT details FROM journal WHERE kind = $1 ORDER BY id", kind)
+    return [json.loads(r["details"]) if isinstance(r["details"], str)
+            else r["details"] for r in rows]
+
+
+async def _open(core, auth: str, cookie: str | None = None,
+                ip: str | None = None):
+    """POST /api/vault/password/open from Chrome on a Mac, as the owner
+    unless `cookie` says else; from `ip` as the proxy on this machine says
+    it (cloudflared's header), when given."""
+    headers = {**CHANGE, "user-agent": CHROME_MAC}
+    if cookie is not None:
+        headers["cookie"] = cookie
+    if ip is not None:
+        headers["cf-connecting-ip"] = ip
+    return await request(core.page_port, "POST", "/api/vault/password/open",
+                         headers=headers,
+                         body=json.dumps({"auth": auth}).encode())
+
+
+async def _wrong_count(core, user_id) -> int:
+    return await core.pool.fetchval(
+        "SELECT password_wrong FROM vaults WHERE user_id = $1", user_id)
+
+
+async def _heard(ws, op: str, wait: float = 5.0) -> dict | None:
+    """The first message `op` the socket gets within `wait` seconds."""
+    try:
+        async with asyncio.timeout(wait):
+            while True:
+                frame = await ws.recv()
+                if isinstance(frame, str) and json.loads(frame).get("op") == op:
+                    return json.loads(frame)
+    except TimeoutError:
+        return None
+
+
+def test_the_password_vectors_check_out():
+    """The vectors' check is SHA-256 of their auth, and it is what the core
+    keeps of the password, with the wrap; auth itself is not kept. The
+    small vector's parameters (fast, for the clients' own tests) are below
+    what the core takes."""
+    for name in ("small", "default"):
+        v = _pw_vector(name)
+        assert b64u(hashlib.sha256(b64u_dec(v["auth"])).digest()) == v["check"]
+    v = _pw_vector()
+    kept = vault._check_password(_pw())
+    assert kept["check"] == b64u_dec(v["check"]), kept
+    assert kept["wrap"] == b64u_dec(v["wrap"]) and kept["salt"] == b64u_dec(v["salt"])
+    assert (kept["kdf"], kept["m"], kept["t"], kept["p"]) == ("argon2id", 65536, 3, 1)
+    assert b64u_dec(v["auth"]) not in kept.values()
+    try:
+        vault._check_password(_pw("small"))
+    except vault.Refused:
+        pass
+    else:
+        raise AssertionError("m=256, t=2 was taken")
+
+
+async def test_a_vault_is_made_with_a_password(h):
+    """0.1.26: the vault is made with its password and no recovery code. The
+    core keeps the salt, the parameters, the wrap and SHA-256 of auth (the
+    vectors' check), never auth; the vault shows the salt, the parameters
+    and when it was set, never the wrap nor the check."""
+    async with h.core() as core:
+        v = _pw_vector()
+        r = await request(core.page_port, "POST", "/api/vault",
+                          headers={**CHANGE, "user-agent": CHROME_MAC},
+                          body=json.dumps(_pw_body(_lock())).encode())
+        assert r.status == 201, r.text
+        made = r.json()["vault"]
+        got = await request(core.page_port, "GET", "/api/vault")
+        assert got.status == 200, got.text
+        for shown in (made, got.json()["vault"]):
+            assert shown["id"] == v["vault_id"] and shown["recoveryAt"] is None
+            assert shown["password"] == {
+                "salt": v["salt"], "kdf": {"alg": "argon2id", "m": 65536,
+                                           "t": 3, "p": 1},
+                "setAt": shown["password"]["setAt"]}, shown["password"]
+            assert isinstance(shown["password"]["setAt"], int)
+            assert [lk["kind"] for lk in shown["locks"]] == ["app"]
+        for secret in (v["wrap"], v["check"], v["auth"]):
+            assert secret not in got.text and secret not in r.text, secret
+        row = await core.pool.fetchrow("SELECT * FROM vaults WHERE id = $1",
+                                       uuid.UUID(v["vault_id"]))
+        assert bytes(row["password_check"]) == b64u_dec(v["check"])
+        assert bytes(row["password_wrap"]) == b64u_dec(v["wrap"])
+        assert bytes(row["password_salt"]) == b64u_dec(v["salt"])
+        assert (row["password_kdf"], row["password_m"], row["password_t"],
+                row["password_p"]) == ("argon2id", 65536, 3, 1)
+        assert row["password_at"] is not None
+        assert (row["recovery_salt"], row["recovery_wrap"],
+                row["recovery_at"]) == (None, None, None)
+        assert row["password_wrong"] == 0 and row["password_wrong_at"] is None
+        kept = [bytes(value) for value in row.values()
+                if isinstance(value, (bytes, bytearray, memoryview))]
+        assert b64u_dec(v["auth"]) not in kept, "auth itself is never kept"
+        # There is no recovery code to give.
+        r = await request(core.page_port, "GET", "/api/vault/recovery")
+        assert r.status == 404, r.text
+        # Made, and its first password set (no code forgotten), by Chrome.
+        assert await _details(core, "vault.created") == [{"lock": "app"}]
+        assert await _details(core, "vault.password.set") == [
+            {"recovery": False, "device": "Chrome on macOS"}]
+
+
+async def test_a_vault_takes_a_password_or_a_recovery_code(h):
+    """One of the two: the password (0.1.26), or the recovery code tTerm for
+    Mac 0.7.x still makes vaults with; not both, and not neither."""
+    async with h.core() as core:
+        both = dict(_pw_body(), recoverySalt=b64u(b"s" * 16),
+                    recoveryWrap=b64u(b"r" * 60))
+        half = dict(_pw_body(), recoveryWrap=b64u(b"r" * 60))
+        neither = {"id": str(uuid.uuid4()), "lock": _lock()}
+        for body in (both, half, neither):
+            r = await request(core.page_port, "POST", "/api/vault",
+                              headers=CHANGE, body=json.dumps(body).encode())
+            assert r.status == 422 and r.json()["error"], r.text
+        assert (await request(core.page_port, "GET", "/api/vault")).json() \
+            == {"vault": None}
+        # The old app's form, as before.
+        old = _create_body()
+        r = await request(core.page_port, "POST", "/api/vault", headers=CHANGE,
+                          body=json.dumps(old).encode())
+        assert r.status == 201, r.text
+        made = r.json()["vault"]
+        assert made["password"] is None and made["recoveryAt"] is not None, made
+        r = await request(core.page_port, "GET", "/api/vault/recovery")
+        assert r.status == 200 and r.json() == {
+            "recoverySalt": old["recoverySalt"],
+            "recoveryWrap": old["recoveryWrap"]}, r.text
+        # It has no password to open.
+        r = await _open(core, _pw_vector()["auth"])
+        assert r.status == 404, r.text
+        assert await _details(core, "vault.password.set") == []
+
+
+async def test_a_password_is_checked_before_it_is_kept(h):
+    """The sizes and the Argon2id parameters the contract allows, and
+    nothing else, when a vault is made and when a password is set; a
+    refused one changes nothing."""
+    def kdf(**change) -> dict:
+        return dict({"alg": "argon2id", "m": 65536, "t": 3, "p": 1}, **change)
+    bad = [
+        _pw(kdf=kdf(m=65535)), _pw(kdf=kdf(t=2)), _pw(kdf=kdf(p=5)),
+        _pw(kdf=kdf(m=1048577)), _pw(kdf=kdf(t=11)), _pw(kdf=kdf(p=0)),
+        _pw(kdf=kdf(alg="argon2i")), _pw(kdf=kdf(alg="scrypt")),
+        _pw(kdf={"m": 65536, "t": 3, "p": 1}), _pw(kdf=None),
+        _pw(kdf="argon2id"), _pw(kdf=kdf(m=65536.0)), _pw(kdf=kdf(m="65536")),
+        _pw(kdf=kdf(p=True)), _pw(kdf=kdf(t=None)),
+        _pw(salt=b64u(b"s" * 15)), _pw(salt=b64u(b"s" * 17)), _pw(salt=None),
+        _pw(salt=_pw()["salt"] + "="),
+        _pw(auth=b64u(b"a" * 31)), _pw(auth=b64u(b"a" * 33)), _pw(auth=None),
+        _pw(wrap=b64u(b"w" * 59)), _pw(wrap=b64u(b"w" * 61)), _pw(wrap=None),
+        "correct horse battery staple", [], {},
+    ]
+    async with h.core() as core:
+        for password in bad:
+            body = {"id": str(uuid.uuid4()), "password": password}
+            r = await request(core.page_port, "POST", "/api/vault",
+                              headers=CHANGE, body=json.dumps(body).encode())
+            assert r.status == 422 and r.json()["error"], (password, r.text)
+        assert (await request(core.page_port, "GET", "/api/vault")).json() \
+            == {"vault": None}
+        # The ends of the ranges are taken, and given back as kept.
+        edges = {"alg": "argon2id", "m": 1048576, "t": 10, "p": 4}
+        r = await request(core.page_port, "POST", "/api/vault", headers=CHANGE,
+                          body=json.dumps({"id": _pw_vector()["vault_id"],
+                                           "password": _pw(kdf=edges)}).encode())
+        assert r.status == 201, r.text
+        assert r.json()["vault"]["password"]["kdf"] == edges
+        # Setting one is checked the same way.
+        for password in bad:
+            r = await request(core.page_port, "PUT", "/api/vault/password",
+                              headers=CHANGE, body=json.dumps(password).encode())
+            assert r.status == 422 and r.json()["error"], (password, r.text)
+        v = (await request(core.page_port, "GET", "/api/vault")).json()["vault"]
+        assert v["password"]["kdf"] == edges, v["password"]
+        assert await _details(core, "vault.password.changed") == []
+
+
+async def test_the_password_opens_the_vault_ten_tries_an_hour(h):
+    """The right proof gets the wrap; a wrong one is 403 with the tries
+    left, counting down, and journaled; a right one starts the count again.
+    After ten wrong ones within an hour of each other the tries pause until
+    an hour after the last (429, retryAt), even for the right one; an hour
+    later it opens, and a wrong one then starts a new count."""
+    async with h.core() as core:
+        v = _pw_vector()
+        owner = core.owner.id
+        r = await request(core.page_port, "POST", "/api/vault", headers=CHANGE,
+                          body=json.dumps(_pw_body()).encode())
+        assert r.status == 201, r.text
+        r = await _open(core, v["auth"])
+        assert r.status == 200 and r.json() == {"wrap": v["wrap"]}, r.text
+        # What is not a proof at all is refused as such, and not counted.
+        for bad in ("not base64!", b64u(b"a" * 31), None):
+            r = await _open(core, bad)
+            assert r.status == 422, r.text
+        assert await _wrong_count(core, owner) == 0
+        wrong = b64u(b"x" * 32)
+        for left in (9, 8, 7):
+            r = await _open(core, wrong)
+            assert r.status == 403 and r.json() == {
+                "error": WRONG, "wrong": True, "left": left}, r.text
+        r = await _open(core, v["auth"])
+        assert r.status == 200 and r.json() == {"wrap": v["wrap"]}, r.text
+        assert await _wrong_count(core, owner) == 0
+        for left in range(9, -1, -1):
+            r = await _open(core, wrong)
+            assert r.status == 403 and r.json() == {
+                "error": WRONG, "wrong": True, "left": left}, r.text
+        # The eleventh within the hour pauses, the right one too.
+        last = await core.pool.fetchval(
+            "SELECT password_wrong_at FROM vaults WHERE user_id = $1", owner)
+        for auth in (v["auth"], wrong):
+            r = await _open(core, auth)
+            assert r.status == 429, r.text
+            body = r.json()
+            assert set(body) == {"error", "paused", "retryAt"}, body
+            assert body["error"] == PAUSED and body["paused"] is True, body
+            assert dt.datetime.fromisoformat(body["retryAt"]) \
+                == last + dt.timedelta(hours=1), (body, last)
+        # Tries in the pause are not counted, nor is the pause pushed on.
+        assert await _wrong_count(core, owner) == 10
+        assert await core.pool.fetchval(
+            "SELECT password_wrong_at FROM vaults WHERE user_id = $1", owner) == last
+        assert await _details(core, "vault.password.wrong") == [
+            {"left": n, "device": "Chrome on macOS", "ip": "127.0.0.1"}
+            for n in [9, 8, 7, *range(9, -1, -1)]]
+        # An hour after the last wrong one, the right one opens.
+        await core.pool.execute(
+            "UPDATE vaults SET password_wrong_at = password_wrong_at "
+            "- interval '61 minutes' WHERE user_id = $1", owner)
+        r = await _open(core, v["auth"])
+        assert r.status == 200 and r.json() == {"wrap": v["wrap"]}, r.text
+        assert await _wrong_count(core, owner) == 0
+        # Paused again and over: a wrong one is the first of a new hour's
+        # count. The day's goes on (24 wrong ones today), so the tries left
+        # before a pause are the day's 6, not the hour's 9.
+        for _ in range(10):
+            await _open(core, wrong)
+        assert (await _open(core, v["auth"])).status == 429
+        await core.pool.execute(
+            "UPDATE vaults SET password_wrong_at = password_wrong_at "
+            "- interval '61 minutes' WHERE user_id = $1", owner)
+        r = await _open(core, wrong)
+        assert r.status == 403 and r.json()["left"] == 6, r.text
+        counts = await core.pool.fetchrow(
+            "SELECT password_wrong, password_wrong_day FROM vaults "
+            "WHERE user_id = $1", owner)
+        assert tuple(counts) == (1, 24), counts
+
+
+async def test_thirty_wrong_passwords_a_day_and_a_right_one_does_not_clear_them(h):
+    """The security review of 02.11: nine wrong and one right, again and
+    again, got past the hour's count for ever. The day's count is not
+    cleared by a right one: the thirtieth wrong one of a day is the last,
+    and from then on every try, the right one too, waits until a day after
+    the first wrong one. Then the count is over, and the next wrong one
+    starts a new day; a new password clears both counts at once. Each wrong
+    one is journaled with the address it came from, as the proxy gives it."""
+    async with h.core() as core:
+        v = _pw_vector()
+        owner = core.owner.id
+        r = await request(core.page_port, "POST", "/api/vault", headers=CHANGE,
+                          body=json.dumps(_pw_body()).encode())
+        assert r.status == 201, r.text
+        wrong = b64u(b"x" * 32)
+
+        async def day_from():
+            return await core.pool.fetchval(
+                "SELECT password_wrong_day_at FROM vaults WHERE user_id = $1",
+                owner)
+        lefts = []
+        first = None
+        for _ in range(3):
+            for _ in range(9):
+                r = await _open(core, wrong, ip="198.51.100.23")
+                assert r.status == 403, r.text
+                lefts.append(r.json()["left"])
+                first = first or await day_from()
+            r = await _open(core, v["auth"])
+            assert r.status == 200 and r.json() == {"wrap": v["wrap"]}, r.text
+        assert lefts == [9, 8, 7, 6, 5, 4, 3, 2, 1] * 3, lefts
+        # The fourth round: what is left now is the day's.
+        for left in (2, 1, 0):
+            r = await _open(core, wrong, ip="198.51.100.23")
+            assert r.status == 403 and r.json() == {
+                "error": WRONG, "wrong": True, "left": left}, r.text
+        assert await day_from() == first, "the day is the first wrong one's"
+        for auth in (v["auth"], wrong, v["auth"]):
+            r = await _open(core, auth)
+            assert r.status == 429 and r.json() == {
+                "error": PAUSED, "paused": True,
+                "retryAt": (first + dt.timedelta(hours=24)).isoformat()}, r.text
+        counts = await core.pool.fetchrow(
+            "SELECT password_wrong, password_wrong_day FROM vaults "
+            "WHERE user_id = $1", owner)
+        assert tuple(counts) == (3, 30), counts
+        details = await _details(core, "vault.password.wrong")
+        assert details == [{"left": n, "device": "Chrome on macOS",
+                            "ip": "198.51.100.23"} for n in lefts + [2, 1, 0]]
+        # A day after the first wrong one the count is over: the right one
+        # opens, and the next wrong one is the first of a new day.
+        await core.pool.execute(
+            "UPDATE vaults SET password_wrong_day_at = password_wrong_day_at "
+            "- interval '24 hours 1 minute', password_wrong_at = "
+            "password_wrong_at - interval '24 hours 1 minute' "
+            "WHERE user_id = $1", owner)
+        r = await _open(core, v["auth"])
+        assert r.status == 200 and r.json() == {"wrap": v["wrap"]}, r.text
+        r = await _open(core, wrong)
+        assert r.status == 403 and r.json()["left"] == 9, r.text
+        row = await core.pool.fetchrow(
+            "SELECT password_wrong, password_wrong_day, password_wrong_day_at "
+            "FROM vaults WHERE user_id = $1", owner)
+        assert (row["password_wrong"], row["password_wrong_day"]) == (1, 1), row
+        assert row["password_wrong_day_at"] > first, row
+        assert (await _details(core, "vault.password.wrong"))[-1]["ip"] == "127.0.0.1"
+        # Thirty again; a new password clears both counts, and opens.
+        await core.pool.execute("UPDATE vaults SET password_wrong_day = 30 "
+                                "WHERE user_id = $1", owner)
+        assert (await _open(core, v["auth"])).status == 429
+        new = _pw_made_up()
+        r = await request(core.page_port, "PUT", "/api/vault/password",
+                          headers=CHANGE, body=json.dumps(new).encode())
+        assert r.status == 200, r.text
+        counts = await core.pool.fetchrow(
+            "SELECT password_wrong, password_wrong_at, password_wrong_day, "
+            "password_wrong_day_at FROM vaults WHERE user_id = $1", owner)
+        assert tuple(counts) == (0, None, 0, None), counts
+        r = await _open(core, new["auth"])
+        assert r.status == 200 and r.json() == {"wrap": new["wrap"]}, r.text
+
+
+async def test_wrong_passwords_at_once_cannot_pass_thirty_a_day(h):
+    """With 25 wrong ones today and the hour's count at 0, twenty wrong
+    tries at once: the row's lock counts them one by one, so five are told
+    the tries left (4 down to 0) and fifteen are paused until a day after
+    the first wrong one of the day."""
+    async with h.core() as core:
+        r = await request(core.page_port, "POST", "/api/vault", headers=CHANGE,
+                          body=json.dumps(_pw_body()).encode())
+        assert r.status == 201, r.text
+        start = await core.pool.fetchval(
+            "UPDATE vaults SET password_wrong_day = 25, password_wrong_day_at "
+            "= now() - interval '3 hours' WHERE user_id = $1 "
+            "RETURNING password_wrong_day_at", core.owner.id)
+        answers = await asyncio.gather(*(_open(core, b64u(b"x" * 32))
+                                         for _ in range(20)))
+        statuses = sorted(a.status for a in answers)
+        assert statuses == [403] * 5 + [429] * 15, statuses
+        assert sorted(a.json()["left"] for a in answers if a.status == 403) \
+            == list(range(5))
+        assert {a.json()["retryAt"] for a in answers if a.status == 429} \
+            == {(start + dt.timedelta(hours=24)).isoformat()}
+        counts = await core.pool.fetchrow(
+            "SELECT password_wrong, password_wrong_day FROM vaults "
+            "WHERE user_id = $1", core.owner.id)
+        assert tuple(counts) == (5, 30), counts
+        assert len(await _details(core, "vault.password.wrong")) == 5
+
+
+async def test_the_later_of_the_two_pauses_is_the_one_said(h):
+    """The thirtieth wrong one of a day that ends in a minute, and the tenth
+    of an hour: the hour's pause lasts longer than the day, so retryAt is
+    the hour's, an hour after that wrong one."""
+    async with h.core() as core:
+        r = await request(core.page_port, "POST", "/api/vault", headers=CHANGE,
+                          body=json.dumps(_pw_body()).encode())
+        assert r.status == 201, r.text
+        await core.pool.execute(
+            "UPDATE vaults SET password_wrong = 9, password_wrong_at = now(), "
+            "password_wrong_day = 29, password_wrong_day_at = now() "
+            "- interval '23 hours 59 minutes' WHERE user_id = $1", core.owner.id)
+        r = await _open(core, b64u(b"x" * 32))
+        assert r.status == 403 and r.json()["left"] == 0, r.text
+        last = await core.pool.fetchval(
+            "SELECT password_wrong_at FROM vaults WHERE user_id = $1",
+            core.owner.id)
+        r = await _open(core, _pw_vector()["auth"])
+        assert r.status == 429, r.text
+        assert r.json()["retryAt"] == (last + dt.timedelta(hours=1)).isoformat()
+
+
+async def test_json_nested_too_deep_is_not_json(h):
+    """The security review of 02.11: arrays nested deeper than Python's
+    parser goes came back as a 500 with its traceback. How deep that is
+    differs: 3.12 and 3.13 stop near 10000 levels, 3.14 goes past 40000
+    (30000 parsed on the owner's Mac), so the core takes the page's JSON 64
+    levels deep at most (ws.page_json). On every Python, every vault body
+    answers 422 for anything deeper, as for anything else that is not JSON,
+    and the page's socket says it did not understand, and goes on; 64
+    levels are still JSON."""
+
+    def nested(levels: int) -> str:
+        """Arrays nested `levels` deep: "[[]]" for 2."""
+        return "[" * levels + "]" * levels
+
+    def attach(inside: str) -> str:
+        """An attach, which the socket answers with "gone" for a terminal
+        that is not there, with `inside` one level down in it."""
+        return ('{"op": "attach", "ch": 1, "id": "%s", "x": %s}'
+                % (uuid.uuid4(), inside))
+
+    deep_list = ("[" * 30000 + "]" * 30000).encode()
+    deep_object = ('{"a":' * 10000 + "1" + "}" * 10000).encode()
+    async with h.core() as core:
+        for method, path in (("POST", "/api/vault"),
+                             ("POST", "/api/vault/password/open"),
+                             ("PUT", "/api/vault/password"),
+                             ("PUT", "/api/vault/recovery"),
+                             ("POST", "/api/vault/locks"),
+                             ("POST", "/api/vault/keys"),
+                             ("POST", "/api/vault/pairings")):
+            for body in (deep_list, deep_object, nested(65).encode()):
+                r = await request(core.page_port, method, path,
+                                  headers=CHANGE, body=body)
+                assert r.status == 422 and r.json() == {
+                    "error": "That is not JSON."}, (path, r.status, r.text[:200])
+        r = await request(core.page_port, "POST", "/api/vault",
+                          headers=CHANGE, body=nested(64).encode())
+        assert r.status == 422 and r.json() == {
+            "error": "That is not a vault request."}, "64 levels are JSON"
+        async with page_socket(core.page_port) as ws:
+            for text in (deep_list.decode(), deep_object.decode(),
+                         attach(nested(64))):
+                await ws.send(text)
+                assert await _heard(ws, "error") == {
+                    "op": "error", "message": "Not understood."}, text[:60]
+            await ws.send(attach(nested(63)))
+            assert await _heard(ws, "gone") is not None, "the socket goes on"
+
+
+async def test_wrong_passwords_sent_at_once_cannot_pass_ten(h):
+    """Twenty wrong tries at once: the vault row's lock counts them one by
+    one, so ten are told the tries left (9 down to 0, each once) and the
+    other ten are paused; then the right one is paused too."""
+    async with h.core() as core:
+        r = await request(core.page_port, "POST", "/api/vault", headers=CHANGE,
+                          body=json.dumps(_pw_body()).encode())
+        assert r.status == 201, r.text
+        wrong = b64u(b"x" * 32)
+        answers = await asyncio.gather(*(_open(core, wrong) for _ in range(20)))
+        statuses = sorted(r.status for r in answers)
+        assert statuses == [403] * 10 + [429] * 10, statuses
+        assert sorted(r.json()["left"] for r in answers if r.status == 403) \
+            == list(range(10))
+        assert await _wrong_count(core, core.owner.id) == 10
+        assert len(await _details(core, "vault.password.wrong")) == 10
+        assert (await _open(core, _pw_vector()["auth"])).status == 429
+
+
+async def test_a_password_replaces_the_recovery_code(h):
+    """A vault made before 0.1.26 keeps its recovery code until a password
+    is set: setting one forgets the code in the same statement, and the
+    journal says a code was forgotten; a new code is refused from then on.
+    A later change is journaled as one, starts the wrong count again, and
+    the old password no longer opens the vault."""
+    async with h.core() as core:
+        v = _pw_vector()
+        owner = core.owner.id
+        old = dict(_create_body(), id=v["vault_id"])
+        r = await request(core.page_port, "POST", "/api/vault", headers=CHANGE,
+                          body=json.dumps(old).encode())
+        assert r.status == 201, r.text
+        assert (await request(core.page_port, "GET",
+                              "/api/vault/recovery")).status == 200
+        r = await request(core.page_port, "PUT", "/api/vault/password",
+                          headers={**CHANGE, "user-agent": CHROME_MAC},
+                          body=json.dumps(_pw()).encode())
+        assert r.status == 200, r.text
+        shown = r.json()["vault"]
+        assert shown["recoveryAt"] is None and shown["password"]["salt"] == v["salt"]
+        assert v["wrap"] not in r.text and v["check"] not in r.text
+        assert len(shown["locks"]) == 1, "the locks stay as they were"
+        r = await request(core.page_port, "GET", "/api/vault/recovery")
+        assert r.status == 404, r.text
+        row = await core.pool.fetchrow(
+            "SELECT recovery_salt, recovery_wrap, recovery_at, password_check "
+            "FROM vaults WHERE user_id = $1", owner)
+        assert (row["recovery_salt"], row["recovery_wrap"],
+                row["recovery_at"]) == (None, None, None), row
+        assert bytes(row["password_check"]) == b64u_dec(v["check"])
+        assert await _details(core, "vault.password.set") == [
+            {"recovery": True, "device": "Chrome on macOS"}]
+        # No new recovery code for it now.
+        r = await request(core.page_port, "PUT", "/api/vault/recovery",
+                          headers=CHANGE, body=json.dumps(
+                              {"recoverySalt": b64u(b"n" * 16),
+                               "recoveryWrap": b64u(b"m" * 60)}).encode())
+        assert r.status == 409 and r.json() == {"error": HAS_PASSWORD}, r.text
+        assert (await request(core.page_port, "GET",
+                              "/api/vault/recovery")).status == 404
+        # Two wrong tries, then a new password: a change, the count at 0.
+        for _ in range(2):
+            await _open(core, b64u(b"x" * 32))
+        assert await _wrong_count(core, owner) == 2
+        new = _pw_made_up()
+        r = await request(core.page_port, "PUT", "/api/vault/password",
+                          headers=CHANGE, body=json.dumps(new).encode())
+        assert r.status == 200, r.text
+        assert r.json()["vault"]["password"]["salt"] == new["salt"]
+        counts = await core.pool.fetchrow(
+            "SELECT password_wrong, password_wrong_at, password_wrong_day, "
+            "password_wrong_day_at FROM vaults WHERE user_id = $1", owner)
+        assert tuple(counts) == (0, None, 0, None), counts
+        assert await _details(core, "vault.password.changed") == [
+            {"device": "A browser"}]
+        assert len(await _details(core, "vault.password.set")) == 1
+        # The old password does not open it any more; the new one does.
+        r = await _open(core, v["auth"])
+        assert r.status == 403 and r.json()["left"] == 9, r.text
+        r = await _open(core, new["auth"])
+        assert r.status == 200 and r.json() == {"wrap": new["wrap"]}, r.text
+
+
+async def test_the_last_lock_stays_with_a_password_too(h):
+    """Change 6 stands in 0.1.26: the vault's last lock is never taken off,
+    with a password or without; with another lock beside it, either one
+    may go, and then the other stays."""
+    async with h.core() as core:
+        r = await request(core.page_port, "POST", "/api/vault", headers=CHANGE,
+                          body=json.dumps(_pw_body(_lock())).encode())
+        assert r.status == 201, r.text
+        last = r.json()["vault"]["locks"][0]["id"]
+        r = await request(core.page_port, "DELETE", f"/api/vault/locks/{last}",
+                          headers=CHANGE)
+        assert r.status == 422 and r.json() == {"error": LAST_LOCK}, r.text
+        v = (await request(core.page_port, "GET", "/api/vault")).json()["vault"]
+        assert [lk["id"] for lk in v["locks"]] == [last], v["locks"]
+        assert await core.pool.fetchval(
+            "SELECT wrap FROM vault_locks WHERE id = $1", uuid.UUID(last)), \
+            "the refused lock keeps its wrap"
+        # With a second lock, the first may go; then the second stays.
+        r = await request(core.page_port, "POST", "/api/vault/locks",
+                          headers=CHANGE, body=json.dumps(_lock("passkey")).encode())
+        assert r.status == 201, r.text
+        passkey = next(lk["id"] for lk in r.json()["vault"]["locks"]
+                       if lk["kind"] == "passkey")
+        r = await request(core.page_port, "DELETE", f"/api/vault/locks/{last}",
+                          headers=CHANGE)
+        assert r.status == 204, r.text
+        r = await request(core.page_port, "DELETE",
+                          f"/api/vault/locks/{passkey}", headers=CHANGE)
+        assert r.status == 422 and r.json() == {"error": LAST_LOCK}, r.text
+        # A vault of before (a recovery code, one lock): the same, before its
+        # password is set and after.
+        anna = await sign_in_as(core, "anna.lock@example.com")
+        as_anna = {**CHANGE, "cookie": anna}
+        r = await request(core.page_port, "POST", "/api/vault", headers=as_anna,
+                          body=json.dumps(_create_body()).encode())
+        assert r.status == 201, r.text
+        hers = r.json()["vault"]["locks"][0]["id"]
+        r = await request(core.page_port, "DELETE", f"/api/vault/locks/{hers}",
+                          headers=as_anna)
+        assert r.status == 422 and r.json() == {"error": LAST_LOCK}, r.text
+        r = await request(core.page_port, "PUT", "/api/vault/password",
+                          headers=as_anna, body=json.dumps(_pw_made_up()).encode())
+        assert r.status == 200, r.text
+        r = await request(core.page_port, "DELETE", f"/api/vault/locks/{hers}",
+                          headers=as_anna)
+        assert r.status == 422 and r.json() == {"error": LAST_LOCK}, r.text
+        v = (await request(core.page_port, "GET", "/api/vault",
+                           headers={"cookie": anna})).json()["vault"]
+        assert [lk["id"] for lk in v["locks"]] == [hers], v["locks"]
+
+
+async def test_two_locks_taken_off_at_once_leave_the_last(h):
+    """The vault's row is held while a removal counts the locks: two
+    removals at once (here let go at the same moment, after a transaction
+    that held both locks' rows) take one lock off and refuse the other, so
+    the last lock stays. In 0.1.17 both could pass the count."""
+    async with h.core() as core:
+        r = await request(core.page_port, "POST", "/api/vault", headers=CHANGE,
+                          body=json.dumps(_pw_body(_lock())).encode())
+        assert r.status == 201, r.text
+        r = await request(core.page_port, "POST", "/api/vault/locks",
+                          headers=CHANGE, body=json.dumps(_lock("passkey")).encode())
+        assert r.status == 201, r.text
+        ids = [lk["id"] for lk in r.json()["vault"]["locks"]]
+        assert len(ids) == 2, ids
+        async with core.pool.acquire() as conn:
+            held = conn.transaction()
+            await held.start()
+            await conn.execute("SELECT 1 FROM vault_locks WHERE id = ANY($1::uuid[]) "
+                               "FOR UPDATE", [uuid.UUID(i) for i in ids])
+            removals = [asyncio.create_task(request(
+                core.page_port, "DELETE", f"/api/vault/locks/{i}",
+                headers=CHANGE)) for i in ids]
+            await asyncio.sleep(0.5)
+            assert not any(t.done() for t in removals), "they wait for the rows"
+            await held.rollback()
+        answers = await asyncio.gather(*removals)
+        assert sorted(a.status for a in answers) == [204, 422], \
+            [a.text for a in answers]
+        v = (await request(core.page_port, "GET", "/api/vault")).json()["vault"]
+        assert len(v["locks"]) == 1, v["locks"]
+
+
+async def test_nobody_else_opens_sets_or_reads_a_vault_password(h):
+    """Another person's session reaches only their own vault: the owner's
+    password neither opens, changes nor shows there, and tries made there
+    count on their own vault, not the owner's."""
+    async with h.core() as core:
+        v = _pw_vector()
+        r = await request(core.page_port, "POST", "/api/vault", headers=CHANGE,
+                          body=json.dumps(_pw_body()).encode())
+        assert r.status == 201, r.text
+        anna = await sign_in_as(core, "anna@example.com")
+        as_anna = {**CHANGE, "cookie": anna}
+        r = await request(core.page_port, "GET", "/api/vault",
+                          headers={"cookie": anna})
+        assert r.json() == {"vault": None}, r.text
+        r = await _open(core, v["auth"], cookie=anna)
+        assert r.status == 404 and "wrap" not in r.json(), r.text
+        r = await request(core.page_port, "PUT", "/api/vault/password",
+                          headers=as_anna, body=json.dumps(_pw_made_up()).encode())
+        assert r.status == 404, r.text
+        r = await request(core.page_port, "GET", "/api/vault/recovery",
+                          headers={"cookie": anna})
+        assert r.status == 404, r.text
+        r = await request(core.page_port, "PUT", "/api/vault/recovery",
+                          headers=as_anna, body=json.dumps(
+                              {"recoverySalt": b64u(b"n" * 16),
+                               "recoveryWrap": b64u(b"m" * 60)}).encode())
+        assert r.status == 404, r.text
+        # Her own vault, with her own password: the owner's proof is a wrong
+        # one there, counted on hers.
+        r = await request(core.page_port, "POST", "/api/vault", headers=as_anna,
+                          body=json.dumps({"id": str(uuid.uuid4()),
+                                           "password": _pw_made_up()}).encode())
+        assert r.status == 201, r.text
+        r = await _open(core, v["auth"], cookie=anna)
+        assert r.status == 403 and r.json()["left"] == 9, r.text
+        r = await request(core.page_port, "PUT", "/api/vault/password",
+                          headers=as_anna, body=json.dumps(_pw_made_up()).encode())
+        assert r.status == 200, r.text
+        # The owner's is as it was.
+        assert await _wrong_count(core, core.owner.id) == 0
+        r = await _open(core, v["auth"])
+        assert r.status == 200 and r.json() == {"wrap": v["wrap"]}, r.text
+        mine = (await request(core.page_port, "GET", "/api/vault")).json()["vault"]
+        assert mine["password"]["salt"] == v["salt"], mine["password"]
+        # And signed out, nothing at all.
+        r = await request(core.page_port, "POST", "/api/vault/password/open",
+                          headers={**CHANGE, "cookie": ""},
+                          body=json.dumps({"auth": v["auth"]}).encode())
+        assert r.status == 401, r.text
+
+
+async def test_the_persons_pages_hear_that_the_password_changed(h):
+    """After a password is set, vault.changed reaches the person's pages
+    (they read the vault again), and nobody else's."""
+    async with h.core() as core:
+        r = await request(core.page_port, "POST", "/api/vault", headers=CHANGE,
+                          body=json.dumps(_create_body()).encode())
+        assert r.status == 201, r.text
+        anna = await sign_in_as(core, "anna.pages@example.com")
+        async with page_socket(core.page_port) as mine, \
+                page_socket(core.page_port, cookie=anna) as hers:
+            r = await request(core.page_port, "PUT", "/api/vault/password",
+                              headers=CHANGE, body=json.dumps(_pw()).encode())
+            assert r.status == 200, r.text
+            assert await _heard(mine, "vault.changed") == {"op": "vault.changed"}
+            assert await _heard(hers, "vault.changed", wait=0.5) is None
+            # A change again; and opening it is no change.
+            r = await request(core.page_port, "PUT", "/api/vault/password",
+                              headers=CHANGE,
+                              body=json.dumps(_pw_made_up()).encode())
+            assert r.status == 200, r.text
+            assert await _heard(mine, "vault.changed") == {"op": "vault.changed"}
+            r = await _open(core, b64u(b"x" * 32))
+            assert r.status == 403, r.text
+            assert await _heard(mine, "vault.changed", wait=0.5) is None
+
+
+async def test_the_password_migration_keeps_a_vault_of_before(h):
+    """020 on a database with a vault of 0.1.25 (a recovery code): the vault
+    stays as it was, with no password and no wrong tries. From then on the
+    schema holds a vault to a whole recovery code or none, a whole password
+    or none, at least one of the two, and the password to the contract's
+    sizes and parameters."""
+    url = await h.empty_database()
+    pool = await db.connect(url)
+    try:
+        files = sorted(db.MIGRATIONS.glob("*.sql"))
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "CREATE TABLE schema_migrations (version text PRIMARY KEY, "
+                "applied_at timestamptz NOT NULL DEFAULT now())")
+            for path in files:
+                if path.stem >= "020":
+                    continue
+                async with conn.transaction():
+                    await conn.execute(path.read_text(encoding="utf-8"))
+                    await conn.execute("INSERT INTO schema_migrations (version) "
+                                       "VALUES ($1)", path.stem)
+        uid = await pool.fetchval(
+            "INSERT INTO users (name) VALUES ('Old') RETURNING id")
+        vid = await pool.fetchval(
+            "INSERT INTO vaults (id, user_id, prf_salt, recovery_salt, "
+            "recovery_wrap) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+            uuid.uuid4(), uid, b"p" * 32, b"s" * 16, b"r" * 60)
+        applied = await db.migrate(pool)
+        assert applied == ["020_vault_password"], applied
+        row = await pool.fetchrow("SELECT * FROM vaults WHERE id = $1", vid)
+        assert bytes(row["recovery_wrap"]) == b"r" * 60 and row["recovery_at"]
+        assert row["password_salt"] is None and row["password_wrong"] == 0
+        assert row["password_wrong_day"] == 0 and row["password_wrong_day_at"] is None
+        view = await vault.get_vault(pool, uid, None)
+        assert view["password"] is None and view["recoveryAt"], view
+
+        async def refused(sql: str, *args) -> None:
+            try:
+                await pool.execute(sql, *args)
+            except asyncpg.CheckViolationError:
+                return
+            raise AssertionError(f"accepted: {sql} {args}")
+
+        no_code = ("UPDATE vaults SET recovery_salt = NULL, recovery_wrap = NULL, "
+                   "recovery_at = NULL WHERE id = $1")
+        await refused(no_code, vid)
+        await refused("UPDATE vaults SET recovery_at = NULL WHERE id = $1", vid)
+        await refused("UPDATE vaults SET password_salt = $2 WHERE id = $1",
+                      vid, b"s" * 16)
+        await refused("UPDATE vaults SET password_wrong = -1 WHERE id = $1", vid)
+        await refused("UPDATE vaults SET password_wrong_day = -1 WHERE id = $1",
+                      vid)
+        good = {"salt": b"s" * 16, "kdf": "argon2id", "m": 65536, "t": 3,
+                "p": 1, "check": b"c" * 32, "wrap": b"w" * 60}
+        set_password = (
+            "UPDATE vaults SET password_salt = $2, password_kdf = $3, "
+            "password_m = $4, password_t = $5, password_p = $6, "
+            "password_check = $7, password_wrap = $8, password_at = now() "
+            "WHERE id = $1")
+        for change in ({"m": 65535}, {"m": 1048577}, {"t": 2}, {"t": 11},
+                       {"p": 0}, {"p": 5}, {"kdf": "argon2i"},
+                       {"salt": b"s" * 15}, {"check": b"c" * 31},
+                       {"wrap": b"w" * 59}, {"wrap": b"w" * 61}):
+            await refused(set_password, vid, *dict(good, **change).values())
+        await refused(set_password.replace(", password_at = now()", ""),
+                      vid, *good.values())
+        # A whole password: then the code may go.
+        await pool.execute(set_password, vid, *good.values())
+        await pool.execute(no_code, vid)
+        view = await vault.get_vault(pool, uid, None)
+        assert view["recoveryAt"] is None and view["password"]["kdf"] == {
+            "alg": "argon2id", "m": 65536, "t": 3, "p": 1}, view
+        await refused("UPDATE vaults SET password_salt = NULL, "
+                      "password_kdf = NULL, password_m = NULL, password_t = NULL, "
+                      "password_p = NULL, password_check = NULL, "
+                      "password_wrap = NULL, password_at = NULL WHERE id = $1", vid)
+    finally:
+        await pool.close()

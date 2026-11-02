@@ -140,6 +140,9 @@ test("a release that ended a terminal, and What's new in it", () => {
   assert.equal(whatsNew("ru", "0.1.24"), "https://docs.tterm.net/ru/whats-new/web/#0124");
   assert.equal(whatsNew("pt-BR", "0.1.24"), "https://docs.tterm.net/pt/whats-new/web/#0124");
   assert.equal(whatsNew("zh-CN", "0.2.0"), "https://docs.tterm.net/zh/whats-new/web/#020");
+  // tTerm for Mac's entries (0.1.26): What's new after an update.
+  assert.equal(whatsNew("en", "0.8.0", "mac"), "https://docs.tterm.net/whats-new/mac/#080");
+  assert.equal(whatsNew("ru", "0.8.0", "mac"), "https://docs.tterm.net/ru/whats-new/mac/#080");
   assert.equal(docsPage("de", ""), "https://docs.tterm.net/de/");
   assert.equal(folderOf("en"), "");
   assert.equal(folderOf("ja"), "ja");

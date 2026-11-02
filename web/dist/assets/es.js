@@ -1609,30 +1609,48 @@ vault.code_label = Código {code}
 
 # ------------------------------------------------------------ keys: Settings › Keys, the vault (Keys.tsx)
 keys.title = Claves
-keys.about = Tu bóveda: las claves SSH que guardaste, en todos tus dispositivos. Solo tus dispositivos la abren, igual que se desbloquean; tTerm no puede.
+keys.about = Tu bóveda: las claves SSH que guardaste. Están cifradas y solo tú puedes abrirlas: con la contraseña de tu bóveda y, donde las guardaste, también sin ella. tTerm no puede.
+# A vault made before 0.1.26 has a recovery code and no password: this
+# banner, above the vault's state, sets one (vault_password.title_set).
+keys.set_title = Establece la contraseña de tu bóveda
+keys.set_text = Con ella abrirás tus claves en cualquier navegador, aunque tu Mac se quede en casa. Después de esto, el código de recuperación dejará de funcionar: la contraseña lo reemplaza.
+keys.set_go = Establecer la contraseña
 keys.open_here = Abierta en este navegador
 # How it opened, then when it locks again: one of these under "Open in this browser".
-keys.open_text.touch = Se abrió con Touch ID. Se vuelve a bloquear tras 8 horas sin actividad, al cerrar tTerm Web o al presionar «Bloquear».
-keys.open_text.hello = Se abrió con Windows Hello. Se vuelve a bloquear tras 8 horas sin actividad, al cerrar tTerm Web o al presionar «Bloquear».
-keys.open_text.passkey = Se abrió con tu llave de acceso. Se vuelve a bloquear tras 8 horas sin actividad, al cerrar tTerm Web o al presionar «Bloquear».
-keys.open_text.recovery = Se abrió con tu código de recuperación, para esta sesión. Se vuelve a bloquear tras 8 horas sin actividad, al cerrar tTerm Web o al presionar «Bloquear».
-keys.open_text.pairing = Se abrió con la aprobación de tu Mac, para esta sesión. Se vuelve a bloquear tras 8 horas sin actividad, al cerrar tTerm Web o al presionar «Bloquear».
-keys.open_text.new = Se acaba de crear en este navegador. Se vuelve a bloquear tras 8 horas sin actividad, al cerrar tTerm Web o al presionar «Bloquear».
+keys.open_text.touch = Se abrió con Touch ID. Se cierra sola tras 8 horas sin actividad, y también al cerrar tTerm Web o al presionar «Bloquear». Para volver a abrirla, basta con un toque de Touch ID.
+keys.open_text.hello = Se abrió con Windows Hello. Se cierra sola tras 8 horas sin actividad, y también al cerrar tTerm Web o al presionar «Bloquear». Se vuelve a abrir con Windows Hello.
+keys.open_text.passkey = Se abrió con tu llave de acceso. Se cierra sola tras 8 horas sin actividad, y también al cerrar tTerm Web o al presionar «Bloquear». Se vuelve a abrir con tu llave de acceso.
+keys.open_text.password = Se abrió con la contraseña de la bóveda, solo para esta sesión. Se cierra sola tras 8 horas sin actividad, y también al cerrar la pestaña o al presionar «Bloquear».
+keys.open_text.recovery = Se abrió con tu código de recuperación, solo para esta sesión. Se cierra sola tras 8 horas sin actividad, y también al cerrar la pestaña o al presionar «Bloquear».
+keys.open_text.pairing = Se abrió con la aprobación de tu Mac, solo para esta sesión. Se cierra sola tras 8 horas sin actividad, y también al cerrar la pestaña o al presionar «Bloquear».
+keys.open_text.new = Se acaba de crear en este navegador. Se cierra sola tras 8 horas sin actividad, y también al cerrar la pestaña o al presionar «Bloquear».
 # In tTerm for Mac.
 keys.open_mac = Abierta en esta Mac
 keys.open_text.mac = Se abrió con Touch ID o con la contraseña de tu Mac. Sigue abierta mientras tTerm se ejecuta, hasta que presiones «Bloquear» o cierres sesión.
 keys.lock = Bloquear
-keys.locked_here = Bloqueada en este navegador
-keys.locked_text = Ábrela para usar tus claves aquí: con el desbloqueo de esta computadora, con la aprobación de tu Mac o con tu código de recuperación.
+# The vault closed in this browser. Where the keys were kept here with
+# Touch ID (or Windows Hello, a passkey), one of the three; else the
+# vault password opens them (keys.closed_text_password, with its field).
+keys.closed_here = Tu bóveda está cerrada
+keys.closed_text.touch = Ábrela con Touch ID para iniciar sesión en tus servidores con tu clave.
+keys.closed_text.hello = Ábrela con Windows Hello para iniciar sesión en tus servidores con tu clave.
+keys.closed_text.passkey = Ábrela con tu llave de acceso para iniciar sesión en tus servidores con tu clave.
+keys.closed_text_password = Tus claves están cifradas y solo las abre la contraseña de tu bóveda. Escríbela: las claves se abren aquí mismo, en este navegador. La contraseña en sí no se envía a ningún lugar.
+# The vault password's row, under the vault's state: {day} is time.today,
+# time.yesterday or time.on_day ("on 2 Nov").
+keys.password_title = Contraseña de la bóveda
+keys.password_text = Abre tus claves en cualquier navegador. Establecida {day}.
+keys.password_change = Cambiar la contraseña
 keys.locked_mac = Bloqueada en esta Mac
 keys.locked_mac_text = Ábrela con Touch ID o con la contraseña de tu Mac, y esta Mac iniciará sesión en tus servidores.
 keys.locked_mac_code = Esta Mac todavía no puede abrir tu bóveda por sí sola. Ábrela aquí una vez con tu código de recuperación; a partir de entonces, se abrirá con Touch ID o con la contraseña de tu Mac.
+keys.locked_mac_password = Esta Mac todavía no puede abrir tu bóveda por sí sola. Ábrela aquí una vez con la contraseña de la bóveda; a partir de entonces, esta Mac la abrirá por sí sola, con Touch ID.
 keys.open = Abrir
 keys.open_code = Abrir con el código de recuperación
 keys.none_title = Aún no tienes una bóveda
-keys.none_web = Añade una clave desde un archivo y se creará tu bóveda, en este navegador, con un código de recuperación que guardarás tú.
-keys.none_app = Guarda una clave con «Mover a la nube» o con la franja que aparece tras un ssh en una terminal, y se creará tu bóveda, con Touch ID.
-keys.no_passkey_here = Este navegador no puede guardar tu bóveda con una llave de acceso: aquí se abre con tu código de recuperación o con la aprobación de tu Mac, por una sesión a la vez.
+keys.none_web = Añade una clave desde un archivo y se creará tu bóveda con la contraseña que tú elijas.
+keys.none_app = Guarda una clave con «Mover a la nube» o con la franja que aparece tras un ssh en una terminal, y se creará tu bóveda con la contraseña que tú elijas.
+keys.no_passkey_here = Este navegador no puede guardar tus claves con una llave de acceso: aquí se abren con la contraseña de tu bóveda o con la aprobación de tu Mac, por una sesión a la vez.
 keys.no_ed25519_here = Este navegador no puede firmar con claves Ed25519. Abre esos servidores en un navegador más reciente o en tTerm para Mac.
 # {servers} is a list of servers: droplet and staging; web-01 in Client X.
 keys.opens = Abre {servers}
@@ -1649,9 +1667,10 @@ keys.cannot_ed25519 = Este navegador no puede firmar con claves Ed25519
 keys.cannot_open = No se abre aquí: vuelve a añadirla desde su archivo
 keys.remove = Quitar
 keys.add_file = Añadir una clave desde un archivo
-keys.new_recovery = Crear un código de recuperación nuevo
 # {places} is where the vault opens: "MacBook-Pro-Denis · tTerm for Mac, Chrome on macOS".
-keys.opens_on = Se abre en: {places}.
+keys.opens_on = Sin la contraseña, tu bóveda se abre en: {places}. En cualquier otro navegador, con la contraseña de la bóveda.
+keys.opens_password_only = Tu bóveda solo se abre con su contraseña: todavía no la guarda ningún dispositivo.
+keys.opens_on_old = Sin la contraseña, tu bóveda se abre en: {places}. Hasta que tenga contraseña, otros navegadores la abren con el código de recuperación o con la aprobación de tu Mac.
 keys.opens_on_code = Solo se abre con tu código de recuperación.
 keys.place_mac = {mac} · {app}
 keys.place_browser = un navegador
@@ -1671,7 +1690,6 @@ add_key.passphrase_hint = La clave está cifrada. Su frase de contraseña la abr
 add_key.open_key = Abrir la clave
 add_key.reading = Leyendo la clave…
 add_key.name = Nombre
-add_key.sealed_here = Queda bloqueada aquí, antes de salir de este navegador. Solo tus dispositivos pueden abrirla; tTerm no.
 add_key.add = Añadir a tu bóveda
 add_key.next = Siguiente
 add_key.added = Se añadió {name} a tu bóveda
@@ -1691,50 +1709,81 @@ add_key.problem_encrypted_pem = Este archivo de clave está cifrado con el méto
 add_key.problem_ed25519 = Este navegador no puede leer claves Ed25519 en este formato. Prueba con un navegador más reciente o con la clave en el formato de OpenSSH.
 add_key.problem_several = El archivo tiene más de una clave: añádelas una por una.
 
-# ------------------------------------------------------------ vault_new: Save your key to your vault (VaultDialogs.tsx)
-vault_new.title = Guarda tu clave en tu bóveda
-# <code>…</code> is the key's name: id_ed25519. {server} is the server's name.
-vault_new.text_server = <code>{key}</code> va a tu bóveda, y {server} se abrirá con ella desde tTerm Web, tu teléfono o cualquier computadora en la que inicies sesión.
-vault_new.text = <code>{key}</code> va a tu bóveda: los servidores que se abren con ella podrán abrirse desde tTerm Web, tu teléfono o cualquier computadora en la que inicies sesión.
-# In tTerm for Mac.
-vault_new.point_mac_unlock = Se abre igual que se desbloquea esta Mac: con Touch ID o con la contraseña de tu Mac. Nada nuevo que recordar.
-vault_new.point_mac_locked = Queda bloqueada antes de salir de esta Mac. Solo tus dispositivos pueden abrirla; tTerm no.
-vault_new.point_mac_browser = Un navegador nuevo la abre cuando lo apruebas aquí, o con tu código de recuperación.
-# In a browser.
-vault_new.point_web_unlock = Se abre igual que se desbloquea esta computadora: con Touch ID, Windows Hello o el bloqueo de pantalla de tu teléfono. Nada nuevo que recordar.
-vault_new.point_web_no_passkey = Este navegador no puede guardarla con una llave de acceso: aquí se abre con tu código de recuperación, por una sesión a la vez.
-vault_new.point_web_locked = Queda bloqueada antes de salir de este navegador. Solo tus dispositivos pueden abrirla; tTerm no.
-vault_new.point_web_browser = Otro navegador la abre con tu código de recuperación, o cuando lo apruebas en tTerm para Mac.
-vault_new.make_touch = Crear mi bóveda con Touch ID
-vault_new.make_hello = Crear mi bóveda con Windows Hello
-vault_new.make_passkey = Crear mi bóveda con una llave de acceso
-vault_new.make = Crear mi bóveda
+# ------------------------------------------------------------ vault_password: the vault password (VaultDialogs.tsx, 0.1.26)
+# Make up a vault password: a new vault, made on the Mac (Move to cloud;
+# the strip after ssh, vault_password.text_key) or in a browser (Add a key
+# from a file, vault_password.text_web). <code>…</code> is the key's name:
+# id_ed25519.
+vault_password.title_new = Crea la contraseña de tu bóveda
+vault_password.text_mac = Las claves de esta Mac van cifradas a tu bóveda en la nube. Con esta contraseña las abrirás en cualquier navegador, aunque tu Mac se quede en casa.
+vault_password.text_key = <code>{key}</code> va cifrada a tu bóveda en la nube. Con esta contraseña la abrirás en cualquier navegador, aunque tu Mac se quede en casa.
+vault_password.text_web = <code>{key}</code> se cifra en este navegador y va a tu bóveda. Con esta contraseña la abrirás en cualquier navegador.
+vault_password.label = Contraseña
+# The second field: the same password once more.
+vault_password.label_again = Repítela
+# Next to the field: the password shown as it is typed, or hidden again.
+vault_password.show = Mostrar
+vault_password.hide = Ocultar
+# Under the first field; while it has 1 to 11 characters, vault_password.short
+# instead. vault_password.latin when it has a character beyond plain Latin.
+vault_password.hint = Al menos 12 caracteres. Lo más fácil es una frase de unas pocas palabras.
+vault_password.short = one: Falta {n} carácter | other: Faltan {n} caracteres
+vault_password.latin = Tiene letras fuera del alfabeto latino básico, como ñ o á: puede que una computadora en otro país no tenga una distribución de teclado para escribirlas.
+# Under the second field.
+vault_password.match = Coincide
+vault_password.no_match = No coincide con la de arriba
+# In a dashed box under the fields: on the Mac, and in a browser.
+vault_password.note_mac = tTerm no conoce esta contraseña y no puede recuperarla. Guárdala en tu administrador de contraseñas. Si la olvidas, establece una nueva aquí, en esta Mac.
+vault_password.note_web = tTerm no conoce esta contraseña y no puede recuperarla. Guárdala en tu administrador de contraseñas.
+vault_password.create = Crear la bóveda
+# On the button, while the password becomes the key (a second; a few on a phone).
+vault_password.working = Cifrando…
+# Settings › Keys: Set a vault password (a vault made before 0.1.26, with a
+# recovery code), or Change it.
+vault_password.title_set = Establece la contraseña de tu bóveda
+vault_password.text_set = Con ella abrirás tus claves en cualquier navegador, aunque tu Mac se quede en casa. tTerm no conoce esta contraseña y no puede recuperarla. Después de esto, el código de recuperación dejará de funcionar.
+vault_password.set = Establecer la contraseña
+vault_password.title_change = Cambia la contraseña de tu bóveda
+vault_password.text_change = La nueva contraseña reemplaza a la anterior al instante: la anterior ya no abre tus claves. Tu Mac y los navegadores donde están guardadas tus claves las abren como antes.
+vault_password.label_new = Nueva contraseña
+vault_password.change = Cambiar la contraseña
+# In a browser where the keys are not kept: what opens the vault for the
+# change (the current password), or for setting it (the recovery code,
+# recovery.now_code).
+vault_password.current = Contraseña actual
+vault_password.current_hint = Tus claves no están guardadas en este navegador, así que para cambiarla se necesita la contraseña actual.
+vault_password.code_hint = Tus claves no están guardadas en este navegador, así que para establecer la contraseña se necesita tu código de recuperación.
+# Said once done.
+vault_password.done_set = Se estableció la contraseña de la bóveda. El código de recuperación ya no abre tu bóveda.
+vault_password.done_change = Se cambió la contraseña de la bóveda.
+# A closed vault, in a browser with no lock of it: the field it opens with,
+# in a server's card and in Settings › Keys.
+vault_password.label_vault = Contraseña de la bóveda
+vault_password.open = Abrir las claves
+vault_password.opening = Abriendo…
+vault_password.forgot = ¿Olvidaste la contraseña?
 
-# ------------------------------------------------------------ recovery: the recovery code, shown once (VaultDialogs.tsx)
-recovery.title = Tu código de recuperación
-recovery.text = Si algún día pierdes todos los dispositivos que abren tu bóveda, este código es la única forma de volver a acceder a tus claves. tTerm no puede recuperarlas por ti. Solo lo verás esta vez.
-recovery.title_new = Tu nuevo código de recuperación
-recovery.text_new = El código que tenías antes ya no abre tu bóveda. Si algún día pierdes todos los dispositivos que abren tu bóveda, este nuevo código es la única forma de volver a acceder a tus claves. Solo lo verás esta vez.
-# For screen readers.
-recovery.code_label = Código de recuperación {code}
-recovery.save_file = Guardar como archivo
-recovery.copy_failed = No se pudo copiar: selecciona el código y cópialo a mano.
-# What the file saved holds.
-recovery.file_text = Código de recuperación de la bóveda de tTerm: {code}\\nAbre tu bóveda cuando ninguno de tus dispositivos pueda hacerlo. Guárdalo en un lugar seguro, lejos de tus dispositivos.
-recovery.kept_mac = Lo guardé en un lugar seguro, no solo en esta Mac
-recovery.kept_web = Lo guardé en un lugar seguro, no solo en esta computadora
-recovery.make_title = ¿Crear un código de recuperación nuevo?
-recovery.make_text = El código que tienes ahora dejará de funcionar, y el nuevo se mostrará una sola vez. Tus claves y tus dispositivos no cambian.
+# ------------------------------------------------------------ vault_forgot: Forgot your vault password? (VaultDialogs.tsx, 0.1.26)
+vault_forgot.title = ¿Olvidaste la contraseña de tu bóveda?
+vault_forgot.text = tTerm no puede recordártela: solo tú conoces la contraseña. Pero puedes establecer una nueva donde tu bóveda se abre sin ella:
+# Two points under the text: where a new password can be set.
+vault_forgot.mac = en tu Mac, en tTerm para Mac: Configuración › Claves › Cambiar la contraseña, con Touch ID;
+vault_forgot.browser = en un navegador donde tus claves están guardadas: también allí, en Configuración.
+# <code>…</code> is the folder of the keys: it stays as it is.
+vault_forgot.none = Si no hay ningún dispositivo así, las claves de tu bóveda ya no se pueden abrir. Las claves en sí suelen seguir en tu Mac, en <code>~/.ssh</code>.
+vault_forgot.ok = Entendido
+
+# ------------------------------------------------------------ recovery: the recovery code of a vault made before 0.1.26 (VaultDialogs.tsx)
 recovery.now_code = Tu código de recuperación actual
-recovery.now_code_hint = Este navegador no tiene ninguna llave de acceso de tu bóveda, así que el código nuevo se crea con el que tienes ahora. ¿Lo perdiste? Crea el nuevo en tTerm para Mac.
-recovery.make_go = Crear un código nuevo
-recovery.make_go_passkey = Crearlo con tu llave de acceso
-recovery.make_touch = Crearlo con Touch ID
 
 # ------------------------------------------------------------ vault_open: Open your keys on this browser (VaultDialogs.tsx)
 vault_open.title = Abre tus claves en este navegador
 vault_open.text = Este navegador es nuevo para tu bóveda. Apruébalo en un dispositivo que ya la abra.
 vault_open.text_code = Abre tu bóveda en este navegador con tu código de recuperación.
+# A vault with a password: the Mac's approval is the second way, and the
+# button at the bottom goes back to the password field.
+vault_open.text_password = Aprueba este navegador en tu Mac. Es útil en la computadora de otra persona: no tienes que escribir en ella la contraseña de la bóveda.
+vault_open.use_password = Escribir la contraseña
 # {mac} is the Mac's name, {app} is app_link.mac: "MacBook-Pro-Denis · tTerm for Mac".
 vault_open.mac_name = {mac} · {app}
 vault_open.mac_ask = Pedirle que abra tu bóveda aquí
@@ -1747,9 +1796,13 @@ vault_open.sas_text = Tu Mac también muestra un código. Autoriza allí solo si
 vault_open.or = o
 vault_open.code = Código de recuperación
 vault_open.open = Abrir
-# Once open with the recovery code or the Mac's approval: whether this browser keeps a passkey.
+# Once open with the password, the Mac's approval or the recovery code, or just made in this browser: whether to keep the keys here with a passkey.
 vault_open.opened_title = Tus claves están abiertas en este navegador
-vault_open.opened_text = ¿Guardar una llave de acceso aquí para que la próxima vez se abran igual que se desbloquea esta computadora? En una computadora que no sea tuya, elige «Solo esta vez».
+vault_open.keep_text.touch = ¿Guardarlas aquí con Touch ID? La próxima vez, en este navegador bastará con Touch ID, sin necesidad de contraseña.
+vault_open.keep_text.hello = ¿Guardarlas aquí con Windows Hello? La próxima vez, en este navegador bastará con Windows Hello, sin necesidad de contraseña.
+vault_open.keep_text.passkey = ¿Guardarlas aquí con una llave de acceso? La próxima vez, en este navegador bastará con la llave de acceso, sin necesidad de contraseña.
+# Small, under the question.
+vault_open.keep_foreign = ¿No es tu computadora? Elige «Solo esta vez»: las claves se cierran al cerrar la pestaña, o solas si no se usan durante un tiempo.
 vault_open.keep_touch = Guardar con Touch ID
 vault_open.keep_hello = Guardar con Windows Hello
 vault_open.keep_passkey = Guardar con una llave de acceso
@@ -1761,6 +1814,9 @@ app_code.title = Abre tu bóveda en esta Mac
 app_code.text = Esta Mac todavía no puede abrir tu bóveda por sí sola. Ábrela aquí una vez con tu código de recuperación; a partir de entonces, esta Mac la abrirá con Touch ID.
 # When this Mac's lock is there but no longer opens the vault (taken off in a browser, or gone from the keychain).
 app_code.text_lost = Esta Mac ya no puede abrir tu bóveda por sí sola. Ábrela aquí una vez con tu código de recuperación; después, esta Mac volverá a abrirla con Touch ID.
+# A vault with a password (0.1.26): opened here once with it.
+app_code.text_password = Esta Mac todavía no puede abrir tu bóveda por sí sola. Ábrela aquí una vez con la contraseña de la bóveda; a partir de entonces, esta Mac la abrirá con Touch ID.
+app_code.text_lost_password = Esta Mac ya no puede abrir tu bóveda por sí sola. Ábrela aquí una vez con la contraseña de la bóveda; después, esta Mac volverá a abrirla con Touch ID.
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1789,8 +1845,21 @@ mac_approve.not_me_note = «No soy yo» cierra esa sesión, y en Configuración 
 # ------------------------------------------------------------ vault_locked: a server with your key, the vault locked here (VaultLocked.tsx)
 vault_locked.title = {machine} se abre con tu clave
 vault_locked.text = Tus claves están bloqueadas en este navegador. Ábrelas igual que se desbloquea esta computadora; luego tTerm inicia sesión en {machine}, y tu clave nunca sale de este navegador.
+# A vault with a password, in a browser that keeps no lock of it: the
+# password field comes under it.
+vault_locked.text_password = Tus claves están cifradas en la nube y solo las abre la contraseña de tu bóveda. Escríbela: las claves se abren aquí mismo, en este navegador, y tTerm inicia sesión en {machine}. La contraseña en sí no se envía a ningún lugar.
+# Where the keys were kept with Touch ID (or Windows Hello, a passkey):
+# one of the three, the button, and a link to type the password instead.
+vault_locked.closed_title = Tu bóveda está cerrada
+vault_locked.closed_text.touch = Ábrela con Touch ID para iniciar sesión en {machine} con tu clave.
+vault_locked.closed_text.hello = Ábrela con Windows Hello para iniciar sesión en {machine} con tu clave.
+vault_locked.closed_text.passkey = Ábrela con tu llave de acceso para iniciar sesión en {machine} con tu clave.
+vault_locked.use_password = o escribir la contraseña de la bóveda
+# Small, at the card's bottom.
+vault_locked.closes_itself = Tu bóveda se cierra sola si no la usas durante un tiempo: por si te alejaste de la computadora.
 vault_locked.text_app = Tus claves están bloqueadas en esta Mac. Ábrelas con Touch ID o con la contraseña de tu Mac; luego esta Mac inicia sesión en {machine}.
 vault_locked.text_app_code = Esta Mac todavía no puede abrir tu bóveda por sí sola. Ábrela aquí una vez con tu código de recuperación; luego esta Mac inicia sesión en {machine}.
+vault_locked.text_app_password = Esta Mac todavía no puede abrir tu bóveda por sí sola. Ábrela aquí una vez con la contraseña de la bóveda; luego esta Mac inicia sesión en {machine}.
 # Small links under the button: "or approve on MacBook-Pro-Denis · use the recovery code".
 vault_locked.or = o
 vault_locked.approve_on = aprobar en {mac}
@@ -1807,17 +1876,32 @@ vault_locked.its_key = su clave
 vault_problem.no_vault = Aún no tienes una bóveda.
 vault_problem.exists = Ya tienes una bóveda: ábrela y luego añade la clave.
 vault_problem.locked = Primero abre tu bóveda.
-vault_problem.no_passkey = Aquí no respondió ninguna llave de acceso de tu bóveda. Aprueba este navegador en tu Mac o usa tu código de recuperación.
-vault_problem.no_prf = Esta llave de acceso no puede abrir tu bóveda aquí. Aprueba este navegador en tu Mac o usa tu código de recuperación.
+# The vault password: {n} tries left (shown when 3 or fewer), {time} a
+# time of day, as the page shows times ("14:05").
+vault_problem.password_wrong = Esa contraseña no abre tu bóveda. Revisa la distribución del teclado y la tecla Bloq Mayús.
+vault_problem.password_left = one: Te queda {n} intento antes de una pausa de una hora. | other: Te quedan {n} intentos antes de una pausa de una hora.
+vault_problem.password_paused = Demasiadas contraseñas incorrectas. Vuelve a intentarlo a partir de esta hora: {time}.
+# The same pause, when it ends another day (thirty wrong ones in a day):
+# {day} is the date as the page writes it ("3 Nov"), {time} the time.
+vault_problem.password_paused_day = Demasiadas contraseñas incorrectas. Vuelve a intentarlo a partir de esta fecha: {day}, {time}.
+vault_problem.no_password = Tu bóveda todavía no tiene contraseña: establécela en tu Mac, en Configuración › Claves.
+vault_problem.password_short = La contraseña debe tener al menos 12 caracteres.
+vault_problem.no_wasm = Este navegador no puede usar la contraseña de la bóveda. Abre tus claves con la aprobación de tu Mac o en un navegador más reciente.
+vault_problem.no_passkey = Aquí no respondió ninguna llave de acceso de tu bóveda. Escribe la contraseña de la bóveda o aprueba este navegador en tu Mac.
+vault_problem.no_passkey_code = Aquí no respondió ninguna llave de acceso de tu bóveda. Aprueba este navegador en tu Mac o usa tu código de recuperación.
+vault_problem.no_prf = Esta llave de acceso no puede abrir tu bóveda aquí. Escribe la contraseña de la bóveda o aprueba este navegador en tu Mac.
+vault_problem.no_prf_code = Esta llave de acceso no puede abrir tu bóveda aquí. Aprueba este navegador en tu Mac o usa tu código de recuperación.
 vault_problem.no_prf_here = Este navegador no puede guardar tu bóveda con una llave de acceso: seguirá abierta solo durante esta sesión.
-vault_problem.lock_broken = El desbloqueo de este navegador ya no abre tu bóveda. Usa tu código de recuperación o aprueba este navegador en tu Mac.
+vault_problem.lock_broken = El desbloqueo de este navegador ya no abre tu bóveda. Escribe la contraseña de la bóveda o aprueba este navegador en tu Mac.
+vault_problem.lock_broken_code = El desbloqueo de este navegador ya no abre tu bóveda. Usa tu código de recuperación o aprueba este navegador en tu Mac.
 vault_problem.code_form = Un código de recuperación tiene 24 letras y dígitos, en seis grupos de cuatro.
 vault_problem.code_wrong = Ese código de recuperación no abre tu bóveda. Revísalo o aprueba este navegador en tu Mac.
 # In tTerm for Mac: the engine's answers, said by the page (the code window, Touch ID).
 vault_problem.code_wrong_app = Ese código de recuperación no abre tu bóveda. Revísalo y vuelve a intentarlo.
 vault_problem.touch_failed = No se pudo confirmar con Touch ID ni con la contraseña de tu Mac. No cambió nada.
 vault_problem.need_code = Escribe ahora tu código de recuperación: este navegador no tiene ninguna llave de acceso de tu bóveda.
-vault_problem.no_x25519 = Este navegador es demasiado antiguo para que tu Mac lo apruebe: usa tu código de recuperación o un navegador más reciente.
+vault_problem.no_x25519 = Este navegador es demasiado antiguo para que tu Mac lo apruebe: escribe la contraseña de la bóveda o usa un navegador más reciente.
+vault_problem.no_x25519_code = Este navegador es demasiado antiguo para que tu Mac lo apruebe: usa tu código de recuperación o un navegador más reciente.
 vault_problem.pairing = La solicitud no se pudo completar. Vuelve a pedirlo.
 vault_problem.passkey_exists = Este navegador ya tiene una llave de acceso para tTerm.
 vault_problem.no_passkey_here = Este navegador no puede crear una llave de acceso.
@@ -1835,7 +1919,7 @@ ssh_strip.let_in = Dar acceso a tTerm
 ssh_strip.not_now = Ahora no
 ssh_strip.never = No preguntar por {alias}
 # <b>…</b> are the two buttons' names, as above.
-ssh_strip.explain = <b>Guardar mi clave:</b> va a tu bóveda, que solo abren tus dispositivos; {alias} sigue como está. <b>Dar acceso a tTerm:</b> tTerm añade su propia línea en {alias}; tu clave se queda en esta Mac. Para varios servidores a la vez: «Mover a la nube», en el menú de la cuenta.
+ssh_strip.explain = <b>Guardar mi clave:</b> va cifrada a tu bóveda y se abre en cualquier navegador con la contraseña de la bóveda; {alias} sigue como está. <b>Dar acceso a tTerm:</b> tTerm añade su propia línea en {alias}; tu clave se queda en esta Mac. Para varios servidores a la vez: «Mover a la nube», en el menú de la cuenta.
 ssh_strip.explain_pass = <b>Dar acceso a tTerm:</b> tTerm añade su propia línea en {alias}; tu clave se queda en esta Mac. Para varios servidores a la vez: «Mover a la nube», en el menú de la cuenta.
 ssh_strip.unreachable = tTerm Web no puede llegar a {alias} desde la nube: se abre a través de esta Mac, mientras esté encendida.
 ssh_strip.through_mac = Abrirlo a través de esta Mac
@@ -1858,7 +1942,7 @@ move.how = Cómo se abre {name}
 move.method_key = Mi clave
 move.method_cert = Pase de tTerm
 move.method_mac = A través de esta Mac
-move.way_key = La clave va a tu bóveda; el servidor sigue como está. Se abre en cualquier navegador en el que desbloquees tu bóveda.
+move.way_key = La clave va a tu bóveda; el servidor sigue como está. Se abre en cualquier navegador con la contraseña de la bóveda.
 move.way_cert = tTerm añade su propia línea en el servidor y tu clave se queda aquí. Se abre desde cualquier lugar, también desde Telegram.
 move.way_mac = No se mueve nada: tTerm le pide a esta Mac que se conecte, mientras esté encendida. Para servidores detrás de una VPN.
 # {address} is root@203.0.113.7, {jump} the bastion it goes through.
@@ -1887,7 +1971,7 @@ move.key_security = En una llave de seguridad: no puede salir de ella. Sus servi
 move.key_agent = Solo en un agente: no se puede copiar. Sus servidores van a través de esta Mac
 move.key_type = Un tipo de clave que la bóveda aún no guarda. Sus servidores van a través de esta Mac
 move.key_passphrase = tiene frase de contraseña
-move.vault_note = Tu bóveda se abre igual que se desbloquea esta Mac: con Touch ID o con la contraseña de tu Mac. Solo tus dispositivos pueden abrirla; tTerm no.
+move.vault_note = Las claves se cifran aquí, en esta Mac. Aquí tu bóveda se abre con Touch ID; en cualquier navegador, con la contraseña de la bóveda. tTerm no puede abrirla.
 move.go = one: Mover {n} servidor | other: Mover {n} servidores
 
 # ------------------------------------------------------------ moved: what came of Move to cloud (MoveToCloud.tsx)
@@ -1904,8 +1988,18 @@ moved.failed = No se movió.
 moved.failed_text = {why} No se guardó nada para este servidor.
 moved.open = Abrir una terminal
 moved.change = Cambiar
+# How to open them from another computer: when a server moved with My
+# key. {site} is the address of tTerm Web; <b>…</b> is bold.
+moved.how_title = Cómo abrirlos desde otra computadora
+moved.how_1 = Abre <b>{site}</b> en cualquier navegador e inicia sesión como siempre, con el código enviado a tu correo.
+moved.how_2 = Abre un servidor: tTerm te pide la <b>contraseña de tu bóveda</b>. Las claves se abren en ese mismo navegador; para eso no hace falta tu Mac.
+moved.how_3 = En tu propia computadora, presiona «Guardar con Touch ID»: a partir de entonces, allí bastará con Touch ID y no se pedirá la contraseña. En la de otra persona, elige «Solo esta vez».
+# Under the steps, for the servers that moved Through this Mac: one
+# server, or several ("db-internal and nas").
+moved.how_mac_one = <b>{servers}</b> solo se abre a través de esta Mac: mientras esté encendida y tTerm se ejecute en ella.
+moved.how_mac_many = <b>{servers}</b> solo se abren a través de esta Mac: mientras esté encendida y tTerm se ejecute en ella.
 # <b>…</b> is the key's name, or a list of them.
-moved.keys_one = <b>{keys}</b> está en tu bóveda, bloqueada: se abre igual que se desbloquean tus dispositivos. Configuración › Claves la muestra en todas partes.
-moved.keys_many = <b>{keys}</b> están en tu bóveda, bloqueadas: se abren igual que se desbloquean tus dispositivos. Configuración › Claves las muestra en todas partes.
+moved.keys_one = <b>{keys}</b> ya está en tu bóveda, cifrada: se abre con la contraseña de la bóveda y, en esta Mac, con Touch ID. Configuración › Claves la muestra en todos tus dispositivos.
+moved.keys_many = <b>{keys}</b> ya están en tu bóveda, cifradas: se abren con la contraseña de la bóveda y, en esta Mac, con Touch ID. Configuración › Claves las muestra en todos tus dispositivos.
 moved.no_keys = No se movió ninguna clave: tus claves se quedan en esta Mac.
 `;export{e as default};

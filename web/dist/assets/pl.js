@@ -1609,30 +1609,48 @@ vault.code_label = Kod {code}
 
 # ------------------------------------------------------------ keys: Settings › Keys, the vault (Keys.tsx)
 keys.title = Klucze
-keys.about = Twój sejf: zapisane przez ciebie klucze SSH, na wszystkich twoich urządzeniach. Otworzyć go mogą tylko twoje urządzenia, tak jak się odblokowują; tTerm nie może.
+keys.about = Twój sejf: dodane przez ciebie klucze SSH. Są zaszyfrowane i otworzyć je możesz tylko ty: hasłem do sejfu, a tam, gdzie je zapisano, także bez niego. tTerm nie może ich otworzyć.
+# A vault made before 0.1.26 has a recovery code and no password: this
+# banner, above the vault's state, sets one (vault_password.title_set).
+keys.set_title = Ustaw hasło do sejfu
+keys.set_text = Dzięki niemu otworzysz swoje klucze w dowolnej przeglądarce, nawet gdy twój Mac zostanie w domu. Po ustawieniu hasła kod odzyskiwania przestanie działać: zastąpi go hasło.
+keys.set_go = Ustaw hasło
 keys.open_here = Otwarty w tej przeglądarce
 # How it opened, then when it locks again: one of these under "Open in this browser".
-keys.open_text.touch = Otwarty za pomocą Touch ID. Zablokuje się ponownie po 8 godzinach bez żadnej aktywności, po zamknięciu tTerm Web albo gdy naciśniesz Zablokuj.
-keys.open_text.hello = Otwarty za pomocą Windows Hello. Zablokuje się ponownie po 8 godzinach bez żadnej aktywności, po zamknięciu tTerm Web albo gdy naciśniesz Zablokuj.
-keys.open_text.passkey = Otwarty twoim kluczem dostępu. Zablokuje się ponownie po 8 godzinach bez żadnej aktywności, po zamknięciu tTerm Web albo gdy naciśniesz Zablokuj.
-keys.open_text.recovery = Otwarty kodem odzyskiwania, na czas tej sesji. Zablokuje się ponownie po 8 godzinach bez żadnej aktywności, po zamknięciu tTerm Web albo gdy naciśniesz Zablokuj.
-keys.open_text.pairing = Otwarty po zatwierdzeniu na twoim Macu, na czas tej sesji. Zablokuje się ponownie po 8 godzinach bez żadnej aktywności, po zamknięciu tTerm Web albo gdy naciśniesz Zablokuj.
-keys.open_text.new = Utworzony przed chwilą w tej przeglądarce. Zablokuje się ponownie po 8 godzinach bez żadnej aktywności, po zamknięciu tTerm Web albo gdy naciśniesz Zablokuj.
+keys.open_text.touch = Otwarty za pomocą Touch ID. Zamknie się sam po 8 godzinach bez żadnej aktywności, a także gdy zamkniesz tTerm Web albo naciśniesz Zablokuj. Ponowne otwarcie to jedno dotknięcie Touch ID.
+keys.open_text.hello = Otwarty za pomocą Windows Hello. Zamknie się sam po 8 godzinach bez żadnej aktywności, a także gdy zamkniesz tTerm Web albo naciśniesz Zablokuj. Ponownie otworzy go Windows Hello.
+keys.open_text.passkey = Otwarty twoim kluczem dostępu. Zamknie się sam po 8 godzinach bez żadnej aktywności, a także gdy zamkniesz tTerm Web albo naciśniesz Zablokuj. Ponownie otworzy go twój klucz dostępu.
+keys.open_text.password = Otwarty hasłem do sejfu, tylko na czas tej sesji. Zamknie się sam po 8 godzinach bez żadnej aktywności, a także gdy zamkniesz kartę albo naciśniesz Zablokuj.
+keys.open_text.recovery = Otwarty kodem odzyskiwania, tylko na czas tej sesji. Zamknie się sam po 8 godzinach bez żadnej aktywności, a także gdy zamkniesz kartę albo naciśniesz Zablokuj.
+keys.open_text.pairing = Otwarty po zatwierdzeniu na twoim Macu, tylko na czas tej sesji. Zamknie się sam po 8 godzinach bez żadnej aktywności, a także gdy zamkniesz kartę albo naciśniesz Zablokuj.
+keys.open_text.new = Utworzony przed chwilą w tej przeglądarce. Zamknie się sam po 8 godzinach bez żadnej aktywności, a także gdy zamkniesz kartę albo naciśniesz Zablokuj.
 # In tTerm for Mac.
 keys.open_mac = Otwarty na tym Macu
 keys.open_text.mac = Otwarty za pomocą Touch ID lub hasła do Maca. Pozostaje otwarty, dopóki działa tTerm, chyba że naciśniesz Zablokuj albo się wylogujesz.
 keys.lock = Zablokuj
-keys.locked_here = Zablokowany w tej przeglądarce
-keys.locked_text = Otwórz go, aby używać tu swoich kluczy: tak, jak odblokowuje się ten komputer, przez zatwierdzenie na swoim Macu albo kodem odzyskiwania.
+# The vault closed in this browser. Where the keys were kept here with
+# Touch ID (or Windows Hello, a passkey), one of the three; else the
+# vault password opens them (keys.closed_text_password, with its field).
+keys.closed_here = Twój sejf jest zamknięty
+keys.closed_text.touch = Otwórz go za pomocą Touch ID, aby logować się na serwerach swoim kluczem.
+keys.closed_text.hello = Otwórz go za pomocą Windows Hello, aby logować się na serwerach swoim kluczem.
+keys.closed_text.passkey = Otwórz go kluczem dostępu, aby logować się na serwerach swoim kluczem.
+keys.closed_text_password = Twoje klucze są zaszyfrowane i otwiera je tylko hasło do sejfu. Wpisz je: klucze otworzą się bezpośrednio w tej przeglądarce. Samo hasło nigdzie nie trafia.
+# The vault password's row, under the vault's state: {day} is time.today,
+# time.yesterday or time.on_day ("on 2 Nov").
+keys.password_title = Hasło do sejfu
+keys.password_text = Otwiera twoje klucze w dowolnej przeglądarce. Ustawione {day}.
+keys.password_change = Zmień hasło
 keys.locked_mac = Zablokowany na tym Macu
 keys.locked_mac_text = Otwórz go za pomocą Touch ID lub hasła do Maca: wtedy ten Mac będzie się logować na twoich serwerach.
 keys.locked_mac_code = Ten Mac nie ma jeszcze dostępu do twojego sejfu. Otwórz go tu raz kodem odzyskiwania: potem otworzy go Touch ID lub hasło do Maca.
+keys.locked_mac_password = Ten Mac nie ma jeszcze dostępu do twojego sejfu. Otwórz go tu raz hasłem do sejfu: potem ten Mac będzie go otwierać sam, za pomocą Touch ID.
 keys.open = Otwórz
 keys.open_code = Otwórz kodem odzyskiwania
 keys.none_title = Nie masz jeszcze sejfu
-keys.none_web = Dodaj klucz z pliku: wtedy w tej przeglądarce powstanie twój sejf, a ty zachowasz do niego kod odzyskiwania.
-keys.none_app = Zapisz klucz przez opcję Przenieś do chmury albo na pasku, który pojawia się po ssh w terminalu: wtedy utworzysz sejf za pomocą Touch ID.
-keys.no_passkey_here = Ta przeglądarka nie może zapisać klucza dostępu do twojego sejfu: tutaj sejf otwiera się kodem odzyskiwania albo po zatwierdzeniu na twoim Macu, za każdym razem na jedną sesję.
+keys.none_web = Dodaj klucz z pliku: wtedy powstanie twój sejf, z hasłem, które wymyślisz.
+keys.none_app = Zapisz klucz przez opcję Przenieś do chmury albo na pasku, który pojawia się po ssh w terminalu: wtedy powstanie twój sejf, z hasłem, które wymyślisz.
+keys.no_passkey_here = Ta przeglądarka nie może zapisać twoich kluczy za pomocą klucza dostępu: tutaj otwierają się hasłem do sejfu albo po zatwierdzeniu na twoim Macu, za każdym razem na jedną sesję.
 keys.no_ed25519_here = Ta przeglądarka nie może podpisywać kluczami Ed25519. Otwieraj te serwery w nowszej przeglądarce albo w tTerm dla Maca.
 # {servers} is a list of servers: droplet and staging; web-01 in Client X.
 keys.opens = Otwiera {servers}
@@ -1649,9 +1667,10 @@ keys.cannot_ed25519 = Ta przeglądarka nie może podpisywać kluczami Ed25519
 keys.cannot_open = Nie otwiera się tutaj: dodaj go ponownie z jego pliku
 keys.remove = Usuń
 keys.add_file = Dodaj klucz z pliku
-keys.new_recovery = Wygeneruj nowy kod odzyskiwania
 # {places} is where the vault opens: "MacBook-Pro-Denis · tTerm for Mac, Chrome on macOS".
-keys.opens_on = Otwiera się na: {places}.
+keys.opens_on = Bez hasła twój sejf otwiera się na: {places}. W dowolnej innej przeglądarce – hasłem do sejfu.
+keys.opens_password_only = Twój sejf otwiera się tylko hasłem: nie zapisało go jeszcze żadne urządzenie.
+keys.opens_on_old = Bez hasła twój sejf otwiera się na: {places}. Dopóki nie ma hasła, inne przeglądarki otwierają go kodem odzyskiwania albo po zatwierdzeniu na twoim Macu.
 keys.opens_on_code = Otwiera się tylko kodem odzyskiwania.
 keys.place_mac = {mac} · {app}
 keys.place_browser = przeglądarka
@@ -1671,7 +1690,6 @@ add_key.passphrase_hint = Klucz jest zaszyfrowany. Hasło otwiera go tutaj, w te
 add_key.open_key = Otwórz klucz
 add_key.reading = Odczytywanie klucza…
 add_key.name = Nazwa
-add_key.sealed_here = Zostaje zablokowany tutaj, zanim opuści tę przeglądarkę. Tylko twoje urządzenia mogą go otworzyć; tTerm nie może.
 add_key.add = Dodaj do sejfu
 add_key.next = Dalej
 add_key.added = Dodano {name} do sejfu
@@ -1691,50 +1709,81 @@ add_key.problem_encrypted_pem = Ten plik klucza jest zaszyfrowany starą metodą
 add_key.problem_ed25519 = Ta przeglądarka nie może odczytać kluczy Ed25519 w tym formacie. Spróbuj w nowszej przeglądarce albo użyj klucza w formacie OpenSSH.
 add_key.problem_several = Plik zawiera więcej niż jeden klucz: dodaj je pojedynczo.
 
-# ------------------------------------------------------------ vault_new: Save your key to your vault (VaultDialogs.tsx)
-vault_new.title = Zapisz swój klucz w sejfie
-# <code>…</code> is the key's name: id_ed25519. {server} is the server's name.
-vault_new.text_server = <code>{key}</code> trafi do twojego sejfu, a {server} otworzy się nim z tTerm Web, z telefonu albo z dowolnego komputera, na którym się zalogujesz.
-vault_new.text = <code>{key}</code> trafi do twojego sejfu: serwery, które się nim otwierają, otworzysz z tTerm Web, z telefonu albo z dowolnego komputera, na którym się zalogujesz.
-# In tTerm for Mac.
-vault_new.point_mac_unlock = Otwiera się tak, jak odblokowuje się ten Mac: za pomocą Touch ID lub hasła do Maca. Nic nowego do zapamiętania.
-vault_new.point_mac_locked = Zostaje zablokowany, zanim opuści tego Maca. Tylko twoje urządzenia mogą go otworzyć; tTerm nie może.
-vault_new.point_mac_browser = Nowa przeglądarka otworzy go po tym, jak zatwierdzisz ją tutaj, albo kodem odzyskiwania.
-# In a browser.
-vault_new.point_web_unlock = Otwiera się tak, jak odblokowuje się ten komputer: za pomocą Touch ID, Windows Hello albo blokady telefonu. Nic nowego do zapamiętania.
-vault_new.point_web_no_passkey = Ta przeglądarka nie może zapisać klucza dostępu do sejfu: tutaj sejf otwiera się kodem odzyskiwania, za każdym razem na jedną sesję.
-vault_new.point_web_locked = Zostaje zablokowany, zanim opuści tę przeglądarkę. Tylko twoje urządzenia mogą go otworzyć; tTerm nie może.
-vault_new.point_web_browser = Inna przeglądarka otworzy go kodem odzyskiwania albo po tym, jak zatwierdzisz ją w tTerm dla Maca.
-vault_new.make_touch = Utwórz sejf za pomocą Touch ID
-vault_new.make_hello = Utwórz sejf za pomocą Windows Hello
-vault_new.make_passkey = Utwórz sejf z kluczem dostępu
-vault_new.make = Utwórz sejf
+# ------------------------------------------------------------ vault_password: the vault password (VaultDialogs.tsx, 0.1.26)
+# Make up a vault password: a new vault, made on the Mac (Move to cloud;
+# the strip after ssh, vault_password.text_key) or in a browser (Add a key
+# from a file, vault_password.text_web). <code>…</code> is the key's name:
+# id_ed25519.
+vault_password.title_new = Wymyśl hasło do sejfu
+vault_password.text_mac = Klucze tego Maca trafią zaszyfrowane do twojego sejfu w chmurze. Tym hasłem otworzysz je w dowolnej przeglądarce, nawet gdy twój Mac zostanie w domu.
+vault_password.text_key = <code>{key}</code> trafi zaszyfrowany do twojego sejfu w chmurze. Tym hasłem otworzysz go w dowolnej przeglądarce, nawet gdy twój Mac zostanie w domu.
+vault_password.text_web = <code>{key}</code> trafi do twojego sejfu, zaszyfrowany jeszcze w tej przeglądarce. Tym hasłem otworzysz go w dowolnej przeglądarce.
+vault_password.label = Hasło
+# The second field: the same password once more.
+vault_password.label_again = Powtórz hasło
+# Next to the field: the password shown as it is typed, or hidden again.
+vault_password.show = Pokaż
+vault_password.hide = Ukryj
+# Under the first field; while it has 1 to 11 characters, vault_password.short
+# instead. vault_password.latin when it has a character beyond plain Latin.
+vault_password.hint = Co najmniej 12 znaków. Najłatwiej użyć frazy z kilku słów.
+vault_password.short = one: Jeszcze {n} znak | few: Jeszcze {n} znaki | many: Jeszcze {n} znaków
+vault_password.latin = Hasło zawiera litery spoza podstawowego alfabetu łacińskiego: komputer za granicą może nie mieć dla nich układu klawiatury.
+# Under the second field.
+vault_password.match = Hasła się zgadzają
+vault_password.no_match = Hasła się różnią
+# In a dashed box under the fields: on the Mac, and in a browser.
+vault_password.note_mac = tTerm nie zna tego hasła i nie może go odzyskać. Zapisz je w swoim menedżerze haseł. Jeśli je zapomnisz, ustaw nowe tutaj, na tym Macu.
+vault_password.note_web = tTerm nie zna tego hasła i nie może go odzyskać. Zapisz je w swoim menedżerze haseł.
+vault_password.create = Utwórz sejf
+# On the button, while the password becomes the key (a second; a few on a phone).
+vault_password.working = Szyfrowanie…
+# Settings › Keys: Set a vault password (a vault made before 0.1.26, with a
+# recovery code), or Change it.
+vault_password.title_set = Ustaw hasło do sejfu
+vault_password.text_set = Dzięki niemu otworzysz swoje klucze w dowolnej przeglądarce, nawet gdy twój Mac zostanie w domu. tTerm nie zna tego hasła i nie może go odzyskać. Po ustawieniu hasła kod odzyskiwania przestanie działać.
+vault_password.set = Ustaw hasło
+vault_password.title_change = Zmień hasło do sejfu
+vault_password.text_change = Nowe hasło od razu zastąpi stare: stare przestanie otwierać twoje klucze. Twój Mac i przeglądarki, w których są zapisane twoje klucze, będą je otwierać tak jak dotąd.
+vault_password.label_new = Nowe hasło
+vault_password.change = Zmień hasło
+# In a browser where the keys are not kept: what opens the vault for the
+# change (the current password), or for setting it (the recovery code,
+# recovery.now_code).
+vault_password.current = Obecne hasło
+vault_password.current_hint = Twoje klucze nie są zapisane w tej przeglądarce, więc aby zmienić hasło, trzeba podać obecne.
+vault_password.code_hint = Twoje klucze nie są zapisane w tej przeglądarce, więc aby ustawić hasło, trzeba podać kod odzyskiwania.
+# Said once done.
+vault_password.done_set = Ustawiono hasło do sejfu. Kod odzyskiwania nie otwiera już twojego sejfu.
+vault_password.done_change = Zmieniono hasło do sejfu.
+# A closed vault, in a browser with no lock of it: the field it opens with,
+# in a server's card and in Settings › Keys.
+vault_password.label_vault = Hasło do sejfu
+vault_password.open = Otwórz klucze
+vault_password.opening = Otwieranie…
+vault_password.forgot = Nie pamiętasz hasła?
 
-# ------------------------------------------------------------ recovery: the recovery code, shown once (VaultDialogs.tsx)
-recovery.title = Twój kod odzyskiwania
-recovery.text = Jeśli kiedykolwiek stracisz wszystkie urządzenia, które otwierają twój sejf, ten kod będzie jedynym sposobem na odzyskanie kluczy. tTerm nie może ich za ciebie odzyskać. Widzisz go tylko raz.
-recovery.title_new = Twój nowy kod odzyskiwania
-recovery.text_new = Poprzedni kod nie otwiera już twojego sejfu. Jeśli kiedykolwiek stracisz wszystkie urządzenia, które go otwierają, ten kod będzie jedynym sposobem na odzyskanie kluczy. Widzisz go tylko raz.
-# For screen readers.
-recovery.code_label = Kod odzyskiwania {code}
-recovery.save_file = Zapisz jako plik
-recovery.copy_failed = Nie udało się skopiować: zaznacz kod i skopiuj go ręcznie.
-# What the file saved holds.
-recovery.file_text = Kod odzyskiwania sejfu tTerm: {code}\\nOtwiera twój sejf, gdy nie otwiera go żadne z twoich urządzeń. Przechowuj go w bezpiecznym miejscu, z dala od swoich urządzeń.
-recovery.kept_mac = Przechowuję go w bezpiecznym miejscu, nie tylko na tym Macu
-recovery.kept_web = Przechowuję go w bezpiecznym miejscu, nie tylko na tym komputerze
-recovery.make_title = Wygenerować nowy kod odzyskiwania?
-recovery.make_text = Obecny kod przestanie działać, a nowy zostanie pokazany tylko raz. Twoje klucze i urządzenia pozostaną bez zmian.
+# ------------------------------------------------------------ vault_forgot: Forgot your vault password? (VaultDialogs.tsx, 0.1.26)
+vault_forgot.title = Nie pamiętasz hasła do sejfu?
+vault_forgot.text = tTerm nie może ci go przypomnieć: hasło znasz tylko ty. Możesz jednak ustawić nowe tam, gdzie twój sejf otwiera się bez hasła:
+# Two points under the text: where a new password can be set.
+vault_forgot.mac = na swoim Macu, w tTerm dla Maca: Ustawienia › Klucze › Zmień hasło, za pomocą Touch ID;
+vault_forgot.browser = w przeglądarce, w której są zapisane twoje klucze: tam też, w Ustawieniach.
+# <code>…</code> is the folder of the keys: it stays as it is.
+vault_forgot.none = Jeśli nie ma takiego urządzenia, kluczy w twoim sejfie nie da się już otworzyć. Same klucze zwykle zostają na twoim Macu, w <code>~/.ssh</code>.
+vault_forgot.ok = Rozumiem
+
+# ------------------------------------------------------------ recovery: the recovery code of a vault made before 0.1.26 (VaultDialogs.tsx)
 recovery.now_code = Obecny kod odzyskiwania
-recovery.now_code_hint = Ta przeglądarka nie ma klucza dostępu do twojego sejfu, więc nowy kod wygenerujesz za pomocą obecnego. Nie masz go już? Wygeneruj nowy w tTerm dla Maca.
-recovery.make_go = Wygeneruj nowy kod
-recovery.make_go_passkey = Wygeneruj za pomocą klucza dostępu
-recovery.make_touch = Wygeneruj za pomocą Touch ID
 
 # ------------------------------------------------------------ vault_open: Open your keys on this browser (VaultDialogs.tsx)
 vault_open.title = Otwórz swoje klucze w tej przeglądarce
 vault_open.text = Twój sejf nie zna jeszcze tej przeglądarki. Zatwierdź ją na urządzeniu, które już go otwiera.
 vault_open.text_code = Otwórz swój sejf w tej przeglądarce kodem odzyskiwania.
+# A vault with a password: the Mac's approval is the second way, and the
+# button at the bottom goes back to the password field.
+vault_open.text_password = Zatwierdź tę przeglądarkę na swoim Macu. Przydaje się na cudzym komputerze: nie trzeba na nim wpisywać hasła do sejfu.
+vault_open.use_password = Zamiast tego wpisz hasło
 # {mac} is the Mac's name, {app} is app_link.mac: "MacBook-Pro-Denis · tTerm for Mac".
 vault_open.mac_name = {app} na {mac}
 vault_open.mac_ask = Poproś go o otwarcie sejfu tutaj
@@ -1747,9 +1796,13 @@ vault_open.sas_text = Twój Mac też pokazuje kod. Zezwól tam tylko wtedy, gdy 
 vault_open.or = lub
 vault_open.code = Kod odzyskiwania
 vault_open.open = Otwórz
-# Once open with the recovery code or the Mac's approval: whether this browser keeps a passkey.
+# Once open with the password, the Mac's approval or the recovery code, or just made in this browser: whether to keep the keys here with a passkey.
 vault_open.opened_title = Twoje klucze są otwarte w tej przeglądarce
-vault_open.opened_text = Zapisać tu klucz dostępu, żeby następnym razem otworzyły się tak, jak odblokowuje się ten komputer? Na cudzym komputerze wybierz Tylko tym razem.
+vault_open.keep_text.touch = Zapisać je tutaj za pomocą Touch ID? Wtedy następnym razem w tej przeglądarce wystarczy Touch ID, a hasło nie będzie potrzebne.
+vault_open.keep_text.hello = Zapisać je tutaj za pomocą Windows Hello? Wtedy następnym razem w tej przeglądarce wystarczy Windows Hello, a hasło nie będzie potrzebne.
+vault_open.keep_text.passkey = Zapisać je tutaj za pomocą klucza dostępu? Wtedy następnym razem w tej przeglądarce wystarczy klucz dostępu, a hasło nie będzie potrzebne.
+# Small, under the question.
+vault_open.keep_foreign = Cudzy komputer? Wybierz „Tylko tym razem”: klucze zamkną się, gdy zamkniesz kartę, albo same, jeśli przez jakiś czas nie będą używane.
 vault_open.keep_touch = Zapisz za pomocą Touch ID
 vault_open.keep_hello = Zapisz za pomocą Windows Hello
 vault_open.keep_passkey = Zapisz klucz dostępu
@@ -1761,6 +1814,9 @@ app_code.title = Otwórz swój sejf na tym Macu
 app_code.text = Ten Mac nie ma jeszcze dostępu do twojego sejfu. Otwórz go tu raz kodem odzyskiwania: potem ten Mac będzie go otwierać za pomocą Touch ID.
 # When this Mac's lock is there but no longer opens the vault (taken off in a browser, or gone from the keychain).
 app_code.text_lost = Ten Mac stracił dostęp do twojego sejfu. Otwórz go tu raz kodem odzyskiwania: potem ten Mac odzyska dostęp, a Touch ID znów będzie go otwierać.
+# A vault with a password (0.1.26): opened here once with it.
+app_code.text_password = Ten Mac nie ma jeszcze dostępu do twojego sejfu. Otwórz go tu raz hasłem do sejfu: potem ten Mac będzie go otwierać za pomocą Touch ID.
+app_code.text_lost_password = Ten Mac stracił dostęp do twojego sejfu. Otwórz go tu raz hasłem do sejfu: potem ten Mac odzyska dostęp, a Touch ID znów będzie go otwierać.
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1789,8 +1845,21 @@ mac_approve.not_me_note = To nie ja: tamta przeglądarka zostanie wylogowana, a 
 # ------------------------------------------------------------ vault_locked: a server with your key, the vault locked here (VaultLocked.tsx)
 vault_locked.title = {machine} otwiera się twoim kluczem
 vault_locked.text = Twoje klucze są zablokowane w tej przeglądarce. Otwórz je tak, jak odblokowuje się ten komputer; wtedy tTerm zaloguje się na {machine}, a twój klucz nigdy nie opuści tej przeglądarki.
+# A vault with a password, in a browser that keeps no lock of it: the
+# password field comes under it.
+vault_locked.text_password = Twoje klucze w chmurze są zaszyfrowane i otwiera je tylko hasło do sejfu. Wpisz je: klucze otworzą się bezpośrednio w tej przeglądarce, a tTerm zaloguje się na {machine}. Samo hasło nigdzie nie trafia.
+# Where the keys were kept with Touch ID (or Windows Hello, a passkey):
+# one of the three, the button, and a link to type the password instead.
+vault_locked.closed_title = Twój sejf jest zamknięty
+vault_locked.closed_text.touch = Otwórz go za pomocą Touch ID, aby zalogować się na {machine} swoim kluczem.
+vault_locked.closed_text.hello = Otwórz go za pomocą Windows Hello, aby zalogować się na {machine} swoim kluczem.
+vault_locked.closed_text.passkey = Otwórz go kluczem dostępu, aby zalogować się na {machine} swoim kluczem.
+vault_locked.use_password = lub wpisz hasło do sejfu
+# Small, at the card's bottom.
+vault_locked.closes_itself = Twój sejf zamyka się sam, gdy przez jakiś czas z niego nie korzystasz: na wypadek, gdyby nie było cię przy komputerze.
 vault_locked.text_app = Twoje klucze są zablokowane na tym Macu. Otwórz je za pomocą Touch ID lub hasła do Maca; wtedy ten Mac zaloguje się na {machine}.
 vault_locked.text_app_code = Ten Mac nie ma jeszcze dostępu do twojego sejfu. Otwórz go tu raz kodem odzyskiwania; wtedy ten Mac zaloguje się na {machine}.
+vault_locked.text_app_password = Ten Mac nie ma jeszcze dostępu do twojego sejfu. Otwórz go tu raz hasłem do sejfu; wtedy ten Mac zaloguje się na {machine}.
 # Small links under the button: "or approve on MacBook-Pro-Denis · use the recovery code".
 vault_locked.or = lub
 vault_locked.approve_on = zatwierdź na {mac}
@@ -1807,17 +1876,32 @@ vault_locked.its_key = jego klucz
 vault_problem.no_vault = Nie masz jeszcze sejfu.
 vault_problem.exists = Masz już sejf: otwórz go, a potem dodaj klucz.
 vault_problem.locked = Najpierw otwórz swój sejf.
-vault_problem.no_passkey = Nie znaleziono tu żadnego klucza dostępu do twojego sejfu. Zatwierdź tę przeglądarkę na swoim Macu albo użyj kodu odzyskiwania.
-vault_problem.no_prf = Ten klucz dostępu nie może tu otworzyć twojego sejfu. Zatwierdź tę przeglądarkę na swoim Macu albo użyj kodu odzyskiwania.
+# The vault password: {n} tries left (shown when 3 or fewer), {time} a
+# time of day, as the page shows times ("14:05").
+vault_problem.password_wrong = To hasło nie otwiera twojego sejfu. Sprawdź układ klawiatury i Caps Lock.
+vault_problem.password_left = one: Została {n} próba przed godzinną przerwą. | few: Zostały {n} próby przed godzinną przerwą. | many: Zostało {n} prób przed godzinną przerwą.
+vault_problem.password_paused = Zbyt wiele błędnych haseł. Spróbuj ponownie o {time}.
+# The same pause, when it ends another day (thirty wrong ones in a day):
+# {day} is the date as the page writes it ("3 Nov"), {time} the time.
+vault_problem.password_paused_day = Zbyt wiele błędnych haseł. Spróbuj ponownie {day} o {time}.
+vault_problem.no_password = Twój sejf nie ma jeszcze hasła: ustaw je na swoim Macu w Ustawieniach › Klucze.
+vault_problem.password_short = Hasło musi mieć co najmniej 12 znaków.
+vault_problem.no_wasm = Ta przeglądarka nie może obsłużyć hasła do sejfu. Otwórz klucze po zatwierdzeniu na swoim Macu albo w nowszej przeglądarce.
+vault_problem.no_passkey = Nie znaleziono tu żadnego klucza dostępu do twojego sejfu. Wpisz hasło do sejfu albo zatwierdź tę przeglądarkę na swoim Macu.
+vault_problem.no_passkey_code = Nie znaleziono tu żadnego klucza dostępu do twojego sejfu. Zatwierdź tę przeglądarkę na swoim Macu albo użyj kodu odzyskiwania.
+vault_problem.no_prf = Ten klucz dostępu nie może tu otworzyć twojego sejfu. Wpisz hasło do sejfu albo zatwierdź tę przeglądarkę na swoim Macu.
+vault_problem.no_prf_code = Ten klucz dostępu nie może tu otworzyć twojego sejfu. Zatwierdź tę przeglądarkę na swoim Macu albo użyj kodu odzyskiwania.
 vault_problem.no_prf_here = Ta przeglądarka nie może zapisać klucza dostępu do twojego sejfu: pozostanie on otwarty tylko na czas tej sesji.
-vault_problem.lock_broken = Klucz dostępu tej przeglądarki nie otwiera już twojego sejfu. Użyj kodu odzyskiwania albo zatwierdź tę przeglądarkę na swoim Macu.
+vault_problem.lock_broken = Klucz dostępu tej przeglądarki nie otwiera już twojego sejfu. Wpisz hasło do sejfu albo zatwierdź tę przeglądarkę na swoim Macu.
+vault_problem.lock_broken_code = Klucz dostępu tej przeglądarki nie otwiera już twojego sejfu. Użyj kodu odzyskiwania albo zatwierdź tę przeglądarkę na swoim Macu.
 vault_problem.code_form = Kod odzyskiwania to 24 litery i cyfry w sześciu grupach po cztery.
 vault_problem.code_wrong = Ten kod odzyskiwania nie otwiera twojego sejfu. Sprawdź go albo zatwierdź tę przeglądarkę na swoim Macu.
 # In tTerm for Mac: the engine's answers, said by the page (the code window, Touch ID).
 vault_problem.code_wrong_app = Ten kod odzyskiwania nie otwiera twojego sejfu. Sprawdź go i spróbuj ponownie.
 vault_problem.touch_failed = Potwierdzenie za pomocą Touch ID lub hasła do Maca nie powiodło się. Nic się nie zmieniło.
 vault_problem.need_code = Wpisz obecny kod odzyskiwania: ta przeglądarka nie ma klucza dostępu do twojego sejfu.
-vault_problem.no_x25519 = Ta przeglądarka jest za stara, by twój Mac mógł ją zatwierdzić: użyj kodu odzyskiwania albo nowszej przeglądarki.
+vault_problem.no_x25519 = Ta przeglądarka jest za stara, by twój Mac mógł ją zatwierdzić: wpisz hasło do sejfu albo użyj nowszej przeglądarki.
+vault_problem.no_x25519_code = Ta przeglądarka jest za stara, by twój Mac mógł ją zatwierdzić: użyj kodu odzyskiwania albo nowszej przeglądarki.
 vault_problem.pairing = Prośba nie dotarła. Poproś ponownie.
 vault_problem.passkey_exists = Ta przeglądarka ma już klucz dostępu do tTerma.
 vault_problem.no_passkey_here = Ta przeglądarka nie może utworzyć klucza dostępu.
@@ -1835,7 +1919,7 @@ ssh_strip.let_in = Wpuść tTerm
 ssh_strip.not_now = Nie teraz
 ssh_strip.never = Nie pytaj więcej o {alias}
 # <b>…</b> are the two buttons' names, as above.
-ssh_strip.explain = <b>Zapisz mój klucz:</b> trafi do twojego sejfu, który otwierają tylko twoje urządzenia; {alias} pozostanie bez zmian. <b>Wpuść tTerm:</b> tTerm doda na {alias} własny wiersz; twój klucz zostanie na tym Macu. Więcej serwerów naraz: Przenieś do chmury w menu konta.
+ssh_strip.explain = <b>Zapisz mój klucz:</b> trafi zaszyfrowany do twojego sejfu i otworzysz go hasłem do sejfu w dowolnej przeglądarce; {alias} pozostanie bez zmian. <b>Wpuść tTerm:</b> tTerm doda na {alias} własny wiersz; twój klucz zostanie na tym Macu. Więcej serwerów naraz: Przenieś do chmury w menu konta.
 ssh_strip.explain_pass = <b>Wpuść tTerm:</b> tTerm doda na {alias} własny wiersz; twój klucz zostanie na tym Macu. Więcej serwerów naraz: Przenieś do chmury w menu konta.
 ssh_strip.unreachable = tTerm Web nie może dotrzeć do {alias} z chmury: otwiera się przez tego Maca, gdy jest włączony.
 ssh_strip.through_mac = Otwórz przez tego Maca
@@ -1858,7 +1942,7 @@ move.how = Jak otwiera się {name}
 move.method_key = Mój klucz
 move.method_cert = Przepustka tTerma
 move.method_mac = Przez tego Maca
-move.way_key = Klucz trafi do twojego sejfu; serwer pozostanie bez zmian. Otwiera się w każdej przeglądarce, w której otworzysz sejf.
+move.way_key = Klucz trafi do twojego sejfu; serwer pozostanie bez zmian. Otwiera się w dowolnej przeglądarce hasłem do sejfu.
 move.way_cert = tTerm doda na serwerze własny wiersz, a twój klucz zostanie tutaj. Otwiera się wszędzie, także z Telegrama.
 move.way_mac = Nic nie jest przenoszone: tTerm prosi tego Maca o połączenie, gdy jest włączony. Dla serwerów za VPN-em.
 # {address} is root@203.0.113.7, {jump} the bastion it goes through.
@@ -1887,7 +1971,7 @@ move.key_security = Na kluczu bezpieczeństwa: nie może go opuścić. Jego serw
 move.key_agent = Tylko w agencie: nie można go skopiować. Jego serwery otwierają się przez tego Maca
 move.key_type = Rodzaj klucza, którego sejf jeszcze nie przechowuje. Jego serwery otwierają się przez tego Maca
 move.key_passphrase = ma hasło
-move.vault_note = Twój sejf otwiera się tak, jak odblokowuje się ten Mac: za pomocą Touch ID lub hasła do Maca. Tylko twoje urządzenia mogą go otworzyć; tTerm nie może.
+move.vault_note = Klucze są szyfrowane tutaj, na tym Macu. Tu twój sejf otwiera się za pomocą Touch ID, a w dowolnej przeglądarce – hasłem do sejfu. tTerm nie może go otworzyć.
 move.go = one: Przenieś {n} serwer | few: Przenieś {n} serwery | many: Przenieś {n} serwerów
 
 # ------------------------------------------------------------ moved: what came of Move to cloud (MoveToCloud.tsx)
@@ -1904,8 +1988,18 @@ moved.failed = Nie udało się go przenieść.
 moved.failed_text = {why} Nic dla niego nie zapisano.
 moved.open = Otwórz terminal
 moved.change = Zmień
+# How to open them from another computer: when a server moved with My
+# key. {site} is the address of tTerm Web; <b>…</b> is bold.
+moved.how_title = Jak otworzyć je z innego komputera
+moved.how_1 = Otwórz <b>{site}</b> w dowolnej przeglądarce i zaloguj się jak zwykle, kodem z e-maila.
+moved.how_2 = Otwórz serwer: tTerm poprosi o <b>hasło do sejfu</b>. Klucze otworzą się bezpośrednio w przeglądarce; twój Mac nie jest do tego potrzebny.
+moved.how_3 = Na swoim komputerze naciśnij „Zapisz za pomocą Touch ID”: potem wystarczy tam Touch ID, bez pytania o hasło. Na cudzym wybierz „Tylko tym razem”.
+# Under the steps, for the servers that moved Through this Mac: one
+# server, or several ("db-internal and nas").
+moved.how_mac_one = <b>{servers}</b> otwiera się tylko przez tego Maca: gdy jest włączony i działa na nim tTerm.
+moved.how_mac_many = <b>{servers}</b> otwierają się tylko przez tego Maca: gdy jest włączony i działa na nim tTerm.
 # <b>…</b> is the key's name, or a list of them.
-moved.keys_one = <b>{keys}</b> jest w twoim sejfie, zablokowany tak, jak odblokowują się twoje urządzenia. W Ustawieniach › Klucze zobaczysz go wszędzie.
-moved.keys_many = <b>{keys}</b> są w twoim sejfie, zablokowane tak, jak odblokowują się twoje urządzenia. W Ustawieniach › Klucze zobaczysz je wszędzie.
+moved.keys_one = <b>{keys}</b> jest już w twoim sejfie, zaszyfrowany: otwiera się hasłem do sejfu, a na tym Macu – za pomocą Touch ID. W Ustawieniach › Klucze zobaczysz go na każdym urządzeniu.
+moved.keys_many = <b>{keys}</b> są już w twoim sejfie, zaszyfrowane: otwierają się hasłem do sejfu, a na tym Macu – za pomocą Touch ID. W Ustawieniach › Klucze zobaczysz je na każdym urządzeniu.
 moved.no_keys = Nie przeniesiono żadnego klucza: twoje klucze zostają na tym Macu.
 `;export{e as default};

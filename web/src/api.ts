@@ -364,9 +364,10 @@ export interface InstallStatus {
 }
 
 /** The core said no, or something went wrong there: `status` is its HTTP
- * answer. */
+ * answer, `body` the rest of what it said (the vault's wrong password says
+ * how many tries are left, 0.1.26). */
 export class CoreError extends Error {
-  constructor(message: string, readonly status = 0) {
+  constructor(message: string, readonly status = 0, readonly body: Record<string, unknown> = {}) {
     super(message);
   }
 }
@@ -396,18 +397,20 @@ export function signedOutNow(): void {
 
 async function check(response: Response): Promise<Response> {
   if (!response.ok) {
-    let body: { error?: string; signedOut?: boolean } = {};
+    let body: Record<string, unknown> = {};
     try {
-      body = await response.clone().json();
+      const said: unknown = await response.clone().json();
+      if (said && typeof said === "object" && !Array.isArray(said)) body = said as Record<string, unknown>;
     } catch {
       // Not JSON; the status says enough.
     }
+    const error = typeof body.error === "string" ? body.error : "";
     if (response.status === 401 && body.signedOut) {
       signedOutNow();
-      throw new SignedOut(body.error ?? say("api.sign_in"), 401);
+      throw new SignedOut(error || say("api.sign_in"), 401);
     }
-    throw new CoreError(body.error || say("api.answered", { status: String(response.status) }),
-      response.status);
+    throw new CoreError(error || say("api.answered", { status: String(response.status) }),
+      response.status, body);
   }
   return response;
 }
@@ -622,7 +625,8 @@ export interface AppUpdate {
     | "unavailable";
   /** The version ready, or on its way. */
   next: string | null;
-  /** Its release's page, for What's new. */
+  /** Its release's page on GitHub. What's new links the documentation's
+   * entry of the version instead, from 0.1.26 (links.ts). */
   notes: string | null;
   readyAt: number | null;
   checkedAt: number | null;
@@ -1345,11 +1349,32 @@ export interface VaultKey {
   servers: { id: string; name: string; project: string }[];
 }
 
+/** How the vault password is derived (0.1.26): Argon2id, `m` KiB, `t`
+ * passes, `p` lanes. */
+export interface VaultKdf {
+  alg: "argon2id";
+  m: number;
+  t: number;
+  p: number;
+}
+
+/** The vault password as the core keeps it, without its wrap: that comes
+ * only for the right `auth` (openVaultPassword). */
+export interface VaultPassword {
+  salt: string;
+  kdf: VaultKdf;
+  setAt: number | string | null;
+}
+
 export interface Vault {
   id: string;
   prfSalt: string;
   createdAt: number;
+  /** When its recovery code was made; null when it has none (a vault made
+   * from 0.1.26 on, or one whose password is set). */
   recoveryAt: number | null;
+  /** Null for a vault made before 0.1.26 that has no password yet. */
+  password?: VaultPassword | null;
   locks: VaultLock[];
   keys: VaultKey[];
 }
@@ -1367,20 +1392,38 @@ export interface NewLock {
   label: string;
 }
 
-/** The vault, made in this browser: its recovery code's salt and wrap; its
- * passkey lock comes after (addVaultLock), from the prfSalt made here. */
-export async function createVault(body: { id: string; recoverySalt: string;
-  recoveryWrap: string }): Promise<Vault> {
+/** A vault password as the page sends it (0.1.26): its salt and kdf, the
+ * `auth` the core keeps the SHA-256 of, and the wrap of VK. */
+export interface NewPassword {
+  salt: string;
+  kdf: VaultKdf;
+  auth: string;
+  wrap: string;
+}
+
+/** The vault, made in this browser with its password (0.1.26); a passkey
+ * lock comes after (addVaultLock), from the prfSalt made here, if the
+ * person keeps the keys in this browser. */
+export async function createVault(body: { id: string; password: NewPassword }): Promise<Vault> {
   return (await (await check(await fetch("/api/vault", change("POST", body)))).json()).vault;
 }
 
-export async function vaultRecovery(): Promise<{ recoverySalt: string; recoveryWrap: string }> {
-  return (await check(await fetch("/api/vault/recovery", { cache: "no-store" }))).json();
+/** The password's wrap, for the right `auth`: 403 with `wrong` and `left`
+ * otherwise, 429 with `paused` and `retryAt` after too many, 404 when the
+ * vault has no password. */
+export async function openVaultPassword(auth: string): Promise<{ wrap: string }> {
+  return (await check(await fetch("/api/vault/password/open", change("POST", { auth })))).json();
 }
 
-/** Make a new recovery code: the one before stops working. */
-export async function setVaultRecovery(body: { recoverySalt: string; recoveryWrap: string }): Promise<void> {
-  await check(await fetch("/api/vault/recovery", change("PUT", body)));
+/** Sets the vault password, or replaces it: the one before, and the
+ * recovery code, stop opening the vault. */
+export async function setVaultPassword(body: NewPassword): Promise<Vault> {
+  return (await (await check(await fetch("/api/vault/password", change("PUT", body)))).json()).vault;
+}
+
+/** A vault made before 0.1.26, until its password is set. */
+export async function vaultRecovery(): Promise<{ recoverySalt: string; recoveryWrap: string }> {
+  return (await check(await fetch("/api/vault/recovery", { cache: "no-store" }))).json();
 }
 
 export async function addVaultLock(lock: NewLock): Promise<Vault> {
@@ -1449,30 +1492,38 @@ export interface AppVault {
   open: boolean;
   /** The fingerprints it can sign for now. */
   keys: string[];
+  /** The tTerm Web this app is signed in to ("app.tterm.net"), from 0.8.0;
+   * null or missing when the engine does not say. */
+  web?: string | null;
 }
 
 export async function loadAppVault(): Promise<AppVault> {
   return (await check(await fetch("/api/app/vault", { cache: "no-store", headers: BACKGROUND }))).json();
 }
 
-/** The vault made on this Mac with Touch ID: its recovery code, shown once. */
-export async function createAppVault(): Promise<{ recoveryCode: string }> {
-  return (await check(await fetch("/api/app/vault/create", change("POST", {})))).json();
+/** The vault made on this Mac with the password the person made up
+ * (0.1.26): no Touch ID; it is open after. */
+export async function createAppVault(password: string): Promise<{ open: boolean }> {
+  return (await check(await fetch("/api/app/vault/create", change("POST", { password })))).json();
 }
 
-/** Opens the vault on this Mac, with Touch ID; with `recoveryCode`, a vault
- * made elsewhere that this Mac has no lock of yet (see "Changes"). */
-export async function openAppVault(recoveryCode?: string): Promise<{ open: boolean }> {
-  return (await check(await fetch("/api/app/vault/open",
-    change("POST", recoveryCode ? { recoveryCode } : {})))).json();
+/** Opens the vault on this Mac: with this Mac's lock, Touch ID; a vault
+ * this Mac has no lock of yet, once with its password (0.1.26: 422 with
+ * `wrong` and `left`, 429 with `paused` and `retryAt`), or with the
+ * recovery code while it has no password. */
+export async function openAppVault(how: { password: string } | { recoveryCode: string } | null = null):
+  Promise<{ open: boolean }> {
+  return (await check(await fetch("/api/app/vault/open", change("POST", how ?? {})))).json();
 }
 
 export async function lockAppVault(): Promise<void> {
   await check(await fetch("/api/app/vault/lock", change("POST", {})));
 }
 
-export async function appRecoveryCode(): Promise<{ recoveryCode: string }> {
-  return (await check(await fetch("/api/app/vault/recovery", change("POST", {})))).json();
+/** A new vault password, set on this Mac with Touch ID (0.1.26): the first
+ * one forgets the recovery code. */
+export async function setAppVaultPassword(password: string): Promise<{ ok: boolean }> {
+  return (await check(await fetch("/api/app/vault/password", change("POST", { password })))).json();
 }
 
 /** The Mac's side of a new browser's request: its key posted, then the six

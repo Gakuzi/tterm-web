@@ -119,15 +119,44 @@ async def test_dns_rebinding_is_refused(h):
             assert r.status == 200, f"{host}: {r.status}"
 
 
+def _policy(csp: str) -> dict[str, list[str]]:
+    """A security policy as its directives, each with its sources."""
+    directives: dict[str, list[str]] = {}
+    for part in csp.split(";"):
+        words = part.split()
+        if words:
+            assert words[0] not in directives, f"{words[0]} twice: {csp}"
+            directives[words[0]] = words[1:]
+    return directives
+
+
 async def test_page_security_headers(h):
+    """The policy directive by directive, on the page (with its style
+    number) and on the API: from 0.1.26 script-src lets the page compile
+    WebAssembly (the vault password's Argon2id), and nothing else is
+    loosened: no eval, nothing inline, no other source anywhere."""
     async with h.core() as core:
-        r = await request(core.page_port, "GET", "/")
-        csp = r.headers["content-security-policy"]
-        assert "frame-ancestors 'none'" in csp and "unsafe-inline" not in csp
-        assert "script-src 'self'" in csp and "font-src 'self'" in csp
-        assert r.headers["x-content-type-options"] == "nosniff"
-        assert r.headers["referrer-policy"] == "no-referrer"
-        assert r.headers["x-frame-options"] == "DENY"
+        for path in ("/", "/api/state"):
+            r = await request(core.page_port, "GET", path)
+            csp = r.headers["content-security-policy"]
+            policy = _policy(csp)
+            assert policy.pop("script-src") == ["'self'", "'wasm-unsafe-eval'"], csp
+            style = policy.pop("style-src")
+            if path == "/":
+                assert len(style) == 2 and style[1].startswith("'nonce-"), csp
+                style = style[:1]
+            assert style == ["'self'"], csp
+            assert policy == {
+                "default-src": ["'self'"], "font-src": ["'self'"],
+                "img-src": ["'self'", "data:"], "connect-src": ["'self'"],
+                "frame-ancestors": ["'none'"], "base-uri": ["'none'"],
+                "form-action": ["'self'"], "object-src": ["'none'"]}, csp
+            words = csp.replace(";", " ").split()
+            assert "'unsafe-eval'" not in words and "'unsafe-inline'" not in words
+            assert "unsafe-inline" not in csp, csp
+            assert r.headers["x-content-type-options"] == "nosniff"
+            assert r.headers["referrer-policy"] == "no-referrer"
+            assert r.headers["x-frame-options"] == "DENY"
 
 
 async def test_page_files_and_addresses_inside_the_page(h):

@@ -13,7 +13,6 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import html
-import json
 import re
 import secrets
 import uuid
@@ -32,7 +31,7 @@ from ..core.mail import Mailer
 from ..core.terminals import NotAllowed, NotOpen, Terminal, Terminals
 from .connect import client_ip
 from .security import PAGE_HEADERS, AddHeaders, PageGuard, page_csp
-from .ws import SIGNED_OUT_CLOSE, PageSocket
+from .ws import SIGNED_OUT_CLOSE, PageSocket, page_json
 
 NO_STORE = {"cache-control": "no-store"}
 #: Stage 1 builds the page with stable file names, so the browser must ask
@@ -254,8 +253,10 @@ async def small_json(request: Request, most: int):
     if len(raw) > most:
         raise TooBig(413, "The note is too long to save. Split it into two.")
     try:
-        return json.loads(raw)
+        return page_json(raw)
     except ValueError:
+        # Nested deeper than any request of the page's is not JSON either
+        # (ws.page_json), on every Python.
         raise TooBig(422, "That is not JSON.") from None
 
 
@@ -1318,13 +1319,20 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     # ------------------------------------------------ the vault (0.1.17)
 
     def vault_refused(exc: vault.Refused) -> Response:
-        return _json({"error": str(exc)}, exc.status)
+        return _json({"error": str(exc), **exc.details}, exc.status)
 
     async def vault_body(request: Request) -> dict:
         data = await small_json(request, VAULT_BODY_MAX)
         if not isinstance(data, dict):
             raise TooBig(422, "That is not a vault request.")
         return data
+
+    def vault_device(request: Request, session: auth.Session) -> str:
+        """The device the journal names for a vault password's change or
+        wrong try: the app by the device it signed in as, a browser by its
+        User-Agent. A wrong try also gets the address (client_ip, as a
+        pairing's)."""
+        return auth.socket_label(session, request.headers.get("user-agent", ""))
 
     @app.get("/api/vault")
     async def get_vault(session: auth.Session = Depends(signed_in)) -> Response:
@@ -1335,15 +1343,18 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     @app.post("/api/vault")
     async def create_vault(request: Request,
                            session: auth.Session = Depends(signed_in)) -> Response:
-        """Makes the person's one vault, with its first lock and recovery
-        code; 409 if one is already there."""
+        """Makes the person's one vault, with its vault password (0.1.26) or,
+        from tTerm for Mac 0.7.x, its recovery code, and its first lock if
+        any; 409 if one is already there."""
         try:
             data = await vault_body(request)
             created = await vault.create_vault(
                 pool, session.person.id, id=data.get("id"),
+                password=data.get("password"),
                 recovery_salt=data.get("recoverySalt"),
                 recovery_wrap=data.get("recoveryWrap"), lock=data.get("lock"),
-                device_id=session.device_id)
+                device_id=session.device_id,
+                device=vault_device(request, session))
         except TooBig as exc:
             return _json({"error": str(exc)}, exc.status)
         except vault.Refused as exc:
@@ -1351,8 +1362,46 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         await vault_changed(session.person.id)
         return _json({"vault": created}, 201)
 
+    @app.post("/api/vault/password/open")
+    async def open_vault_password(request: Request,
+                                  session: auth.Session = Depends(signed_in)) -> Response:
+        """The wrap of the vault key for the vault password, for the right
+        proof (auth). 403 with the tries left for a wrong one; 429 with
+        when to try again after ten wrong ones within an hour of each other,
+        or thirty in a day; 404 when the vault has no password."""
+        try:
+            data = await vault_body(request)
+            opened = await vault.open_with_password(
+                pool, session.person.id, auth=data.get("auth"),
+                device=vault_device(request, session), ip=client_ip(request))
+        except TooBig as exc:
+            return _json({"error": str(exc)}, exc.status)
+        except vault.Refused as exc:
+            return vault_refused(exc)
+        return _json(opened)
+
+    @app.put("/api/vault/password")
+    async def set_vault_password(request: Request,
+                                 session: auth.Session = Depends(signed_in)) -> Response:
+        """Sets the vault password, or replaces it; the recovery code goes,
+        and the person's pages hear that the vault changed."""
+        try:
+            data = await vault_body(request)
+            changed = await vault.set_password(
+                pool, session.person.id, password=data,
+                device_id=session.device_id,
+                device=vault_device(request, session))
+        except TooBig as exc:
+            return _json({"error": str(exc)}, exc.status)
+        except vault.Refused as exc:
+            return vault_refused(exc)
+        await vault_changed(session.person.id)
+        return _json({"vault": changed})
+
     @app.get("/api/vault/recovery")
     async def vault_recovery(session: auth.Session = Depends(signed_in)) -> Response:
+        """The recovery code's salt and wrap; 404 when the vault has no
+        code (a password replaced it, or it was made with one)."""
         try:
             return _json(await vault.recovery(pool, session.person.id))
         except vault.Refused as exc:
@@ -1361,7 +1410,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     @app.put("/api/vault/recovery")
     async def set_vault_recovery(request: Request,
                                  session: auth.Session = Depends(signed_in)) -> Response:
-        """Make a new recovery code: the one shown before stops working."""
+        """Make a new recovery code: the one shown before stops working.
+        Refused (409) for a vault with a password."""
         try:
             data = await vault_body(request)
             await vault.set_recovery(

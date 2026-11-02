@@ -1609,30 +1609,48 @@ vault.code_label = Kod {code}
 
 # ------------------------------------------------------------ keys: Settings › Keys, the vault (Keys.tsx)
 keys.title = Anahtarlar
-keys.about = Kasan: kaydettiğin SSH anahtarları, tüm cihazlarında. Onu yalnızca cihazların, kilitlerini açtığın yöntemle açabilir; tTerm açamaz.
+keys.about = Kasan: kaydettiğin SSH anahtarları. Anahtarlar şifrelidir ve onları yalnızca sen açabilirsin: kasa parolanla, sakladığın yerlerde ise parola olmadan da. tTerm açamaz.
+# A vault made before 0.1.26 has a recovery code and no password: this
+# banner, above the vault's state, sets one (vault_password.title_set).
+keys.set_title = Kasa parolası belirle
+keys.set_text = Bu parolayla anahtarlarını, Mac'in evde kalsa bile herhangi bir tarayıcıda açabilirsin. Bundan sonra kurtarma kodu geçersiz olur: yerini parola alır.
+keys.set_go = Parolayı belirle
 keys.open_here = Bu tarayıcıda açık
 # How it opened, then when it locks again: one of these under "Open in this browser".
-keys.open_text.touch = Touch ID ile açıldı. 8 saat boyunca hiçbir işlem yapılmadığında, tTerm Web'i kapattığında ya da Kilitle düğmesine bastığında yeniden kilitlenir.
-keys.open_text.hello = Windows Hello ile açıldı. 8 saat boyunca hiçbir işlem yapılmadığında, tTerm Web'i kapattığında ya da Kilitle düğmesine bastığında yeniden kilitlenir.
-keys.open_text.passkey = Geçiş anahtarınla açıldı. 8 saat boyunca hiçbir işlem yapılmadığında, tTerm Web'i kapattığında ya da Kilitle düğmesine bastığında yeniden kilitlenir.
-keys.open_text.recovery = Kurtarma kodunla, bu oturum için açıldı. 8 saat boyunca hiçbir işlem yapılmadığında, tTerm Web'i kapattığında ya da Kilitle düğmesine bastığında yeniden kilitlenir.
-keys.open_text.pairing = Mac'inin onayıyla, bu oturum için açıldı. 8 saat boyunca hiçbir işlem yapılmadığında, tTerm Web'i kapattığında ya da Kilitle düğmesine bastığında yeniden kilitlenir.
-keys.open_text.new = Az önce bu tarayıcıda oluşturuldu. 8 saat boyunca hiçbir işlem yapılmadığında, tTerm Web'i kapattığında ya da Kilitle düğmesine bastığında yeniden kilitlenir.
+keys.open_text.touch = Touch ID ile açıldı. 8 saat boyunca hiçbir işlem yapılmazsa kendiliğinden kapanır; tTerm Web'i kapattığında ya da Kilitle düğmesine bastığında da kapanır. Yeniden açmak için Touch ID'ye bir dokunuş yeter.
+keys.open_text.hello = Windows Hello ile açıldı. 8 saat boyunca hiçbir işlem yapılmazsa kendiliğinden kapanır; tTerm Web'i kapattığında ya da Kilitle düğmesine bastığında da kapanır. Windows Hello ile yeniden açılır.
+keys.open_text.passkey = Geçiş anahtarınla açıldı. 8 saat boyunca hiçbir işlem yapılmazsa kendiliğinden kapanır; tTerm Web'i kapattığında ya da Kilitle düğmesine bastığında da kapanır. Geçiş anahtarınla yeniden açılır.
+keys.open_text.password = Kasa parolanla, yalnızca bu oturum için açıldı. 8 saat boyunca hiçbir işlem yapılmazsa kendiliğinden kapanır; sekmeyi kapattığında ya da Kilitle düğmesine bastığında da kapanır.
+keys.open_text.recovery = Kurtarma kodunla, yalnızca bu oturum için açıldı. 8 saat boyunca hiçbir işlem yapılmazsa kendiliğinden kapanır; sekmeyi kapattığında ya da Kilitle düğmesine bastığında da kapanır.
+keys.open_text.pairing = Mac'inin onayıyla, yalnızca bu oturum için açıldı. 8 saat boyunca hiçbir işlem yapılmazsa kendiliğinden kapanır; sekmeyi kapattığında ya da Kilitle düğmesine bastığında da kapanır.
+keys.open_text.new = Az önce bu tarayıcıda oluşturuldu. 8 saat boyunca hiçbir işlem yapılmazsa kendiliğinden kapanır; sekmeyi kapattığında ya da Kilitle düğmesine bastığında da kapanır.
 # In tTerm for Mac.
 keys.open_mac = Bu Mac'te açık
 keys.open_text.mac = Touch ID ya da Mac'inin parolasıyla açıldı. tTerm çalıştığı sürece, Kilitle düğmesine basana ya da çıkış yapana kadar açık kalır.
 keys.lock = Kilitle
-keys.locked_here = Bu tarayıcıda kilitli
-keys.locked_text = Anahtarlarını burada kullanmak için kasanı aç: bu bilgisayarın kilidini açtığın yöntemle, Mac'inin onayıyla ya da kurtarma kodunla.
+# The vault closed in this browser. Where the keys were kept here with
+# Touch ID (or Windows Hello, a passkey), one of the three; else the
+# vault password opens them (keys.closed_text_password, with its field).
+keys.closed_here = Kasan kapalı
+keys.closed_text.touch = Sunuculara anahtarınla giriş yapmak için kasanı Touch ID ile aç.
+keys.closed_text.hello = Sunuculara anahtarınla giriş yapmak için kasanı Windows Hello ile aç.
+keys.closed_text.passkey = Sunuculara anahtarınla giriş yapmak için kasanı geçiş anahtarınla aç.
+keys.closed_text_password = Anahtarların şifreli ve onları yalnızca kasa parolan açar. Parolanı yaz: anahtarlar burada, bu tarayıcıda açılır. Parolanın kendisi hiçbir yere gitmez.
+# The vault password's row, under the vault's state: {day} is time.today,
+# time.yesterday or time.on_day ("on 2 Nov").
+keys.password_title = Kasa parolası
+keys.password_text = Anahtarlarını herhangi bir tarayıcıda açar. Parola {day} belirlendi.
+keys.password_change = Parolayı değiştir
 keys.locked_mac = Bu Mac'te kilitli
 keys.locked_mac_text = Kasanı Touch ID ya da Mac'inin parolasıyla aç: ardından bu Mac, sunucularına giriş yapar.
 keys.locked_mac_code = Bu Mac henüz kasanı kendi başına açamıyor. Onu burada bir kez kurtarma kodunla aç: sonra Touch ID ya da Mac'inin parolasıyla açılır.
+keys.locked_mac_password = Bu Mac henüz kasanı kendi başına açamıyor. Onu burada bir kez kasa parolanla aç: sonra bu Mac onu kendi başına, Touch ID ile açar.
 keys.open = Aç
 keys.open_code = Kurtarma koduyla aç
 keys.none_title = Henüz kasa yok
-keys.none_web = Dosyadan bir anahtar ekle: kasan o zaman bu tarayıcıda, saklayacağın bir kurtarma koduyla oluşturulur.
-keys.none_app = Buluta taşı özelliğiyle ya da bir terminalde ssh komutundan sonra beliren şeritle bir anahtar kaydet: kasan o zaman Touch ID ile oluşturulur.
-keys.no_passkey_here = Bu tarayıcı kasana ait bir geçiş anahtarı saklayamaz: kasan burada kurtarma kodunla ya da Mac'inin onayıyla, her seferinde tek bir oturum için açılır.
+keys.none_web = Dosyadan anahtar ekle: kasan da o zaman, kendi belirleyeceğin bir kasa parolasıyla oluşturulur.
+keys.none_app = Buluta taşı özelliğiyle ya da bir terminalde ssh komutundan sonra beliren şeritle bir anahtar kaydet: kasan da o zaman, kendi belirleyeceğin bir kasa parolasıyla oluşturulur.
+keys.no_passkey_here = Bu tarayıcı anahtarlarını geçiş anahtarıyla saklayamaz: burada anahtarların kasa parolanla ya da Mac'inin onayıyla, her seferinde tek bir oturum için açılır.
 keys.no_ed25519_here = Bu tarayıcı Ed25519 anahtarlarıyla imza atamaz. O sunucuları daha yeni bir tarayıcıda ya da Mac için tTerm'de aç.
 # {servers} is a list of servers: droplet and staging; web-01 in Client X.
 keys.opens = Açtığı sunucular: {servers}
@@ -1649,9 +1667,10 @@ keys.cannot_ed25519 = Bu tarayıcı Ed25519 anahtarlarıyla imza atamaz
 keys.cannot_open = Burada açılmıyor: dosyasından yeniden ekle
 keys.remove = Kaldır
 keys.add_file = Dosyadan anahtar ekle
-keys.new_recovery = Yeni kurtarma kodu oluştur
 # {places} is where the vault opens: "MacBook-Pro-Denis · tTerm for Mac, Chrome on macOS".
-keys.opens_on = Açıldığı yerler: {places}.
+keys.opens_on = Kasanın parola olmadan açıldığı yerler: {places}. Başka herhangi bir tarayıcıda kasa parolasıyla açılır.
+keys.opens_password_only = Kasan yalnızca parolasıyla açılır: henüz hiçbir cihazda saklanmıyor.
+keys.opens_on_old = Kasanın parola olmadan açıldığı yerler: {places}. Parolası olana kadar diğer tarayıcılarda kurtarma koduyla ya da Mac'inin onayıyla açılır.
 keys.opens_on_code = Yalnızca kurtarma kodunla açılır.
 keys.place_mac = {mac} · {app}
 keys.place_browser = bir tarayıcı
@@ -1671,7 +1690,6 @@ add_key.passphrase_hint = Anahtar şifreli. Parolası anahtarı burada, bu taray
 add_key.open_key = Anahtarı aç
 add_key.reading = Anahtar okunuyor…
 add_key.name = Ad
-add_key.sealed_here = Anahtar, bu tarayıcıdan çıkmadan önce burada kilitlenir. Onu yalnızca cihazların açabilir; tTerm açamaz.
 add_key.add = Kasana ekle
 add_key.next = İleri
 add_key.added = {name} artık kasanda
@@ -1691,50 +1709,81 @@ add_key.problem_encrypted_pem = Bu anahtar dosyası eski PEM yöntemiyle şifrel
 add_key.problem_ed25519 = Bu tarayıcı bu biçimdeki Ed25519 anahtarlarını okuyamaz. Daha yeni bir tarayıcıyı ya da anahtarı OpenSSH biçiminde dene.
 add_key.problem_several = Dosyada birden fazla anahtar var: onları tek tek ekle.
 
-# ------------------------------------------------------------ vault_new: Save your key to your vault (VaultDialogs.tsx)
-vault_new.title = Anahtarını kasana kaydet
-# <code>…</code> is the key's name: id_ed25519. {server} is the server's name.
-vault_new.text_server = <code>{key}</code> kasana gider ve {server} onunla tTerm Web'den, telefonundan ya da giriş yaptığın herhangi bir bilgisayardan açılır.
-vault_new.text = <code>{key}</code> kasana gider: onunla açılan sunucular tTerm Web'den, telefonundan ya da giriş yaptığın herhangi bir bilgisayardan açılır.
-# In tTerm for Mac.
-vault_new.point_mac_unlock = Kasan, bu Mac'in kilidini açtığın yöntemle açılır: Touch ID ya da Mac'inin parolası. Hatırlaman gereken yeni bir şey yok.
-vault_new.point_mac_locked = Anahtarın bu Mac'ten çıkmadan önce kilitlenir. Onu yalnızca cihazların açabilir; tTerm açamaz.
-vault_new.point_mac_browser = Yeni bir tarayıcı kasanı, sen o tarayıcıyı burada onayladığında ya da kurtarma kodunla açar.
-# In a browser.
-vault_new.point_web_unlock = Kasan, bu bilgisayarın kilidini açtığın yöntemle açılır: Touch ID, Windows Hello ya da telefonunun ekran kilidi. Hatırlaman gereken yeni bir şey yok.
-vault_new.point_web_no_passkey = Bu tarayıcı kasana ait bir geçiş anahtarı saklayamaz: kasan burada kurtarma kodunla, her seferinde tek bir oturum için açılır.
-vault_new.point_web_locked = Anahtarın bu tarayıcıdan çıkmadan önce kilitlenir. Onu yalnızca cihazların açabilir; tTerm açamaz.
-vault_new.point_web_browser = Başka bir tarayıcı kasanı kurtarma kodunla ya da sen o tarayıcıyı Mac için tTerm'de onayladığında açar.
-vault_new.make_touch = Kasamı Touch ID ile oluştur
-vault_new.make_hello = Kasamı Windows Hello ile oluştur
-vault_new.make_passkey = Kasamı geçiş anahtarıyla oluştur
-vault_new.make = Kasamı oluştur
+# ------------------------------------------------------------ vault_password: the vault password (VaultDialogs.tsx, 0.1.26)
+# Make up a vault password: a new vault, made on the Mac (Move to cloud;
+# the strip after ssh, vault_password.text_key) or in a browser (Add a key
+# from a file, vault_password.text_web). <code>…</code> is the key's name:
+# id_ed25519.
+vault_password.title_new = Kasa parolası oluştur
+vault_password.text_mac = Bu Mac'in anahtarları şifrelenerek buluttaki kasana gider. Bu parolayla onları, Mac'in evde kalsa bile herhangi bir tarayıcıda açabilirsin.
+vault_password.text_key = <code>{key}</code> şifrelenerek buluttaki kasana gider. Bu parolayla onu, Mac'in evde kalsa bile herhangi bir tarayıcıda açabilirsin.
+vault_password.text_web = <code>{key}</code> bu tarayıcıda şifrelenip kasana gider. Bu parolayla onu herhangi bir tarayıcıda açabilirsin.
+vault_password.label = Parola
+# The second field: the same password once more.
+vault_password.label_again = Tekrar
+# Next to the field: the password shown as it is typed, or hidden again.
+vault_password.show = Göster
+vault_password.hide = Gizle
+# Under the first field; while it has 1 to 11 characters, vault_password.short
+# instead. vault_password.latin when it has a character beyond plain Latin.
+vault_password.hint = En az 12 karakter. En kolayı, birkaç sözcükten oluşan bir ifade.
+vault_password.short = one: {n} karakter daha | other: {n} karakter daha
+vault_password.latin = Parolada İngiliz alfabesinde olmayan harfler var: yurt dışındaki bir bilgisayarda bunlar için klavye düzeni olmayabilir.
+# Under the second field.
+vault_password.match = Eşleşiyor
+vault_password.no_match = Yukarıdakiyle aynı değil
+# In a dashed box under the fields: on the Mac, and in a browser.
+vault_password.note_mac = tTerm bu parolayı bilmez ve kurtaramaz. Onu parola yöneticinde sakla. Unutursan yenisini burada, bu Mac'te belirle.
+vault_password.note_web = tTerm bu parolayı bilmez ve kurtaramaz. Onu parola yöneticinde sakla.
+vault_password.create = Kasayı oluştur
+# On the button, while the password becomes the key (a second; a few on a phone).
+vault_password.working = Şifreleniyor…
+# Settings › Keys: Set a vault password (a vault made before 0.1.26, with a
+# recovery code), or Change it.
+vault_password.title_set = Kasa parolası belirle
+vault_password.text_set = Bu parolayla anahtarlarını, Mac'in evde kalsa bile herhangi bir tarayıcıda açabilirsin. tTerm bu parolayı bilmez ve kurtaramaz. Bundan sonra kurtarma kodu geçersiz olur.
+vault_password.set = Parolayı belirle
+vault_password.title_change = Kasa parolasını değiştir
+vault_password.text_change = Yeni parola eskisinin yerini hemen alır: eski parola artık anahtarlarını açmaz. Mac'in ve anahtarlarının saklandığı tarayıcılar onları eskisi gibi açar.
+vault_password.label_new = Yeni parola
+vault_password.change = Parolayı değiştir
+# In a browser where the keys are not kept: what opens the vault for the
+# change (the current password), or for setting it (the recovery code,
+# recovery.now_code).
+vault_password.current = Şu anki parola
+vault_password.current_hint = Anahtarların bu tarayıcıda saklanmıyor, bu yüzden parolayı değiştirmek için şu anki parola gerekiyor.
+vault_password.code_hint = Anahtarların bu tarayıcıda saklanmıyor, bu yüzden parolayı belirlemek için kurtarma kodun gerekiyor.
+# Said once done.
+vault_password.done_set = Kasa parolası belirlendi. Kurtarma kodu artık kasanı açmıyor.
+vault_password.done_change = Kasa parolası değiştirildi.
+# A closed vault, in a browser with no lock of it: the field it opens with,
+# in a server's card and in Settings › Keys.
+vault_password.label_vault = Kasa parolası
+vault_password.open = Anahtarları aç
+vault_password.opening = Açılıyor…
+vault_password.forgot = Parolayı mı unuttun?
 
-# ------------------------------------------------------------ recovery: the recovery code, shown once (VaultDialogs.tsx)
-recovery.title = Kurtarma kodun
-recovery.text = Kasanı açan tüm cihazlarını bir gün kaybedersen anahtarlarına yeniden ulaşmanın tek yolu bu kod. tTerm onları senin için kurtaramaz. Bu kodu yalnızca bir kez görürsün.
-recovery.title_new = Yeni kurtarma kodun
-recovery.text_new = Önceki kodun artık kasanı açmıyor. Kasanı açan tüm cihazlarını bir gün kaybedersen anahtarlarına yeniden ulaşmanın tek yolu bu kod. Bu kodu yalnızca bir kez görürsün.
-# For screen readers.
-recovery.code_label = Kurtarma kodu {code}
-recovery.save_file = Dosya olarak kaydet
-recovery.copy_failed = Kopyalanamadı: kodu seç ve elle kopyala.
-# What the file saved holds.
-recovery.file_text = tTerm kasasının kurtarma kodu: {code}\\nCihazlarından hiçbiri açamadığında kasanı bu kod açar. Bu kodu cihazlarından uzakta, güvenli bir yerde sakla.
-recovery.kept_mac = Kodu güvenli bir yerde sakladım, yalnızca bu Mac'te değil
-recovery.kept_web = Kodu güvenli bir yerde sakladım, yalnızca bu bilgisayarda değil
-recovery.make_title = Yeni bir kurtarma kodu oluşturulsun mu?
-recovery.make_text = Şu anki kodun geçersiz olur ve yenisi yalnızca bir kez gösterilir. Anahtarların ve cihazların olduğu gibi kalır.
+# ------------------------------------------------------------ vault_forgot: Forgot your vault password? (VaultDialogs.tsx, 0.1.26)
+vault_forgot.title = Kasa parolanı mı unuttun?
+vault_forgot.text = tTerm onu sana hatırlatamaz: parolayı yalnızca sen biliyorsun. Ama kasanın parola olmadan açıldığı bir yerde yenisini belirleyebilirsin:
+# Two points under the text: where a new password can be set.
+vault_forgot.mac = Mac'inde, Mac için tTerm'de: Ayarlar › Anahtarlar › Parolayı değiştir, Touch ID ile;
+vault_forgot.browser = anahtarlarının saklandığı bir tarayıcıda: orada da, Ayarlar'da.
+# <code>…</code> is the folder of the keys: it stays as it is.
+vault_forgot.none = Böyle bir cihaz yoksa kasandaki anahtarlar artık açılamaz. Anahtarların kendisi ise genellikle Mac'inde, <code>~/.ssh</code> içinde kalır.
+vault_forgot.ok = Anladım
+
+# ------------------------------------------------------------ recovery: the recovery code of a vault made before 0.1.26 (VaultDialogs.tsx)
 recovery.now_code = Şu anki kurtarma kodun
-recovery.now_code_hint = Bu tarayıcıda kasana ait bir geçiş anahtarı yok, bu yüzden yeni kod şu anki kodunla oluşturulur. Onu kaybettin mi? Yenisini Mac için tTerm'de oluştur.
-recovery.make_go = Yeni kod oluştur
-recovery.make_go_passkey = Geçiş anahtarınla oluştur
-recovery.make_touch = Touch ID ile oluştur
 
 # ------------------------------------------------------------ vault_open: Open your keys on this browser (VaultDialogs.tsx)
 vault_open.title = Anahtarlarını bu tarayıcıda aç
 vault_open.text = Bu tarayıcı kasan için yeni. Onu, kasanı zaten açan bir cihazda onayla.
 vault_open.text_code = Kasanı bu tarayıcıda kurtarma kodunla aç.
+# A vault with a password: the Mac's approval is the second way, and the
+# button at the bottom goes back to the password field.
+vault_open.text_password = Bu tarayıcıyı Mac'inde onayla. Başkasının bilgisayarında işe yarar: kasa parolasını orada yazman gerekmez.
+vault_open.use_password = Bunun yerine parolayı yaz
 # {mac} is the Mac's name, {app} is app_link.mac: "MacBook-Pro-Denis · tTerm for Mac".
 vault_open.mac_name = {mac} · {app}
 vault_open.mac_ask = Kasanı burada açmasını iste
@@ -1747,9 +1796,13 @@ vault_open.sas_text = Mac'in de bir kod gösteriyor. Yalnızca aynıysa orada iz
 vault_open.or = ya da
 vault_open.code = Kurtarma kodu
 vault_open.open = Aç
-# Once open with the recovery code or the Mac's approval: whether this browser keeps a passkey.
+# Once open with the password, the Mac's approval or the recovery code, or just made in this browser: whether to keep the keys here with a passkey.
 vault_open.opened_title = Anahtarların bu tarayıcıda açık
-vault_open.opened_text = Anahtarların bir dahaki sefere bu bilgisayarın kilidini açtığın yöntemle açılsın diye burada bir geçiş anahtarı saklansın mı? Senin olmayan bir bilgisayarda Yalnızca bu sefer seçeneğini seç.
+vault_open.keep_text.touch = Anahtarların burada Touch ID ile saklansın mı? Böylece bir dahaki sefere bu tarayıcıda Touch ID yeter, parola gerekmez.
+vault_open.keep_text.hello = Anahtarların burada Windows Hello ile saklansın mı? Böylece bir dahaki sefere bu tarayıcıda Windows Hello yeter, parola gerekmez.
+vault_open.keep_text.passkey = Anahtarların burada geçiş anahtarıyla saklansın mı? Böylece bir dahaki sefere bu tarayıcıda geçiş anahtarı yeter, parola gerekmez.
+# Small, under the question.
+vault_open.keep_foreign = Başkasının bilgisayarında mısın? “Yalnızca bu sefer” seçeneğini seç: anahtarlar sekmeyi kapattığında kapanır, bir süre kullanılmazlarsa da kendiliğinden kapanır.
 vault_open.keep_touch = Touch ID ile sakla
 vault_open.keep_hello = Windows Hello ile sakla
 vault_open.keep_passkey = Geçiş anahtarıyla sakla
@@ -1761,6 +1814,9 @@ app_code.title = Kasanı bu Mac'te aç
 app_code.text = Bu Mac henüz kasanı kendi başına açamıyor. Onu burada bir kez kurtarma kodunla aç: sonra bu Mac onu Touch ID ile açar.
 # When this Mac's lock is there but no longer opens the vault (taken off in a browser, or gone from the keychain).
 app_code.text_lost = Bu Mac artık kasanı kendi başına açamıyor. Onu burada bir kez kurtarma kodunla aç: sonra bu Mac onu yeniden Touch ID ile açar.
+# A vault with a password (0.1.26): opened here once with it.
+app_code.text_password = Bu Mac henüz kasanı kendi başına açamıyor. Onu burada bir kez kasa parolanla aç: sonra bu Mac onu Touch ID ile açar.
+app_code.text_lost_password = Bu Mac artık kasanı kendi başına açamıyor. Onu burada bir kez kasa parolanla aç: sonra bu Mac onu yeniden Touch ID ile açar.
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1789,8 +1845,21 @@ mac_approve.not_me_note = Ben değilim: o oturum sona erer, Ayarlar › Cihazlar
 # ------------------------------------------------------------ vault_locked: a server with your key, the vault locked here (VaultLocked.tsx)
 vault_locked.title = {machine} anahtarınla açılır
 vault_locked.text = Anahtarların bu tarayıcıda kilitli. Onları bu bilgisayarın kilidini açtığın yöntemle aç; ardından tTerm {machine} sunucusuna giriş yapar ve anahtarın bu tarayıcıdan hiçbir zaman çıkmaz.
+# A vault with a password, in a browser that keeps no lock of it: the
+# password field comes under it.
+vault_locked.text_password = Buluttaki anahtarların şifreli ve onları yalnızca kasa parolan açar. Parolanı yaz: anahtarlar burada, bu tarayıcıda açılır ve tTerm {machine} sunucusuna giriş yapar. Parolanın kendisi hiçbir yere gitmez.
+# Where the keys were kept with Touch ID (or Windows Hello, a passkey):
+# one of the three, the button, and a link to type the password instead.
+vault_locked.closed_title = Kasan kapalı
+vault_locked.closed_text.touch = {machine} sunucusuna anahtarınla giriş yapmak için kasanı Touch ID ile aç.
+vault_locked.closed_text.hello = {machine} sunucusuna anahtarınla giriş yapmak için kasanı Windows Hello ile aç.
+vault_locked.closed_text.passkey = {machine} sunucusuna anahtarınla giriş yapmak için kasanı geçiş anahtarınla aç.
+vault_locked.use_password = ya da kasa parolasını yaz
+# Small, at the card's bottom.
+vault_locked.closes_itself = Bir süre kullanmadığında kasan kendiliğinden kapanır: bilgisayarın başından ayrılmış olman ihtimaline karşı.
 vault_locked.text_app = Anahtarların bu Mac'te kilitli. Onları Touch ID ya da Mac'inin parolasıyla aç; ardından bu Mac {machine} sunucusuna giriş yapar.
 vault_locked.text_app_code = Bu Mac henüz kasanı kendi başına açamıyor. Onu burada bir kez kurtarma kodunla aç; ardından bu Mac {machine} sunucusuna giriş yapar.
+vault_locked.text_app_password = Bu Mac henüz kasanı kendi başına açamıyor. Onu burada bir kez kasa parolanla aç; ardından bu Mac {machine} sunucusuna giriş yapar.
 # Small links under the button: "or approve on MacBook-Pro-Denis · use the recovery code".
 vault_locked.or = ya da
 vault_locked.approve_on = {mac} üzerinde onayla
@@ -1807,17 +1876,32 @@ vault_locked.its_key = sunucunun anahtarı
 vault_problem.no_vault = Henüz bir kasan yok.
 vault_problem.exists = Zaten bir kasan var: önce onu aç, sonra anahtarı ekle.
 vault_problem.locked = Önce kasanı aç.
-vault_problem.no_passkey = Burada kasana ait hiçbir geçiş anahtarı yanıt vermedi. Bu tarayıcıyı Mac'inde onayla ya da kurtarma kodunu kullan.
-vault_problem.no_prf = Bu geçiş anahtarı kasanı burada açamaz. Bu tarayıcıyı Mac'inde onayla ya da kurtarma kodunu kullan.
+# The vault password: {n} tries left (shown when 3 or fewer), {time} a
+# time of day, as the page shows times ("14:05").
+vault_problem.password_wrong = Bu parola kasanı açmıyor. Klavye düzenini ve Caps Lock tuşunu kontrol et.
+vault_problem.password_left = one: {n} deneme hakkın kaldı, sonra bir saat beklemen gerekecek. | other: {n} deneme hakkın kaldı, sonra bir saat beklemen gerekecek.
+vault_problem.password_paused = Çok fazla yanlış parola girildi. Saat {time} olunca yeniden dene.
+# The same pause, when it ends another day (thirty wrong ones in a day):
+# {day} is the date as the page writes it ("3 Nov"), {time} the time.
+vault_problem.password_paused_day = Çok fazla yanlış parola girildi. {day} saat {time} olunca yeniden dene.
+vault_problem.no_password = Kasanın henüz parolası yok: Mac'inde Ayarlar › Anahtarlar bölümünde bir parola belirle.
+vault_problem.password_short = Parola en az 12 karakter olmalı.
+vault_problem.no_wasm = Bu tarayıcıda kasa parolası kullanılamıyor. Anahtarlarını Mac'inin onayıyla ya da daha yeni bir tarayıcıda aç.
+vault_problem.no_passkey = Burada kasana ait hiçbir geçiş anahtarı yanıt vermedi. Kasa parolanı yaz ya da bu tarayıcıyı Mac'inde onayla.
+vault_problem.no_passkey_code = Burada kasana ait hiçbir geçiş anahtarı yanıt vermedi. Bu tarayıcıyı Mac'inde onayla ya da kurtarma kodunu kullan.
+vault_problem.no_prf = Bu geçiş anahtarı kasanı burada açamaz. Kasa parolanı yaz ya da bu tarayıcıyı Mac'inde onayla.
+vault_problem.no_prf_code = Bu geçiş anahtarı kasanı burada açamaz. Bu tarayıcıyı Mac'inde onayla ya da kurtarma kodunu kullan.
 vault_problem.no_prf_here = Bu tarayıcı kasana ait bir geçiş anahtarı saklayamaz: kasan yalnızca bu oturum boyunca açık kalır.
-vault_problem.lock_broken = Bu tarayıcının kilidi artık kasanı açmıyor. Kurtarma kodunu kullan ya da bu tarayıcıyı Mac'inde onayla.
+vault_problem.lock_broken = Bu tarayıcının kilidi artık kasanı açmıyor. Kasa parolanı yaz ya da bu tarayıcıyı Mac'inde onayla.
+vault_problem.lock_broken_code = Bu tarayıcının kilidi artık kasanı açmıyor. Kurtarma kodunu kullan ya da bu tarayıcıyı Mac'inde onayla.
 vault_problem.code_form = Kurtarma kodu, dörderli altı grupta 24 harf ve rakamdan oluşur.
 vault_problem.code_wrong = Bu kurtarma kodu kasanı açmıyor. Kodu kontrol et ya da bu tarayıcıyı Mac'inde onayla.
 # In tTerm for Mac: the engine's answers, said by the page (the code window, Touch ID).
 vault_problem.code_wrong_app = Bu kurtarma kodu kasanı açmıyor. Kodu kontrol et ve yeniden dene.
 vault_problem.touch_failed = Touch ID ya da Mac'inin parolasıyla onay verilemedi. Hiçbir şey değişmedi.
 vault_problem.need_code = Şimdi kurtarma kodunu yaz: bu tarayıcıda kasana ait bir geçiş anahtarı yok.
-vault_problem.no_x25519 = Bu tarayıcı, Mac'inin onaylayabilmesi için fazla eski: kurtarma kodunu ya da daha yeni bir tarayıcı kullan.
+vault_problem.no_x25519 = Bu tarayıcı, Mac'inin onaylayabilmesi için fazla eski: kasa parolanı yaz ya da daha yeni bir tarayıcı kullan.
+vault_problem.no_x25519_code = Bu tarayıcı, Mac'inin onaylayabilmesi için fazla eski: kurtarma kodunu ya da daha yeni bir tarayıcı kullan.
 vault_problem.pairing = İstek iletilemedi. Yeniden iste.
 vault_problem.passkey_exists = Bu tarayıcıda tTerm için zaten bir geçiş anahtarı var.
 vault_problem.no_passkey_here = Bu tarayıcı geçiş anahtarı oluşturamaz.
@@ -1835,7 +1919,7 @@ ssh_strip.let_in = tTerm'i içeri al
 ssh_strip.not_now = Şimdi değil
 ssh_strip.never = {alias} için bir daha sorma
 # <b>…</b> are the two buttons' names, as above.
-ssh_strip.explain = <b>Anahtarımı kaydet:</b> anahtarın, yalnızca cihazlarının açtığı kasana gider; {alias} olduğu gibi kalır. <b>tTerm'i içeri al:</b> tTerm, {alias} sunucusuna kendi satırını ekler; anahtarın bu Mac'te kalır. Aynı anda daha fazla sunucu için: hesap menüsünde Buluta taşı.
+ssh_strip.explain = <b>Anahtarımı kaydet:</b> anahtarın şifrelenerek kasana gider ve herhangi bir tarayıcıda kasa parolanla açılır; {alias} sunucusu olduğu gibi kalır. <b>tTerm'i içeri al:</b> tTerm, {alias} sunucusuna kendi satırını ekler; anahtarın bu Mac'te kalır. Aynı anda daha fazla sunucu için: hesap menüsünde Buluta taşı.
 ssh_strip.explain_pass = <b>tTerm'i içeri al:</b> tTerm, {alias} sunucusuna kendi satırını ekler; anahtarın bu Mac'te kalır. Aynı anda daha fazla sunucu için: hesap menüsünde Buluta taşı.
 ssh_strip.unreachable = tTerm Web buluttan {alias} sunucusuna erişemiyor: sunucu bu Mac üzerinden, Mac açık olduğu sürece açılır.
 ssh_strip.through_mac = Bu Mac üzerinden aç
@@ -1858,7 +1942,7 @@ move.how = {name} nasıl açılır
 move.method_key = Anahtarım
 move.method_cert = tTerm'in giriş izni
 move.method_mac = Bu Mac üzerinden
-move.way_key = Anahtar kasana gider; sunucu olduğu gibi kalır. Kasanın kilidini açan her tarayıcıda açılır.
+move.way_key = Anahtar kasana gider, sunucu olduğu gibi kalır. Herhangi bir tarayıcıda kasa parolanla açılır.
 move.way_cert = tTerm sunucuya kendi satırını ekler, anahtarın burada kalır. Her yerden açılır, Telegram'dan da.
 move.way_mac = Hiçbir şey taşınmaz: bu Mac açık olduğu sürece tTerm ondan bağlanmasını ister. VPN arkasındaki sunucular için.
 # {address} is root@203.0.113.7, {jump} the bastion it goes through.
@@ -1887,7 +1971,7 @@ move.key_security = Bir güvenlik anahtarında: oradan çıkamaz. Sunucuları bu
 move.key_agent = Yalnızca bir SSH ajanında: kopyalanamaz. Sunucuları bu Mac üzerinden açılır
 move.key_type = Kasanın henüz saklamadığı bir anahtar türü. Sunucuları bu Mac üzerinden açılır
 move.key_passphrase = parolalı
-move.vault_note = Kasan, bu Mac'in kilidini açtığın yöntemle açılır: Touch ID ya da Mac'inin parolası. Onu yalnızca cihazların açabilir; tTerm açamaz.
+move.vault_note = Anahtarlar burada, bu Mac'te şifrelenir. Kasan burada Touch ID ile, herhangi bir tarayıcıda ise kasa parolanla açılır. tTerm onu açamaz.
 move.go = one: {n} sunucuyu taşı | other: {n} sunucuyu taşı
 
 # ------------------------------------------------------------ moved: what came of Move to cloud (MoveToCloud.tsx)
@@ -1904,8 +1988,18 @@ moved.failed = Taşınamadı.
 moved.failed_text = {why} Bu sunucu için hiçbir şey kaydedilmedi.
 moved.open = Terminal aç
 moved.change = Değiştir
+# How to open them from another computer: when a server moved with My
+# key. {site} is the address of tTerm Web; <b>…</b> is bold.
+moved.how_title = Başka bir bilgisayardan nasıl açılır
+moved.how_1 = Herhangi bir tarayıcıda <b>{site}</b> adresini aç ve her zamanki gibi, e-postayla gelen kodla giriş yap.
+moved.how_2 = Bir sunucu aç: tTerm senden <b>kasa parolanı</b> ister. Anahtarlar orada, o tarayıcıda açılır; bunun için Mac'ine gerek yok.
+moved.how_3 = Kendi bilgisayarında “Touch ID ile sakla” düğmesine bas: bundan sonra orada Touch ID yeter, parola sorulmaz. Başkasının bilgisayarında ise “Yalnızca bu sefer” seçeneğini seç.
+# Under the steps, for the servers that moved Through this Mac: one
+# server, or several ("db-internal and nas").
+moved.how_mac_one = <b>{servers}</b> yalnızca bu Mac üzerinden açılır: Mac açık olduğu ve üzerinde tTerm çalıştığı sürece.
+moved.how_mac_many = <b>{servers}</b> yalnızca bu Mac üzerinden açılır: Mac açık olduğu ve üzerinde tTerm çalıştığı sürece.
 # <b>…</b> is the key's name, or a list of them.
-moved.keys_one = <b>{keys}</b> artık kasanda, cihazlarının kilidini açtığın yöntemle kilitli. Ayarlar › Anahtarlar onu her yerde gösterir.
-moved.keys_many = <b>{keys}</b> artık kasanda, cihazlarının kilidini açtığın yöntemle kilitli. Ayarlar › Anahtarlar onları her yerde gösterir.
+moved.keys_one = <b>{keys}</b> artık kasanda ve şifreli: kasa parolanla, bu Mac'te ise Touch ID ile açılır. Her cihazda Ayarlar › Anahtarlar bölümünde görünür.
+moved.keys_many = <b>{keys}</b> artık kasanda ve şifreli: kasa parolanla, bu Mac'te ise Touch ID ile açılır. Her cihazda Ayarlar › Anahtarlar bölümünde görünür.
 moved.no_keys = Hiçbir anahtar taşınmadı: anahtarların bu Mac'te kalıyor.
 `;export{e as default};

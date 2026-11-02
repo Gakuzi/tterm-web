@@ -459,6 +459,14 @@ export const Unlock = (p: Props) => (
   </Stroke>
 );
 
+/** The vault password (0.1.26): a field of hidden characters. */
+export const Password = (p: Props) => (
+  <Stroke {...p}>
+    <rect x="3" y="7" width="18" height="10" rx="2" />
+    <path d="M7 12h.01M11 12h.01M15 12h.01" />
+  </Stroke>
+);
+
 /** Something to look at again: an exclamation mark. */
 export const Alert = (p: Props) => (
   <Stroke {...p} width={2.6}><path d="M12 7v6M12 17h.01" /></Stroke>

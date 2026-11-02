@@ -1,7 +1,8 @@
 // The strip under a successful `ssh <host>` in this Mac's terminals
 // (0.1.17, Vault.dc, ssh): the server, "open it from anywhere", with Save
-// my key (the key goes to the vault, which only the person's devices open;
-// the server stays as it is), Let tTerm in (tTerm's own line goes on the
+// my key (the key goes to the vault, encrypted on this Mac, and opens with
+// the vault password in any browser, 0.1.26; the server stays as it is),
+// Let tTerm in (tTerm's own line goes on the
 // server; the key stays on this Mac), Not now and Don't ask for <host>.
 // Once per host, remembered on this Mac; not for a host already in tTerm,
 // nor for one with no terminal (a git host). A server the cloud does not
@@ -49,14 +50,15 @@ export function inventory(fresh = false): Promise<SshInventory> {
   return known;
 }
 
-/** The vault ready on this Mac for a key: made (Save your key to your
- * vault, then its recovery code), or opened (Touch ID with this Mac's own
- * lock; a vault this Mac has no lock of, once, with its recovery code).
- * False when the person stopped. */
-export async function vaultReady(keyName: string, server: string | null): Promise<boolean> {
+/** The vault ready on this Mac for a key: made (Make up a vault password:
+ * `keyName` the key the strip saves, none for Move to cloud, which moves
+ * this Mac's keys; no Touch ID), or opened (Touch ID with this Mac's own
+ * lock; a vault this Mac has no lock of, once, with its password, or its
+ * recovery code while it has none). False when the person stopped. */
+export async function vaultReady(keyName: string | null): Promise<boolean> {
   await vaultStore.refreshApp();
   const state = vaultStore.get();
-  if (!state.appVault?.exists && !state.vault) return vaultUi.newVault("app", keyName, server);
+  if (!state.appVault?.exists && !state.vault) return vaultUi.newVault("app", keyName);
   return openOnMac();
 }
 
@@ -132,7 +134,7 @@ export function SshStrip(props: { block: FeedBlock; blocks: FeedBlock[] }) {
       let passphrase: string | undefined;
       if (how === "key") {
         if (!key) return;
-        if (!await vaultReady(key.name, alias)) return;
+        if (!await vaultReady(key.name)) return;
         if (key.encrypted) {
           const said = await vaultUi.passphrase(key.name);
           if (said === null) return;

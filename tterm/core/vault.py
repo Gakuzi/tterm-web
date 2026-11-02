@@ -16,9 +16,16 @@ secrets:
 * it runs the pairing state machine, where it checks the revealed public
   key against the commit the new browser posted first;
 * it builds the SSH signature blob from the raw signature the device makes
-  and verifies it with the stored public key before a login uses it.
+  and verifies it with the stored public key before a login uses it;
+* from 0.1.26 it guards the wrap of the vault password (migration 020): the
+  client derives a key-encryption key and a proof ("auth") from the
+  password, and the core keeps only SHA-256 of the proof. It hands the wrap
+  to a session whose proof hashes to it (compared in constant time), and
+  counts the wrong ones, so that someone who got into the person's email
+  guesses at the core, ten tries an hour and thirty a day, and cannot take
+  the wrap away to guess at leisure.
 
-Nothing sealed, no wrap and no signature is ever logged.
+Nothing sealed, no wrap, no proof and no signature is ever logged.
 
 Signing a login with a vault key (login_method 'key'): asyncssh calls
 `sign_async` on the client key when it has one. RelayKeyPair's `sign_async`
@@ -33,6 +40,7 @@ import asyncio
 import base64
 import datetime as dt
 import hashlib
+import hmac
 import logging
 import re
 import uuid
@@ -60,6 +68,28 @@ SEALED_MAX = 16 * 1024
 CREDENTIAL_ID_MAX = 1024
 NAME_MAX = 64
 SOURCE_LABEL_MAX = 200
+
+#: The vault password (0.1.26): a 16-byte salt the client makes each time a
+#: password is set, its 32-byte proof (auth, of which the core keeps only
+#: SHA-256), and the Argon2id parameters the core takes, as the contract
+#: has them: memory in KiB, passes, lanes.
+PASSWORD_SALT_LEN = 16
+PASSWORD_AUTH_LEN = 32
+PASSWORD_KDF = "argon2id"
+PASSWORD_M = (65536, 1048576)
+PASSWORD_T = (3, 10)
+PASSWORD_P = (1, 4)
+#: Wrong passwords within an hour of each other before the tries pause, and
+#: how long they pause after the last of them.
+PASSWORD_TRIES = 10
+PASSWORD_PAUSE = dt.timedelta(hours=1)
+#: Wrong passwords in a day, counted from the first wrong one of the day:
+#: at that many every try waits until the day is over. A right password
+#: does not clear this count, only a new password does (the security
+#: review of 02.11: nine wrong and one right, five times over, were 45
+#: guesses in seconds under the hour's count alone).
+PASSWORD_DAY_TRIES = 30
+PASSWORD_DAY = dt.timedelta(hours=24)
 
 #: The key types a vault holds, and so the SSH key algorithms the relay signs
 #: for. The public key's own algorithm must be one of these.
@@ -98,12 +128,23 @@ PAIR_SAS_LABEL = b"tterm/vault/pair/sas/v1"
 # --------------------------------------------------------------- refusals
 
 class Refused(Exception):
-    """Not done; the message says why, `status` is the HTTP answer."""
+    """Not done; the message says why, `status` is the HTTP answer, and
+    `details` what else the answer carries (as auth.Refused has them)."""
     status = 422
+
+    def __init__(self, message: str, **details) -> None:
+        super().__init__(message)
+        self.details = details
 
 
 class NotFound(Refused):
     status = 404
+
+
+class WrongPassword(Refused):
+    """The proof is not the vault password's: `wrong`, and the tries `left`
+    before the pause."""
+    status = 403
 
 
 class Taken(Refused):
@@ -254,15 +295,33 @@ def _ms(when: dt.datetime | None) -> int | None:
 
 async def _vault_row(conn, user_id: uuid.UUID) -> asyncpg.Record | None:
     return await conn.fetchrow(
-        "SELECT id, prf_salt, created_at, recovery_at FROM vaults "
-        "WHERE user_id = $1", user_id)
+        "SELECT id, prf_salt, created_at, recovery_at, password_salt, "
+        "password_kdf, password_m, password_t, password_p, password_at "
+        "FROM vaults WHERE user_id = $1", user_id)
+
+
+def _password_view(vault: asyncpg.Record) -> dict | None:
+    """The vault password as the page reads it: what a client derives from
+    it with (the salt, the Argon2id parameters) and when it was set. Never
+    the wrap nor the check: the wrap goes only to a right proof
+    (open_with_password). None when the vault has no password."""
+    if vault["password_salt"] is None:
+        return None
+    return {
+        "salt": b64u(bytes(vault["password_salt"])),
+        "kdf": {"alg": vault["password_kdf"], "m": vault["password_m"],
+                "t": vault["password_t"], "p": vault["password_p"]},
+        "setAt": _ms(vault["password_at"]),
+    }
 
 
 async def get_vault(pool: asyncpg.Pool, user_id: uuid.UUID,
                     device_id: uuid.UUID | None) -> dict | None:
-    """The whole vault for its owner: the salts the page needs, the locks
-    (which one is this browser's), and the keys with the servers that use
-    each. None when the person has no vault yet."""
+    """The whole vault for its owner: the salts the page needs, the
+    password's salt and parameters, the locks (which one is this
+    browser's), and the keys with the servers that use each. None when the
+    person has no vault yet. recoveryAt is null when the vault has no
+    recovery code."""
     async with pool.acquire() as conn:
         vault = await _vault_row(conn, user_id)
         if vault is None:
@@ -294,6 +353,7 @@ async def get_vault(pool: asyncpg.Pool, user_id: uuid.UUID,
         "prfSalt": b64u(bytes(vault["prf_salt"])),
         "createdAt": _ms(vault["created_at"]),
         "recoveryAt": _ms(vault["recovery_at"]),
+        "password": _password_view(vault),
         "locks": [{
             "id": str(lk["id"]), "kind": lk["kind"], "label": lk["label"],
             "credentialId": b64u(bytes(lk["credential_id"]))
@@ -339,20 +399,69 @@ def _check_lock(lock: object) -> dict:
     return out
 
 
+def _whole_number(raw: object, bounds: tuple[int, int]) -> int | None:
+    """A whole number within the bounds, or None. JSON's true is not one,
+    nor is 65536.0."""
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        return None
+    low, high = bounds
+    return raw if low <= raw <= high else None
+
+
+def _check_password(password: object) -> dict:
+    """The vault password as a client sends it: the salt, the Argon2id
+    parameters it used, the proof (auth) and the wrap of the vault key.
+    Returns what the core keeps, with SHA-256 of the proof in place of the
+    proof; raises on anything wrong. Members of kdf other than the four are
+    not kept (the derivation is fixed by them and the contract)."""
+    if not isinstance(password, dict):
+        raise Refused("The vault password is missing.")
+    salt = decode_b64u(password.get("salt"), exact=PASSWORD_SALT_LEN,
+                       what="password salt")
+    kdf = password.get("kdf")
+    if not isinstance(kdf, dict) or kdf.get("alg") != PASSWORD_KDF:
+        raise Refused("The vault password is derived with Argon2id.")
+    m = _whole_number(kdf.get("m"), PASSWORD_M)
+    t = _whole_number(kdf.get("t"), PASSWORD_T)
+    p = _whole_number(kdf.get("p"), PASSWORD_P)
+    if m is None or t is None or p is None:
+        raise Refused("Those Argon2id parameters are not ones the vault "
+                      "takes.")
+    proof = decode_b64u(password.get("auth"), exact=PASSWORD_AUTH_LEN,
+                        what="password proof")
+    wrap = decode_b64u(password.get("wrap"), exact=WRAP_LEN,
+                       what="password wrap")
+    return {"salt": salt, "kdf": PASSWORD_KDF, "m": m, "t": t, "p": p,
+            "check": hashlib.sha256(proof).digest(), "wrap": wrap}
+
+
 async def create_vault(pool: asyncpg.Pool, user_id: uuid.UUID, *, id: object,
-                       recovery_salt: object, recovery_wrap: object,
-                       lock: object, device_id: uuid.UUID | None) -> dict:
-    """Makes the person's one vault, with its first lock and its recovery
-    code. The server makes prf_salt. 409 if a vault is already there.
+                       password: object = None, recovery_salt: object = None,
+                       recovery_wrap: object = None, lock: object,
+                       device_id: uuid.UUID | None, device: str = "") -> dict:
+    """Makes the person's one vault, with its vault password (from 0.1.26)
+    or its recovery code (the form of tTerm for Mac 0.7.x, kept until it
+    updates): one of the two, not both. The server makes prf_salt. 409 if a
+    vault is already there. A vault made with a password is journaled as
+    its first password set too (vault.password.set, no code forgotten).
 
     The lock may be left out (None): a browser that makes the vault adds its
     passkey lock right after, with POST /api/vault/locks, since the PRF input
     is the prf_salt made here; a browser without PRF has no lock at all, and
-    opens the vault with the recovery code."""
+    opens the vault with the password (or the recovery code)."""
     vault_id = is_uuid(id)
-    salt = decode_b64u(recovery_salt, exact=RECOVERY_SALT_LEN,
-                       what="recovery salt")
-    wrap = decode_b64u(recovery_wrap, exact=WRAP_LEN, what="recovery wrap")
+    code = recovery_salt is not None or recovery_wrap is not None
+    if password is not None and code:
+        raise Refused("A vault is made with a password or a recovery code, "
+                      "not both.")
+    if password is None and not code:
+        raise Refused("A vault is made with its vault password.")
+    if password is not None:
+        secret = _check_password(password)
+    else:
+        salt = decode_b64u(recovery_salt, exact=RECOVERY_SALT_LEN,
+                           what="recovery salt")
+        wrap = decode_b64u(recovery_wrap, exact=WRAP_LEN, what="recovery wrap")
     first = _check_lock(lock) if lock is not None else None
     prf_salt = _random(PRF_SALT_LEN)
     async with pool.acquire() as conn, conn.transaction():
@@ -360,15 +469,29 @@ async def create_vault(pool: asyncpg.Pool, user_id: uuid.UUID, *, id: object,
                            f"vault:{user_id}")
         if await _vault_row(conn, user_id) is not None:
             raise Taken("This account already has a vault.")
-        await conn.execute(
-            "INSERT INTO vaults (id, user_id, prf_salt, recovery_salt, "
-            "recovery_wrap) VALUES ($1, $2, $3, $4, $5)",
-            vault_id, user_id, prf_salt, salt, wrap)
+        if password is not None:
+            await conn.execute(
+                "INSERT INTO vaults (id, user_id, prf_salt, password_salt, "
+                "password_kdf, password_m, password_t, password_p, "
+                "password_check, password_wrap, password_at) "
+                "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())",
+                vault_id, user_id, prf_salt, secret["salt"], secret["kdf"],
+                secret["m"], secret["t"], secret["p"], secret["check"],
+                secret["wrap"])
+        else:
+            await conn.execute(
+                "INSERT INTO vaults (id, user_id, prf_salt, recovery_salt, "
+                "recovery_wrap, recovery_at) VALUES ($1, $2, $3, $4, $5, now())",
+                vault_id, user_id, prf_salt, salt, wrap)
         if first is not None:
             await _insert_lock(conn, vault_id, first, device_id)
         await accounts.journal(conn, "vault.created", user_id=user_id,
                                details={"lock": first["kind"] if first
                                         else None})
+        if password is not None:
+            await accounts.journal(conn, "vault.password.set", user_id=user_id,
+                                   details={"recovery": False,
+                                            "device": device})
     log.info("vault created for %s", user_id)
     return await get_vault(pool, user_id, device_id)
 
@@ -403,11 +526,15 @@ async def add_lock(pool: asyncpg.Pool, user_id: uuid.UUID, *, lock: object,
 
 async def remove_lock(pool: asyncpg.Pool, user_id: uuid.UUID,
                       lock_id: uuid.UUID, device_id: uuid.UUID | None) -> dict:
-    """Takes a lock off the vault. The last lock stays: a vault with no lock
-    could never be opened again except by the recovery code, which Make a new
-    recovery code is for."""
+    """Takes a lock off the vault. The last lock stays, with a vault password
+    or without (0.1.26 keeps it so): nothing of tTerm's takes locks off, and
+    a vault left with its password only could be lost to someone who has
+    no more than a session of the person's, as a session may set a password
+    of its own. The vault's row is held while the locks are counted, so that
+    two removals at once cannot both pass the count."""
     async with pool.acquire() as conn, conn.transaction():
-        vault = await _vault_row(conn, user_id)
+        vault = await conn.fetchrow(
+            "SELECT id FROM vaults WHERE user_id = $1 FOR UPDATE", user_id)
         if vault is None:
             raise NotFound("This account has no vault.")
         row = await conn.fetchrow(
@@ -419,8 +546,7 @@ async def remove_lock(pool: asyncpg.Pool, user_id: uuid.UUID,
             "SELECT count(*) FROM vault_locks WHERE vault_id = $1 "
             "AND removed_at IS NULL", vault["id"])
         if left <= 1:
-            raise Refused("This is the only lock. Add another way to open the "
-                          "vault first, or make a new recovery code.")
+            raise Refused("That is the last lock of your vault: it stays.")
         # The wrap and the credential go at once (the Privacy Policy says
         # "deleted"); the rest of the row stays for the record.
         await conn.execute("UPDATE vault_locks SET removed_at = now(), "
@@ -443,12 +569,16 @@ async def lock_used(pool: asyncpg.Pool, user_id: uuid.UUID,
 
 
 async def recovery(pool: asyncpg.Pool, user_id: uuid.UUID) -> dict:
-    """The recovery salt and wrap, for opening the vault with the code."""
+    """The recovery salt and wrap, for opening the vault with the code. A
+    vault made with a password, or one whose password has been set, has no
+    code (404)."""
     row = await pool.fetchrow(
         "SELECT recovery_salt, recovery_wrap FROM vaults WHERE user_id = $1",
         user_id)
     if row is None:
         raise NotFound("This account has no vault.")
+    if row["recovery_salt"] is None:
+        raise NotFound("This vault has no recovery code.")
     return {"recoverySalt": b64u(bytes(row["recovery_salt"])),
             "recoveryWrap": b64u(bytes(row["recovery_wrap"]))}
 
@@ -456,18 +586,139 @@ async def recovery(pool: asyncpg.Pool, user_id: uuid.UUID) -> dict:
 async def set_recovery(pool: asyncpg.Pool, user_id: uuid.UUID, *,
                        recovery_salt: object, recovery_wrap: object) -> None:
     """Make a new recovery code: a new salt and wrap replace the old, so the
-    code shown before stops working."""
+    code shown before stops working. Only for a vault with no password yet
+    (tTerm for Mac 0.7.x): the password replaced the code (409)."""
     salt = decode_b64u(recovery_salt, exact=RECOVERY_SALT_LEN,
                        what="recovery salt")
     wrap = decode_b64u(recovery_wrap, exact=WRAP_LEN, what="recovery wrap")
     async with pool.acquire() as conn, conn.transaction():
-        done = await conn.fetchval(
-            "UPDATE vaults SET recovery_salt = $2, recovery_wrap = $3, "
-            "recovery_at = now() WHERE user_id = $1 RETURNING id",
-            user_id, salt, wrap)
-        if done is None:
+        row = await conn.fetchrow(
+            "SELECT id, password_check IS NOT NULL AS password FROM vaults "
+            "WHERE user_id = $1 FOR UPDATE", user_id)
+        if row is None:
             raise NotFound("This account has no vault.")
+        if row["password"]:
+            raise Taken("This vault has a password: it has no recovery code "
+                        "any more.")
+        await conn.execute(
+            "UPDATE vaults SET recovery_salt = $2, recovery_wrap = $3, "
+            "recovery_at = now() WHERE id = $1", row["id"], salt, wrap)
         await accounts.journal(conn, "vault.recovery.changed", user_id=user_id)
+
+
+async def open_with_password(pool: asyncpg.Pool, user_id: uuid.UUID, *,
+                             auth: object, device: str = "",
+                             ip: str = "") -> dict:
+    """The wrap of the vault key for the vault password, to a session that
+    sends the password's proof: SHA-256 of it must be the check the core
+    keeps, compared in constant time.
+
+    The wrong ones are counted twice. Ten within an hour of each other
+    pause the tries until an hour after the last of them; a right one sets
+    that count to 0. Thirty in a day, counted from the first wrong one of
+    the day, pause them until the day is over; a right one leaves that
+    count as it is (only a new password clears it). While either pause
+    lasts every try is 429, with when to try again (the later of the two),
+    even for the right password. `left` is what is left before the nearer
+    pause. Both counts are kept under the vault row's lock, so tries sent at
+    once cannot slip past either, and the refusal is raised only after the
+    transaction, which keeps the wrong try. A wrong one is journaled, with
+    the tries left, the device and the address. 404 when the vault has no
+    password."""
+    proof = decode_b64u(auth, exact=PASSWORD_AUTH_LEN, what="password proof")
+    check = hashlib.sha256(proof).digest()
+    refusal: Refused | None = None
+    async with pool.acquire() as conn, conn.transaction():
+        row = await conn.fetchrow(
+            "SELECT id, password_check, password_wrap, password_wrong, "
+            "password_wrong_at, password_wrong_day, password_wrong_day_at, "
+            "password_wrong_at > now() - $2::interval AS recent, "
+            "password_wrong_day_at > now() - $3::interval AS today "
+            "FROM vaults WHERE user_id = $1 FOR UPDATE",
+            user_id, PASSWORD_PAUSE, PASSWORD_DAY)
+        if row is None:
+            raise NotFound("This account has no vault.")
+        if row["password_check"] is None:
+            raise NotFound("This vault has no password.")
+        # The hour's count goes on while each wrong one comes within an hour
+        # of the one before; the day's for a day from the first wrong one of
+        # it. Once over, each starts again with the next wrong one.
+        wrong = row["password_wrong"] if row["recent"] else 0
+        day = row["password_wrong_day"] if row["today"] else 0
+        day_from = row["password_wrong_day_at"] if row["today"] else None
+        until = []
+        if wrong >= PASSWORD_TRIES:
+            until.append(row["password_wrong_at"] + PASSWORD_PAUSE)
+        if day >= PASSWORD_DAY_TRIES:
+            until.append(day_from + PASSWORD_DAY)
+        if until:
+            refusal = TooSoon("Too many wrong passwords.", paused=True,
+                              retryAt=max(until).isoformat())
+        elif hmac.compare_digest(bytes(row["password_check"]), check):
+            if row["password_wrong"] or row["password_wrong_at"] is not None:
+                await conn.execute(
+                    "UPDATE vaults SET password_wrong = 0, "
+                    "password_wrong_at = NULL WHERE id = $1", row["id"])
+        else:
+            wrong += 1
+            day += 1
+            left = min(PASSWORD_TRIES - wrong, PASSWORD_DAY_TRIES - day)
+            await conn.execute(
+                "UPDATE vaults SET password_wrong = $2, password_wrong_at = now(), "
+                "password_wrong_day = $3, "
+                "password_wrong_day_at = COALESCE($4::timestamptz, now()) "
+                "WHERE id = $1", row["id"], wrong, day, day_from)
+            await accounts.journal(conn, "vault.password.wrong", user_id=user_id,
+                                   details={"left": left, "device": device,
+                                            "ip": ip})
+            refusal = WrongPassword("That password does not open your vault.",
+                                    wrong=True, left=left)
+    if refusal is not None:
+        raise refusal
+    return {"wrap": b64u(bytes(row["password_wrap"]))}
+
+
+async def set_password(pool: asyncpg.Pool, user_id: uuid.UUID, *,
+                       password: object, device_id: uuid.UUID | None,
+                       device: str = "") -> dict:
+    """Sets the vault password, or replaces it: the new salt, parameters,
+    check (SHA-256 of the proof) and wrap. In the same statement the
+    recovery code goes (a password replaces it) and both wrong counts, the
+    hour's and the day's, start again: they were the old password's. The
+    first one is journaled as vault.password.set, saying whether a code was
+    forgotten; later ones as vault.password.changed.
+
+    The core cannot tell that the wrap holds the vault key: the client that
+    sets it has the key open (the Mac with Touch ID, a browser that keeps
+    its lock, or the current password typed again)."""
+    secret = _check_password(password)
+    async with pool.acquire() as conn, conn.transaction():
+        row = await conn.fetchrow(
+            "SELECT id, password_check IS NOT NULL AS password, "
+            "recovery_salt IS NOT NULL AS recovery FROM vaults "
+            "WHERE user_id = $1 FOR UPDATE", user_id)
+        if row is None:
+            raise NotFound("This account has no vault.")
+        await conn.execute(
+            "UPDATE vaults SET password_salt = $2, password_kdf = $3, "
+            "password_m = $4, password_t = $5, password_p = $6, "
+            "password_check = $7, password_wrap = $8, password_at = now(), "
+            "password_wrong = 0, password_wrong_at = NULL, "
+            "password_wrong_day = 0, password_wrong_day_at = NULL, "
+            "recovery_salt = NULL, recovery_wrap = NULL, recovery_at = NULL "
+            "WHERE id = $1", row["id"], secret["salt"], secret["kdf"],
+            secret["m"], secret["t"], secret["p"], secret["check"],
+            secret["wrap"])
+        if row["password"]:
+            await accounts.journal(conn, "vault.password.changed",
+                                   user_id=user_id, details={"device": device})
+        else:
+            await accounts.journal(conn, "vault.password.set", user_id=user_id,
+                                   details={"recovery": row["recovery"],
+                                            "device": device})
+    log.info("vault password %s for %s",
+             "changed" if row["password"] else "set", user_id)
+    return await get_vault(pool, user_id, device_id)
 
 
 async def add_key(pool: asyncpg.Pool, user_id: uuid.UUID, *, id: object,

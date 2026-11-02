@@ -13,12 +13,23 @@
 //                  KEK    = HKDF(X25519(priv, pub), pubA || pubB, "tterm/vault/pair/v1"),
 //                  sealed = box(KEK, VK, "tterm/vault/pair/v1/" + pairing id)
 //
+// The vault password (0.1.26, the contract's "v2: the vault password"):
+//
+//   pw             the password as typed, Unicode NFC, UTF-8: 12 to 256 code
+//                  points after NFC, nothing trimmed
+//   out            = Argon2id(pw, salt (16 random bytes), m KiB, t passes, p lanes, 32 bytes)
+//   kek, auth      = HKDF(out, 32 zero bytes, "tterm/vault/password/kek/v1" | ".../auth/v1")
+//   wrap           = box(kek, VK, "tterm/vault/password/v1/" + vault id)
+//
+// The core keeps salt, kdf, wrap and SHA-256(auth), and gives the wrap only
+// for the right auth; it never sees the password, out or kek.
+//
 // The vault key (VK) is held as a non-extractable AES-GCM CryptoKey once it
-// is open; its raw bytes exist only for the moment a lock or a recovery code
-// is made from them, and are wiped right after.
+// is open; its raw bytes exist only for the moment a lock or a password is
+// made from them, and are wiped right after.
 
 import {
-  bytes, concat, fromUtf8, random, utf8, wipe, type Bytes,
+  bytes, concat, copy, fromB64u, fromUtf8, random, utf8, wipe, type Bytes,
 } from "./bytes.ts";
 
 const subtle = (): SubtleCrypto => globalThis.crypto.subtle;
@@ -32,12 +43,15 @@ export const AAD = {
   lock: (lockId: string): string => `tterm/vault/lock/v1/${lockId}`,
   recovery: (vaultId: string): string => `tterm/vault/recovery/v1/${vaultId}`,
   pair: (pairingId: string): string => `tterm/vault/pair/v1/${pairingId}`,
+  password: (vaultId: string): string => `tterm/vault/password/v1/${vaultId}`,
 };
 
 export const INFO = {
   prf: "tterm/vault/prf/v1",
   recovery: "tterm/vault/recovery/v1",
   pair: "tterm/vault/pair/v1",
+  passwordKek: "tterm/vault/password/kek/v1",
+  passwordAuth: "tterm/vault/password/auth/v1",
 };
 
 const COMMIT_LABEL = "tterm/vault/pair/commit/v1";
@@ -196,6 +210,174 @@ export async function makeRecovery(vk: Bytes, vaultId: string): Promise<{
   const code = newRecoveryCode();
   const salt = random(RECOVERY_SALT_LENGTH);
   return { code, salt, wrap: await wrapRecovery(code, salt, vk, vaultId) };
+}
+
+// ----------------------------------------------- the vault password (v2)
+
+/** A vault password is 12 to 256 code points long, after NFC. */
+export const PASSWORD_MIN = 12;
+export const PASSWORD_MAX = 256;
+export const PASSWORD_SALT_LENGTH = 16;
+
+/** How a password is derived: Argon2id (RFC 9106, version 0x13), `m` KiB
+ * of memory, `t` passes, `p` lanes. */
+export interface Kdf {
+  alg: "argon2id";
+  m: number;
+  t: number;
+  p: number;
+}
+
+/** What a new password is made with. */
+export const KDF: Kdf = { alg: "argon2id", m: 65536, t: 3, p: 1 };
+
+/** The parameters the core takes, and so the only ones this page derives
+ * with when the core gives them back: weaker ones would let whoever answers
+ * for the core guess the password from the `auth` this page sends. */
+export function kdfAllowed(kdf: unknown): kdf is Kdf {
+  const k = kdf as Partial<Kdf> | null;
+  const whole = (n: unknown, low: number, high: number) =>
+    typeof n === "number" && Number.isInteger(n) && n >= low && n <= high;
+  return !!k && typeof k === "object" && k.alg === "argon2id" &&
+    whole(k.m, 65536, 1048576) && whole(k.t, 3, 10) && whole(k.p, 1, 4);
+}
+
+/** The salt and settings of a password as the core keeps it, when this page
+ * may derive with them: a salt of 16 bytes (strict base64url) and settings
+ * within the core's range; null otherwise, and nothing is derived (the
+ * engine's change 46 does the same). */
+export function passwordSettings(kept: { salt?: unknown; kdf?: unknown } | null | undefined):
+  { salt: Bytes; kdf: Kdf } | null {
+  if (!kept || typeof kept.salt !== "string" || !kdfAllowed(kept.kdf)) return null;
+  let salt: Bytes;
+  try {
+    salt = fromB64u(kept.salt);
+  } catch {
+    return null;
+  }
+  if (salt.length !== PASSWORD_SALT_LENGTH) return null;
+  const { m, t, p } = kept.kdf;
+  return { salt, kdf: { alg: "argon2id", m, t, p } };
+}
+
+/** The password's length as the rule counts it: code points, after NFC. */
+export function passwordLength(password: string): number {
+  return [...password.normalize("NFC")].length;
+}
+
+/** Half of a UTF-16 pair without its other half. Without the `u` flag the
+ * pattern works on code units; it needs no lookbehind, which a browser
+ * that cannot parse one would fail on with the whole module. */
+export const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+/** Whether the text is well-formed Unicode: no lone surrogate. UTF-8 has no
+ * form for one (TextEncoder writes U+FFFD in its place), so two different
+ * passwords would give the same keys; the engine refuses such a password,
+ * and the page neither sets nor sends one. String.prototype.isWellFormed
+ * where the browser has it (ES2024), the pattern where not. */
+export function wellFormed(text: string): boolean {
+  const native = (text as unknown as { isWellFormed?: () => boolean }).isWellFormed;
+  return typeof native === "function" ? native.call(text) : !LONE_SURROGATE.test(text);
+}
+
+/** Whether a password may be set: 12 to 256 code points, well-formed. */
+export function passwordFits(password: string): boolean {
+  const n = passwordLength(password);
+  return wellFormed(password) && n >= PASSWORD_MIN && n <= PASSWORD_MAX;
+}
+
+/** Whether it has a character beyond U+0020–U+007E: on a computer abroad
+ * there may be no keyboard layout for it. */
+export function beyondLatin(password: string): boolean {
+  return /[^\x20-\x7e]/.test(password);
+}
+
+/** This browser cannot run Argon2id: no WebAssembly, or not allowed, or
+ * not the memory for it. */
+export class NoWasm extends Error {
+  constructor() {
+    super("no-webassembly");
+    this.name = "NoWasm";
+  }
+}
+
+function wasmFailed(error: unknown): boolean {
+  const wasm = (globalThis as { WebAssembly?: typeof WebAssembly }).WebAssembly;
+  return error instanceof RangeError || error instanceof EvalError ||
+    (!!wasm && (error instanceof wasm.CompileError || error instanceof wasm.LinkError ||
+      error instanceof wasm.RuntimeError));
+}
+
+/** Argon2id of the password (NFC, UTF-8) and the salt: 32 bytes. Nothing
+ * is derived from a password that is not well-formed Unicode. */
+export async function argon2(password: string, salt: Bytes, kdf: Kdf): Promise<Bytes> {
+  if (!wellFormed(password)) throw new Error("password-not-well-formed");
+  if (typeof (globalThis as { WebAssembly?: unknown }).WebAssembly !== "object") throw new NoWasm();
+  const { argon2id } = await import("./argon2.ts");
+  const pw = utf8(password.normalize("NFC"));
+  try {
+    const out = await argon2id({
+      password: pw, salt, parallelism: kdf.p, iterations: kdf.t, memorySize: kdf.m,
+      hashLength: 32, outputType: "binary",
+    });
+    const result = copy(out);
+    out.fill(0);
+    return result;
+  } catch (error) {
+    if (wasmFailed(error)) throw new NoWasm();
+    throw error;
+  } finally {
+    wipe(pw);
+  }
+}
+
+/** The password's two keys: `kek` wraps VK, `auth` is what the core checks
+ * before it gives the wrap. */
+export async function passwordKeys(password: string, salt: Bytes, kdf: Kdf): Promise<{
+  kek: Bytes; auth: Bytes;
+}> {
+  const out = await argon2(password, salt, kdf);
+  try {
+    return {
+      kek: await hkdf(out, bytes(32), INFO.passwordKek),
+      auth: await hkdf(out, bytes(32), INFO.passwordAuth),
+    };
+  } finally {
+    wipe(out);
+  }
+}
+
+/** What the core keeps of `auth`: its SHA-256 (the page never sends it). */
+export function passwordCheck(auth: Bytes): Promise<Bytes> {
+  return sha256(auth);
+}
+
+export function wrapPassword(kek: Bytes, vk: Bytes, vaultId: string, nonce?: Bytes): Promise<Bytes> {
+  return seal(kek, vk, AAD.password(vaultId), nonce);
+}
+
+/** VK's raw bytes from the password's wrap; an error when the kek is not
+ * this vault's. */
+export async function unwrapPassword(kek: Bytes, wrap: Bytes, vaultId: string): Promise<Bytes> {
+  const vk = await open(kek, wrap, AAD.password(vaultId));
+  if (vk.length !== VK_LENGTH) throw new Error("vault key length");
+  return vk;
+}
+
+/** A password set for VK, anew each time (a fresh salt): what the core
+ * keeps of it, and the `auth` it checks. */
+export async function makePassword(password: string, vk: Bytes, vaultId: string, kdf: Kdf = KDF): Promise<{
+  salt: Bytes; kdf: Kdf; auth: Bytes; wrap: Bytes;
+}> {
+  if (!passwordFits(password)) throw new Error("password length");
+  const salt = random(PASSWORD_SALT_LENGTH);
+  const { kek, auth } = await passwordKeys(password, salt, kdf);
+  try {
+    return { salt, kdf: { alg: "argon2id", m: kdf.m, t: kdf.t, p: kdf.p }, auth,
+      wrap: await wrapPassword(kek, vk, vaultId) };
+  } finally {
+    wipe(kek);
+  }
 }
 
 // ------------------------------------------------------------ the pairing

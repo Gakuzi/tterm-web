@@ -7,13 +7,16 @@
 // while it is on: a server behind a VPN, or one whose key cannot leave
 // this Mac). The keys of ~/.ssh: only the ticked ones go to the vault.
 // Nothing moves until Move is pressed; then, server by server, what came of
-// it, with Try again and Change for one that did not.
+// it, with Try again and Change for one that did not. From 0.1.26 a new
+// vault is made with the password the person makes up (no Touch ID), and
+// once a server moved with its own key, the result says how to open it from
+// another computer (VaultPass.dc, moved).
 
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { moveToCloud, type MoveMethod, type MoveResult, type SshHost, type SshInventory, type SshKeyFile } from "./api";
 import { PageHead, useEscCloses } from "./Account";
 import { list, useT, type Translate } from "./i18n";
-import { Alert, Check, CloudUp, Key, Lock, Server } from "./icons";
+import { Alert, Check, CloudUp, Globe, Key, Lock, Server } from "./icons";
 import { keyKind } from "./Keys";
 import { inventory, MoveContext, vaultReady } from "./SshStrip";
 import {
@@ -34,6 +37,12 @@ interface Row {
   /** Why it cannot be moved: a git host, or one in tTerm already. */
   off: "git" | "there" | null;
 }
+
+/** Where the moved servers open from another computer: the tTerm Web the
+ * app is signed in to, as the engine names it in GET /api/app/vault
+ * ("app.tterm.net", from 0.8.0); else tTerm Web (vault-password-texts.md,
+ * 10). */
+const WEB = "tTerm Web";
 
 const METHODS: { value: MoveMethod; label: string }[] = [
   { value: "key", label: "move.method_key" },
@@ -168,7 +177,7 @@ export function MoveToCloud(props: {
       // stays on this Mac.
       const signIn = keys.filter((k) => k.encrypted && !toVault.includes(k) &&
         lettingIn.some((r) => r.key?.path === k.path));
-      if (own.length && !await vaultReady(toVault[0]?.name ?? own[0].host.alias, null)) return;
+      if (own.length && !await vaultReady(null)) return;
       const phrases = new Map<string, string>();
       for (const k of [...toVault, ...signIn]) {
         if (!k.encrypted) continue;
@@ -230,6 +239,12 @@ export function MoveToCloud(props: {
   if (results) {
     const ok = results.filter((r) => r.result.ok).length;
     const project = frame.personal?.name ?? "";
+    // How to open them from another computer (0.1.26): once a server went
+    // with its own key; and which ones open only through this Mac.
+    const byKey = results.some((r) => r.result.ok && r.method === "key");
+    const throughMac = results.filter((r) => r.result.ok && r.method === "mac")
+      .map((r) => r.result.machine?.name ?? r.row.host.alias);
+    const strong = (inner: ReactNode) => <strong>{inner}</strong>;
     return (
       <main className="account-view move-view" aria-labelledby="md-title">
         <div className="move-head">
@@ -279,6 +294,26 @@ export function MoveToCloud(props: {
           })}
         </ul>
         {problem && <div className="error-box" role="alert">{problem}</div>}
+        {byKey && (
+          <section className="move-how" aria-labelledby="md-how">
+            <h2 id="md-how"><Globe size={18} />{t("moved.how_title")}</h2>
+            <ol>
+              <li><span className="move-step" aria-hidden="true">1</span>
+                <span>{t.rich("moved.how_1", { site: v.appVault?.web || WEB, b: strong })}</span></li>
+              <li><span className="move-step" aria-hidden="true">2</span>
+                <span>{t.rich("moved.how_2", { b: strong })}</span></li>
+              <li><span className="move-step" aria-hidden="true">3</span>
+                <span>{t("moved.how_3")}</span></li>
+            </ol>
+            {throughMac.length > 0 && (
+              <p className="move-how-mac">
+                {throughMac.length === 1
+                  ? t.rich("moved.how_mac_one", { servers: throughMac[0], b: strong })
+                  : t.rich("moved.how_mac_many", { servers: list(throughMac, t.lang), b: strong })}
+              </p>
+            )}
+          </section>
+        )}
         <div className="account-card move-foot">
           <Lock size={18} />
           <span>

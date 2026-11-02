@@ -1609,30 +1609,48 @@ vault.code_label = Codice {code}
 
 # ------------------------------------------------------------ keys: Settings › Keys, the vault (Keys.tsx)
 keys.title = Chiavi
-keys.about = La tua cassaforte: le chiavi SSH che hai salvato, su tutti i tuoi dispositivi. Solo i tuoi dispositivi possono aprirla, come quando li sblocchi; tTerm non può.
+keys.about = La tua cassaforte: le chiavi SSH che hai salvato. Sono cifrate e solo tu puoi aprirle: con la password della cassaforte e, dove le hai salvate, anche senza. tTerm non può.
+# A vault made before 0.1.26 has a recovery code and no password: this
+# banner, above the vault's state, sets one (vault_password.title_set).
+keys.set_title = Imposta la password della cassaforte
+keys.set_text = Con la password apri le tue chiavi in qualsiasi browser, anche quando il tuo Mac resta a casa. Quando la imposti, il codice di recupero smette di funzionare: lo sostituisce la password.
+keys.set_go = Imposta la password
 keys.open_here = Aperta in questo browser
 # How it opened, then when it locks again: one of these under "Open in this browser".
-keys.open_text.touch = Aperta con Touch ID. Si blocca di nuovo dopo 8 ore di inattività, quando chiudi tTerm Web o quando premi Blocca.
-keys.open_text.hello = Aperta con Windows Hello. Si blocca di nuovo dopo 8 ore di inattività, quando chiudi tTerm Web o quando premi Blocca.
-keys.open_text.passkey = Aperta con la tua passkey. Si blocca di nuovo dopo 8 ore di inattività, quando chiudi tTerm Web o quando premi Blocca.
-keys.open_text.recovery = Aperta con il tuo codice di recupero, per questa sessione. Si blocca di nuovo dopo 8 ore di inattività, quando chiudi tTerm Web o quando premi Blocca.
-keys.open_text.pairing = Aperta con l'approvazione del tuo Mac, per questa sessione. Si blocca di nuovo dopo 8 ore di inattività, quando chiudi tTerm Web o quando premi Blocca.
-keys.open_text.new = Creata in questo browser poco fa. Si blocca di nuovo dopo 8 ore di inattività, quando chiudi tTerm Web o quando premi Blocca.
+keys.open_text.touch = Aperta con Touch ID. Si chiude da sola dopo 8 ore di inattività, e anche quando chiudi tTerm Web o premi Blocca. Per riaprirla basta un tocco su Touch ID.
+keys.open_text.hello = Aperta con Windows Hello. Si chiude da sola dopo 8 ore di inattività, e anche quando chiudi tTerm Web o premi Blocca. Si riapre con Windows Hello.
+keys.open_text.passkey = Aperta con la tua passkey. Si chiude da sola dopo 8 ore di inattività, e anche quando chiudi tTerm Web o premi Blocca. Si riapre con la tua passkey.
+keys.open_text.password = Aperta con la password della cassaforte, solo per questa sessione. Si chiude da sola dopo 8 ore di inattività, e anche quando chiudi la scheda o premi Blocca.
+keys.open_text.recovery = Aperta con il tuo codice di recupero, solo per questa sessione. Si chiude da sola dopo 8 ore di inattività, e anche quando chiudi la scheda o premi Blocca.
+keys.open_text.pairing = Aperta con l'approvazione del tuo Mac, solo per questa sessione. Si chiude da sola dopo 8 ore di inattività, e anche quando chiudi la scheda o premi Blocca.
+keys.open_text.new = Creata in questo browser poco fa. Si chiude da sola dopo 8 ore di inattività, e anche quando chiudi la scheda o premi Blocca.
 # In tTerm for Mac.
 keys.open_mac = Aperta su questo Mac
 keys.open_text.mac = Aperta con Touch ID o con la password del tuo Mac. Resta aperta mentre tTerm è in esecuzione, finché non premi Blocca o non ti disconnetti.
 keys.lock = Blocca
-keys.locked_here = Bloccata in questo browser
-keys.locked_text = Aprila per usare qui le tue chiavi: come quando sblocchi questo computer, con l'approvazione del tuo Mac o con il tuo codice di recupero.
+# The vault closed in this browser. Where the keys were kept here with
+# Touch ID (or Windows Hello, a passkey), one of the three; else the
+# vault password opens them (keys.closed_text_password, with its field).
+keys.closed_here = La tua cassaforte è chiusa
+keys.closed_text.touch = Aprila con Touch ID per accedere ai server con la tua chiave.
+keys.closed_text.hello = Aprila con Windows Hello per accedere ai server con la tua chiave.
+keys.closed_text.passkey = Aprila con la tua passkey per accedere ai server con la tua chiave.
+keys.closed_text_password = Le tue chiavi sono cifrate e si aprono solo con la password della cassaforte. Digitala: le chiavi si aprono direttamente in questo browser. La password non viene inviata da nessuna parte.
+# The vault password's row, under the vault's state: {day} is time.today,
+# time.yesterday or time.on_day ("on 2 Nov").
+keys.password_title = Password della cassaforte
+keys.password_text = Apre le tue chiavi in qualsiasi browser. Impostata: {day}.
+keys.password_change = Cambia la password
 keys.locked_mac = Bloccata su questo Mac
 keys.locked_mac_text = Aprila con Touch ID o con la password del tuo Mac: poi questo Mac effettua l'accesso ai tuoi server.
 keys.locked_mac_code = Questo Mac non può ancora aprire la tua cassaforte da solo. Aprila qui una volta con il tuo codice di recupero: da quel momento la aprono Touch ID o la password del tuo Mac.
+keys.locked_mac_password = Questo Mac non può ancora aprire la tua cassaforte da solo. Aprila qui una volta con la password della cassaforte: da quel momento questo Mac la aprirà da solo, con Touch ID.
 keys.open = Apri
 keys.open_code = Apri con il codice di recupero
 keys.none_title = Ancora nessuna cassaforte
-keys.none_web = Aggiungi una chiave da un file: in quel momento viene creata la tua cassaforte, in questo browser, con un codice di recupero che conservi tu.
-keys.none_app = Salva una chiave con Sposta nel cloud, o dalla barra che compare dopo ssh in un terminale: in quel momento viene creata la tua cassaforte, con Touch ID.
-keys.no_passkey_here = Questo browser non può salvare una passkey per la tua cassaforte: qui si apre con il tuo codice di recupero o con l'approvazione del tuo Mac, una sessione alla volta.
+keys.none_web = Aggiungi una chiave da un file: in quel momento viene creata la tua cassaforte, con una password che scegli tu.
+keys.none_app = Salva una chiave con Sposta nel cloud, o dalla barra che compare dopo ssh in un terminale: in quel momento viene creata la tua cassaforte, con una password che scegli tu.
+keys.no_passkey_here = Questo browser non può salvare le tue chiavi con una passkey: qui si aprono con la password della cassaforte o con l'approvazione del tuo Mac, una sessione alla volta.
 keys.no_ed25519_here = Questo browser non può firmare con chiavi Ed25519. Apri quei server in un browser più recente o in tTerm per Mac.
 # {servers} is a list of servers: droplet and staging; web-01 in Client X.
 keys.opens = Apre {servers}
@@ -1649,9 +1667,10 @@ keys.cannot_ed25519 = Questo browser non può firmare con chiavi Ed25519
 keys.cannot_open = Qui non si apre: aggiungila di nuovo dal suo file
 keys.remove = Rimuovi
 keys.add_file = Aggiungi una chiave da un file
-keys.new_recovery = Crea un nuovo codice di recupero
 # {places} is where the vault opens: "MacBook-Pro-Denis · tTerm for Mac, Chrome on macOS".
-keys.opens_on = Si apre su: {places}.
+keys.opens_on = Senza password la tua cassaforte si apre su: {places}. In qualsiasi altro browser, con la password della cassaforte.
+keys.opens_password_only = La tua cassaforte si apre solo con la sua password: nessun dispositivo l'ha ancora salvata.
+keys.opens_on_old = Senza password la tua cassaforte si apre su: {places}. Finché non ha una password, gli altri browser la aprono con il codice di recupero o con l'approvazione del tuo Mac.
 keys.opens_on_code = Si apre solo con il tuo codice di recupero.
 keys.place_mac = {mac} · {app}
 keys.place_browser = un browser
@@ -1671,7 +1690,6 @@ add_key.passphrase_hint = La chiave è cifrata. La sua passphrase la apre qui, i
 add_key.open_key = Apri la chiave
 add_key.reading = Lettura della chiave…
 add_key.name = Nome
-add_key.sealed_here = Viene bloccata qui, prima di lasciare questo browser. Solo i tuoi dispositivi possono aprirla; tTerm non può.
 add_key.add = Aggiungi alla cassaforte
 add_key.next = Avanti
 add_key.added = {name} è nella tua cassaforte
@@ -1691,50 +1709,81 @@ add_key.problem_encrypted_pem = Questo file di chiave è cifrato con il vecchio 
 add_key.problem_ed25519 = Questo browser non sa leggere chiavi Ed25519 in questo formato. Prova con un browser più recente o con la chiave nel formato di OpenSSH.
 add_key.problem_several = Il file contiene più di una chiave: aggiungile una alla volta.
 
-# ------------------------------------------------------------ vault_new: Save your key to your vault (VaultDialogs.tsx)
-vault_new.title = Salva la chiave nella tua cassaforte
-# <code>…</code> is the key's name: id_ed25519. {server} is the server's name.
-vault_new.text_server = <code>{key}</code> va nella tua cassaforte, e {server} si aprirà con questa chiave da tTerm Web, dal tuo telefono o da qualsiasi computer su cui accedi.
-vault_new.text = <code>{key}</code> va nella tua cassaforte: i server che usano questa chiave si potranno aprire da tTerm Web, dal tuo telefono o da qualsiasi computer su cui accedi.
-# In tTerm for Mac.
-vault_new.point_mac_unlock = Si apre come quando sblocchi questo Mac: con Touch ID o con la password del tuo Mac. Niente di nuovo da ricordare.
-vault_new.point_mac_locked = Viene bloccata prima di lasciare questo Mac. Solo i tuoi dispositivi possono aprirla; tTerm non può.
-vault_new.point_mac_browser = Un nuovo browser la apre dopo che lo approvi qui, o con il tuo codice di recupero.
-# In a browser.
-vault_new.point_web_unlock = Si apre come quando sblocchi questo computer: con Touch ID, Windows Hello o il blocco schermo del tuo telefono. Niente di nuovo da ricordare.
-vault_new.point_web_no_passkey = Questo browser non può salvare una passkey per la tua cassaforte: qui si apre con il tuo codice di recupero, una sessione alla volta.
-vault_new.point_web_locked = Viene bloccata prima di lasciare questo browser. Solo i tuoi dispositivi possono aprirla; tTerm non può.
-vault_new.point_web_browser = Un altro browser la apre con il tuo codice di recupero, o dopo che lo approvi in tTerm per Mac.
-vault_new.make_touch = Crea la cassaforte con Touch ID
-vault_new.make_hello = Crea la cassaforte con Windows Hello
-vault_new.make_passkey = Crea la cassaforte con una passkey
-vault_new.make = Crea la cassaforte
+# ------------------------------------------------------------ vault_password: the vault password (VaultDialogs.tsx, 0.1.26)
+# Make up a vault password: a new vault, made on the Mac (Move to cloud;
+# the strip after ssh, vault_password.text_key) or in a browser (Add a key
+# from a file, vault_password.text_web). <code>…</code> is the key's name:
+# id_ed25519.
+vault_password.title_new = Scegli la password della cassaforte
+vault_password.text_mac = Le chiavi di questo Mac vengono cifrate e vanno nella tua cassaforte nel cloud. Con questa password le apri in qualsiasi browser, anche quando il tuo Mac resta a casa.
+vault_password.text_key = <code>{key}</code> viene cifrata e va nella tua cassaforte nel cloud. Con questa password la apri in qualsiasi browser, anche quando il tuo Mac resta a casa.
+vault_password.text_web = <code>{key}</code> viene cifrata in questo browser e va nella tua cassaforte. Con questa password la apri in qualsiasi browser.
+vault_password.label = Password
+# The second field: the same password once more.
+vault_password.label_again = Conferma
+# Next to the field: the password shown as it is typed, or hidden again.
+vault_password.show = Mostra
+vault_password.hide = Nascondi
+# Under the first field; while it has 1 to 11 characters, vault_password.short
+# instead. vault_password.latin when it has a character beyond plain Latin.
+vault_password.hint = Almeno 12 caratteri. La cosa più semplice è una frase di qualche parola.
+vault_password.short = one: Manca {n} carattere | other: Mancano {n} caratteri
+vault_password.latin = Contiene lettere accentate o non latine: un computer all'estero potrebbe non avere il layout di tastiera per digitarle.
+# Under the second field.
+vault_password.match = Coincide
+vault_password.no_match = Non coincide con quella qui sopra
+# In a dashed box under the fields: on the Mac, and in a browser.
+vault_password.note_mac = tTerm non conosce questa password e non può recuperarla. Salvala nel tuo gestore di password. Se la dimentichi, impostane una nuova qui, su questo Mac.
+vault_password.note_web = tTerm non conosce questa password e non può recuperarla. Salvala nel tuo gestore di password.
+vault_password.create = Crea la cassaforte
+# On the button, while the password becomes the key (a second; a few on a phone).
+vault_password.working = Cifratura…
+# Settings › Keys: Set a vault password (a vault made before 0.1.26, with a
+# recovery code), or Change it.
+vault_password.title_set = Imposta la password della cassaforte
+vault_password.text_set = Con la password apri le tue chiavi in qualsiasi browser, anche quando il tuo Mac resta a casa. tTerm non conosce questa password e non può recuperarla. Quando la imposti, il codice di recupero smette di funzionare.
+vault_password.set = Imposta la password
+vault_password.title_change = Cambia la password della cassaforte
+vault_password.text_change = La nuova password sostituisce subito quella vecchia: la vecchia non apre più le tue chiavi. Il tuo Mac e i browser in cui sono salvate continuano ad aprirle come prima.
+vault_password.label_new = Nuova password
+vault_password.change = Cambia la password
+# In a browser where the keys are not kept: what opens the vault for the
+# change (the current password), or for setting it (the recovery code,
+# recovery.now_code).
+vault_password.current = Password attuale
+vault_password.current_hint = Le tue chiavi non sono salvate in questo browser, quindi per cambiarla serve la password attuale.
+vault_password.code_hint = Le tue chiavi non sono salvate in questo browser, quindi per impostare la password serve il tuo codice di recupero.
+# Said once done.
+vault_password.done_set = La password della cassaforte è stata impostata. Il codice di recupero non apre più la tua cassaforte.
+vault_password.done_change = La password della cassaforte è stata cambiata.
+# A closed vault, in a browser with no lock of it: the field it opens with,
+# in a server's card and in Settings › Keys.
+vault_password.label_vault = Password della cassaforte
+vault_password.open = Apri le chiavi
+vault_password.opening = Apertura…
+vault_password.forgot = Hai dimenticato la password?
 
-# ------------------------------------------------------------ recovery: the recovery code, shown once (VaultDialogs.tsx)
-recovery.title = Il tuo codice di recupero
-recovery.text = Se dovessi perdere tutti i dispositivi che aprono la tua cassaforte, questo codice sarà l'unico modo per riaccedere alle tue chiavi. tTerm non può recuperarle per te. Lo vedi solo questa volta.
-recovery.title_new = Il tuo nuovo codice di recupero
-recovery.text_new = Il codice che avevi prima non apre più la tua cassaforte. Se dovessi perdere tutti i dispositivi che la aprono, questo sarà l'unico modo per riaccedere alle tue chiavi. Lo vedi solo questa volta.
-# For screen readers.
-recovery.code_label = Codice di recupero {code}
-recovery.save_file = Salva come file
-recovery.copy_failed = Impossibile copiare: seleziona il codice e copialo a mano.
-# What the file saved holds.
-recovery.file_text = Codice di recupero della cassaforte di tTerm: {code}\nApre la tua cassaforte quando nessuno dei tuoi dispositivi può farlo. Conservalo in un posto sicuro, lontano dai tuoi dispositivi.
-recovery.kept_mac = L'ho conservato in un posto sicuro, non solo su questo Mac
-recovery.kept_web = L'ho conservato in un posto sicuro, non solo su questo computer
-recovery.make_title = Creare un nuovo codice di recupero?
-recovery.make_text = Il codice che hai ora smette di funzionare, e quello nuovo viene mostrato una sola volta. Le tue chiavi e i tuoi dispositivi restano come sono.
+# ------------------------------------------------------------ vault_forgot: Forgot your vault password? (VaultDialogs.tsx, 0.1.26)
+vault_forgot.title = Hai dimenticato la password della cassaforte?
+vault_forgot.text = tTerm non può ricordartela: solo tu conosci la password. Puoi però impostarne una nuova dove la tua cassaforte si apre senza password:
+# Two points under the text: where a new password can be set.
+vault_forgot.mac = sul tuo Mac, in tTerm per Mac: Impostazioni › Chiavi › Cambia la password, con Touch ID;
+vault_forgot.browser = in un browser in cui le tue chiavi sono salvate: anche lì, in Impostazioni.
+# <code>…</code> is the folder of the keys: it stays as it is.
+vault_forgot.none = Se non hai nessun dispositivo del genere, le chiavi nella tua cassaforte non si possono più aprire. Le chiavi stesse, di solito, restano sul tuo Mac, in <code>~/.ssh</code>.
+vault_forgot.ok = Ho capito
+
+# ------------------------------------------------------------ recovery: the recovery code of a vault made before 0.1.26 (VaultDialogs.tsx)
 recovery.now_code = Il tuo codice di recupero attuale
-recovery.now_code_hint = Questo browser non ha una passkey della tua cassaforte, quindi il nuovo codice si crea con quello che hai ora. L'hai perso? Crea quello nuovo in tTerm per Mac.
-recovery.make_go = Crea un nuovo codice
-recovery.make_go_passkey = Crealo con la tua passkey
-recovery.make_touch = Crealo con Touch ID
 
 # ------------------------------------------------------------ vault_open: Open your keys on this browser (VaultDialogs.tsx)
 vault_open.title = Apri le tue chiavi in questo browser
 vault_open.text = La tua cassaforte non conosce ancora questo browser. Approvalo su un dispositivo che la apre già.
 vault_open.text_code = Apri la tua cassaforte in questo browser con il tuo codice di recupero.
+# A vault with a password: the Mac's approval is the second way, and the
+# button at the bottom goes back to the password field.
+vault_open.text_password = Approva questo browser sul tuo Mac. Comodo su un computer che non è tuo: lì non serve digitare la password della cassaforte.
+vault_open.use_password = Digita invece la password
 # {mac} is the Mac's name, {app} is app_link.mac: "MacBook-Pro-Denis · tTerm for Mac".
 vault_open.mac_name = {mac} · {app}
 vault_open.mac_ask = Chiedigli di aprire qui la tua cassaforte
@@ -1747,9 +1796,13 @@ vault_open.sas_text = Anche il tuo Mac mostra un codice. Consenti lì solo se è
 vault_open.or = oppure
 vault_open.code = Codice di recupero
 vault_open.open = Apri
-# Once open with the recovery code or the Mac's approval: whether this browser keeps a passkey.
+# Once open with the password, the Mac's approval or the recovery code, or just made in this browser: whether to keep the keys here with a passkey.
 vault_open.opened_title = Le tue chiavi sono aperte in questo browser
-vault_open.opened_text = Vuoi salvare qui una passkey, così la prossima volta si aprono come quando sblocchi questo computer? Su un computer che non è tuo, scegli Solo questa volta.
+vault_open.keep_text.touch = Vuoi salvarle qui con Touch ID? Così la prossima volta in questo browser basterà Touch ID, senza bisogno della password.
+vault_open.keep_text.hello = Vuoi salvarle qui con Windows Hello? Così la prossima volta in questo browser basterà Windows Hello, senza bisogno della password.
+vault_open.keep_text.passkey = Vuoi salvarle qui con una passkey? Così la prossima volta in questo browser basterà la passkey, senza bisogno della password.
+# Small, under the question.
+vault_open.keep_foreign = Non è il tuo computer? Scegli “Solo questa volta”: le chiavi si chiudono quando chiudi la scheda, oppure da sole quando non le usi per un po'.
 vault_open.keep_touch = Salva con Touch ID
 vault_open.keep_hello = Salva con Windows Hello
 vault_open.keep_passkey = Salva con una passkey
@@ -1761,6 +1814,9 @@ app_code.title = Apri la tua cassaforte su questo Mac
 app_code.text = Questo Mac non può ancora aprire la tua cassaforte da solo. Aprila qui una volta con il tuo codice di recupero: poi questo Mac la aprirà con Touch ID.
 # When this Mac's lock is there but no longer opens the vault (taken off in a browser, or gone from the keychain).
 app_code.text_lost = Questo Mac non può più aprire la tua cassaforte da solo. Aprila qui una volta con il tuo codice di recupero: poi questo Mac tornerà ad aprirla con Touch ID.
+# A vault with a password (0.1.26): opened here once with it.
+app_code.text_password = Questo Mac non può ancora aprire la tua cassaforte da solo. Aprila qui una volta con la password della cassaforte: poi questo Mac la aprirà con Touch ID.
+app_code.text_lost_password = Questo Mac non può più aprire la tua cassaforte da solo. Aprila qui una volta con la password della cassaforte: poi questo Mac tornerà ad aprirla con Touch ID.
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1789,8 +1845,21 @@ mac_approve.not_me_note = Non sono io: quell'accesso termina, e in Impostazioni 
 # ------------------------------------------------------------ vault_locked: a server with your key, the vault locked here (VaultLocked.tsx)
 vault_locked.title = {machine} si apre con la tua chiave
 vault_locked.text = Le tue chiavi sono bloccate in questo browser. Aprile come quando sblocchi questo computer; poi tTerm effettua l'accesso a {machine}, e la tua chiave non lascia mai questo browser.
+# A vault with a password, in a browser that keeps no lock of it: the
+# password field comes under it.
+vault_locked.text_password = Le tue chiavi sono cifrate nel cloud e si aprono solo con la password della cassaforte. Digitala: le chiavi si aprono direttamente in questo browser e tTerm effettua l'accesso a {machine}. La password non viene inviata da nessuna parte.
+# Where the keys were kept with Touch ID (or Windows Hello, a passkey):
+# one of the three, the button, and a link to type the password instead.
+vault_locked.closed_title = La tua cassaforte è chiusa
+vault_locked.closed_text.touch = Aprila con Touch ID per accedere a {machine} con la tua chiave.
+vault_locked.closed_text.hello = Aprila con Windows Hello per accedere a {machine} con la tua chiave.
+vault_locked.closed_text.passkey = Aprila con la tua passkey per accedere a {machine} con la tua chiave.
+vault_locked.use_password = oppure digita la password della cassaforte
+# Small, at the card's bottom.
+vault_locked.closes_itself = La tua cassaforte si chiude da sola quando non la usi per un po', nel caso ti allontani dal computer.
 vault_locked.text_app = Le tue chiavi sono bloccate su questo Mac. Aprile con Touch ID o con la password del tuo Mac; poi questo Mac effettua l'accesso a {machine}.
 vault_locked.text_app_code = Questo Mac non può ancora aprire la tua cassaforte da solo. Aprila qui una volta con il tuo codice di recupero; poi questo Mac effettua l'accesso a {machine}.
+vault_locked.text_app_password = Questo Mac non può ancora aprire la tua cassaforte da solo. Aprila qui una volta con la password della cassaforte; poi questo Mac effettua l'accesso a {machine}.
 # Small links under the button: "or approve on MacBook-Pro-Denis · use the recovery code".
 vault_locked.or = oppure
 vault_locked.approve_on = approva su {mac}
@@ -1807,17 +1876,32 @@ vault_locked.its_key = la chiave del server
 vault_problem.no_vault = Non hai ancora una cassaforte.
 vault_problem.exists = Hai già una cassaforte: aprila, poi aggiungi la chiave.
 vault_problem.locked = Prima apri la tua cassaforte.
-vault_problem.no_passkey = Qui non ha risposto nessuna passkey della tua cassaforte. Approva questo browser sul tuo Mac o usa il tuo codice di recupero.
-vault_problem.no_prf = Questa passkey non può aprire qui la tua cassaforte. Approva questo browser sul tuo Mac o usa il tuo codice di recupero.
+# The vault password: {n} tries left (shown when 3 or fewer), {time} a
+# time of day, as the page shows times ("14:05").
+vault_problem.password_wrong = Questa password non apre la tua cassaforte. Controlla il layout della tastiera e il Caps Lock.
+vault_problem.password_left = one: Ti resta {n} tentativo prima di una pausa di un'ora. | other: Ti restano {n} tentativi prima di una pausa di un'ora.
+vault_problem.password_paused = Troppe password errate. Riprova alle {time}.
+# The same pause, when it ends another day (thirty wrong ones in a day):
+# {day} is the date as the page writes it ("3 Nov"), {time} the time.
+vault_problem.password_paused_day = Troppe password errate. Riprova il {day} alle {time}.
+vault_problem.no_password = La tua cassaforte non ha ancora una password: impostala in Impostazioni › Chiavi sul tuo Mac.
+vault_problem.password_short = La password deve avere almeno 12 caratteri.
+vault_problem.no_wasm = Questo browser non può usare la password della cassaforte. Apri le tue chiavi con l'approvazione del tuo Mac o in un browser più recente.
+vault_problem.no_passkey = Qui non ha risposto nessuna passkey della tua cassaforte. Digita la password della cassaforte o approva questo browser sul tuo Mac.
+vault_problem.no_passkey_code = Qui non ha risposto nessuna passkey della tua cassaforte. Approva questo browser sul tuo Mac o usa il tuo codice di recupero.
+vault_problem.no_prf = Questa passkey non può aprire qui la tua cassaforte. Digita la password della cassaforte o approva questo browser sul tuo Mac.
+vault_problem.no_prf_code = Questa passkey non può aprire qui la tua cassaforte. Approva questo browser sul tuo Mac o usa il tuo codice di recupero.
 vault_problem.no_prf_here = Questo browser non può salvare una passkey per la tua cassaforte: resta aperta solo per questa sessione.
-vault_problem.lock_broken = Con il blocco di questo browser la tua cassaforte non si apre più. Usa il tuo codice di recupero o approva il browser sul tuo Mac.
+vault_problem.lock_broken = Con il blocco di questo browser la tua cassaforte non si apre più. Digita la password della cassaforte o approva questo browser sul tuo Mac.
+vault_problem.lock_broken_code = Con il blocco di questo browser la tua cassaforte non si apre più. Usa il tuo codice di recupero o approva il browser sul tuo Mac.
 vault_problem.code_form = Un codice di recupero è formato da 24 lettere e cifre, in sei gruppi da quattro.
 vault_problem.code_wrong = Questo codice di recupero non apre la tua cassaforte. Controllalo o approva questo browser sul tuo Mac.
 # In tTerm for Mac: the engine's answers, said by the page (the code window, Touch ID).
 vault_problem.code_wrong_app = Questo codice di recupero non apre la tua cassaforte. Controllalo e riprova.
 vault_problem.touch_failed = La conferma con Touch ID o con la password del tuo Mac non è andata a buon fine. Non è cambiato nulla.
 vault_problem.need_code = Digita ora il tuo codice di recupero: questo browser non ha una passkey della tua cassaforte.
-vault_problem.no_x25519 = Questo browser è troppo vecchio perché il tuo Mac possa approvarlo: usa il tuo codice di recupero o un browser più recente.
+vault_problem.no_x25519 = Questo browser è troppo vecchio perché il tuo Mac possa approvarlo: digita la password della cassaforte o usa un browser più recente.
+vault_problem.no_x25519_code = Questo browser è troppo vecchio perché il tuo Mac possa approvarlo: usa il tuo codice di recupero o un browser più recente.
 vault_problem.pairing = La richiesta non è andata a buon fine. Chiedi di nuovo.
 vault_problem.passkey_exists = Questo browser ha già una passkey per tTerm.
 vault_problem.no_passkey_here = Questo browser non può creare una passkey.
@@ -1835,7 +1919,7 @@ ssh_strip.let_in = Fai entrare tTerm
 ssh_strip.not_now = Non ora
 ssh_strip.never = Non chiedere più per {alias}
 # <b>…</b> are the two buttons' names, as above.
-ssh_strip.explain = <b>Salva la mia chiave:</b> va nella tua cassaforte, che solo i tuoi dispositivi possono aprire; {alias} resta com'è. <b>Fai entrare tTerm:</b> tTerm aggiunge una propria riga su {alias}; la tua chiave resta su questo Mac. Per più server insieme: Sposta nel cloud nel menu dell'account.
+ssh_strip.explain = <b>Salva la mia chiave:</b> va nella tua cassaforte, cifrata, e si apre in qualsiasi browser con la password della cassaforte; {alias} resta com'è. <b>Fai entrare tTerm:</b> tTerm aggiunge una propria riga su {alias}; la tua chiave resta su questo Mac. Per più server insieme: Sposta nel cloud nel menu dell'account.
 ssh_strip.explain_pass = <b>Fai entrare tTerm:</b> tTerm aggiunge una propria riga su {alias}; la tua chiave resta su questo Mac. Per più server insieme: Sposta nel cloud nel menu dell'account.
 ssh_strip.unreachable = tTerm Web non riesce a raggiungere {alias} dal cloud: si apre tramite questo Mac, finché è acceso.
 ssh_strip.through_mac = Aprilo tramite questo Mac
@@ -1858,7 +1942,7 @@ move.how = Come si apre {name}
 move.method_key = La mia chiave
 move.method_cert = Pass di tTerm
 move.method_mac = Tramite questo Mac
-move.way_key = La chiave va nella tua cassaforte; il server resta com'è. Si apre in qualsiasi browser in cui sblocchi la tua cassaforte.
+move.way_key = La chiave va nella tua cassaforte; il server resta com'è. Si apre in qualsiasi browser con la password della cassaforte.
 move.way_cert = tTerm aggiunge una propria riga sul server, la tua chiave resta qui. Si apre ovunque, anche da Telegram.
 move.way_mac = Non si sposta nulla: tTerm chiede a questo Mac di collegarsi, finché è acceso. Per i server dietro una VPN.
 # {address} is root@203.0.113.7, {jump} the bastion it goes through.
@@ -1887,7 +1971,7 @@ move.key_security = Su una chiave di sicurezza: non può uscirne. I suoi server 
 move.key_agent = Solo in un agente SSH: non si può copiare. I suoi server si aprono tramite questo Mac
 move.key_type = Un tipo di chiave che la cassaforte non conserva ancora. I suoi server si aprono tramite questo Mac
 move.key_passphrase = ha una passphrase
-move.vault_note = La tua cassaforte si apre come quando sblocchi questo Mac: con Touch ID o con la password del tuo Mac. Solo i tuoi dispositivi possono aprirla; tTerm non può.
+move.vault_note = Le chiavi vengono cifrate qui, su questo Mac. Qui la tua cassaforte si apre con Touch ID; in qualsiasi browser, con la password della cassaforte. tTerm non può aprirla.
 move.go = one: Sposta {n} server | other: Sposta {n} server
 
 # ------------------------------------------------------------ moved: what came of Move to cloud (MoveToCloud.tsx)
@@ -1904,7 +1988,17 @@ moved.failed = Non è stato spostato.
 moved.failed_text = {why} Per questo server non è stato salvato nulla.
 moved.open = Apri un terminale
 moved.change = Cambia
+# How to open them from another computer: when a server moved with My
+# key. {site} is the address of tTerm Web; <b>…</b> is bold.
+moved.how_title = Come aprirli da un altro computer
+moved.how_1 = Apri <b>{site}</b> in qualsiasi browser e accedi come sempre, con il codice ricevuto via email.
+moved.how_2 = Apri un server: tTerm ti chiede la <b>password della cassaforte</b>. Le chiavi si aprono direttamente in quel browser, senza bisogno del tuo Mac.
+moved.how_3 = Sul tuo computer premi “Salva con Touch ID”: poi lì basta Touch ID e la password non viene più chiesta. Su un computer che non è tuo, scegli “Solo questa volta”.
+# Under the steps, for the servers that moved Through this Mac: one
+# server, or several ("db-internal and nas").
+moved.how_mac_one = <b>{servers}</b> si apre solo tramite questo Mac: finché è acceso e tTerm è in esecuzione.
+moved.how_mac_many = <b>{servers}</b> si aprono solo tramite questo Mac: finché è acceso e tTerm è in esecuzione.
 # <b>…</b> is the key's name, or a list of them.
-moved.keys_one = <b>{keys}</b> è nella tua cassaforte, bloccata: si apre come quando sblocchi i tuoi dispositivi. In Impostazioni › Chiavi la vedi ovunque.
-moved.keys_many = <b>{keys}</b> sono nella tua cassaforte, bloccate: si aprono come quando sblocchi i tuoi dispositivi. In Impostazioni › Chiavi le vedi ovunque.
+moved.keys_one = <b>{keys}</b> ora è nella tua cassaforte, cifrata: si apre con la password della cassaforte e, su questo Mac, con Touch ID. In Impostazioni › Chiavi la vedi su ogni dispositivo.
+moved.keys_many = <b>{keys}</b> ora sono nella tua cassaforte, cifrate: si aprono con la password della cassaforte e, su questo Mac, con Touch ID. In Impostazioni › Chiavi le vedi su ogni dispositivo.
 moved.no_keys = Nessuna chiave spostata: le tue chiavi restano su questo Mac.

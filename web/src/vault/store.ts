@@ -1,16 +1,21 @@
-// The vault as this page holds it (0.1.17, vault-design.md).
+// The vault as this page holds it (0.1.17, vault-design.md; the vault
+// password from 0.1.26, the contract's "v2").
 //
 // In a browser: the vault key (VK) lives only in this page's memory, as a
 // non-extractable AES-GCM CryptoKey, and so do the keys it opens, each
-// imported for signing and not extractable. It opens with this browser's
-// passkey (Touch ID, Windows Hello…: PRF), with the recovery code, or by
-// the Mac's approval (pairing). It is dropped on Lock, on sign out, when the
-// session ends, on a reload, and after 8 hours without anything done here.
-// While it is open the page says on its socket which keys it can sign for
-// (vault.can) and answers the core's vault.sign with the raw signature.
-// Its raw bytes exist only for a moment: when a lock or a recovery code is
-// made from them (then opened again through the passkey, or the code), and
-// while the person says whether this browser keeps a passkey lock.
+// imported for signing and not extractable. It opens with the vault
+// password (for this session), with this browser's passkey where the
+// person kept the keys here (Touch ID, Windows Hello…: PRF), or by the
+// Mac's approval (pairing); a vault made before 0.1.26 that has no password
+// yet also with its recovery code. It is dropped on Lock, on sign out, when
+// the session ends, on a reload, and after 8 hours without anything done
+// here. While it is open the page says on its socket which keys it can sign
+// for (vault.can) and answers the core's vault.sign with the raw signature.
+// Its raw bytes exist only for a moment: when a lock or a password is made
+// from them (got again through the passkey, the password or the code), and
+// while the person says whether this browser keeps the keys with a passkey
+// (the Keep question, after the password, the Mac's approval or a new
+// vault).
 //
 // In tTerm for Mac the vault opens in the engine, which signs on the
 // socket itself: the page does not sign and sends no vault.can; it asks the
@@ -19,19 +24,23 @@
 
 import { useSyncExternalStore } from "react";
 import {
-  addVaultKey, addVaultLock, answerAppPairing, approveAppPairing, appRecoveryCode,
-  createAppVault, createVault, denyAppPairing, loadAppVault, loadPairing, loadVault,
-  lockAppVault, onSignedOut, openAppVault, removeVaultKey, revealPairing, setVaultRecovery,
+  addVaultKey, addVaultLock, answerAppPairing, approveAppPairing, createAppVault, createVault,
+  denyAppPairing, loadAppVault, loadPairing, loadVault, lockAppVault, onSignedOut, openAppVault,
+  openVaultPassword, removeVaultKey, revealPairing, setAppVaultPassword, setVaultPassword,
   startPairing, vaultLockUsed, vaultRecovery, CoreError, type AppVault, type Vault, type VaultLock,
 } from "../api";
+import type { Values } from "../i18n";
 import { socket, type VaultMessage } from "../socket";
+import { coreSaid, engineSaid, refusedSaid, type Said } from "./answers.ts";
 import { b64u, fromB64u, uuid, wipe, type Bytes } from "./bytes.ts";
 import {
-  aesKey, isRecoveryCode, makeRecovery, newVk, openKey, openPairing, pairCommit, pairSas,
-  prfKek, sealKey, unwrapRecovery, unwrapVk, wrapVk, x25519Pair,
+  aesKey, isRecoveryCode, makePassword, newVk, NoWasm, openKey, openPairing, pairCommit,
+  pairSas, passwordFits, passwordKeys, passwordLength, passwordSettings, prfKek, sealKey,
+  unwrapPassword, unwrapRecovery, unwrapVk, wellFormed, wrapVk, x25519Pair, PASSWORD_MAX, PASSWORD_MIN,
+  type Kdf,
 } from "./crypto.ts";
 import type { ReadKey } from "./keyfile.ts";
-import { prfCreate, prfGet } from "./passkey.ts";
+import { cancelled, prfCreate, prfGet } from "./passkey.ts";
 import { ALGS, isUserauth, signerOf, type SigAlg, type Signer } from "./sign.ts";
 import { deviceLabel, passkeysHere, support, type Support } from "./support.ts";
 
@@ -45,31 +54,89 @@ const PAIR_POLL_MS = 2_000;
  * convenience, so that the page knows which lock is this browser's. */
 const PASSKEYS_KEY = "tterm.vault.passkeys";
 
-/** Words of the page for what went wrong, by key (i18n/en.txt). */
+/** Words of the page for what went wrong, by key (i18n/en.txt), with their
+ * values; `then`, a sentence after it (how many tries are left); `at`, the
+ * moment `{time}` names, said with its day when it is not today. */
 export class VaultError extends Error {
   key: string;
+  values?: Values;
+  then?: { key: string; values?: Values };
+  at?: number;
 
-  constructor(key: string) {
+  constructor(key: string, values?: Values, then?: { key: string; values?: Values }, at?: number) {
     super(key);
     this.name = "VaultError";
     this.key = key;
+    this.values = values;
+    this.then = then;
+    this.at = at;
   }
 }
 
+/** A VaultError of what the page says (answers.ts). */
+function saidError(said: Said): VaultError {
+  return new VaultError(said.key, said.values, said.then, said.at);
+}
+
+/** What the core says to a vault password, in the page's words (0.1.26):
+ * wrong, with the tries left when few; too many, with the time to try
+ * again; none set; anything else, something that went wrong. The core's
+ * sentences are never shown (the security review's L5). */
+export function passwordWords(error: unknown): unknown {
+  return error instanceof CoreError ? saidError(coreSaid(error)) : error;
+}
+
+/** The core's refusal of a vault made here or of a password set, in the
+ * page's words (answers.ts, refusedSaid). */
+function refusedWords(error: unknown, what: "make" | "set"): unknown {
+  return error instanceof CoreError ? saidError(refusedSaid(error, what)) : error;
+}
+
+/** Any other answer of the core on the way to a password: something that
+ * went wrong, not its sentence. */
+function somethingWords(error: unknown): unknown {
+  return error instanceof CoreError ? new VaultError("vault_problem.something") : error;
+}
+
 /** The engine's answers the page says in its own words (0.1.17; the app's
- * checks of 01.11 found them in English in the app's other languages): Touch
- * ID or the Mac's password not gone through, and, with a code, one that does
- * not open the vault. Known by the engine's sentence, so that another 403 or
- * 422 keeps its own. Anything else as it came. */
-export function appWords(error: unknown, withCode = false): unknown {
+ * checks of 01.11 found them in English in the app's other languages):
+ * Touch ID or the Mac's password not gone through; with a code, one that
+ * does not open the vault; from 0.1.26, with a password, as the core's,
+ * and a vault made or a password set refused (answers.ts, engineSaid).
+ * With a code, a password or a new password, anything else is something
+ * that went wrong; a Touch ID open keeps it as it came (openOnMac tells
+ * this Mac's missing lock by its 409). */
+export function appWords(error: unknown, what: "code" | "password" | "new" | null = null): unknown {
   if (!(error instanceof CoreError)) return error;
-  if (error.status === 403 && error.message.startsWith("Touch ID or your Mac's password did not go through")) { // i18n-ignore: the engine's words
-    return new VaultError("vault_problem.touch_failed");
-  }
-  if (withCode && error.status === 422 && error.message.startsWith("That recovery code does not open your vault")) { // i18n-ignore: the engine's words
-    return new VaultError("vault_problem.code_wrong_app");
-  }
-  return error;
+  const said = engineSaid(error, what);
+  return said ? saidError(said) : error;
+}
+
+/** Four texts name the vault password as the other way in; a vault with no
+ * password yet (made before 0.1.26) keeps their forms with the recovery
+ * code. */
+const WITH_CODE = {
+  "vault_problem.no_passkey": "vault_problem.no_passkey_code",
+  "vault_problem.no_prf": "vault_problem.no_prf_code",
+  "vault_problem.lock_broken": "vault_problem.lock_broken_code",
+  "vault_problem.no_x25519": "vault_problem.no_x25519_code",
+} as const;
+
+/** Argon2id where it cannot run here, in the page's words. */
+function wasmWords(error: unknown): unknown {
+  return error instanceof NoWasm ? new VaultError("vault_problem.no_wasm") : error;
+}
+
+/** The vault password as the core keeps it, checked: what this page
+ * derives with. Settings outside the core's own range, or a salt of another
+ * length, are not used (crypto.ts, passwordSettings): weaker ones would let
+ * whoever answered for the core guess the password from the `auth` this
+ * page would send. Said as something that went wrong. */
+function passwordOf(vault: Vault): { salt: Bytes; kdf: Kdf } {
+  if (!vault.password) throw new VaultError("vault_problem.no_password");
+  const settings = passwordSettings(vault.password);
+  if (!settings) throw new VaultError("vault_problem.something");
+  return settings;
 }
 
 /** A problem kept as text (MacRequest): a key of the page for appWords'. */
@@ -78,7 +145,12 @@ function problemKept(error: unknown): string {
   return said instanceof VaultError ? said.key : (error as Error).message;
 }
 
-export type OpenedBy = "passkey" | "recovery" | "pairing" | "new";
+export type OpenedBy = "passkey" | "password" | "recovery" | "pairing" | "new";
+
+/** Where VK's raw bytes come from when a password is set in a browser:
+ * this browser's passkey, the current password, or (a vault with no
+ * password yet) the recovery code. */
+export type RawFrom = { passkey: true } | { password: string } | { code: string };
 
 /** A new browser's request to the Mac, as this browser follows it. */
 export interface PairingView {
@@ -119,9 +191,13 @@ export interface VaultState {
   /** What the engine says (in the app). */
   appVault: AppVault | null;
   pairing: PairingView | null;
-  /** Just opened with the recovery code or the Mac's approval: whether this
-   * browser keeps a passkey lock is the person's to say. */
+  /** Just opened with the password, the recovery code or the Mac's
+   * approval, or just made here: whether this browser keeps the keys with a
+   * passkey is the person's to say (the Keep question is up). */
   offerPasskey: boolean;
+  /** While the Keep question is up: VK's raw bytes are still here, so a
+   * passkey lock can be made (false after it failed for good). */
+  canKeep: boolean;
   request: MacRequest | null;
 }
 
@@ -145,7 +221,7 @@ interface PairingInside {
 const EMPTY: VaultState = {
   ready: false, app: false, vault: null, open: false, openedBy: null, signable: [],
   unsignable: {}, support: null, hereLock: null, appVault: null, pairing: null,
-  offerPasskey: false, request: null,
+  offerPasskey: false, canKeep: false, request: null,
 };
 
 function remembered(userId: string): string[] {
@@ -179,6 +255,9 @@ class Store {
   /** VK's raw bytes, only while the person says whether to keep a passkey
    * lock here (offerPasskey). */
   private pendingRaw: Bytes | null = null;
+  /** Who waits for the Keep question to be answered (a new vault's first
+   * key goes in after it). */
+  private keepWaiters: (() => void)[] = [];
   private pair: PairingInside | null = null;
   private release: (() => void) | null = null;
   private lastActivity = Date.now();
@@ -204,7 +283,23 @@ class Store {
 
   private set(change: Partial<VaultState>): void {
     this.state = { ...this.state, ...change };
+    if (!this.state.offerPasskey) this.keepDone();
     for (const listener of [...this.listeners]) listener();
+  }
+
+  /** The Keep question answered (or gone with the vault): whoever waited
+   * goes on. */
+  private keepDone(): void {
+    if (!this.keepWaiters.length) return;
+    const waiting = this.keepWaiters;
+    this.keepWaiters = [];
+    for (const go of waiting) go();
+  }
+
+  /** Once the Keep question is answered; at once when it is not up. */
+  keepAnswered(): Promise<void> {
+    if (!this.state.offerPasskey) return Promise.resolve();
+    return new Promise((resolve) => this.keepWaiters.push(resolve));
   }
 
   /** Signed in (again): the vault of this person. In the app the engine
@@ -246,6 +341,7 @@ class Store {
     this.release = null;
     this.me = null;
     this.state = EMPTY;
+    this.keepDone();
     for (const listener of [...this.listeners]) listener();
   }
 
@@ -289,43 +385,111 @@ class Store {
 
   // -------------------------------------------------- opening, in a browser
 
-  /** Opens with this browser's passkey; with none known here, with any
-   * passkey lock of the vault the browser has (a synced one). */
-  async openWithPasskey(): Promise<void> {
-    const vault = this.need();
+  /** The text for a vault with a password, or the one with the recovery
+   * code a vault with no password yet keeps (0.1.26). */
+  private said(key: keyof typeof WITH_CODE, vault: Vault | null = this.state.vault): string {
+    return vault?.password ? key : WITH_CODE[key];
+  }
+
+  /** VK's raw bytes through a passkey of this browser: its own lock, or
+   * with none known here, any passkey lock of the vault the browser has (a
+   * synced one). The passkey is asked first thing, nothing awaited before
+   * it: Safari lets a page ask only right after a click. */
+  private async rawFromPasskey(vault: Vault): Promise<{ raw: Bytes; lock: VaultLock }> {
     const here = this.hereLock(vault);
     const locks = here ? [here] : vault.locks.filter((l) => l.kind === "passkey" && l.credentialId);
-    if (!locks.length) throw new VaultError("vault_problem.no_passkey");
+    if (!locks.length) throw new VaultError(this.said("vault_problem.no_passkey", vault));
     const got = await prfGet(locks.map((l) => fromB64u(l.credentialId!)), fromB64u(vault.prfSalt));
     const lock = locks.find((l) => l.credentialId === b64u(got.credentialId));
-    if (!lock) throw new VaultError("vault_problem.no_passkey");
-    if (!got.prf) throw new VaultError("vault_problem.no_prf");
+    if (!lock) {
+      wipe(got.prf);
+      throw new VaultError(this.said("vault_problem.no_passkey", vault));
+    }
+    if (!got.prf) throw new VaultError(this.said("vault_problem.no_prf", vault));
     const kek = await prfKek(got.prf);
     wipe(got.prf);
-    let raw: Bytes;
     try {
-      raw = await unwrapVk(kek, fromB64u(lock.wrap), lock.id);
+      return { raw: await unwrapVk(kek, fromB64u(lock.wrap), lock.id), lock };
     } catch {
-      throw new VaultError("vault_problem.lock_broken");
+      throw new VaultError(this.said("vault_problem.lock_broken", vault));
     } finally {
       wipe(kek);
     }
+  }
+
+  /** VK's raw bytes from the vault password: derived here (Argon2id, with
+   * the salt and parameters the core keeps), and the wrap the core gives
+   * for the right `auth`. The vault is read again first, so that a password
+   * changed elsewhere is derived with its own salt and no try is lost on a
+   * stale one. A password that cannot be one (under 12 characters, over
+   * 256, or not well-formed Unicode) is not sent: it would only cost a try.
+   * Whatever else the core answers is said in the page's words. */
+  private async rawFromPassword(password: string): Promise<Bytes> {
+    const n = passwordLength(password);
+    if (n < PASSWORD_MIN) throw new VaultError("vault_problem.password_short");
+    if (n > PASSWORD_MAX || !wellFormed(password)) throw new VaultError("vault_problem.password_wrong");
+    const vault = await loadVault().catch((error: unknown) => {
+      throw somethingWords(error);
+    });
+    if (!vault) throw new VaultError("vault_problem.no_vault");
+    this.applyVault(vault);
+    const { salt, kdf } = passwordOf(vault);
+    const { kek, auth } = await passwordKeys(password, salt, kdf).catch((error: unknown) => {
+      throw wasmWords(error);
+    });
+    try {
+      const { wrap } = await openVaultPassword(b64u(auth)).catch((error: unknown) => {
+        throw passwordWords(error);
+      });
+      try {
+        return await unwrapPassword(kek, fromB64u(wrap), vault.id);
+      } catch {
+        throw new VaultError("vault_problem.password_wrong");
+      }
+    } finally {
+      wipe(kek, auth);
+    }
+  }
+
+  /** VK's raw bytes from the recovery code (a vault with no password yet). */
+  /** VK from the recovery code of a vault made before 0.1.26. `wrong` is
+   * what a code that does not open it says: when it opens this browser,
+   * the Mac's approval is the other way; when it sets the password, the
+   * person may have no Mac, so only to check it. */
+  private async rawFromCode(vault: Vault, code: string,
+    wrong: "vault_problem.code_wrong" | "vault_problem.code_wrong_app" = "vault_problem.code_wrong"): Promise<Bytes> {
+    if (!isRecoveryCode(code)) throw new VaultError("vault_problem.code_form");
+    const { recoverySalt, recoveryWrap } = await vaultRecovery().catch((error: unknown) => {
+      throw somethingWords(error);
+    });
+    try {
+      return await unwrapRecovery(code, fromB64u(recoverySalt), fromB64u(recoveryWrap), vault.id);
+    } catch {
+      throw new VaultError(wrong);
+    }
+  }
+
+  /** Opens with this browser's passkey. */
+  async openWithPasskey(): Promise<void> {
+    const vault = this.need();
+    const { raw, lock } = await this.rawFromPasskey(vault);
     if (this.me && lock.credentialId) remember(this.me.id, lock.credentialId);
     await this.openWith(raw, "passkey", false);
     vaultLockUsed(lock.id).catch(() => {});
   }
 
-  /** Opens with the recovery code. */
+  /** Opens with the vault password, for this session; then the Keep
+   * question. */
+  async openWithPassword(password: string): Promise<void> {
+    this.need();
+    const raw = await this.rawFromPassword(password);
+    await this.openWith(raw, "password", true);
+  }
+
+  /** Opens with the recovery code (a vault with no password yet). */
   async openWithRecovery(code: string): Promise<void> {
     const vault = this.need();
-    if (!isRecoveryCode(code)) throw new VaultError("vault_problem.code_form");
-    const { recoverySalt, recoveryWrap } = await vaultRecovery();
-    let raw: Bytes;
-    try {
-      raw = await unwrapRecovery(code, fromB64u(recoverySalt), fromB64u(recoveryWrap), vault.id);
-    } catch {
-      throw new VaultError("vault_problem.code_wrong");
-    }
+    const raw = await this.rawFromCode(vault, code);
     await this.openWith(raw, "recovery", true);
   }
 
@@ -348,7 +512,7 @@ class Store {
     wipe(this.pendingRaw);
     this.pendingRaw = keep ? raw : null;
     if (!keep) wipe(raw);
-    this.set({ open: true, openedBy: by, offerPasskey: keep });
+    this.set({ open: true, openedBy: by, offerPasskey: keep, canKeep: keep });
     this.release ??= socket.hold();
     try {
       const vault = await loadVault();
@@ -396,38 +560,74 @@ class Store {
     socket.send({ op: "vault.can", keys: this.vk ? [...this.signers.keys()] : [] });
   }
 
-  /** The person's word after opening with the code or the Mac: a passkey
-   * lock for this browser, so that it opens with Touch ID next time. */
-  async keepWithPasskey(): Promise<boolean> {
+  /** The person's word after the password, the Mac's approval or a new
+   * vault: a passkey lock for this browser, so that Touch ID is enough here
+   * next time. The passkey is made first thing (Safari: right after the
+   * click). Cancelled, the question stays, to try again or say Only this
+   * time; failed otherwise, the raw bytes go and the question stays only
+   * to say why. */
+  async keepWithPasskey(): Promise<void> {
     const raw = this.pendingRaw;
-    if (!raw || !this.me) return false;
+    const me = this.me;
+    const vault = this.state.vault;
+    if (!raw || !me || !vault) {
+      this.skipPasskey();
+      return;
+    }
+    let made: { credentialId: Bytes; prf: Bytes | null };
     try {
-      const vault = this.need();
-      const made = await prfCreate(this.me.email ?? this.me.name, fromB64u(vault.prfSalt));
+      made = await prfCreate(me.email ?? me.name, fromB64u(vault.prfSalt));
+    } catch (error) {
+      if (!cancelled(error)) this.spendRaw();
+      throw error;
+    }
+    // Locked, or signed out, while the passkey was made: the raw bytes are
+    // gone (wiped), and nothing is wrapped from them.
+    if (this.pendingRaw !== raw || this.me !== me || !this.vk) {
+      wipe(made.prf);
+      this.spendRaw();
+      throw new VaultError("vault_problem.locked");
+    }
+    try {
       if (!made.prf) {
         this.set({ support: this.state.support ? { ...this.state.support, prf: false } : null });
         throw new VaultError("vault_problem.no_prf_here");
       }
       const lockId = uuid();
       const kek = await prfKek(made.prf);
-      const wrap = await wrapVk(kek, raw, lockId);
-      wipe(kek, made.prf);
+      let wrap: Bytes;
+      try {
+        wrap = await wrapVk(kek, raw, lockId);
+      } finally {
+        wipe(kek, made.prf);
+      }
       const credentialId = b64u(made.credentialId);
       const updated = await addVaultLock({ id: lockId, kind: "passkey", credentialId,
         wrap: b64u(wrap), label: deviceLabel() });
-      remember(this.me.id, credentialId);
+      remember(me.id, credentialId);
       this.applyVault(updated);
-      return true;
-    } finally {
-      this.skipPasskey();
+      wipe(this.pendingRaw);
+      this.pendingRaw = null;
+      // Kept here: it opens with Touch ID from now on.
+      this.set({ offerPasskey: false, canKeep: false, openedBy: this.vk ? "passkey" : this.state.openedBy });
+    } catch (error) {
+      this.spendRaw();
+      throw error;
     }
+  }
+
+  /** The raw bytes go; the Keep question stays up, to say why. */
+  private spendRaw(): void {
+    wipe(this.pendingRaw);
+    this.pendingRaw = null;
+    if (this.state.canKeep) this.set({ canKeep: false });
   }
 
   /** Only this time: no passkey lock here; VK stays for this session. */
   skipPasskey(): void {
     wipe(this.pendingRaw);
     this.pendingRaw = null;
-    if (this.state.offerPasskey) this.set({ offerPasskey: false });
+    if (this.state.offerPasskey || this.state.canKeep) this.set({ offerPasskey: false, canKeep: false });
   }
 
   private dropKeys(): void {
@@ -446,7 +646,8 @@ class Store {
     }
     const was = !!this.vk;
     this.dropKeys();
-    this.set({ open: false, openedBy: null, signable: [], unsignable: {}, offerPasskey: false });
+    this.set({ open: false, openedBy: null, signable: [], unsignable: {}, offerPasskey: false,
+      canKeep: false });
     if (was) this.announce();
     if (!this.pair) {
       this.release?.();
@@ -456,47 +657,35 @@ class Store {
 
   // ----------------------------------------------- making it, in a browser
 
-  /** A vault made in this browser, for a person without the Mac: VK, the
-   * recovery code (what this gives back, to show once), and this browser's
-   * passkey lock when it can have one. It is open here after. */
-  async create(): Promise<string> {
+  /** A vault made in this browser, for a person without the Mac (Add a key
+   * from a file): VK, and the password the person made up, derived here.
+   * It is open here after, for this session; the Keep question comes next. */
+  async create(password: string): Promise<void> {
     if (this.state.vault) throw new VaultError("vault_problem.exists");
     if (!this.me) throw new VaultError("vault_problem.no_vault");
+    if (!passwordFits(password)) {
+      throw new VaultError(passwordLength(password) < PASSWORD_MIN ? "vault_problem.password_short"
+        : "vault_problem.something");
+    }
     const raw = newVk();
     const vaultId = uuid();
-    let locked = false;
     try {
-      const recovery = await makeRecovery(raw, vaultId);
-      const vault = await createVault({ id: vaultId, recoverySalt: b64u(recovery.salt),
-        recoveryWrap: b64u(recovery.wrap) });
-      this.applyVault(vault);
-      if (passkeysHere(this.state.support)) {
-        try {
-          const made = await prfCreate(this.me.email ?? this.me.name, fromB64u(vault.prfSalt));
-          if (made.prf) {
-            const lockId = uuid();
-            const kek = await prfKek(made.prf);
-            const wrap = await wrapVk(kek, raw, lockId);
-            wipe(kek, made.prf);
-            const credentialId = b64u(made.credentialId);
-            this.applyVault(await addVaultLock({ id: lockId, kind: "passkey", credentialId,
-              wrap: b64u(wrap), label: deviceLabel() }));
-            remember(this.me.id, credentialId);
-            locked = true;
-          } else if (this.state.support) {
-            this.set({ support: { ...this.state.support, prf: false } });
-          }
-        } catch {
-          // Cancelled, or no passkey here: the recovery code opens it, and
-          // it stays open for this session.
-        }
+      const made = await makePassword(password, raw, vaultId).catch((error: unknown) => {
+        throw wasmWords(error);
+      });
+      try {
+        this.applyVault(await createVault({ id: vaultId, password: { salt: b64u(made.salt),
+          kdf: made.kdf, auth: b64u(made.auth), wrap: b64u(made.wrap) } }).catch((error: unknown) => {
+          throw refusedWords(error, "make");
+        }));
+      } finally {
+        wipe(made.auth);
       }
-      await this.openWith(raw, locked ? "passkey" : "new", false);
-      return recovery.code;
     } catch (error) {
       wipe(raw);
       throw error;
     }
+    await this.openWith(raw, "new", true);
   }
 
   /** A key read from a file, into the vault: sealed here with VK. */
@@ -516,50 +705,54 @@ class Store {
     await this.reload();
   }
 
-  /** Make a new recovery code: VK's raw bytes again, through this browser's
-   * passkey or the code it has now; in the app, the engine's. The new code,
-   * to show once. */
-  async newRecoveryCode(currentCode?: string): Promise<string> {
+  /** Sets the vault password, or a new one in place of it. In a browser,
+   * VK's raw bytes again, right then: through this browser's passkey, else
+   * from the current password, else (a vault with no password yet) from the
+   * recovery code; then a fresh salt, the derivation, and the core keeps it.
+   * In the app, the engine (Touch ID). Whether it was the first password
+   * (the recovery code is forgotten then). */
+  async setPassword(password: string, from: RawFrom | null): Promise<boolean> {
+    if (!passwordFits(password)) {
+      throw new VaultError(passwordLength(password) < PASSWORD_MIN ? "vault_problem.password_short"
+        : "vault_problem.something");
+    }
     if (this.state.app) {
-      const made = await appRecoveryCode().catch((error: unknown) => {
-        throw appWords(error);
+      const first = !this.state.vault?.password;
+      await setAppVaultPassword(password).catch((error: unknown) => {
+        throw appWords(error, "new");
       });
-      void this.reload();
-      return made.recoveryCode;
+      await this.reload();
+      return first;
     }
     const vault = this.need();
     let raw: Bytes;
-    if (currentCode) {
-      if (!isRecoveryCode(currentCode)) throw new VaultError("vault_problem.code_form");
-      const { recoverySalt, recoveryWrap } = await vaultRecovery();
-      try {
-        raw = await unwrapRecovery(currentCode, fromB64u(recoverySalt), fromB64u(recoveryWrap), vault.id);
-      } catch {
-        throw new VaultError("vault_problem.code_wrong");
-      }
+    if (from && "passkey" in from) {
+      raw = (await this.rawFromPasskey(vault)).raw;
+    } else if (from && "password" in from) {
+      raw = await this.rawFromPassword(from.password);
+    } else if (from && "code" in from) {
+      raw = await this.rawFromCode(vault, from.code, "vault_problem.code_wrong_app");
     } else {
-      const lock = this.hereLock(vault);
-      if (!lock?.credentialId) throw new VaultError("vault_problem.need_code");
-      const got = await prfGet([fromB64u(lock.credentialId)], fromB64u(vault.prfSalt));
-      if (!got.prf) throw new VaultError("vault_problem.no_prf");
-      const kek = await prfKek(got.prf);
-      wipe(got.prf);
-      try {
-        raw = await unwrapVk(kek, fromB64u(lock.wrap), lock.id);
-      } catch {
-        throw new VaultError("vault_problem.lock_broken");
-      } finally {
-        wipe(kek);
-      }
+      throw new VaultError(vault.password ? "vault_problem.password_short" : "vault_problem.need_code");
     }
+    const now = this.state.vault ?? vault;
+    const first = !now.password;
     try {
-      const made = await makeRecovery(raw, vault.id);
-      await setVaultRecovery({ recoverySalt: b64u(made.salt), recoveryWrap: b64u(made.wrap) });
-      void this.reload();
-      return made.code;
+      const made = await makePassword(password, raw, now.id).catch((error: unknown) => {
+        throw wasmWords(error);
+      });
+      try {
+        this.applyVault(await setVaultPassword({ salt: b64u(made.salt), kdf: made.kdf,
+          auth: b64u(made.auth), wrap: b64u(made.wrap) }).catch((error: unknown) => {
+          throw refusedWords(error, "set");
+        }));
+      } finally {
+        wipe(made.auth);
+      }
     } finally {
       wipe(raw);
     }
+    return first;
   }
 
   // ------------------------------------------- a new browser asks the Mac
@@ -568,7 +761,7 @@ class Store {
     if (this.pair) return;
     const found = this.state.support ?? await support();
     if (!found.x25519) {
-      this.set({ pairing: { id: null, state: "failed", sas: null, problem: "vault_problem.no_x25519" } });
+      this.set({ pairing: { id: null, state: "failed", sas: null, problem: this.said("vault_problem.no_x25519") } });
       return;
     }
     this.set({ pairing: { id: null, state: "starting", sas: null, problem: null } });
@@ -734,24 +927,35 @@ class Store {
     }
   }
 
-  /** Opens the vault on this Mac (Touch ID or its password); with the code,
-   * a vault made elsewhere. */
-  async appOpen(recoveryCode?: string): Promise<void> {
-    await openAppVault(recoveryCode).catch((error: unknown) => {
-      throw appWords(error, !!recoveryCode);
+  /** Opens the vault on this Mac: Touch ID or the Mac's password, with this
+   * Mac's lock; a vault this Mac has no lock of yet, once with the vault
+   * password (or the recovery code, while it has no password), and the
+   * engine gives this Mac its own lock. */
+  async appOpen(how: { password: string } | { recoveryCode: string } | null = null): Promise<void> {
+    if (how && "password" in how) {
+      const n = passwordLength(how.password);
+      if (n < PASSWORD_MIN) throw new VaultError("vault_problem.password_short");
+      if (n > PASSWORD_MAX || !wellFormed(how.password)) throw new VaultError("vault_problem.password_wrong");
+    }
+    await openAppVault(how).catch((error: unknown) => {
+      throw appWords(error, !how ? null : "password" in how ? "password" : "code");
     });
     await this.refreshApp();
     void this.reload();
   }
 
-  /** The vault made on this Mac: the recovery code, shown once. */
-  async appCreate(): Promise<string> {
-    const made = await createAppVault().catch((error: unknown) => {
-      throw appWords(error);
+  /** The vault made on this Mac, with the password the person made up: no
+   * Touch ID, and it is open after (0.1.26). */
+  async appCreate(password: string): Promise<void> {
+    if (!passwordFits(password)) {
+      throw new VaultError(passwordLength(password) < PASSWORD_MIN ? "vault_problem.password_short"
+        : "vault_problem.something");
+    }
+    await createAppVault(password).catch((error: unknown) => {
+      throw appWords(error, "new");
     });
     await this.reload();
     await this.refreshApp();
-    return made.recoveryCode;
   }
 
   private requestCame(message: VaultMessage): void {
