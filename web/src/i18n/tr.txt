@@ -1368,8 +1368,6 @@ log.ended = {who} sonlandırdı: {name}
 # A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
 log.ended_why = {name} sonlandı: {why}
 # A command's line under the mouse.
-log.output = Çıktı
-log.output_title = Çıktıyı burada, satırın altında göster
 log.output_gone = çıktı saklanmadı
 # {days} is log.keep_days or log.keep_year.
 log.output_gone_title = Çıktı {days} saklanır
@@ -1421,9 +1419,7 @@ log.old_banner = <b>Bu komutların çıktısı artık saklanmıyor:</b> çıktı
 log.no_open = Log açılamadı: {why}
 log.gone_title = Bu log burada değil
 log.gone_text = Makinesi kaldırıldı ya da üyesi olmadığın bir projeye taşındı.
-# 0.1.21 (the canvas, version 95): what a command printed opens under its line. Hide output closes it again.
-log.hide_output = Çıktıyı gizle
-log.hide_output_title = Yazdırdıklarını gizle
+# 0.1.21 (the canvas, version 95): what a command printed opens under its line; from 0.1.22 with the line, on a click.
 # Under the output: 27 lines · Show all 27 lines · Copy output (block.copy_output).
 log.output_lines = one: {n} satır | other: {n} satır
 log.output_all = one: {n} satırı göster | other: {n} satırın tümünü göster

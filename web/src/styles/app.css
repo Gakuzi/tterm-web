@@ -8147,10 +8147,6 @@ mark.found-mark {
   display: flex;
 }
 
-.log-line.open .log-term {
-  display: none;
-}
-
 .log-out {
   margin: 2px 0 10px 110px;
   border: 1px solid var(--line);
@@ -8376,30 +8372,116 @@ mark.log-hit {
   font-weight: 700;
 }
 
-.log-line.found {
+/* -------------------------- the log of a machine, a line opened (0.1.22) */
+
+/* A command's line opens and closes on a click, in the day and among what
+   was found: on one line, its command cut short where it is long, and how
+   many notes are under it; open, the command in full, what it printed and
+   the notes. */
+.log-line {
   cursor: pointer;
 }
 
-/* A found line's time: a button to its day, for the keys too. */
-.log-time.log-open {
-  padding: 0;
-  border: 0;
+.log-say {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.log-say .log-cmd {
+  flex: 0 1 auto;
+}
+
+.log-cmd:focus-visible {
   border-radius: 4px;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
+  box-shadow: 0 0 0 2px var(--amber-ring);
 }
 
-.log-time.log-open:hover,
-.log-time.log-open:focus-visible {
+/* How many notes, while they are not shown; lit when one of them has the
+   words Find in this log looked for. */
+.log-count {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--raised);
+  color: var(--dim);
+  font: 600 11.5px var(--font-ui);
+}
+
+.log-count.hit {
+  background: var(--amber-tint);
   color: var(--amber-ink);
-  text-decoration: underline;
+}
+
+/* Open: the command across the whole line, wrapped; under it how it ended,
+   how long it took, where, the terminal, and what can be done. */
+.log-line.open {
+  grid-template-columns: 44px 18px 12px minmax(0, 1fr);
+  align-items: start;
+  row-gap: 4px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  background: var(--surface);
+}
+
+.log-line.open .log-time,
+.log-line.open .log-cmd {
+  line-height: 20px;
+}
+
+.log-line.open .log-mark {
+  height: 20px;
+}
+
+.log-line.open .avatar {
+  margin-top: 1px;
+}
+
+.log-line.open .log-side {
+  grid-column: 4;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  min-height: 26px;
+}
+
+.log-line.open .log-acts {
+  margin-left: auto;
+}
+
+.log-line.open .log-term,
+.log-line.open:hover .log-term,
+.log-line.open:focus-within .log-term {
+  display: inline;
+}
+
+.log-line.open .log-cmd {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+}
+
+/* Its words whole where it wraps, not broken after a dash; a word longer
+   than the line breaks inside itself. */
+.log-cmd .tok {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.log-line.open .log-redacted span {
+  white-space: normal;
 }
 
 @media (max-width: 720px) {
   .log-out {
     margin-left: 0;
   }
+
 
   .log-find {
     width: 100%;

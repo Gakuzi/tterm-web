@@ -4,7 +4,12 @@ tTerm in the browser: a real terminal with command blocks, for people who work
 with servers and for their teams. Projects, roles, a journal of who ran what,
 and watching a colleague's terminal, always with them knowing.
 
-**Status:** early development. Version 0.1.21 opens what a command
+**Status:** early development. Version 0.1.22 keeps each line of a
+machine's log to one line, the command cut short where it is long and
+how many notes are under it; a click on it opens the command in full,
+what it printed and the notes, and a click again closes it. Lines Find
+in this log found open the same way, and the search stays until you
+clear it. Version 0.1.21 opens what a command
 printed under its line of a machine's log, finds words in the whole log, a
 year back, and in search too, and shows only the failed lines, those with
 notes, someone's or one terminal's, the newest first if you like.

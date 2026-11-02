@@ -1368,8 +1368,6 @@ log.ended = {who} 님이 {name} 종료함
 # A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
 log.ended_why = {name} 종료됨: {why}
 # A command's line under the mouse.
-log.output = 출력
-log.output_title = 출력을 이 줄 아래에 보기
 log.output_gone = 출력 보관 안 됨
 # {days} is log.keep_days or log.keep_year.
 log.output_gone_title = 출력은 {days} 동안 보관돼요
@@ -1421,9 +1419,7 @@ log.old_banner = <b>이 명령들이 출력한 내용은 더 이상 보관되지
 log.no_open = 로그를 열지 못했어요: {why}
 log.gone_title = 이 로그를 찾을 수 없어요
 log.gone_text = 이 로그의 머신이 제거됐거나, 내가 속하지 않은 프로젝트로 옮겨졌어요.
-# 0.1.21 (the canvas, version 95): what a command printed opens under its line. Hide output closes it again.
-log.hide_output = 출력 숨기기
-log.hide_output_title = 출력을 숨겨요
+# 0.1.21 (the canvas, version 95): what a command printed opens under its line; from 0.1.22 with the line, on a click.
 # Under the output: 27 lines · Show all 27 lines · Copy output (block.copy_output).
 log.output_lines = other: {n}줄
 log.output_all = other: {n}줄 모두 보기

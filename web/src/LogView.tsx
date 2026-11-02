@@ -14,10 +14,20 @@
 // lines, and which of them show: whose, the failed ones, those with notes,
 // one terminal's.
 //
+// From 0.1.22 (the owner, 02.11): a command's line is one line, the
+// command cut short where it is long, and how many notes are under it. A
+// click on it opens it: the command in full, what it printed, the notes;
+// a click again closes it. What Find in this log found is worked with the
+// same way, and stays until it is cleared: a click on a found line opens
+// it there, and its day is a step of its own, Open the day.
+//
 // Like a note, the log stays on the page behind its tab. While it shows
 // today and is in front, it looks again now and then for new lines.
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import {
+  Fragment, useCallback, useEffect, useRef, useState, type KeyboardEvent as KeyEvent,
+  type ReactNode,
+} from "react";
 import {
   addLogNote, blockOutput, findInLog, loadLog, LogGone, redactLog, type LogDay, type LogEntry,
   type LogFound, type LogNote, type Me, type Project,
@@ -29,8 +39,8 @@ import { Confirm } from "./Confirm";
 import { goneThere, useFoundLine, wentThere } from "./found";
 import { useT, type Translate } from "./i18n";
 import {
-  Branch, Calendar, ChevronDown, ChevronLeft, ChevronRight, Close, Collapse, Copy, Cross, Erase,
-  History, Lines, Link, Lock, NoteAdd, Order, Search, TerminalIcon,
+  Branch, Bubble, Calendar, ChevronDown, ChevronLeft, ChevronRight, Close, Collapse, Copy, Cross,
+  Erase, History, Lines, Link, Lock, NoteAdd, Order, Search, TerminalIcon,
 } from "./icons";
 import {
   dayStart, fromIsoDay, isoDay, lineLink, linkedLine, logChanged, onLogChange, plainly,
@@ -58,6 +68,9 @@ const CLOSED_BY_HAND = "Closed."; // i18n-ignore
 const FIND_AFTER_MS = 250;
 /** Lines of what a command printed shown before Show all. */
 const FOLD_LINES = 12;
+/** A click on an open line closes it after this long, unless a second
+ * click makes it a double click: a word being chosen. */
+const CLOSE_AFTER_MS = 250;
 /** The order of the lines, as this browser last had it. */
 const ORDER_KEY = "tterm.log.newest";
 
@@ -96,6 +109,16 @@ function fullDay(ms: number, t: Translate): string {
 /** "a year", "30 days": how long the project keeps something. */
 function kept(days: number, t: Translate): string {
   return days === 365 ? t("log.keep_year") : t("log.keep_days", { n: days });
+}
+
+/** A command's words as an open line wraps them (0.1.22): each kept whole,
+ * as it is read, so that "-not -path" never reads "-not -" on one line and
+ * "path" on the next; one longer than the line breaks inside itself. The
+ * words looked for, marked. */
+function wrapped(command: string, words: string[]): ReactNode[] {
+  return command.split(/(\s+)/).map((part, i) => (part.trim()
+    ? <span key={i} className="tok">{words.length ? marked(part, words, "log-hit") : part}</span>
+    : part));
 }
 
 /** A command as Markdown code, whatever backticks are in it. */
@@ -262,7 +285,8 @@ export function LogView(props: Props) {
   const loads = useRef(0);
   const linkAfter = useRef(0);
   // The tools (0.1.21): which lines show, their order, what is looked for
-  // in the whole log and what was found, the lines whose output is open.
+  // in the whole log and what was found; the lines open (0.1.22), in the
+  // day and among what was found alike.
   const [filter, setFilter] = useState<LogFilter>(NO_FILTER);
   const [newest, setNewest] = useState(savedNewest);
   const [query, setQuery] = useState("");
@@ -270,7 +294,11 @@ export function LogView(props: Props) {
   const [finding, setFinding] = useState(false);
   const [findProblem, setFindProblem] = useState<string | null>(null);
   const [findAttempt, setFindAttempt] = useState(0);
-  const [opened, setOpened] = useState<ReadonlySet<number>>(() => new Set());
+  // A line a link pointed to is open when its day comes.
+  const [opened, setOpened] = useState<ReadonlySet<number>>(() => {
+    const linkedTo = location.pathname === `/l/${machineId}` ? linkedLine(location.hash) : null;
+    return new Set(linkedTo ? [linkedTo.entry] : []);
+  });
   const findField = useRef<HTMLInputElement>(null);
   const looking = query.trim().length > 0;
   const end = shiftDay(start, 1);
@@ -344,14 +372,16 @@ export function LogView(props: Props) {
     };
   }, [query, newest, machineId, active, findAttempt]);
 
-  /** A line asked for by a link, by search, or among what was found: its
-   * day, fresh, with nothing filtered out, and the line lit. */
-  const goToLine = useCallback((entry: number, at: number) => {
+  /** A line asked for by a link or by search: its day, fresh, with nothing
+   * filtered out, and the line lit and open. Open the day, from among what
+   * was found, keeps the filters: the line shows with them. */
+  const goToLine = useCallback((entry: number, at: number, keepFilter = false) => {
     setQuery("");
     setWriting(null);
-    setFilter(NO_FILTER);
+    if (!keepFilter) setFilter(NO_FILTER);
     setStart(dayStart(at));
     setLinked(entry);
+    setOpened((was) => (was.has(entry) ? was : new Set(was).add(entry)));
     linkAfter.current = loads.current;
     setAttempt((n) => n + 1);
   }, []);
@@ -423,16 +453,47 @@ export function LogView(props: Props) {
     setStart(dayStart(to));
   };
 
-  /** A found line's day, with the line lit: what was looked for gives way. */
-  const openAt = (e: LogEntry) => goToLine(e.id, e.at);
+  /** A found line's day, with the line lit: what was looked for gives way,
+   * as Open the day says; the filters stay, as with the day's own. */
+  const openAt = (e: LogEntry) => goToLine(e.id, e.at, true);
 
-  const toggleOutput = (id: number) => {
+  /** A line opened or closed: a click on it, Enter or Space on its command. */
+  const toggleLine = (id: number) => {
     setOpened((was) => {
       const next = new Set(was);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+  };
+
+  /** A line closed, if it is open: what a click on it does a moment later. */
+  const closeLine = (id: number) => {
+    setOpened((was) => {
+      if (!was.has(id)) return was;
+      const next = new Set(was);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  // A click on an open line closes it a moment later (a double click
+  // chooses a word instead): the lines about to close, by their ids. And
+  // whether a menu was open when the button went down: the click closes the
+  // menu, not the line.
+  const closing = useRef(new Map<number, number>());
+  const menuWasOpen = useRef(false);
+  useEffect(() => {
+    const timers = closing.current;
+    return () => {
+      for (const timer of timers.values()) window.clearTimeout(timer);
+    };
+  }, []);
+
+  /** A note started under a line: the line opens, and stays open after. */
+  const startNote = (id: number) => {
+    setOpened((was) => (was.has(id) ? was : new Set(was).add(id)));
+    setWriting(id);
   };
 
   const turnOrder = () => {
@@ -485,6 +546,12 @@ export function LogView(props: Props) {
   const pool = looking ? (found?.entries ?? []) : entries;
   const visible = pool.filter((e) => shows(e, filter, me.id));
   const ordered = !looking && newest ? [...visible].reverse() : visible;
+  // A note being written under a line that shows no more (what was found
+  // changed, or a filter): let go of, so that its editor does not come back
+  // empty with the line and take the keys from where they are.
+  useEffect(() => {
+    if (writing !== null && !ordered.some((e) => e.id === writing)) setWriting(null);
+  }, [writing, ordered]);
   const authors = authorsOf(pool, me.id);
   const terms = terminalsOf(pool);
   const filtered = filtering(filter);
@@ -605,43 +672,84 @@ export function LogView(props: Props) {
     const bad = failedLine(e);
     const mine = e.by?.id === me.id;
     const here = writing === e.id;
-    const open = opened.has(e.id) && !!e.output;
+    // Open: the command in full, what it printed, the notes. A line with a
+    // note being written under it stays open until the note is saved or let
+    // go of, so that what is typed is not lost to a click.
+    const open = here || opened.has(e.id);
+    const printed = !!e.output && !!e.terminal && e.seq !== undefined;
     const command = plainly(e.command ?? "");
+    const notes = e.notes ?? [];
+    // Among what was found: a note under the line has the words.
+    const noteHit = words.length > 0 && notes.some((n) => hasWords(n.text, words));
+    const toggle = () => {
+      if (!here) toggleLine(e.id);
+    };
+    const keys = (event: KeyEvent<HTMLElement>) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      event.preventDefault();
+      // A key held down: once, not on and off.
+      if (event.repeat) return;
+      toggle();
+    };
+    // The command, for the keys: a button that opens and closes its line.
+    const say = { role: "button", tabIndex: 0, "aria-expanded": open, onKeyDown: keys };
     const classes = ["log-line", ...(lit === e.id ? ["lit"] : []), ...(here ? ["writing"] : []),
       ...(open ? ["open"] : []), ...(looking ? ["found"] : [])].join(" ");
     return (
       <Fragment key={e.id}>
         <div id={looking ? undefined : `e${e.id}`} className={classes}
-          onClick={looking ? (event) => {
-            // A line found: its day, at the line. Not when a button of it,
-            // its menu or text being selected had the click.
+          onMouseDown={() => {
+            menuWasOpen.current = !!page.current?.querySelector(".menu");
+          }}
+          onClick={(event) => {
+            // The line opens or closes. Not when a button of it, its menu or
+            // text being selected had the click, nor a click that closed a
+            // menu; a second click is a double click, a word being chosen.
             // i18n-ignore
-            if ((event.target as Element).closest("button, a, input, .menu")) return;
-            if (window.getSelection()?.toString()) return;
-            openAt(e);
-          } : undefined}>
-          {looking ? (
-            <button type="button" className="log-time log-open" title={t("log.open_day")}
-              aria-label={`${t("log.open_day")}: ${dayLabel(dayStart(e.at))}, ${clock(e.at)}`}
-              onClick={() => openAt(e)}>
-              {clock(e.at)}
-            </button>
-          ) : (
-            <span className="log-time">{clock(e.at)}</span>
-          )}
+            if ((event.target as Element).closest("button, a, input, textarea, .menu")) return;
+            const timers = closing.current;
+            if (event.detail > 1) {
+              window.clearTimeout(timers.get(e.id));
+              timers.delete(e.id);
+              return;
+            }
+            if (menuWasOpen.current || window.getSelection()?.toString()) return;
+            if (!open) {
+              toggle();
+              return;
+            }
+            if (timers.has(e.id) || here) return;
+            timers.set(e.id, window.setTimeout(() => {
+              timers.delete(e.id);
+              if (!window.getSelection()?.toString()) closeLine(e.id);
+            }, CLOSE_AFTER_MS));
+          }}>
+          <span className="log-time">{clock(e.at)}</span>
           <Avatar who={e.by} me={me} size="xs" />
           <span className="log-mark">
             {bad ? <Cross size={10} /> : <span className="dot" aria-hidden="true" />}
           </span>
-          {e.redacted ? (
-            <span className="log-cmd" tabIndex={0}>
-              <RedactedMark redacted={e.redacted} me={me} />
-            </span>
-          ) : (
-            <code className="log-cmd" tabIndex={0} title={command}>
-              {words.length ? marked(command, words, "log-hit") : command}
-            </code>
-          )}
+          <span className="log-say">
+            {e.redacted ? (
+              <span className="log-cmd" {...say}>
+                <RedactedMark redacted={e.redacted} me={me} />
+              </span>
+            ) : (
+              <code className="log-cmd" {...say}>
+                {open ? wrapped(command, words)
+                  : words.length ? marked(command, words, "log-hit") : command}
+              </code>
+            )}
+            {!open && notes.length > 0 && (
+              <span className={noteHit ? "log-count hit" : "log-count"}
+                title={t("count.notes", { n: notes.length })}>
+                <Bubble size={12} />
+                <span className="log-count-n" aria-hidden="true">{notes.length}</span>
+                <span className="visually-hidden">{t("count.notes", { n: notes.length })}</span>
+              </span>
+            )}
+          </span>
           <span className="log-side">
             {bad && <span className="red">{t("block.exit", { code: String(e.exit) })}</span>}
             {e.ms !== null && e.ms !== undefined && <span>{duration(e.ms)}</span>}
@@ -649,14 +757,7 @@ export function LogView(props: Props) {
             {e.branch && <span className="br"><Branch size={12} />{e.branch}</span>}
             <span className="log-term">{terminalName(e.terminal?.name ?? "1", t)}</span>
             <span className="log-acts">
-              {e.output && e.terminal && e.seq !== undefined ? (
-                <button type="button" className={open ? "log-act on" : "log-act"}
-                  aria-expanded={open}
-                  title={open ? t("log.hide_output_title") : t("log.output_title")}
-                  onClick={() => toggleOutput(e.id)}>
-                  <Lines size={13} />{open ? t("log.hide_output") : t("log.output")}
-                </button>
-              ) : mine && !e.redacted && (
+              {!printed && mine && !e.redacted && (
                 <span className="log-gone"
                   title={t("log.output_gone_title", { days: kept(log?.keep.output ?? found?.keep.output ?? 30, t) })}>
                   {t("log.output_gone")}
@@ -664,13 +765,26 @@ export function LogView(props: Props) {
               )}
               {e.canNote && (
                 <button type="button" className={here ? "log-act on" : "log-act"}
-                  title={t("log.add_note_title")} onClick={() => setWriting(e.id)}>
+                  title={t("log.add_note_title")} onClick={() => startNote(e.id)}>
                   <NoteAdd size={13} />{t("log.add_note")}
                 </button>
               )}
               <MenuButton label={t("log.line_menu")} className="log-more">
                 {(close) => (
                   <>
+                    {looking && (
+                      <>
+                        <button type="button" className="menu-item" role="menuitem"
+                          onClick={() => {
+                            close();
+                            openAt(e);
+                          }}>
+                          <Calendar size={15} />
+                          <span className="menu-text">{t("log.open_day")}</span>
+                        </button>
+                        <div className="menu-line" />
+                      </>
+                    )}
                     {!e.redacted && (
                       <button type="button" className="menu-item" role="menuitem"
                         onClick={() => {
@@ -710,13 +824,15 @@ export function LogView(props: Props) {
             </span>
           </span>
         </div>
-        {open && <OutputBox entry={e} notify={props.notify} />}
-        <Thread notes={e.notes ?? []} me={me} canWrite={!!e.canNote} writing={here}
-          onWrite={() => setWriting(e.id)} onCancel={() => setWriting(null)}
-          onSave={(text) => saveNote(e, text)}
-          menuOf={e.canRedact ? (n) => noteMenu(e, n) : undefined}
-          words={words}
-          className="log-note" />
+        {open && printed && <OutputBox entry={e} notify={props.notify} />}
+        {open && (
+          <Thread notes={notes} me={me} canWrite={!!e.canNote} writing={here}
+            onWrite={() => startNote(e.id)} onCancel={() => setWriting(null)}
+            onSave={(text) => saveNote(e, text)}
+            menuOf={e.canRedact ? (n) => noteMenu(e, n) : undefined}
+            words={words}
+            className="log-note" />
+        )}
       </Fragment>
     );
   };

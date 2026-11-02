@@ -1368,8 +1368,6 @@ log.ended = {who} ended {name}
 # A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
 log.ended_why = {name} ended: {why}
 # A command's line under the mouse.
-log.output = Output
-log.output_title = Show what it printed, under the line
 log.output_gone = output not kept
 # {days} is log.keep_days or log.keep_year.
 log.output_gone_title = What it printed is kept {days}
@@ -1421,9 +1419,7 @@ log.old_banner = <b>What these commands printed is no longer kept:</b> output st
 log.no_open = The log did not open: {why}
 log.gone_title = This log is not here
 log.gone_text = Its machine was removed, or moved to a project you are not in.
-# 0.1.21 (the canvas, version 95): what a command printed opens under its line. Hide output closes it again.
-log.hide_output = Hide output
-log.hide_output_title = Hide what it printed
+# 0.1.21 (the canvas, version 95): what a command printed opens under its line; from 0.1.22 with the line, on a click.
 # Under the output: 27 lines · Show all 27 lines · Copy output (block.copy_output).
 log.output_lines = one: {n} line | other: {n} lines
 log.output_all = one: Show all {n} line | other: Show all {n} lines

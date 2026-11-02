@@ -1368,8 +1368,6 @@ log.ended = {name} を {who} が終了しました
 # A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
 log.ended_why = {name} が終了しました：{why}
 # A command's line under the mouse.
-log.output = 出力
-log.output_title = 出力をこの行の下に表示
 log.output_gone = 出力は保存されていません
 # {days} is log.keep_days or log.keep_year.
 log.output_gone_title = 出力は {days}保存されます
@@ -1421,9 +1419,7 @@ log.old_banner = <b>これらのコマンドの出力は、もう保存されて
 log.no_open = ログを開けませんでした：{why}
 log.gone_title = このログは見つかりません
 log.gone_text = このログのマシンが削除されたか、あなたがメンバーではないプロジェクトに移動されました。
-# 0.1.21 (the canvas, version 95): what a command printed opens under its line. Hide output closes it again.
-log.hide_output = 出力を隠す
-log.hide_output_title = 出力を隠します
+# 0.1.21 (the canvas, version 95): what a command printed opens under its line; from 0.1.22 with the line, on a click.
 # Under the output: 27 lines · Show all 27 lines · Copy output (block.copy_output).
 log.output_lines = other: {n} 行
 log.output_all = other: {n} 行をすべて表示

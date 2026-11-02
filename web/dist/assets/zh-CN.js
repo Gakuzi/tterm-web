@@ -1368,8 +1368,6 @@ log.ended = {name} 由 {who} 结束
 # A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
 log.ended_why = {name} 已结束：{why}
 # A command's line under the mouse.
-log.output = 输出
-log.output_title = 在这一行下方查看输出
 log.output_gone = 输出未保留
 # {days} is log.keep_days or log.keep_year.
 log.output_gone_title = 输出保留 {days}
@@ -1421,9 +1419,7 @@ log.old_banner = <b>这些命令的输出已不再保留。</b>输出保留 {out
 log.no_open = 无法打开日志：{why}
 log.gone_title = 这份日志不存在
 log.gone_text = 它所属的机器已被移除，或被移到了你未加入的项目中。
-# 0.1.21 (the canvas, version 95): what a command printed opens under its line. Hide output closes it again.
-log.hide_output = 隐藏输出
-log.hide_output_title = 隐藏它打印的内容
+# 0.1.21 (the canvas, version 95): what a command printed opens under its line; from 0.1.22 with the line, on a click.
 # Under the output: 27 lines · Show all 27 lines · Copy output (block.copy_output).
 log.output_lines = other: {n} 行
 log.output_all = other: 显示全部 {n} 行
