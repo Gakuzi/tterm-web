@@ -43,6 +43,7 @@ import {
   Download, Folder as FolderIcon, FolderOpen, Gear, History, Key, Languages, Lock, Logo, Moon,
   People, Person, Pin, Plus, Server, SignIn, SignOut, Sun,
 } from "./icons";
+import { folderOf } from "./links";
 import { hereWord, onMac } from "./local";
 import { NameInput } from "./NameInput";
 import { Avatar, NoteIcon } from "./ProjectPage";
@@ -126,11 +127,9 @@ export type AccountPage = "settings" | "account" | "move";
  * the person has signed in with the app. It has the latest release's dmg and says how
  * to open an app signed with tTerm's own certificate, not Apple's, which
  * macOS does not open with a double click the first time. The site keeps
- * English at the root, Portuguese in pt and Chinese in zh. */
-const SITE_FOLDER: Partial<Record<Lang, string>> = { en: "", "pt-BR": "pt", "zh-CN": "zh" };
-
+ * its languages in folders (links.ts). */
 export function macDownload(lang: Lang): string {
-  const folder = SITE_FOLDER[lang] ?? lang;
+  const folder = folderOf(lang);
   return folder ? `https://tterm.net/${folder}/download/` : "https://tterm.net/download/";
 }
 

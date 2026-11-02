@@ -965,10 +965,12 @@ export async function installStatus(id: string): Promise<InstallStatus> {
   return (await check(response)).json();
 }
 
+/** `cwd` (0.1.24): the folder to start in, the one an ended terminal was
+ * in; the core starts there if it can, and at home otherwise. */
 export async function openTerminal(machineId: string, cols: number,
-  rows: number): Promise<TerminalInfo> {
+  rows: number, cwd?: string): Promise<TerminalInfo> {
   const response = await fetch("/api/terminals",
-    change("POST", { machineId, cols, rows }));
+    change("POST", cwd ? { machineId, cols, rows, cwd } : { machineId, cols, rows }));
   return (await check(response)).json();
 }
 

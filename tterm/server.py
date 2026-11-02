@@ -249,9 +249,11 @@ class Core:
                 await self._sweeper
             self._sweeper = None
         # Terminals first: their ends go to the database, which closes last.
+        # Each waits up to 5 seconds for its last commands to be saved before
+        # its line in the log (terminals.py, _end): twice the grace for them.
         if self.terminals is not None:
             with contextlib.suppress(Exception):
-                await asyncio.wait_for(self.terminals.stop(), grace)
+                await asyncio.wait_for(self.terminals.stop(), grace * 2)
             self.terminals = None
         self.agents.close_all("tTerm Web stopped.")
         for server in self._servers:

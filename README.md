@@ -4,7 +4,12 @@ tTerm in the browser: a real terminal with command blocks, for people who work
 with servers and for their teams. Projects, roles, a journal of who ran what,
 and watching a colleague's terminal, always with them knowing.
 
-**Status:** early development. Version 0.1.23 makes a machine's log the
+**Status:** early development. Version 0.1.24 says why a terminal
+ended when a release of tTerm Web ended it: "tTerm Web was updated to
+0.1.24", that open terminals end when it updates and that their commands
+and what they printed are in the machine's log, with What's new in that
+version (docs.tterm.net) and the log a click away; Open a new terminal
+there starts in the folder the old one was in. Version 0.1.23 makes a machine's log the
 machine's own: moved to another project, the machine takes all of it
 along, the lines written before the move too, and the move is a line of
 it; whoever is in the project the machine is in now reads all of it, and

@@ -69,8 +69,13 @@ sh /opt/tterm-web/deploy/update.sh
 
 It takes the latest from git as the user `tterm-web`, the Python packages,
 the systemd units and nginx's settings, and restarts both services. The
-core restarting ends the terminals; agents connect again by themselves. The
-page comes built in `web/dist`: the server has no Node.
+core restarting ends the terminals; agents connect again by themselves. A
+terminal that ended so says "tTerm Web was updated to <version>." on its
+tab and in its machine's log once a new version starts (the core keeps
+each start and its version, in `core_runs`); a restart of the same version,
+with nothing new in git, says "tTerm Web stopped.", as before. Open a new
+terminal there starts in the folder it was in. The page comes built in
+`web/dist`: the server has no Node.
 
 ## Plans and their limits
 

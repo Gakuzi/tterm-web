@@ -23,7 +23,7 @@ from urllib.parse import urlencode
 import asyncpg
 from fastapi import Depends, FastAPI, Request, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .. import __version__
 from ..core import (accounts, auth, letters, logs, machines, notes,
@@ -140,6 +140,10 @@ class TerminalRequest(BaseModel):
     machineId: uuid.UUID
     cols: int = 80
     rows: int = 24
+    #: The folder to start in (0.1.24): Open a new terminal on one that
+    #: ended starts where it was. One the shell cannot be told is ignored
+    #: (shell.start_in); the limit is only one for the size of the request.
+    cwd: str = Field("", max_length=65536)
 
 
 class CompleteRequest(BaseModel):
@@ -908,12 +912,14 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     async def open_terminal(request: TerminalRequest,
                             session: auth.Session = Depends(signed_in)) -> Response:
         """A new terminal on a machine. It connects in the background; the
-        page attaches to it over the socket and watches it come up."""
+        page attaches to it over the socket and watches it come up. With
+        `cwd` (0.1.24) it starts in that folder, if it can."""
         if terminals is None:
             return _json({"error": "terminals are not running"}, 503)
         try:
             terminal = await terminals.open(session.person, request.machineId,
-                                            request.cols, request.rows)
+                                            request.cols, request.rows,
+                                            request.cwd)
         except NotAllowed as exc:
             return _json({"error": str(exc)}, 404)
         return _json(terminal.describe(), 201)

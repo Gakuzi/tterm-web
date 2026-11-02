@@ -1469,6 +1469,8 @@ log.open_day = Günü aç
 # ------------------------------------------------------------ reason: why a terminal ended (reasons.ts)
 # What tTerm Web says when a terminal ends by itself, under a terminal that ended and in the log (log.ended_why). {machine} and {mac} are machines' names, {code} a number, {why} what the system said, as it said it.
 reason.stopped = tTerm Web durdu.
+# A release ended it (0.1.24). {version} is the version tTerm Web was updated to: 0.1.24.
+reason.updated = tTerm Web, {version} sürümüne güncellendi.
 reason.closed = Kapatıldı.
 reason.closed_early = Açılmadan kapatıldı.
 reason.shell_code = Kabuk {code} koduyla sonlandı.
@@ -1508,7 +1510,12 @@ terminal_view.no_such = Böyle bir terminal yok
 terminal_view.ended = Bu terminal sonlandı
 terminal_view.not_running = Artık çalışmıyor.
 terminal_view.open_new = {machine} üzerinde yeni terminal aç
+# The title of open_new, when the folder the ended terminal was in is known: the new one starts there if it can (0.1.24), at home otherwise. {folder}: ~/shop.
+terminal_view.open_new_title = Dizin hâlâ duruyorsa bu terminalin bulunduğu {folder} dizininde açılır.
 terminal_view.close_tab = Sekmeyi kapat
+# A release ended it (0.1.24): after reason.updated, and under it a link to What's new in that version, in the documentation. {version}: 0.1.24.
+terminal_view.release_note = Güncelleme sırasında açık terminaller sonlanır; komutları ve çıktıları makinenin logunda kalır.
+terminal_view.whats_new = {version} sürümündeki yenilikler
 
 # ------------------------------------------------------------ classic: the Classic mode, every key straight to the shell (ClassicTerminal.tsx)
 # A command search put here. Line is the mode (input.mode_line).

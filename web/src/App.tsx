@@ -635,14 +635,15 @@ export function App() {
 
   /** A new terminal on the machine, in a new tab. Opened from an ended
    * terminal (`instead`), it takes that one's tab and its address: Back
-   * does not bring the ended one back. */
+   * does not bring the ended one back; and from 0.1.24 it starts in the
+   * folder that one was in (`cwd`). */
   const startTerminal = useCallback((machineId: string, instead?: string,
-    then?: (terminalId: string) => void) => {
+    then?: (terminalId: string) => void, cwd?: string) => {
     const { cols, rows } = guessSize();
     const project = stateNow.current?.projects.find((p) =>
       p.machines.some((m) => m.id === machineId));
     if (project) unfold(`p:${project.id}`, `m:${machineId}`);
-    openTerminal(machineId, cols, rows)
+    openTerminal(machineId, cols, rows, cwd)
       .then((terminal) => {
         setStatuses((all) => {
           const next = { ...all, [terminal.id]: {
@@ -1674,7 +1675,10 @@ export function App() {
         {shownTabs.filter(isTerminalTab).map((id) => (
           <TerminalView key={id} terminalId={id} active={id === current}
             shownTheme={shownTheme} onStatus={onStatus} onCloseTab={closeTab}
-            onOpenNew={startTerminal} onChanged={refresh} notify={notYet}
+            onOpenNew={(machineId, instead, cwd) =>
+              startTerminal(machineId, instead, undefined, cwd)}
+            onOpenLog={(machineId) => openTab(logTab(machineId))}
+            onChanged={refresh} notify={notYet}
             machineThere={(machineId) => machineIds.has(machineId)}
             paste={paste?.terminalId === id ? paste : null} me={state.me}
             here={hereIds.has(liveTerminals.find((x) => x.id === id)?.machineId ?? "")} />

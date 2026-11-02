@@ -100,26 +100,57 @@ class Plan:
     blocks: bool = False
 
 
-def plan(deploy_output: str) -> Plan:
+def plan(deploy_output: str, folder: str = "") -> Plan:
     """The login shell decides, as with plain ssh: zsh if it is zsh,
     otherwise bash. Without bash (a bare busybox) the login shell starts as
     it is, and the terminal works without blocks. bash older than 4.4 has
-    no PS0: it marks its prompts, but not where commands start."""
+    no PS0: it marks its prompts, but not where commands start.
+
+    `folder`, from 0.1.24: where the shell starts, the folder the terminal
+    it replaces was in (see start_in)."""
     found: dict[str, str] = {}
     for line in deploy_output.splitlines():
         name, sep, value = line.partition("=")
         if sep:
             found[name.strip()] = value.strip()
     login = found.get("shell", "")
+    first = start_in(folder, login)
     if login.rsplit("/", 1)[-1] == "zsh" and found.get("zsh"):
-        return Plan("zsh", f'ZDOTDIR="$HOME/{FOLDER}/zsh" exec zsh -il', True,
-                    True)
+        return Plan("zsh",
+                    first + f'ZDOTDIR="$HOME/{FOLDER}/zsh" exec zsh -il',
+                    True, True)
     if found.get("bash"):
         return Plan("bash",
-                    f'exec bash --init-file "$HOME/{FOLDER}/bash.sh" -i', True,
-                    _version(found.get("bash_version", "")) >= (4, 4))
+                    first + f'exec bash --init-file "$HOME/{FOLDER}/bash.sh" -i',
+                    True, _version(found.get("bash_version", "")) >= (4, 4))
     name = login.rsplit("/", 1)[-1] or "sh"
-    return Plan(name, 'exec "${SHELL:-/bin/sh}" -l', False)
+    return Plan(name, first + 'exec "${SHELL:-/bin/sh}" -l', False)
+
+
+#: The login shells that read the words of start_in alike: sshd and the
+#: agent run the shell's command with the login shell, `$SHELL -c`. Any
+#: other (csh, nu...) starts the shell in the home folder, as before.
+_READS_CD = frozenset({"sh", "bash", "zsh", "dash", "ash", "ksh", "mksh",
+                       "yash", "fish"})
+#: A longer folder is not started in.
+FOLDER_MAX = 1024
+
+
+def start_in(folder: str, login: str) -> str:
+    """The words before the shell's command that start it in `folder`:
+    "Open a new terminal" on a terminal that ended starts where it was
+    (0.1.24). Empty when there is no folder, when the login shell is not
+    one of _READS_CD, and for a folder that is not a whole path or has a
+    control character or a backslash in it: inside single quotes fish
+    reads a backslash before a quote as the quote itself, and the folder
+    must not end the quotes. A folder that is gone by then, or that cannot
+    be entered, leaves the shell in the home folder, without a word."""
+    if (not folder.startswith("/") or len(folder) > FOLDER_MAX
+            or "\\" in folder or any(ord(c) < 32 or ord(c) == 127 for c in folder)
+            or login.rsplit("/", 1)[-1] not in _READS_CD):
+        return ""
+    quoted = "'" + folder.replace("'", "'\\''") + "'"
+    return f"cd {quoted} 2>/dev/null; "
 
 
 def _version(text: str) -> tuple[int, int]:

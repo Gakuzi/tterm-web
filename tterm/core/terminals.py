@@ -26,6 +26,11 @@ SSH; the terminal does it all the same way over either (see transport.py).
 From 0.0.7 a computer's terminal waits for its agent when the agent goes
 (the laptop sleeps, the network blinks): it stays open, away, takes no keys
 meanwhile, and goes on where it was when the agent is back.
+
+From 0.1.24 a terminal that a release of tTerm Web ended says so: "tTerm Web
+was updated to 0.1.24." instead of "tTerm Web stopped.", on its tab and in
+its machine's log; and Open a new terminal there starts in the folder it
+was in.
 """
 from __future__ import annotations
 
@@ -48,6 +53,7 @@ from typing import Awaitable, Callable
 import asyncpg
 import asyncssh
 
+from .. import __version__
 from . import (accounts, complete, logs, search, shell, ssh, transport, trust,
                vault)
 from .accounts import Person
@@ -76,6 +82,20 @@ PENDING_MAX = 64 * 1024
 #: Roles that may open terminals; observers only watch. How many one person
 #: may have open at once is their plan's ("terminals" in its limits).
 CAN_OPEN = ("owner", "admin", "member")
+
+#: Why the terminals open when the core stops end (Terminals.stop).
+STOPPED = "tTerm Web stopped."
+#: A release says so of the terminals the stop before it ended (0.1.24):
+#: those that ended at most this long before it starts, the moments of a
+#: restart. A longer wait, or a run that kept no version (one before
+#: 0.1.24, gone back to), does not stretch it to earlier stops.
+RESTART_WINDOW = "15 minutes"
+
+
+def updated(version: str) -> str:
+    """Why the terminals open when tTerm Web was updated ended (0.1.24)."""
+    return f"tTerm Web was updated to {version}."
+
 
 #: What deploying the shell scripts may take, at most.
 DEPLOY_TIMEOUT = 20
@@ -260,7 +280,8 @@ class Terminal:
 
     def __init__(self, *, pool: asyncpg.Pool, signer: SignerClient,
                  owner: Person, machine: Machine, name: str,
-                 cols: int, rows: int, agents=None, relay=None) -> None:
+                 cols: int, rows: int, agents=None, relay=None,
+                 start_in: str = "") -> None:
         self.id = uuid.uuid4()
         self.pool = pool
         self.signer = signer
@@ -288,6 +309,9 @@ class Terminal:
         self.home = ""
         self.branch = ""
         self.venv = ""
+        #: The folder the shell starts in, when the login shell can be told
+        #: (shell.start_in): the one the terminal it replaces was in.
+        self._start_in = start_in
         #: The shell's PATH at its last prompt, for Tab on a command.
         self.path = ""
 
@@ -354,7 +378,8 @@ class Terminal:
             "shell": self.shell,
             "markers": self.markers,
             "blocks": self.blocks,
-            "cwd": self.cwd,
+            # Until its first prompt, the folder it is to start in (0.1.24).
+            "cwd": self.cwd or self._start_in,
             "home": self.home,
             "branch": self.branch,
             "venv": self.venv,
@@ -558,7 +583,7 @@ class Terminal:
                         self.machine.label,
                         err.decode("utf-8", "replace").strip()[-300:])
             return shell.plan("")
-        return shell.plan(output)
+        return shell.plan(output, self._start_in)
 
     # ------------------------------------------------------------ stream
 
@@ -979,16 +1004,22 @@ class Terminal:
             self._link.release()
         self._chan = None
         self._changed()
-        if self._saving:
-            await asyncio.wait(set(self._saving), timeout=5)
+        # Its end goes in first, the moment it is known: a core stopping has
+        # only seconds (Core.stop), and the next start closes what is left
+        # open without it. And the folder it was in, or was to start in:
+        # Open a new terminal starts there (0.1.24).
         try:
             await self.pool.execute(
                 "UPDATE terminals SET closed_at = now(), last_seq = $2, "
-                "end_reason = $3, shell = $4, home = $5 WHERE id = $1",
+                "end_reason = $3, shell = $4, home = $5, last_cwd = $6 "
+                "WHERE id = $1",
                 self.id, self.last_seq, reason[:500], self.shell,
-                self.home or None)
+                self.home or None, (self.cwd or self._start_in) or None)
         except Exception:               # noqa: BLE001
             log.exception("could not record the end of terminal %s", self.id)
+        # Its line in the log after the lines of its last commands.
+        if self._saving:
+            await asyncio.wait(set(self._saving), timeout=5)
         await self._journal("terminal.closed", {"reason": reason[:500]})
         log.info("terminal on %s ended: %s", self.machine.label, reason)
 
@@ -1072,14 +1103,59 @@ class Terminals:
         self._peak = 0
         self._peak_one = 0
 
-    async def start(self) -> None:
+    async def start(self, version: str = __version__) -> None:
         """Terminals do not outlive the core: any left open by the last run
-        ended with it."""
-        await self.pool.execute(
-            "UPDATE terminals SET closed_at = now(), end_reason = $1 "
-            "WHERE closed_at IS NULL", "tTerm Web stopped.")
+        ended with it (see close_left)."""
+        await self.close_left(version)
         self._sweeper = asyncio.create_task(self._sweep())
         self._filler = asyncio.create_task(self._fill())
+
+    async def close_left(self, version: str) -> None:
+        """Closes the terminals the last run left open, each with its line
+        in its machine's log, and keeps this start and its version (0.1.24).
+
+        A start of another version than the run before it is a release: the
+        terminals the stop of that run ended (RESTART_WINDOW), and any it
+        left open, say "tTerm Web was updated to 0.1.24." instead of "tTerm
+        Web stopped.", on their tabs (ended() gives the page what the
+        database has) and in the machine's log. The same version again is a
+        restart, and says what it always did."""
+        async with self.pool.acquire() as conn, conn.transaction():
+            last = await conn.fetchrow(
+                "SELECT version, started_at FROM core_runs "
+                "ORDER BY id DESC LIMIT 1")
+            await conn.execute("INSERT INTO core_runs (version) VALUES ($1)",
+                               version)
+            release = last is None or last["version"] != version
+            reason = updated(version) if release else STOPPED
+            # Left open: a stop that ran out of time, or a crash. Their line
+            # in the log is at this start.
+            await conn.execute(
+                """
+                WITH closed AS (
+                    UPDATE terminals SET closed_at = now(), end_reason = $1
+                    WHERE closed_at IS NULL
+                    RETURNING id, machine_id, owner_id)
+                INSERT INTO journal (project_id, user_id, kind, machine_id,
+                                     terminal_id, details, expires_at)
+                SELECT m.project_id, c.owner_id, 'terminal.closed', c.machine_id,
+                       c.id, jsonb_build_object('reason', $1::text),
+                       now() + make_interval(days => COALESCE(
+                           p.journal_days, $2))
+                FROM closed c
+                JOIN machines m ON m.id = c.machine_id
+                JOIN projects p ON p.id = m.project_id
+                """, reason, accounts.PERSONAL_JOURNAL_DAYS)
+            if release:
+                # Those the last run's stop ended: after it started (those
+                # its own start closed have its very moment), and moments
+                # before this one.
+                await conn.execute(
+                    "UPDATE terminals SET end_reason = $1 "
+                    "WHERE end_reason = $2 "
+                    "AND closed_at > coalesce($3::timestamptz, '-infinity') "
+                    f"AND closed_at > now() - interval '{RESTART_WINDOW}'",
+                    reason, STOPPED, last["started_at"] if last else None)
 
     async def _fill(self) -> None:
         try:
@@ -1090,7 +1166,10 @@ class Terminals:
             log.exception("could not make the text of earlier blocks for search")
 
     async def open(self, person: Person, machine_id: uuid.UUID, cols: int,
-                   rows: int) -> Terminal:
+                   rows: int, cwd: str = "") -> Terminal:
+        """A new terminal on the machine. `cwd` (0.1.24): the folder to start
+        in, the one the terminal it replaces was in; where the login shell
+        cannot be told, or the folder is gone, it starts at home."""
         lock = self._opening.setdefault(person.id, asyncio.Lock())
         async with lock:
             machine = await self._machine(machine_id, person.id)
@@ -1107,7 +1186,7 @@ class Terminals:
             terminal = Terminal(pool=self.pool, signer=self.signer,
                                 owner=person, machine=machine, name=name,
                                 cols=cols, rows=rows, agents=self.agents,
-                                relay=self.relay)
+                                relay=self.relay, start_in=cwd)
             await self.pool.execute(
                 "INSERT INTO terminals (id, machine_id, owner_id, name, kind) "
                 "VALUES ($1, $2, $3, $4, 'term')",
@@ -1201,7 +1280,7 @@ class Terminals:
         row = await self.pool.fetchrow(
             """
             SELECT t.id, t.name, t.closed_at, t.end_reason, t.home,
-                   m.id AS machine_id, m.name AS machine, p.code
+                   t.last_cwd, m.id AS machine_id, m.name AS machine, p.code
             FROM terminals t
             JOIN machines m ON m.id = t.machine_id
             JOIN projects p ON p.id = m.project_id
@@ -1215,6 +1294,8 @@ class Terminals:
         return {"id": str(row["id"]), "machineId": str(row["machine_id"]),
                 "machine": row["machine"], "label": label,
                 "name": row["name"], "state": "gone", "home": row["home"] or "",
+                # The folder it ended in (0.1.24), for Open a new terminal.
+                "cwd": row["last_cwd"] or "",
                 "reason": row["end_reason"] or "This terminal is no longer running."}
 
     # ------------------------------------------------- blocks and history
@@ -1367,7 +1448,7 @@ class Terminals:
                 task.cancel()
                 with contextlib.suppress(BaseException):
                     await task
-        await asyncio.gather(*(t.stop("tTerm Web stopped.")
+        await asyncio.gather(*(t.stop(STOPPED)
                                for t in list(self._live.values())),
                              return_exceptions=True)
 

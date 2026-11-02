@@ -17,6 +17,7 @@ import socket
 import subprocess
 import tempfile
 import termios
+import datetime as dt
 import time
 import uuid
 import zlib
@@ -25,7 +26,7 @@ from pathlib import Path
 import asyncssh
 import websockets
 
-from ..core import machines, shell, ssh, terminals, trust
+from ..core import accounts, logs, machines, shell, ssh, terminals, trust
 from ..core.machines import remember_cas
 from .harness import old_line, page_socket, request, shell_server
 
@@ -118,6 +119,36 @@ def test_shell_follows_the_login_shell():
     bare = shell.plan("shell=/bin/ash\nbash=\nzsh=\n")
     assert bare.shell == "ash" and not bare.markers
     assert not shell.plan("").markers, "nothing known: no key typed in"
+
+
+def test_a_shell_starts_where_the_terminal_before_it_was():
+    """Open a new terminal on one that ended starts in its folder (0.1.24):
+    `cd '<folder>' 2>/dev/null; ` before the shell's command, which the
+    login shell reads."""
+    bash = shell.plan("shell=/bin/bash\nbash=/bin/bash\nbash_version=5.2\n",
+                      "/srv/my shop")
+    assert bash.command.startswith("cd '/srv/my shop' 2>/dev/null; exec bash"), \
+        bash.command
+    zsh = shell.plan("shell=/usr/bin/zsh\nzsh=/usr/bin/zsh\n", "/srv/x")
+    assert zsh.command.startswith("cd '/srv/x' 2>/dev/null; ZDOTDIR="), zsh.command
+    bare = shell.plan("shell=/bin/ash\nbash=\nzsh=\n", "/srv/x")
+    assert bare.command.startswith("cd '/srv/x' 2>/dev/null; exec"), bare.command
+    assert shell.plan("shell=/bin/bash\nbash=/bin/bash\n").command.startswith(
+        "exec bash"), "no folder: as before"
+    # A quote stays inside the quotes; fish reads them alike.
+    assert shell.start_in("/srv/it's", "/usr/bin/fish") == \
+        "cd '/srv/it'\\''s' 2>/dev/null; "
+    # Not started in: a login shell that reads other words, no whole path,
+    # a backslash (fish would end the quotes at \'), control characters,
+    # anything too long.
+    for folder, login in [("/srv/x", "/bin/csh"), ("/srv/x", "/usr/bin/nu"),
+                          ("/srv/x", ""), ("srv/x", "/bin/bash"),
+                          ("~/x", "/bin/bash"), ("/srv/a\\'b", "/usr/bin/fish"),
+                          ("/srv/a\nb", "/bin/bash"), ("/srv/a\x1bb", "/bin/bash"),
+                          ("/" + "x" * shell.FOLDER_MAX, "/bin/bash")]:
+        assert shell.start_in(folder, login) == "", (folder, login)
+    assert shell.plan("", "/srv/x").command == 'exec "${SHELL:-/bin/sh}" -l', \
+        "nothing known of the login shell: home"
 
 
 def test_block_keeps_the_start_and_the_end():
@@ -315,6 +346,53 @@ def _run_shell(login_shell: str, full: bool) -> None:
         shutil.rmtree(home, ignore_errors=True)
 
 
+def _first_folder(login_shell: str, folder: str, make: bool = False) -> str:
+    """Where a shell started with `folder` (0.1.24) says it is, at its first
+    prompt; with "!" after it if it said anything of cd before, and
+    "!pwned" if a command hidden in the folder's name ran."""
+    home = _home()
+    p = None
+    try:
+        where = folder.replace("{home}", str(home))
+        if make:
+            os.makedirs(where)
+        p = Pty(home, login_shell,
+                shell.plan(_deploy(home, login_shell), where).command)
+        p.read_until(1)
+        said = p.screen.decode("utf-8", "replace")
+        pwned = any("pwned" in files for _, _, files in os.walk(home))
+        return (os.path.realpath(p.marks[-1].field(1))
+                .replace(os.path.realpath(home), "{home}")
+                + ("!" if "cd" in said or "No such" in said else "")
+                + ("!pwned" if pwned else ""))
+    finally:
+        if p:
+            p.close()
+        shutil.rmtree(home, ignore_errors=True)
+
+
+def test_real_shells_start_in_the_folder():
+    # Each login shell there is that reads the words (sh, dash, fish...: the
+    # login shell reads them, bash or zsh runs in the folder).
+    tried = 0
+    for login in sorted(shell._READS_CD):
+        found = shutil.which(login)
+        if not found:
+            continue
+        tried += 1
+        got = _first_folder(found, "{home}/my repo")
+        assert got == "{home}/my repo", (login, got)
+        # Gone by now: at home, without a word.
+        got = _first_folder(found, "{home}/gone")
+        assert got == "{home}", (login, got)
+        # Names that try to end the quotes: they stay letters.
+        for odd in ("{home}/it's $HOME; ok", "{home}/x'$(touch pwned)'",
+                    "{home}/a''b", "{home}/end'", "{home}/`touch pwned`"):
+            got = _first_folder(found, odd, make=True)
+            assert got == odd, (login, odd, got)
+    assert tried >= 2, "bash and sh at least"
+
+
 def test_bash_prints_markers():
     if not shutil.which("bash"):
         return
@@ -421,14 +499,29 @@ async def test_a_terminal_runs_over_ssh_and_keeps_blocks(h):
             assert second.name == "2" and second.label == "P/lab · 2"
             await _until(lambda: second.state == "open", what="the second")
             await second.close()
+            # The folder it ends in is kept, and Open a new terminal starts
+            # there (0.1.24).
+            t.write(b'cd "$HOME/my repo"\n')
+            await _until(lambda: _prompts(t) >= 5, what="cd")
             t.write(b"exit\n")
             await _until(lambda: t.state == "ended", what="the end")
             assert "ended" in (t.reason or "") or "code" in (t.reason or "")
             row = await core.pool.fetchrow(
-                "SELECT closed_at, end_reason, shell, last_seq FROM terminals "
-                "WHERE id = $1", t.id)
+                "SELECT closed_at, end_reason, shell, last_seq, last_cwd "
+                "FROM terminals WHERE id = $1", t.id)
             assert row["closed_at"] and row["end_reason"] and row["shell"]
             assert row["last_seq"] == t.last_seq
+            folder = os.path.join(os.path.realpath(home), "my repo")
+            assert os.path.realpath(row["last_cwd"]) == folder, row["last_cwd"]
+            info = await core.terminals.ended(t.id, core.owner.id)
+            assert os.path.realpath(info["cwd"]) == folder, info
+            third = await core.terminals.open(core.owner, machine_id, 80, 24,
+                                              cwd=info["cwd"])
+            await _until(lambda: _prompts(third) >= 1, what="the third")
+            first = next(e.data for e in third.events
+                         if e.kind == "ev" and e.data["t"] == "P")
+            assert os.path.realpath(first["cwd"]) == folder, first
+            await third.close()
             kinds = [r["kind"] for r in await core.pool.fetch(
                 "SELECT kind FROM journal WHERE terminal_id = $1 ORDER BY id",
                 t.id)]
@@ -688,12 +781,101 @@ async def test_terminals_left_by_the_last_run_are_closed(h):
         tid = await core.pool.fetchval(
             "INSERT INTO terminals (machine_id, owner_id, name) VALUES ($1, $2, "
             "'1') RETURNING id", machine, core.owner.id)
-        await core.terminals.start()
+        await core.terminals.close_left(terminals.__version__)
         row = await core.pool.fetchrow(
             "SELECT closed_at, end_reason FROM terminals WHERE id = $1", tid)
         assert row["closed_at"] and "stopped" in row["end_reason"]
         info = await core.terminals.ended(tid, core.owner.id)
         assert info and info["state"] == "gone" and info["label"] == "P/old"
+        # With its line in the log (0.1.24): the last run did not write it.
+        said = await core.pool.fetchval(
+            "SELECT details->>'reason' FROM journal WHERE terminal_id = $1 "
+            "AND kind = 'terminal.closed'", tid)
+        assert said == terminals.STOPPED, said
+
+
+async def test_a_release_says_so_of_the_terminals_it_ended(h):
+    """A start of another version is a release (0.1.24): the terminals the
+    stop before it ended, and those left open, say "tTerm Web was updated
+    to …" on their tabs and in the log; nothing else changes. The first
+    start that keeps its version goes by the minutes before it."""
+    async with h.core() as core:
+        pool, me = core.pool, core.owner.id
+        project = await pool.fetchval(
+            "SELECT id FROM projects WHERE owner_id = $1", me)
+        machine = await pool.fetchval(
+            "INSERT INTO machines (project_id, kind, name) VALUES ($1, 'server', "
+            "'web') RETURNING id", project)
+        run = await pool.fetchval("SELECT max(started_at) FROM core_runs")
+        assert run, "the core's own start is kept"
+
+        async def terminal(closed: dt.datetime | None, reason: str | None,
+                           cwd: str | None = None) -> uuid.UUID:
+            tid = await pool.fetchval(
+                "INSERT INTO terminals (machine_id, owner_id, name, closed_at, "
+                "end_reason, last_cwd) VALUES ($1, $2, '1', $3, $4, $5) "
+                "RETURNING id", machine, me, closed, reason, cwd)
+            if reason:
+                async with pool.acquire() as conn:
+                    await accounts.journal(
+                        conn, "terminal.closed", project_id=project, user_id=me,
+                        machine_id=machine, terminal_id=tid,
+                        details={"reason": reason})
+            return tid
+
+        async def reason(tid: uuid.UUID) -> str:
+            return (await core.terminals.ended(tid, me))["reason"]
+
+        now = await pool.fetchval("SELECT now()")
+        by_stop = await terminal(now, terminals.STOPPED, "/srv/shop")
+        left_open = await terminal(None, None)
+        before = await terminal(run - dt.timedelta(hours=1), terminals.STOPPED)
+        closed = await terminal(now, "Closed.")
+        await core.terminals.close_left("9.9.9")
+        update = "tTerm Web was updated to 9.9.9."
+        assert await reason(by_stop) == update
+        assert await reason(left_open) == update
+        assert await reason(before) == terminals.STOPPED, \
+            "an older stop is not this release's"
+        assert await reason(closed) == "Closed."
+        info = await core.terminals.ended(by_stop, me)
+        assert info["cwd"] == "/srv/shop", info
+        assert (await core.terminals.ended(closed, me))["cwd"] == ""
+        # The log says what the tab says.
+        start = now - dt.timedelta(hours=12)
+        lines = (await logs.day(pool, me, machine, start,
+                                start + dt.timedelta(hours=24)))["entries"]
+        why = {e["terminal"]["id"]: e["reason"] for e in lines
+               if e["kind"] == "terminal.closed"}
+        assert why[str(by_stop)] == update and why[str(closed)] == "Closed.", why
+        assert why[str(before)] == terminals.STOPPED, why
+        assert why[str(left_open)] == update, "left open: its line, at the start"
+
+        # The same version again: a restart, not a release.
+        again = await terminal(None, None)
+        await core.terminals.close_left("9.9.9")
+        assert await reason(again) == terminals.STOPPED
+        assert await reason(by_stop) == update, "and what was said stays"
+        # Another version next: the start before closed `again` at its very
+        # moment, not its stop; that stays as it was.
+        await core.terminals.close_left("9.9.11")
+        assert await reason(again) == terminals.STOPPED
+
+        # A run that kept no version (gone back to one before 0.1.24) for
+        # days: a stop of a day ago is not the next release's.
+        await pool.execute("UPDATE core_runs SET started_at = now() - "
+                           "interval '3 days'")
+        day_ago = await terminal(now - dt.timedelta(days=1), terminals.STOPPED)
+        await core.terminals.close_left("9.9.12")
+        assert await reason(day_ago) == terminals.STOPPED
+
+        # The first start that keeps its version: the minutes before it.
+        await pool.execute("DELETE FROM core_runs")
+        recent = await terminal(now - dt.timedelta(minutes=3), terminals.STOPPED)
+        older = await terminal(now - dt.timedelta(hours=2), terminals.STOPPED)
+        await core.terminals.close_left("9.9.10")
+        assert await reason(recent) == "tTerm Web was updated to 9.9.10."
+        assert await reason(older) == terminals.STOPPED
 
 
 # ------------------------------------------------------------ the socket
@@ -811,6 +993,11 @@ async def test_the_socket_is_only_for_this_page(h):
                           headers=CHANGE,
                           body=json.dumps({"machineId": str(uuid.uuid4())}).encode())
         assert r.status == 404
+        r = await request(core.page_port, "POST", "/api/terminals",
+                          headers=CHANGE,
+                          body=json.dumps({"machineId": str(uuid.uuid4()),
+                                           "cwd": "/" + "x" * 70000}).encode())
+        assert r.status == 422, "no folder is that long (0.1.24)"
         r = await request(core.page_port, "GET",
                           f"/api/terminals/{uuid.uuid4()}")
         assert r.status == 404

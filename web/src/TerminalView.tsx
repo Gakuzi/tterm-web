@@ -16,6 +16,10 @@
 // "vault"): the card of VaultLocked.tsx says how to open the vault here. In
 // tTerm for Mac a successful `ssh <host>` in this Mac's own terminals gets
 // the strip of SshStrip.tsx under its block.
+//
+// From 0.1.24 a terminal a release of tTerm Web ended says so, and why it
+// had to end, with What's new in that version and the machine's log, where
+// its commands are; and Open a new terminal starts where it was.
 
 import { useEffect, useRef, useState } from "react";
 import { endTerminal, terminalInfo, type Me, type TerminalInfo,
@@ -26,9 +30,10 @@ import { FeedTerminal } from "./FeedTerminal";
 import { useFoundBlock, wentThere } from "./found";
 import { SshStrip } from "./SshStrip";
 import { VaultLocked } from "./VaultLocked";
-import { useT } from "./i18n";
+import { gap, useT } from "./i18n";
 import { ModeToggle } from "./InputLine";
-import { reasonText } from "./reasons";
+import { whatsNew } from "./links";
+import { reasonText, updatedTo } from "./reasons";
 import type { Shown } from "./theme";
 import { since } from "./time";
 
@@ -72,8 +77,11 @@ interface Props {
   shownTheme: Shown;
   onStatus: (id: string, status: TabStatus) => void;
   onCloseTab: (id: string) => void;
-  /** A new terminal on the machine, in this ended one's tab. */
-  onOpenNew: (machineId: string, instead: string) => void;
+  /** A new terminal on the machine, in this ended one's tab, in the folder
+   * it was in (0.1.24). */
+  onOpenNew: (machineId: string, instead: string, cwd?: string) => void;
+  /** The machine's log, in its tab (0.1.24). */
+  onOpenLog: (machineId: string) => void;
   onChanged: () => void;
   notify: (text: string) => void;
   /** Whether the machine is still in tTerm Web: one removed gets no new
@@ -205,6 +213,9 @@ export function TerminalView(props: Props) {
       .finally(() => setEnding(false));
   };
   const machine = info?.machine;
+  const release = isEnded ? updatedTo(info?.reason) : null;
+  const why = info?.reason ? reasonText(info.reason, t) : t("terminal_view.not_running");
+  const note = release ? t("terminal_view.release_note") : "";
 
   return (
     <div className={active ? "terminal-view" : "terminal-view behind"}
@@ -266,17 +277,32 @@ export function TerminalView(props: Props) {
           </div>
         )}
         {isEnded && (
-          <div className="terminal-ended" role="status">
+          <div className={release ? "terminal-ended release" : "terminal-ended"}
+            role="status">
             <div className="ended-text">
               <strong>{missing && !info ? t("terminal_view.no_such")
                 : t("terminal_view.ended")}</strong>
-              <span>{info?.reason ? reasonText(info.reason, t)
-                : t("terminal_view.not_running")}</span>
+              <span>{why}{note && gap(why, note, t.lang)}{note}</span>
+              {release && info && (
+                <div className="ended-links">
+                  <a href={whatsNew(t.lang, release)} target="_blank" rel="noreferrer">
+                    {t("terminal_view.whats_new", { version: release })}
+                  </a>
+                  {props.machineThere(info.machineId) && (
+                    <button type="button" className="link-button"
+                      onClick={() => props.onOpenLog(info.machineId)}>
+                      {t("log.tab_title", { machine: info.machine })}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             <div className="button-row">
               {info && props.machineThere(info.machineId) && (
                 <button type="button" className="button-accent big"
-                  onClick={() => props.onOpenNew(info.machineId, terminalId)}>
+                  title={info.cwd ? t("terminal_view.open_new_title",
+                    { folder: shortPath(info.cwd, info.home) }) : undefined}
+                  onClick={() => props.onOpenNew(info.machineId, terminalId, info.cwd)}>
                   {t("terminal_view.open_new", { machine: info.machine })}
                 </button>
               )}

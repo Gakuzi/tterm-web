@@ -1469,6 +1469,8 @@ log.open_day = 打开这一天
 # ------------------------------------------------------------ reason: why a terminal ended (reasons.ts)
 # What tTerm Web says when a terminal ends by itself, under a terminal that ended and in the log (log.ended_why). {machine} and {mac} are machines' names, {code} a number, {why} what the system said, as it said it.
 reason.stopped = tTerm Web 已停止。
+# A release ended it (0.1.24). {version} is the version tTerm Web was updated to: 0.1.24.
+reason.updated = tTerm Web 已更新到 {version}。
 reason.closed = 已关闭。
 reason.closed_early = 在打开前已关闭。
 reason.shell_code = Shell 以代码 {code} 结束。
@@ -1508,7 +1510,12 @@ terminal_view.no_such = 终端不存在
 terminal_view.ended = 这个终端已结束
 terminal_view.not_running = 它已不再运行。
 terminal_view.open_new = 在 {machine} 上打开新终端
+# The title of open_new, when the folder the ended terminal was in is known: the new one starts there if it can (0.1.24), at home otherwise. {folder}: ~/shop.
+terminal_view.open_new_title = 将在 {folder} 中打开，即这个终端所在的目录（如果该目录仍然存在）。
 terminal_view.close_tab = 关闭标签页
+# A release ended it (0.1.24): after reason.updated, and under it a link to What's new in that version, in the documentation. {version}: 0.1.24.
+terminal_view.release_note = 更新时，打开的终端会结束；其中的命令和输出会保留在这台机器的日志中。
+terminal_view.whats_new = {version} 的更新内容
 
 # ------------------------------------------------------------ classic: the Classic mode, every key straight to the shell (ClassicTerminal.tsx)
 # A command search put here. Line is the mode (input.mode_line).

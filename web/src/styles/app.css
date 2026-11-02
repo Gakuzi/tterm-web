@@ -1999,6 +1999,34 @@ code {
   color: var(--dim);
 }
 
+/* A release ended it (0.1.24): the words take the width, the buttons go
+ * under them; What's new and the machine's log under the words. */
+.terminal-ended.release .ended-text {
+  flex: 1 1 100%;
+}
+
+.ended-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 18px;
+  margin-top: 6px;
+}
+
+.ended-links a,
+.ended-links .link-button {
+  font: 600 13px var(--font-ui);
+  color: var(--amber-ink);
+  text-decoration: none;
+}
+
+.ended-links a:hover,
+.ended-links .link-button:hover {
+  color: var(--amber-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* Beside "Open a terminal", so of its size. */
 .button-plain.running,
 .button-plain.quiet {

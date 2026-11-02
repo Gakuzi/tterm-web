@@ -8,9 +8,19 @@ import type { Translate } from "./i18n";
 
 type Say = (m: RegExpExecArray, t: Translate) => string;
 
+/** A release ended it (0.1.24): the core says so once the new version
+ * starts (core/terminals.py, Terminals.start). */
+const UPDATED = /^tTerm Web was updated to ([0-9][0-9A-Za-z.-]*)\.$/;
+
+/** The version tTerm Web was updated to, when that ended the terminal. */
+export function updatedTo(reason: string | null | undefined): string | null {
+  return reason ? UPDATED.exec(reason)?.[1] ?? null : null;
+}
+
 /** The core's words, each with how the page says them. */
 const KNOWN: [RegExp, Say][] = [
   [/^tTerm Web stopped\.$/, (_, t) => t("reason.stopped")],
+  [UPDATED, (m, t) => t("reason.updated", { version: m[1] })],
   [/^Closed\.$/, (_, t) => t("reason.closed")],
   [/^Closed before it opened\.$/, (_, t) => t("reason.closed_early")],
   [/^The shell ended with code (-?\d+)\.$/, (m, t) => t("reason.shell_code", { code: m[1] })],

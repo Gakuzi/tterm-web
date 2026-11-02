@@ -1469,6 +1469,8 @@ log.open_day = 이날 열기
 # ------------------------------------------------------------ reason: why a terminal ended (reasons.ts)
 # What tTerm Web says when a terminal ends by itself, under a terminal that ended and in the log (log.ended_why). {machine} and {mac} are machines' names, {code} a number, {why} what the system said, as it said it.
 reason.stopped = tTerm Web이 멈췄어요.
+# A release ended it (0.1.24). {version} is the version tTerm Web was updated to: 0.1.24.
+reason.updated = tTerm Web이 {version} 버전으로 업데이트됐어요.
 reason.closed = 닫혔어요.
 reason.closed_early = 열리기 전에 닫혔어요.
 reason.shell_code = 셸이 코드 {code}(으)로 종료됐어요.
@@ -1508,7 +1510,12 @@ terminal_view.no_such = 터미널을 찾을 수 없어요
 terminal_view.ended = 이 터미널은 종료됐어요
 terminal_view.not_running = 더 이상 실행되고 있지 않아요.
 terminal_view.open_new = {machine}에서 새 터미널 열기
+# The title of open_new, when the folder the ended terminal was in is known: the new one starts there if it can (0.1.24), at home otherwise. {folder}: ~/shop.
+terminal_view.open_new_title = 그 폴더가 아직 있으면 이 터미널이 있던 {folder}에서 열려요.
 terminal_view.close_tab = 탭 닫기
+# A release ended it (0.1.24): after reason.updated, and under it a link to What's new in that version, in the documentation. {version}: 0.1.24.
+terminal_view.release_note = 업데이트할 때 열려 있던 터미널은 종료돼요. 명령과 출력은 머신의 로그에 남아 있어요.
+terminal_view.whats_new = {version} 버전의 새 소식
 
 # ------------------------------------------------------------ classic: the Classic mode, every key straight to the shell (ClassicTerminal.tsx)
 # A command search put here. Line is the mode (input.mode_line).

@@ -25,8 +25,9 @@ StateDirectoryMode=0700
 UMask=0077
 # Terminals and agents: many connections at once.
 LimitNOFILE=16384
-# Terminals end when the core stops; give them a moment to say so.
-TimeoutStopSec=20
+# Terminals end when the core stops; give them a moment to say so (up to
+# 10 seconds, then the servers and the database: tterm/server.py, stop).
+TimeoutStopSec=30
 Restart=on-failure
 RestartSec=3
 

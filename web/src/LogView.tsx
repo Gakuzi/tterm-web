@@ -621,7 +621,17 @@ export function LogView(props: Props) {
     ? (!n.by || n.by.id === me.id ? t("log.ai_for_you") : t("log.ai_for", { who: n.by.firstName }))
     : whoOf(n.by, me, t);
 
+  /** A line of a terminal or of the machine, in words. A sentence starts
+   * with a capital (0.1.24): a terminal known by its number, first in it,
+   * is "Terminal 1", "Терминал 1"; a name someone gave it stays as written. */
   function eventText(e: LogEntry): string {
+    const said = eventWords(e);
+    const name = e.terminal?.name ?? "1";
+    return /^\d+$/.test(name) && said.startsWith(terminalName(name, t))
+      ? said.charAt(0).toLocaleUpperCase(t.lang) + said.slice(1) : said;
+  }
+
+  function eventWords(e: LogEntry): string {
     const term = terminalName(e.terminal?.name ?? "1", t);
     const mine = !e.by || e.by.id === me.id;
     if (e.kind === "machine.moved") {

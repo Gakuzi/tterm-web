@@ -1469,6 +1469,8 @@ log.open_day = Ouvrir le jour
 # ------------------------------------------------------------ reason: why a terminal ended (reasons.ts)
 # What tTerm Web says when a terminal ends by itself, under a terminal that ended and in the log (log.ended_why). {machine} and {mac} are machines' names, {code} a number, {why} what the system said, as it said it.
 reason.stopped = tTerm Web s’est arrêté.
+# A release ended it (0.1.24). {version} is the version tTerm Web was updated to: 0.1.24.
+reason.updated = tTerm Web est passé à la version {version}.
 reason.closed = Fermé.
 reason.closed_early = Fermé avant de s’ouvrir.
 reason.shell_code = Le shell s’est terminé avec le code {code}.
@@ -1508,7 +1510,12 @@ terminal_view.no_such = Terminal introuvable
 terminal_view.ended = Ce terminal a pris fin
 terminal_view.not_running = Il ne tourne plus.
 terminal_view.open_new = Ouvrir un nouveau terminal sur {machine}
+# The title of open_new, when the folder the ended terminal was in is known: the new one starts there if it can (0.1.24), at home otherwise. {folder}: ~/shop.
+terminal_view.open_new_title = Il s’ouvre dans {folder}, là où était celui-ci, si ce répertoire existe encore.
 terminal_view.close_tab = Fermer l’onglet
+# A release ended it (0.1.24): after reason.updated, and under it a link to What's new in that version, in the documentation. {version}: 0.1.24.
+terminal_view.release_note = Les terminaux ouverts prennent fin lors d’une mise à jour\xA0; leurs commandes et leur sortie restent dans le journal de la machine.
+terminal_view.whats_new = Nouveautés de la version {version}
 
 # ------------------------------------------------------------ classic: the Classic mode, every key straight to the shell (ClassicTerminal.tsx)
 # A command search put here. Line is the mode (input.mode_line).

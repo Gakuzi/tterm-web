@@ -1091,7 +1091,8 @@ async def sweep(pool: asyncpg.Pool) -> None:
     signed in with for DEVICE_DAYS (0.0.12), and from 0.1.6 the codes
     browsers gave apps, after a day. So does what is kept only
     for a while: commands with their output (30 days unless the project
-    says less), the journal (a year) with the words of the machines' logs,
+    says less) and from 0.1.24 the folder a terminal ended in (30 days),
+    the journal (a year) with the words of the machines' logs,
     and from 0.1.17 the vault's pairings (a week; what they carried, an
     hour after they are over)."""
     await pool.execute("DELETE FROM login_codes "
@@ -1118,6 +1119,11 @@ async def sweep(pool: asyncpg.Pool) -> None:
                                gone)
     await pool.execute("DELETE FROM blocks WHERE expires_at <= now()")
     await pool.execute("DELETE FROM journal WHERE expires_at <= now()")
+    # The folder a terminal ended in (0.1.24), for Open a new terminal on
+    # it: as long as what its commands printed.
+    await pool.execute(
+        "UPDATE terminals SET last_cwd = NULL WHERE last_cwd IS NOT NULL "
+        "AND closed_at < now() - interval '30 days'")
     # The words of the machine's log (0.1.20) go with their lines.
     await pool.execute(
         "DELETE FROM log_texts t WHERE t.expires_at <= now() "

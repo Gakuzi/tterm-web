@@ -1,7 +1,8 @@
 // The tools of a machine's log (src/logfilter.ts, 0.1.21): which lines show
 // with which filters, who and which terminals there are, the days of what
 // Find in this log found; and why a terminal ended, in the page's words
-// (src/reasons.ts).
+// (src/reasons.ts), with the release that ended it and its What's new
+// (0.1.24, src/links.ts).
 //
 //   node --test --experimental-strip-types tests/logfilter.test.ts
 import { test } from "node:test";
@@ -11,7 +12,8 @@ import type { Translate } from "../src/i18n.ts";
 import {
   authorsOf, byDay, filtering, hasWords, NO_FILTER, shows, terminalsOf,
 } from "../src/logfilter.ts";
-import { reasonText } from "../src/reasons.ts";
+import { docsPage, folderOf, whatsNew } from "../src/links.ts";
+import { reasonText, updatedTo } from "../src/reasons.ts";
 
 const ME = "u-me";
 const person = (id: string, firstName: string): LogPerson =>
@@ -122,6 +124,25 @@ test("why a terminal ended, in the page's words", () => {
   assert.equal(reasonText("Could not open a terminal on mini: the agent could not start the " +
     "shell", t), 'reason.no_open{"machine":"mini","why":"the agent could not start the shell"}');
   assert.equal(reasonText("This terminal is no longer running.", t), "terminal_view.not_running");
+  assert.equal(reasonText("tTerm Web was updated to 0.1.24.", t),
+    'reason.updated{"version":"0.1.24"}');
+});
+
+test("a release that ended a terminal, and What's new in it", () => {
+  assert.equal(updatedTo("tTerm Web was updated to 0.1.24."), "0.1.24");
+  assert.equal(updatedTo("tTerm Web was updated to 1.0.0-rc1."), "1.0.0-rc1");
+  assert.equal(updatedTo("tTerm Web stopped."), null);
+  assert.equal(updatedTo("tTerm Web was updated to ."), null);
+  assert.equal(updatedTo("tTerm Web was updated to 0.1.24. And more."), null);
+  assert.equal(updatedTo(null), null);
+  assert.equal(updatedTo(undefined), null);
+  assert.equal(whatsNew("en", "0.1.24"), "https://docs.tterm.net/whats-new/web/#0124");
+  assert.equal(whatsNew("ru", "0.1.24"), "https://docs.tterm.net/ru/whats-new/web/#0124");
+  assert.equal(whatsNew("pt-BR", "0.1.24"), "https://docs.tterm.net/pt/whats-new/web/#0124");
+  assert.equal(whatsNew("zh-CN", "0.2.0"), "https://docs.tterm.net/zh/whats-new/web/#020");
+  assert.equal(docsPage("de", ""), "https://docs.tterm.net/de/");
+  assert.equal(folderOf("en"), "");
+  assert.equal(folderOf("ja"), "ja");
 });
 
 test("any other reason, an SSH error say, shows as the core wrote it", () => {

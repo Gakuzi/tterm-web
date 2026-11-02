@@ -459,11 +459,13 @@ async def machine_of(conn: asyncpg.Connection, machine_id: uuid.UUID,
 
 #: A line of a log as the page draws it: who, its words, how it ended, and
 #: whether what it printed is still kept, in the person's own terminal,
-#: with the width it ran at: it opens under the line (0.1.21). The query
-#: that adds to it takes $1 for the machine and $2 for the person.
+#: with the width it ran at: it opens under the line (0.1.21). Why a
+#: terminal ended is what its row says last: a release says so of the
+#: terminals its stop ended once it starts (0.1.24). The query that adds
+#: to it takes $1 for the machine and $2 for the person.
 _LINES = """
     SELECT j.id, j.at, j.kind, j.user_id, j.author, j.ai,
-           j.terminal_id, j.details, t.name AS terminal, x.text,
+           j.terminal_id, j.details, t.name AS terminal, t.end_reason, x.text,
            x.redacted_at, x.redacted_by, x.reason,
            coalesce(ob.kept, false) AS output, ob.cols
     FROM journal j
@@ -526,7 +528,7 @@ async def _entries(conn: asyncpg.Connection, rows: list[asyncpg.Record],
                 "notes": by_entry.get(r["id"], []),
                 "canNote": role in WRITERS, "canRedact": role in MANAGERS})
         elif r["kind"] == "terminal.closed":
-            entry["reason"] = d.get("reason") or ""
+            entry["reason"] = r["end_reason"] or d.get("reason") or ""
         elif r["kind"] == "machine.moved":
             # The projects by their names then, as the move had them.
             entry.update({"from": d.get("fromName") or "",
