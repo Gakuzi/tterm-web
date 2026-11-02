@@ -518,3 +518,11 @@ export const Calendar = (p: Props) => (
     <path d="M3 10h18M8 3v4M16 3v4" />
   </Stroke>
 );
+
+/** An arrow down and one up: the order of a log's lines (0.1.21). */
+export const Order = (p: Props) => (
+  <Stroke {...p}>
+    <path d="M8 5v14M5 16l3 3 3-3" />
+    <path d="M16 19V5M13 8l3-3 3 3" />
+  </Stroke>
+);

@@ -1086,6 +1086,7 @@ menus.name_example = Например, Ранбуки
 # its groups.
 search.kind_commands = Команды
 search.kind_output = Вывод
+search.kind_logs = Логи
 search.kind_notes = Заметки
 search.kind_terminals = Терминалы
 search.kind_machines = Машины
@@ -1094,6 +1095,8 @@ search.kind_actions = Действия
 # The kind of the line chosen, on top of the preview beside the list.
 search.label_command = Команда
 search.label_output = Вывод
+search.label_log_line = Строка лога
+search.label_log_note = Заметка в логе
 search.label_note = Заметка
 search.label_terminal = Терминал
 search.label_machine = Машина
@@ -1104,6 +1107,7 @@ search.label_action = Действие
 search.nothing_for = По запросу «{text}» ничего нет.
 search.nothing_in_commands = По запросу «{text}» среди команд ничего нет.
 search.nothing_in_output = По запросу «{text}» в выводе ничего нет.
+search.nothing_in_logs = По запросу «{text}» в логах ничего нет.
 search.nothing_in_notes = По запросу «{text}» в заметках ничего нет.
 search.nothing_in_terminals = По запросу «{text}» среди терминалов ничего нет.
 search.nothing_in_machines = По запросу «{text}» среди машин ничего нет.
@@ -1127,6 +1131,9 @@ search.row_branch = Ветка
 search.row_status = Состояние
 search.row_when = Когда
 search.row_terminal = Терминал
+search.row_who = Кто
+search.row_notes = Заметки
+search.row_under = Под чем
 # {terminal} is the terminal as its tab names it, P/web-01 · deploy; {when}
 # is when it ended: 10:46, yesterday 17:38, 2 Oct 09:12.
 search.terminal_ended = {terminal}, завершён: {when}
@@ -1134,6 +1141,9 @@ search.terminal_ended = {terminal}, завершён: {when}
 # into the line of the terminal in front, not run.
 search.open_in_terminal = Открыть в терминале
 search.into_line = В строку ввода
+# 0.1.21: a line of a machine's log, or a note under one. {command} is the line's command.
+search.open_in_log = Открыть в логе
+search.under = под {command}
 # A note found: where it is (its project and folder), when it was edited.
 search.row_in = Где
 search.row_edited = Изменена
@@ -1148,7 +1158,7 @@ search.all = one: Все {n} | few: Все {n} | many: Все {n}
 search.all_more = one: Все {n}+ | few: Все {n}+ | many: Все {n}+
 # The window, and its field.
 search.label = Поиск
-search.placeholder = Команды, вывод, заметки, терминалы, машины…
+search.placeholder = Команды, вывод, логи, заметки, терминалы, машины…
 search.close_title = Закрыть (Esc)
 # The buttons above the list; All is the first of them.
 search.filters = Где искать
@@ -1156,17 +1166,19 @@ search.kind_all = Всё
 # The list of what was found, for screen readers.
 search.found = Найдено
 search.nothing_typed = Запрос пока пуст: здесь то, что было открыто, и то, что ты чаще всего запускаешь на этой машине.
-search.looks_in = Поиск идёт по всем командам всех твоих терминалов, по их выводу, по заметкам, терминалам, машинам и проектам.
+search.looks_in = Поиск идёт по всем командам всех твоих терминалов, по их выводу, по логам твоих машин, по заметкам, терминалам, машинам и проектам.
 search.everything = Искать везде
 # With Output, Notes or Commands chosen and nothing typed yet.
 search.type_output = Введи слово, чтобы искать в выводе команд.
 search.type_notes = Введи слово, чтобы искать в заметках.
 search.type_commands = Введи слово, чтобы искать в командах.
+search.type_logs = Введи слово, чтобы искать в логах твоих машин.
 # Beside the list while nothing is chosen: what to type (c: nginx,
 # o: timed out…), and what each keeps to.
 search.tips = Префикс в начале сужает поиск до одного вида
 search.tip_commands = команды
 search.tip_output = вывод команд
+search.tip_logs = логи машин
 search.tip_notes = заметки
 search.tip_terminals = терминалы
 search.tip_machines = машины
@@ -1185,6 +1197,7 @@ search.keys_next = <kbd>Tab</kbd> следующий вид
 search.prefixes_title = t: терминалы, m: машины, p: проекты
 search.prefix_commands = <code>c:</code> команды
 search.prefix_output = <code>o:</code> вывод
+search.prefix_logs = <code>l:</code> логи
 search.prefix_notes = <code>n:</code> заметки
 search.prefix_actions = <code>></code> действия
 
@@ -1356,7 +1369,7 @@ log.ended = {name} завершён: {who}
 log.ended_why = {name} завершился: {why}
 # A command's line under the mouse.
 log.output = Вывод
-log.output_title = Открыть в терминале
+log.output_title = Показать вывод здесь, под строкой
 log.output_gone = вывод не сохранился
 # {days} is log.keep_days or log.keep_year.
 log.output_gone_title = Вывод хранится {days}
@@ -1408,6 +1421,70 @@ log.old_banner = <b>Вывод этих команд больше не хран�
 log.no_open = Лог не открылся: {why}
 log.gone_title = Этого лога здесь нет
 log.gone_text = Его машину удалили или перенесли в проект, где тебя нет.
+# 0.1.21 (the canvas, version 95): what a command printed opens under its line. Hide output closes it again.
+log.hide_output = Скрыть вывод
+log.hide_output_title = Скрыть то, что напечатала команда
+# Under the output: 27 lines · Show all 27 lines · Copy output (block.copy_output).
+log.output_lines = one: {n} строка | few: {n} строки | many: {n} строк
+log.output_all = one: Показать {n} строку | few: Показать все {n} строки | many: Показать все {n} строк
+log.output_fold = Свернуть
+log.output_lost = Вывод уже не хранится.
+# {why} is what went wrong, as tTerm Web said it.
+log.output_no = Не удалось получить вывод: {why}
+log.output_empty = Команда ничего не напечатала.
+log.output_screen = Команда рисовала на весь экран, как полноэкранная программа: это здесь не хранится.
+# The tools under the day: Find in this log (/ goes there), the order, whose lines, Failed, With notes, which terminal.
+log.find = Найти в логе
+log.find_clear = Очистить поиск
+log.find_key = Нажми /, чтобы искать в логе
+log.order_title = Порядок строк
+log.order_old = Сначала старые
+log.order_new = Сначала новые
+log.who_title = Чьи строки
+log.who_all = Все
+log.who_you = Ты
+log.who_ai = ИИ
+log.who_note = Кто запустил команду или написал под ней заметку.
+log.only_failed = С ошибкой
+log.with_notes = С заметками
+log.terminals_title = Какой терминал
+log.terminals_all = Все терминалы
+log.terminals_one = Один терминал
+# With filters on, on the right of the day: 2 of 8 commands · With notes, and Clear.
+log.shown = one: {shown} из {n} команды | few: {shown} из {n} команд | many: {shown} из {n} команд
+log.clear = Сбросить
+log.none_shown = С этими фильтрами здесь ничего нет.
+# What Find in this log found: In all of web-01’s log, a year back: 3 commands and 2 notes, on 2 days. {back} is log.keep_year or log.keep_days; {what} is log.found_commands, or log.found_both; {days} is log.found_days.
+log.found = Во всём логе {machine} за {back}: <b>{what}</b>, {days}
+log.found_commands = one: {n} команда | few: {n} команды | many: {n} команд
+log.found_notes = one: {n} заметка | few: {n} заметки | many: {n} заметок
+log.found_both = {commands} и {notes}
+log.found_days = one: за {n} день | few: за {n} дня | many: за {n} дней
+log.found_none = В логе {machine} за {back} нет «{text}».
+log.found_cut = Найдено больше, чем показано здесь, только первые {n}. Добавь слово, чтобы сузить поиск.
+log.found_among = Среди первых {n} найденных в логе {machine}: <b>{what}</b>, {days}
+# {why} is what went wrong, as tTerm Web said it.
+log.no_find = Не удалось поискать в логе: {why}
+log.back_to_day = Назад к дню
+log.open_day = Открыть день
+
+# ------------------------------------------------------------ reason: why a terminal ended (reasons.ts)
+# What tTerm Web says when a terminal ends by itself, under a terminal that ended and in the log (log.ended_why). {machine} and {mac} are machines' names, {code} a number, {why} what the system said, as it said it.
+reason.stopped = tTerm Web остановлен.
+reason.closed = Закрыт.
+reason.closed_early = Закрыт до того, как открылся.
+reason.shell_code = Шелл завершился с кодом {code}.
+reason.link_closed = Соединение с {machine} закрыто.
+reason.link_lost = Соединение с {machine} потеряно: {why}
+reason.removed = Машина {machine} удалена из tTerm Web.
+reason.agent_off = Машина {machine} сейчас не на связи: её агент не запущен. Запусти агент на этом компьютере и открой терминал снова.
+reason.mac_off = {mac} сейчас не на связи. Открой этот терминал с мака или запусти tTerm для Mac, потом открой его снова.
+# A computer's terminal that waited for its agent; a terminal that did not open; the Mac, when its name is not known (reason.mac_off).
+reason.away_long = Машина {machine} не вернулась за 12 часов: терминал завершён.
+reason.came_back_without = Машина {machine} вернулась без этого терминала: её агент перезапустили, или компьютер был включён и без сети больше часа.
+reason.agent_stopped = Агент на машине {machine} остановлен: терминал завершён.
+reason.no_open = Не удалось открыть терминал на машине {machine}: {why}
+reason.the_mac = Мак
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.

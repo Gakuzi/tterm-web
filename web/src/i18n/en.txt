@@ -1086,6 +1086,7 @@ menus.name_example = For example, Runbooks
 # its groups.
 search.kind_commands = Commands
 search.kind_output = Output
+search.kind_logs = Logs
 search.kind_notes = Notes
 search.kind_terminals = Terminals
 search.kind_machines = Machines
@@ -1094,6 +1095,8 @@ search.kind_actions = Actions
 # The kind of the line chosen, on top of the preview beside the list.
 search.label_command = Command
 search.label_output = Output
+search.label_log_line = Log line
+search.label_log_note = Note in a log
 search.label_note = Note
 search.label_terminal = Terminal
 search.label_machine = Machine
@@ -1104,6 +1107,7 @@ search.label_action = Action
 search.nothing_for = Nothing for “{text}”.
 search.nothing_in_commands = Nothing for “{text}” in Commands.
 search.nothing_in_output = Nothing for “{text}” in Output.
+search.nothing_in_logs = Nothing for “{text}” in Logs.
 search.nothing_in_notes = Nothing for “{text}” in Notes.
 search.nothing_in_terminals = Nothing for “{text}” in Terminals.
 search.nothing_in_machines = Nothing for “{text}” in Machines.
@@ -1127,6 +1131,9 @@ search.row_branch = Branch
 search.row_status = Status
 search.row_when = When
 search.row_terminal = Terminal
+search.row_who = Who
+search.row_notes = Notes
+search.row_under = Under
 # {terminal} is the terminal as its tab names it, P/web-01 · deploy; {when}
 # is when it ended: 10:46, yesterday 17:38, 2 Oct 09:12.
 search.terminal_ended = {terminal}, ended {when}
@@ -1134,6 +1141,9 @@ search.terminal_ended = {terminal}, ended {when}
 # into the line of the terminal in front, not run.
 search.open_in_terminal = Open in its terminal
 search.into_line = Into the line
+# 0.1.21: a line of a machine's log, or a note under one. {command} is the line's command.
+search.open_in_log = Open in the log
+search.under = under {command}
 # A note found: where it is (its project and folder), when it was edited.
 search.row_in = In
 search.row_edited = Edited
@@ -1148,7 +1158,7 @@ search.all = one: All {n} | other: All {n}
 search.all_more = one: All {n}+ | other: All {n}+
 # The window, and its field.
 search.label = Search
-search.placeholder = Commands, output, notes, terminals, machines…
+search.placeholder = Commands, output, logs, notes, terminals, machines…
 search.close_title = Close (Esc)
 # The buttons above the list; All is the first of them.
 search.filters = What to search
@@ -1156,17 +1166,19 @@ search.kind_all = All
 # The list of what was found, for screen readers.
 search.found = Found
 search.nothing_typed = Nothing typed yet: what you had open, and what you run most here.
-search.looks_in = Search looks in every command of every terminal of yours, in what they printed, in notes, terminals, machines and projects.
+search.looks_in = Search looks in every command of every terminal of yours, in what they printed, in the logs of your machines, in notes, terminals, machines and projects.
 search.everything = Search everything
 # With Output, Notes or Commands chosen and nothing typed yet.
 search.type_output = Type a word to look for in what commands printed.
 search.type_notes = Type a word to look for in notes.
 search.type_commands = Type a word to look for in commands.
+search.type_logs = Type a word to look for in the logs of your machines.
 # Beside the list while nothing is chosen: what to type (c: nginx,
 # o: timed out…), and what each keeps to.
 search.tips = A word in front keeps to one kind
 search.tip_commands = commands
 search.tip_output = what commands printed
+search.tip_logs = the logs of machines
 search.tip_notes = notes
 search.tip_terminals = terminals
 search.tip_machines = machines
@@ -1185,6 +1197,7 @@ search.keys_next = <kbd>Tab</kbd> next kind
 search.prefixes_title = t: terminals, m: machines, p: projects
 search.prefix_commands = <code>c:</code> commands
 search.prefix_output = <code>o:</code> output
+search.prefix_logs = <code>l:</code> logs
 search.prefix_notes = <code>n:</code> notes
 search.prefix_actions = <code>></code> actions
 
@@ -1356,7 +1369,7 @@ log.ended = {who} ended {name}
 log.ended_why = {name} ended: {why}
 # A command's line under the mouse.
 log.output = Output
-log.output_title = Open it in its terminal
+log.output_title = Show what it printed, under the line
 log.output_gone = output not kept
 # {days} is log.keep_days or log.keep_year.
 log.output_gone_title = What it printed is kept {days}
@@ -1408,6 +1421,70 @@ log.old_banner = <b>What these commands printed is no longer kept:</b> output st
 log.no_open = The log did not open: {why}
 log.gone_title = This log is not here
 log.gone_text = Its machine was removed, or moved to a project you are not in.
+# 0.1.21 (the canvas, version 95): what a command printed opens under its line. Hide output closes it again.
+log.hide_output = Hide output
+log.hide_output_title = Hide what it printed
+# Under the output: 27 lines · Show all 27 lines · Copy output (block.copy_output).
+log.output_lines = one: {n} line | other: {n} lines
+log.output_all = one: Show all {n} line | other: Show all {n} lines
+log.output_fold = Fold it
+log.output_lost = What it printed is no longer kept.
+# {why} is what went wrong, as tTerm Web said it.
+log.output_no = Could not get what it printed: {why}
+log.output_empty = It printed nothing.
+log.output_screen = It drew on the whole screen, as a full-screen program does: that is not kept here.
+# The tools under the day: Find in this log (/ goes there), the order, whose lines, Failed, With notes, which terminal.
+log.find = Find in this log
+log.find_clear = Clear the search
+log.find_key = Press / to find in this log
+log.order_title = The order of the lines
+log.order_old = Oldest first
+log.order_new = Newest first
+log.who_title = Whose lines
+log.who_all = Everyone
+log.who_you = You
+log.who_ai = AI
+log.who_note = Who ran the command, or wrote a note under it.
+log.only_failed = Failed
+log.with_notes = With notes
+log.terminals_title = Which terminal
+log.terminals_all = All terminals
+log.terminals_one = One terminal
+# With filters on, on the right of the day: 2 of 8 commands · With notes, and Clear.
+log.shown = one: {shown} of {n} command | other: {shown} of {n} commands
+log.clear = Clear
+log.none_shown = Nothing here with these filters.
+# What Find in this log found: In all of web-01’s log, a year back: 3 commands and 2 notes, on 2 days. {back} is log.keep_year or log.keep_days; {what} is log.found_commands, or log.found_both; {days} is log.found_days.
+log.found = In all of {machine}’s log, {back} back: <b>{what}</b>, {days}
+log.found_commands = one: {n} command | other: {n} commands
+log.found_notes = one: {n} note | other: {n} notes
+log.found_both = {commands} and {notes}
+log.found_days = one: on {n} day | other: on {n} days
+log.found_none = Nothing for “{text}” in {machine}’s log, {back} back.
+log.found_cut = More was found than is shown here, only the first {n}. Add a word to narrow it down.
+log.found_among = Among the first {n} found in {machine}’s log: <b>{what}</b>, {days}
+# {why} is what went wrong, as tTerm Web said it.
+log.no_find = Could not look through the log: {why}
+log.back_to_day = Back to the day
+log.open_day = Open the day
+
+# ------------------------------------------------------------ reason: why a terminal ended (reasons.ts)
+# What tTerm Web says when a terminal ends by itself, under a terminal that ended and in the log (log.ended_why). {machine} and {mac} are machines' names, {code} a number, {why} what the system said, as it said it.
+reason.stopped = tTerm Web stopped.
+reason.closed = Closed.
+reason.closed_early = Closed before it opened.
+reason.shell_code = The shell ended with code {code}.
+reason.link_closed = The connection to {machine} was closed.
+reason.link_lost = The connection to {machine} was lost: {why}
+reason.removed = {machine} was removed from tTerm Web.
+reason.agent_off = {machine} is not connected right now: its agent is not running. Start the agent on that computer, then open a terminal again.
+reason.mac_off = {mac} is not connected right now. Open it from the Mac, or start tTerm for Mac, then open this terminal again.
+# A computer's terminal that waited for its agent; a terminal that did not open; the Mac, when its name is not known (reason.mac_off).
+reason.away_long = {machine} did not come back within 12 hours: this terminal has ended.
+reason.came_back_without = {machine} came back without this terminal: its agent was restarted, or the computer was awake and offline for over an hour.
+reason.agent_stopped = The agent on {machine} was stopped: this terminal has ended.
+reason.no_open = Could not open a terminal on {machine}: {why}
+reason.the_mac = The Mac
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.

@@ -1086,6 +1086,7 @@ menus.name_example = Örneğin Runbook'lar
 # its groups.
 search.kind_commands = Komutlar
 search.kind_output = Çıktı
+search.kind_logs = Loglar
 search.kind_notes = Notlar
 search.kind_terminals = Terminaller
 search.kind_machines = Makineler
@@ -1094,6 +1095,8 @@ search.kind_actions = Eylemler
 # The kind of the line chosen, on top of the preview beside the list.
 search.label_command = Komut
 search.label_output = Çıktı
+search.label_log_line = Log satırı
+search.label_log_note = Logdaki not
 search.label_note = Not
 search.label_terminal = Terminal
 search.label_machine = Makine
@@ -1104,6 +1107,7 @@ search.label_action = Eylem
 search.nothing_for = “{text}” için sonuç yok.
 search.nothing_in_commands = Komutlar içinde “{text}” için sonuç yok.
 search.nothing_in_output = Çıktı içinde “{text}” için sonuç yok.
+search.nothing_in_logs = Loglar içinde “{text}” için sonuç yok.
 search.nothing_in_notes = Notlar içinde “{text}” için sonuç yok.
 search.nothing_in_terminals = Terminaller içinde “{text}” için sonuç yok.
 search.nothing_in_machines = Makineler içinde “{text}” için sonuç yok.
@@ -1127,6 +1131,9 @@ search.row_branch = Dal
 search.row_status = Durum
 search.row_when = Zaman
 search.row_terminal = Terminal
+search.row_who = Kim
+search.row_notes = Notlar
+search.row_under = Altında
 # {terminal} is the terminal as its tab names it, P/web-01 · deploy; {when}
 # is when it ended: 10:46, yesterday 17:38, 2 Oct 09:12.
 search.terminal_ended = {terminal}, sonlandı: {when}
@@ -1134,6 +1141,9 @@ search.terminal_ended = {terminal}, sonlandı: {when}
 # into the line of the terminal in front, not run.
 search.open_in_terminal = Terminalinde aç
 search.into_line = Satıra aktar
+# 0.1.21: a line of a machine's log, or a note under one. {command} is the line's command.
+search.open_in_log = Logda aç
+search.under = {command} altında
 # A note found: where it is (its project and folder), when it was edited.
 search.row_in = Konum
 search.row_edited = Düzenlendi
@@ -1148,7 +1158,7 @@ search.all = one: Tümü ({n}) | other: Tümü ({n})
 search.all_more = one: Tümü ({n}+) | other: Tümü ({n}+)
 # The window, and its field.
 search.label = Arama
-search.placeholder = Komutlar, çıktı, notlar, terminaller, makineler…
+search.placeholder = Komutlar, çıktı, loglar, notlar, terminaller, makineler…
 search.close_title = Kapat (Esc)
 # The buttons above the list; All is the first of them.
 search.filters = Arama kapsamı
@@ -1156,17 +1166,19 @@ search.kind_all = Tümü
 # The list of what was found, for screen readers.
 search.found = Bulunanlar
 search.nothing_typed = Henüz bir şey yazılmadı: son açtıkların ve burada en çok çalıştırdıkların.
-search.looks_in = Arama, tüm terminallerindeki her komutu, bu komutların çıktısını, notları, terminalleri, makineleri ve projeleri tarar.
+search.looks_in = Arama, tüm terminallerindeki her komutu, bu komutların çıktısını, makinelerinin loglarını, notları, terminalleri, makineleri ve projeleri tarar.
 search.everything = Her şeyde ara
 # With Output, Notes or Commands chosen and nothing typed yet.
 search.type_output = Komutların çıktısında aramak için bir sözcük yaz.
 search.type_notes = Notlarda aramak için bir sözcük yaz.
 search.type_commands = Komutlarda aramak için bir sözcük yaz.
+search.type_logs = Makinelerinin loglarında aramak için bir sözcük yaz.
 # Beside the list while nothing is chosen: what to type (c: nginx,
 # o: timed out…), and what each keeps to.
 search.tips = Başa yazılan bir önek aramayı tek bir türle sınırlar
 search.tip_commands = komutlar
 search.tip_output = komutların çıktısı
+search.tip_logs = makinelerin logları
 search.tip_notes = notlar
 search.tip_terminals = terminaller
 search.tip_machines = makineler
@@ -1185,6 +1197,7 @@ search.keys_next = <kbd>Tab</kbd> sonraki tür
 search.prefixes_title = t: terminaller, m: makineler, p: projeler
 search.prefix_commands = <code>c:</code> komutlar
 search.prefix_output = <code>o:</code> çıktı
+search.prefix_logs = <code>l:</code> loglar
 search.prefix_notes = <code>n:</code> notlar
 search.prefix_actions = <code>></code> eylemler
 
@@ -1356,7 +1369,7 @@ log.ended = {who} sonlandırdı: {name}
 log.ended_why = {name} sonlandı: {why}
 # A command's line under the mouse.
 log.output = Çıktı
-log.output_title = Terminalinde aç
+log.output_title = Çıktıyı burada, satırın altında göster
 log.output_gone = çıktı saklanmadı
 # {days} is log.keep_days or log.keep_year.
 log.output_gone_title = Çıktı {days} saklanır
@@ -1408,6 +1421,70 @@ log.old_banner = <b>Bu komutların çıktısı artık saklanmıyor:</b> çıktı
 log.no_open = Log açılamadı: {why}
 log.gone_title = Bu log burada değil
 log.gone_text = Makinesi kaldırıldı ya da üyesi olmadığın bir projeye taşındı.
+# 0.1.21 (the canvas, version 95): what a command printed opens under its line. Hide output closes it again.
+log.hide_output = Çıktıyı gizle
+log.hide_output_title = Yazdırdıklarını gizle
+# Under the output: 27 lines · Show all 27 lines · Copy output (block.copy_output).
+log.output_lines = one: {n} satır | other: {n} satır
+log.output_all = one: {n} satırı göster | other: {n} satırın tümünü göster
+log.output_fold = Daralt
+log.output_lost = Yazdırdıkları artık saklanmıyor.
+# {why} is what went wrong, as tTerm Web said it.
+log.output_no = Çıktı alınamadı: {why}
+log.output_empty = Hiçbir şey yazdırmadı.
+log.output_screen = Tam ekran bir program gibi bütün ekrana çizdi: bu kısım burada saklanmıyor.
+# The tools under the day: Find in this log (/ goes there), the order, whose lines, Failed, With notes, which terminal.
+log.find = Bu logda ara
+log.find_clear = Aramayı temizle
+log.find_key = Bu logda aramak için / tuşuna bas
+log.order_title = Satırların sırası
+log.order_old = Önce en eski
+log.order_new = Önce en yeni
+log.who_title = Kimin satırları
+log.who_all = Herkes
+log.who_you = Sen
+log.who_ai = YZ
+log.who_note = Komutu kim çalıştırdı ya da altına kim not yazdı.
+log.only_failed = Başarısız
+log.with_notes = Notlu
+log.terminals_title = Hangi terminal
+log.terminals_all = Tüm terminaller
+log.terminals_one = Bir terminal
+# With filters on, on the right of the day: 2 of 8 commands · With notes, and Clear.
+log.shown = one: {n} komuttan {shown} | other: {n} komuttan {shown}
+log.clear = Filtreleri kaldır
+log.none_shown = Bu filtrelerle burada bir şey yok.
+# What Find in this log found: In all of web-01’s log, a year back: 3 commands and 2 notes, on 2 days. {back} is log.keep_year or log.keep_days; {what} is log.found_commands, or log.found_both; {days} is log.found_days.
+log.found = {machine} logunun tamamında, son {back}: <b>{what}</b>, {days}
+log.found_commands = one: {n} komut | other: {n} komut
+log.found_notes = one: {n} not | other: {n} not
+log.found_both = {commands} ve {notes}
+log.found_days = one: {n} günde | other: {n} günde
+log.found_none = {machine} logunda, son {back} içinde “{text}” için sonuç yok.
+log.found_cut = Burada gösterilenden fazlası bulundu, yalnızca ilk {n}. Daraltmak için bir sözcük ekle.
+log.found_among = {machine} logunda bulunan ilk {n} sonuç arasında: <b>{what}</b>, {days}
+# {why} is what went wrong, as tTerm Web said it.
+log.no_find = Logda arama yapılamadı: {why}
+log.back_to_day = Güne dön
+log.open_day = Günü aç
+
+# ------------------------------------------------------------ reason: why a terminal ended (reasons.ts)
+# What tTerm Web says when a terminal ends by itself, under a terminal that ended and in the log (log.ended_why). {machine} and {mac} are machines' names, {code} a number, {why} what the system said, as it said it.
+reason.stopped = tTerm Web durdu.
+reason.closed = Kapatıldı.
+reason.closed_early = Açılmadan kapatıldı.
+reason.shell_code = Kabuk {code} koduyla sonlandı.
+reason.link_closed = {machine} bağlantısı kapandı.
+reason.link_lost = {machine} bağlantısı koptu: {why}
+reason.removed = {machine}, tTerm Web’den kaldırıldı.
+reason.agent_off = {machine} şu anda bağlı değil: ajanı çalışmıyor. O bilgisayarda ajanı başlat, sonra yeniden bir terminal aç.
+reason.mac_off = {mac} şu anda bağlı değil. Mac’ten aç ya da Mac için tTerm’i başlat, sonra bu terminali yeniden aç.
+# A computer's terminal that waited for its agent; a terminal that did not open; the Mac, when its name is not known (reason.mac_off).
+reason.away_long = {machine} 12 saat içinde geri dönmedi: bu terminal sonlandı.
+reason.came_back_without = {machine} bu terminal olmadan geri döndü: ajanı yeniden başlatıldı ya da bilgisayar bir saatten uzun süre açık ve çevrimdışıydı.
+reason.agent_stopped = {machine} üzerindeki ajan durduruldu: bu terminal sonlandı.
+reason.no_open = {machine} üzerinde terminal açılamadı: {why}
+reason.the_mac = Mac
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.

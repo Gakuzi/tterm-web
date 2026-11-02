@@ -8138,3 +8138,290 @@ mark.found-mark {
     margin-left: 0;
   }
 }
+
+/* ------------------------------ the log of a machine, the tools (0.1.21) */
+
+/* What a command printed, under its line: its own box, as on the canvas
+   (version 95); a long one folded to its first lines, fading out. */
+.log-line.open .log-acts {
+  display: flex;
+}
+
+.log-line.open .log-term {
+  display: none;
+}
+
+.log-out {
+  margin: 2px 0 10px 110px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--ground);
+  overflow: hidden;
+}
+
+.log-out pre.out {
+  margin: 0;
+  padding: 10px 14px;
+  overflow-x: auto;
+}
+
+.log-out.folded pre.out {
+  -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent);
+  mask-image: linear-gradient(to bottom, #000 72%, transparent);
+}
+
+.log-out-foot {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px 5px 14px;
+  border-top: 1px solid var(--raised);
+  background: var(--surface);
+}
+
+.log-out-size {
+  margin-right: auto;
+  font: 500 12px var(--font-ui);
+  color: var(--faint);
+}
+
+.log-out-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  font: 500 12.5px var(--font-ui);
+  color: var(--faint);
+}
+
+/* Under the day: Find in this log, the order, who, Failed, With notes, and
+   the terminal when the day had more than one. */
+.log-tools {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 10px;
+}
+
+.log-find {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 300px;
+  max-width: 100%;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 6px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--faint);
+  cursor: text;
+}
+
+.log-find.on {
+  border-color: var(--amber);
+}
+
+.log-find:focus-within {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px var(--amber-ring);
+}
+
+.log-find input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font: 500 13px var(--font-ui);
+}
+
+.log-find input::placeholder {
+  color: var(--faint);
+}
+
+.log-find kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font: 600 10.5px var(--font-ui);
+  color: var(--faint);
+}
+
+.log-find .icon-button.small {
+  width: 22px;
+  height: 22px;
+}
+
+.log-find .spinner {
+  width: 12px;
+  height: 12px;
+}
+
+/* A chip that opens a menu: its words, not the ⋯ button's square. */
+.log-tools .log-chip.menu-button {
+  width: auto;
+  height: 30px;
+  white-space: nowrap;
+}
+
+.log-tools .log-chip.on {
+  border-color: var(--amber);
+  background: var(--amber-tint);
+  color: var(--amber-ink);
+}
+
+.log-tools .log-chip.open {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.log-tools .log-chip .down {
+  margin-right: -3px;
+  opacity: 0.7;
+}
+
+.log-tools .sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--line);
+}
+
+.log-drop .menu {
+  width: 240px;
+}
+
+.log-drop .menu-note {
+  padding: 6px 10px 4px;
+  font: 500 11.5px/1.45 var(--font-ui);
+  color: var(--faint);
+  white-space: normal;
+}
+
+.log-clear {
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--amber-ink);
+  font: 600 12px var(--font-ui);
+  cursor: pointer;
+}
+
+.log-clear:hover,
+.log-clear:focus-visible {
+  background: var(--raised);
+}
+
+.log-day-count b {
+  color: var(--dim);
+  font-weight: 700;
+}
+
+.log-day-count .log-clear {
+  margin-left: 4px;
+}
+
+/* What Find in this log found, day by day, the words marked. */
+.log-found {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 10px 0 2px;
+  font: 500 13px var(--font-ui);
+  color: var(--dim);
+}
+
+.log-found b {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.log-found .back {
+  margin-left: auto;
+}
+
+.log-dayhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 6px;
+  font: 700 13.5px var(--font-ui);
+  color: var(--ink);
+}
+
+.log-dayhead .rule {
+  flex: 1;
+  height: 1px;
+  background: var(--raised);
+}
+
+.log-dayhead .log-clear {
+  color: var(--dim);
+}
+
+mark.log-hit {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: var(--amber-tint);
+  color: var(--amber-ink);
+  font-weight: 700;
+}
+
+.log-line.found {
+  cursor: pointer;
+}
+
+/* A found line's time: a button to its day, for the keys too. */
+.log-time.log-open {
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.log-time.log-open:hover,
+.log-time.log-open:focus-visible {
+  color: var(--amber-ink);
+  text-decoration: underline;
+}
+
+@media (max-width: 720px) {
+  .log-out {
+    margin-left: 0;
+  }
+
+  .log-find {
+    width: 100%;
+  }
+
+  .log-found .back {
+    margin-left: 0;
+  }
+
+  /* A chip's menu under the whole row of tools, across it: on a phone a
+     chip may sit anywhere in the row, and its menu stays on the screen. */
+  .log-tools .log-drop {
+    position: static;
+  }
+
+  .log-tools .sep {
+    display: none;
+  }
+
+  .log-tools .log-drop .menu {
+    left: 0;
+    right: 0;
+    width: auto;
+  }
+}

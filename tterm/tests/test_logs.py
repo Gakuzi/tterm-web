@@ -1,6 +1,8 @@
 """The log of a machine (0.1.20): commands as lines, notes under them by
 people and by an AI on a person's behalf, redaction, who may do what, how
-long it all stays, and the lines brought in from the blocks of before."""
+long it all stays, and the lines brought in from the blocks of before. From
+0.1.21: Find in this log, the logs in search, and what a line needs for its
+output to open under it."""
 import datetime as dt
 import hashlib
 import json
@@ -247,6 +249,150 @@ async def test_a_day_of_the_log_with_its_notes(h):
         assert r[3]["redacted"] is None and r[3]["canNote"]
 
 
+async def test_find_in_a_log_and_the_logs_in_search(h):
+    async with h.pool() as pool:
+        me, project = await _owner(pool)
+        anna = await _person(pool, "anna@example.com", "Anna Admin")
+        stranger = await _person(pool, "sam@example.com", "Sam Stranger")
+        await _join(pool, project, anna, "member")
+        machine, terminal = await _computer(pool, project, me.id)
+        other, other_terminal = await _computer(pool, project, me.id, "web-02")
+        now = dt.datetime.now(dt.UTC).replace(microsecond=0)
+        old = now - dt.timedelta(days=48)
+        cp = "cp config/production.example.json config/production.json"
+        first_cp = await _ran(pool, project, me.id, machine, terminal, 1, cp,
+                              at=old, block=False)
+        await logs.add_note(pool, me.id, "First deploy: production.json from "
+                            "the example.", entry_id=first_cp)
+        await _ran(pool, project, me.id, machine, terminal, 2,
+                   "vim config/production.json", at=old + dt.timedelta(minutes=2),
+                   block=False)
+        failed = await _ran(pool, project, me.id, machine, terminal, 10,
+                            "npm run build", at=now - dt.timedelta(minutes=9),
+                            exit_code=1)
+        await logs.add_note(pool, me.id, "The build needs config/production.json"
+                            ", and it is not in git (.gitignore).",
+                            entry_id=failed, ai="claude-opus-5-5")
+        await _ran(pool, project, me.id, machine, terminal, 20, cp,
+                   at=now - dt.timedelta(minutes=5))
+        built = await _ran(pool, project, me.id, machine, terminal, 30,
+                           "npm run build", at=now - dt.timedelta(minutes=4))
+        await logs.add_note(pool, me.id, "Config copied from the example.",
+                            entry_id=built)
+        secret = await _ran(pool, project, me.id, machine, terminal, 40,
+                            "mysql -p'S3cr3t-pa55' app", at=now - dt.timedelta(minutes=2))
+        await _ran(pool, project, me.id, other, other_terminal, 5,
+                   "cat config/production.json", at=now - dt.timedelta(minutes=1))
+
+        found = await logs.find(pool, me.id, machine, ["production.json"])
+        assert [e["command"] for e in found["entries"]] == \
+            [cp, "vim config/production.json", "npm run build", cp], \
+            "the oldest first; the failed build by its note; not web-02's"
+        assert found["words"] == ["production.json"] and not found["cut"]
+        assert found["machine"]["name"] == "web-01" and found["role"] == "owner"
+        assert found["keep"] == {"lines": 365, "output": 30}
+        by_id = {e["id"]: e for e in found["entries"]}
+        assert [n["text"] for n in by_id[first_cp]["notes"]] == \
+            ["First deploy: production.json from the example."]
+        assert by_id[failed]["notes"][0]["author"] == "ai"
+        assert by_id[failed]["exit"] == 1 and by_id[failed]["output"]
+        assert not by_id[first_cp]["output"], "48 days: no output kept"
+        newest = await logs.find(pool, me.id, machine, ["production.json"],
+                                 newest=True)
+        assert [e["id"] for e in newest["entries"]] == \
+            [e["id"] for e in reversed(found["entries"])]
+        # Every word in the command, or every word in one note under it;
+        # not some here and some there.
+        both = await logs.find(pool, me.id, machine, ["build", "gitignore"])
+        assert [e["id"] for e in both["entries"]] == [failed]
+        assert (await logs.find(pool, me.id, machine, ["npm", "gitignore"]))["entries"] == []
+        # Any case, inside other words; % and _ as themselves.
+        assert [e["id"] for e in (await logs.find(
+            pool, me.id, machine, ["config/prod"]))["entries"]][0] == first_cp
+        assert (await logs.find(pool, me.id, machine, ["%"]))["entries"] == []
+        assert (await logs.find(pool, me.id, machine, ["npm_run"]))["entries"] == []
+        # Redacted words are found nowhere: a command's, a note's.
+        await logs.redact(pool, me.id, secret, "a password")
+        assert (await logs.find(pool, me.id, machine, ["s3cr3t"]))["entries"] == []
+        token = await logs.add_note(pool, me.id, "token xoxb-8f2k", entry_id=built)
+        assert len((await logs.find(pool, me.id, machine, ["xoxb"]))["entries"]) == 1
+        await logs.redact(pool, me.id, token["note"]["id"], "a token")
+        assert (await logs.find(pool, me.id, machine, ["xoxb"]))["entries"] == []
+        # A line written in a project one is not in (the machine was there
+        # then) is not found here.
+        theirs_project = (await accounts.projects_of(pool, stranger.id))[0]["id"]
+        await _ran(pool, uuid.UUID(theirs_project), stranger.id, machine, terminal, 50,
+                   "cat config/production.json", at=old - dt.timedelta(days=1), block=False)
+        assert all(e["command"] != "cat config/production.json" for e in
+                   (await logs.find(pool, me.id, machine, ["production.json"]))["entries"])
+        await _refused(logs.Invalid, logs.find(pool, me.id, machine, []))
+        await _refused(logs.NotFound, logs.find(pool, stranger.id, machine,
+                                                ["build"]))
+        # Someone else in the project finds the lines; what they printed
+        # stays with the one whose terminal it is.
+        theirs = await logs.find(pool, anna.id, machine, ["npm"])
+        assert len(theirs["entries"]) == 2
+        assert not any(e["output"] for e in theirs["entries"])
+        assert all(e["cols"] is None for e in theirs["entries"])
+        # The width a command ran at, for its output under the line.
+        await pool.execute("UPDATE blocks SET cols = 132 WHERE terminal_id = $1 "
+                            "AND seq_start = 10", terminal)
+        start, end = now - dt.timedelta(hours=1), now + dt.timedelta(hours=1)
+        log = await logs.day(pool, me.id, machine, start, end)
+        line = [e for e in log["entries"] if e["id"] == failed][0]
+        assert line["output"] and line["cols"] == 132
+        gone = [e for e in log["entries"] if e["id"] == secret][0]
+        assert not gone["output"] and gone["cols"] is None
+
+        # Search: the logs of the machines one reads.
+        async with pool.acquire() as conn:
+            got, more = await logs.found_in_logs(conn, me.id, ["production.json"])
+        assert not more
+        lines = [x for x in got if x["kind"] == "line"]
+        notes = [x for x in got if x["kind"] == "note"]
+        assert [(x["command"], x["machine"], x["runs"]) for x in lines] == [
+            ("cat config/production.json", "web-02", 1),
+            (cp, "web-01", 2),
+            ("vim config/production.json", "web-01", 1)], lines
+        latest = lines[1]
+        assert latest["entry"] != first_cp and latest["by"]["me"]
+        assert latest["cwd"] == "/srv/app" and latest["branch"] == "main"
+        assert latest["exit"] == 0 and latest["code"] == "P"
+        assert latest["notes"] == 0 and latest["note"] is None
+        assert sorted(x["text"][:20] for x in notes) == \
+            ["First deploy: produc", "The build needs conf"]
+        ai = [x for x in notes if x["author"] == "ai"][0]
+        assert ai["entry"] == failed and ai["command"] == "npm run build"
+        assert ai["ai"] == "claude-opus-5-5" and ai["by"]["me"]
+        assert ai["machineId"] == str(machine) and ai["lineAt"] is not None
+        async with pool.acquire() as conn:
+            got, _ = await logs.found_in_logs(conn, me.id, ["vim"])
+            assert got[0]["notes"] == 0
+            got, _ = await logs.found_in_logs(conn, me.id, ["cp", "example"])
+            assert got[0]["note"] is None
+            got, _ = await logs.found_in_logs(conn, me.id, ["s3cr3t"])
+            assert got == [], "a redacted command is not found"
+            got, _ = await logs.found_in_logs(conn, stranger.id, ["production"])
+            assert got == []
+            got, _ = await logs.found_in_logs(conn, anna.id, ["production"])
+            assert len(got) == 5
+        # A line with notes says how many and the first of them.
+        async with pool.acquire() as conn:
+            got, _ = await logs.found_in_logs(conn, me.id, ["npm", "build"])
+        assert got[0]["runs"] == 2 and got[0]["entry"] == built
+        assert got[0]["notes"] == 2, "the redacted one counts, not shown"
+        assert got[0]["note"]["text"] == "Config copied from the example."
+        # A machine taken out of tTerm: its log is not there to open.
+        await pool.execute("UPDATE machines SET removed_at = now() WHERE id = $1",
+                           other)
+        async with pool.acquire() as conn:
+            got, _ = await logs.found_in_logs(conn, me.id, ["production.json"])
+        assert "web-02" not in {x["machine"] for x in got}
+        everything = await search.search(pool, me.id, "production.json")
+        assert len(everything["logs"]) == 4 and everything["more"]["logs"] is False
+        assert (await search.search(pool, me.id, ""))["logs"] == []
+
+
 async def test_who_reads_writes_and_redacts(h):
     async with h.pool() as pool:
         me, project = await _owner(pool)
@@ -472,7 +618,13 @@ async def test_the_commands_of_before_come_into_the_log(h):
                 "$5::jsonb, now() + interval '300 days')", moved_at, pid, me.id,
                 moved, json.dumps({"from": str(project), "to": str(team)}))
         db.MIGRATIONS = real
-        assert await db.migrate(pool) == ["016_machine_log"]
+        assert await db.migrate(pool) == ["016_machine_log", "017_log_words"]
+        # The words looked for by a trigram index, where pg_trgm is (0.1.21).
+        trgm = await pool.fetchval("SELECT count(*) FROM pg_extension "
+                                   "WHERE extname = 'pg_trgm'")
+        index = await pool.fetchval("SELECT count(*) FROM pg_indexes "
+                                    "WHERE indexname = 'log_texts_words'")
+        assert index == trgm, (index, trgm)
         where = {r["text"]: r["project_id"] for r in await pool.fetch(
             "SELECT x.text, j.project_id FROM journal j JOIN log_texts x "
             "ON x.id = j.text_id WHERE j.machine_id = $1", moved)}
@@ -575,6 +727,30 @@ async def test_a_terminal_writes_the_log_and_forgets_what_is_redacted(h):
             feed = r.json()["blocks"]
             assert [n["text"] for n in feed[0]["notes"]] == ["The first."]
             assert [n["text"] for n in feed[2]["notes"]] == ["Exit 3 on purpose."]
+            # The width each command ran at, for its output under the line.
+            assert all(e["cols"] == 100 for e in lines)
+            # Find in this log, and the logs in search (0.1.21).
+            find = f"/api/machines/{machine_id}/log/find"
+            r = await request(page, "GET", f"{find}?q=echo")
+            assert r.status == 200, r.body
+            assert [e["command"] for e in r.json()["entries"]] == \
+                ["echo first", "echo s3cret-t0ken"]
+            r = await request(page, "GET", f"{find}?q=echo&newest=1")
+            assert [e["command"] for e in r.json()["entries"]] == \
+                ["echo s3cret-t0ken", "echo first"]
+            r = await request(page, "GET", f"{find}?q=PURPOSE")
+            assert [e["command"] for e in r.json()["entries"]] == ["(exit 3)"]
+            assert r.json()["entries"][0]["notes"][0]["text"] == \
+                "Exit 3 on purpose."
+            r = await request(page, "GET", f"{find}?q=%20")
+            assert r.status == 422
+            r = await request(page, "GET",
+                              f"/api/machines/{uuid.uuid4()}/log/find?q=echo")
+            assert r.status == 404
+            r = await request(page, "GET", "/api/search?q=purpose")
+            said = [x for x in r.json()["logs"] if x["kind"] == "note"]
+            assert [x["text"] for x in said] == ["Exit 3 on purpose."]
+            assert said[0]["command"] == "(exit 3)"
             # Redacted: gone from the log, the feed, search, the history
             # and the terminal's memory; the pages watching hear it.
             assert b"s3cret-t0ken" in _screen(t)
@@ -600,6 +776,9 @@ async def test_a_terminal_writes_the_log_and_forgets_what_is_redacted(h):
             assert block["size"] == 0
             r = await request(page, "GET", "/api/search?q=s3cret")
             assert not r.json()["commands"] and not r.json()["output"]
+            assert not r.json()["logs"]
+            r = await request(page, "GET", f"{find}?q=s3cret")
+            assert r.json()["entries"] == []
             r = await request(page, "GET", f"/api/terminals/{t.id}/history")
             assert all("s3cret" not in c["command"]
                        for c in r.json()["commands"])

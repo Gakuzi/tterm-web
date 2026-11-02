@@ -15,7 +15,7 @@ import {
 import { colorClass } from "./colors";
 import { Confirm, Removed } from "./Confirm";
 import { Finder, type FinderGroup, type FinderItem } from "./Finder";
-import { foundBlock, foundNote } from "./found";
+import { foundBlock, foundLine, foundNote } from "./found";
 import {
   ChevronRight, Close, CloudOff, CloudUp, Computer, Doc, Folder as FolderIcon, Gear, ListCheck,
   Moon, Pencil, Person, Pin, Plus, Server, SignIn as SignInIcon,
@@ -1593,10 +1593,16 @@ export function App() {
     foundNote(note.noteId, note.blockId, words);
     openTab(noteTab(note.noteId));
   };
+  /** A line of a machine's log search found (0.1.21): the log, at the
+   * line's day, the line lit. */
+  const openFoundLine = (machineId: string, entry: number, at: number, words: string[]) => {
+    foundLine(machineId, entry, at, words);
+    openTab(logTab(machineId));
+  };
   /** Cmd+Enter: the command into the line of the terminal in front, even on
    * another machine (the owner, 24.10); with none in front, of a terminal of
    * yours on its machine, or of a new one there. Not run. */
-  const pasteFound = (block: FoundBlock) => {
+  const pasteFound = (block: Pick<FoundBlock, "command" | "machineId" | "machine">) => {
     const put = (terminalId: string) => {
       pasteN.current += 1;
       setPaste({ terminalId, text: block.command, n: pasteN.current });
@@ -1687,11 +1693,6 @@ export function App() {
         {shownTabs.filter((tab) => tabKind(tab) === "log").map((tab) => (
           <LogView key={tab} machineId={tabTarget(tab)} active={tab === current}
             me={state.me} projects={projects}
-            onOutput={(terminalId, seq) => {
-              // At its block, as search opens one, without words to mark.
-              foundBlock(terminalId, seq, [], false);
-              openTab(terminalId);
-            }}
             onCloseTab={() => closeTabs([tab], true)} notify={notYet} />
         ))}
         {frontKind === "project" && (
@@ -1862,7 +1863,8 @@ export function App() {
         return (
           <Search entries={entries} recent={recent} near={near}
             onOpenBlock={openFoundBlock} onPaste={pasteFound}
-            onOpenNote={openFoundNote} onClose={() => setPalette(false)} />
+            onOpenNote={openFoundNote} onOpenLine={openFoundLine}
+            onClose={() => setPalette(false)} />
         );
       })()}
 

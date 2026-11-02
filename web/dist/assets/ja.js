@@ -1086,6 +1086,7 @@ menus.name_example = 例：手順書
 # its groups.
 search.kind_commands = コマンド
 search.kind_output = 出力
+search.kind_logs = ログ
 search.kind_notes = ノート
 search.kind_terminals = ターミナル
 search.kind_machines = マシン
@@ -1094,6 +1095,8 @@ search.kind_actions = アクション
 # The kind of the line chosen, on top of the preview beside the list.
 search.label_command = コマンド
 search.label_output = 出力
+search.label_log_line = ログの行
+search.label_log_note = ログのノート
 search.label_note = ノート
 search.label_terminal = ターミナル
 search.label_machine = マシン
@@ -1104,6 +1107,7 @@ search.label_action = アクション
 search.nothing_for = 「{text}」に一致するものはありません。
 search.nothing_in_commands = 「{text}」に一致するコマンドはありません。
 search.nothing_in_output = 「{text}」に一致する出力はありません。
+search.nothing_in_logs = 「{text}」に一致するログはありません。
 search.nothing_in_notes = 「{text}」に一致するノートはありません。
 search.nothing_in_terminals = 「{text}」に一致するターミナルはありません。
 search.nothing_in_machines = 「{text}」に一致するマシンはありません。
@@ -1127,6 +1131,9 @@ search.row_branch = ブランチ
 search.row_status = 状態
 search.row_when = 日時
 search.row_terminal = ターミナル
+search.row_who = 誰
+search.row_notes = ノート
+search.row_under = 対象
 # {terminal} is the terminal as its tab names it, P/web-01 · deploy; {when}
 # is when it ended: 10:46, yesterday 17:38, 2 Oct 09:12.
 search.terminal_ended = {terminal}、{when} に終了
@@ -1134,6 +1141,9 @@ search.terminal_ended = {terminal}、{when} に終了
 # into the line of the terminal in front, not run.
 search.open_in_terminal = ターミナルで開く
 search.into_line = 入力行に入れる
+# 0.1.21: a line of a machine's log, or a note under one. {command} is the line's command.
+search.open_in_log = ログで開く
+search.under = {command} の下
 # A note found: where it is (its project and folder), when it was edited.
 search.row_in = 場所
 search.row_edited = 最終編集
@@ -1148,7 +1158,7 @@ search.all = other: すべて {n} 件
 search.all_more = other: すべて {n} 件以上
 # The window, and its field.
 search.label = 検索
-search.placeholder = コマンド、出力、ノート、ターミナル、マシン…
+search.placeholder = コマンド、出力、ログ、ノート、ターミナル、マシン…
 search.close_title = 閉じる（Esc）
 # The buttons above the list; All is the first of them.
 search.filters = 検索対象
@@ -1156,17 +1166,19 @@ search.kind_all = すべて
 # The list of what was found, for screen readers.
 search.found = 検索結果
 search.nothing_typed = まだ何も入力されていません。最近開いたものと、ここでよく実行するコマンドを表示しています。
-search.looks_in = あなたのすべてのターミナルの、すべてのコマンドとその出力、ノート、ターミナル、マシン、プロジェクトを検索します。
+search.looks_in = あなたのすべてのターミナルの、すべてのコマンドとその出力、マシンのログ、ノート、ターミナル、マシン、プロジェクトを検索します。
 search.everything = すべてを検索
 # With Output, Notes or Commands chosen and nothing typed yet.
 search.type_output = コマンドの出力から探す語句を入力してください。
 search.type_notes = ノートから探す語句を入力してください。
 search.type_commands = コマンドから探す語句を入力してください。
+search.type_logs = マシンのログから探す語句を入力してください。
 # Beside the list while nothing is chosen: what to type (c: nginx,
 # o: timed out…), and what each keeps to.
 search.tips = 先頭に付けると、種類を絞り込めます
 search.tip_commands = コマンド
 search.tip_output = コマンドの出力
+search.tip_logs = マシンのログ
 search.tip_notes = ノート
 search.tip_terminals = ターミナル
 search.tip_machines = マシン
@@ -1185,6 +1197,7 @@ search.keys_next = <kbd>Tab</kbd> 次の種類
 search.prefixes_title = t: ターミナル、m: マシン、p: プロジェクト
 search.prefix_commands = <code>c:</code> コマンド
 search.prefix_output = <code>o:</code> 出力
+search.prefix_logs = <code>l:</code> ログ
 search.prefix_notes = <code>n:</code> ノート
 search.prefix_actions = <code>></code> アクション
 
@@ -1356,7 +1369,7 @@ log.ended = {name} を {who} が終了しました
 log.ended_why = {name} が終了しました：{why}
 # A command's line under the mouse.
 log.output = 出力
-log.output_title = ターミナルで開く
+log.output_title = 出力をこの行の下に表示
 log.output_gone = 出力は保存されていません
 # {days} is log.keep_days or log.keep_year.
 log.output_gone_title = 出力は {days}保存されます
@@ -1408,6 +1421,70 @@ log.old_banner = <b>これらのコマンドの出力は、もう保存されて
 log.no_open = ログを開けませんでした：{why}
 log.gone_title = このログは見つかりません
 log.gone_text = このログのマシンが削除されたか、あなたがメンバーではないプロジェクトに移動されました。
+# 0.1.21 (the canvas, version 95): what a command printed opens under its line. Hide output closes it again.
+log.hide_output = 出力を隠す
+log.hide_output_title = 出力を隠します
+# Under the output: 27 lines · Show all 27 lines · Copy output (block.copy_output).
+log.output_lines = other: {n} 行
+log.output_all = other: {n} 行をすべて表示
+log.output_fold = 折りたたむ
+log.output_lost = 出力はもう保存されていません。
+# {why} is what went wrong, as tTerm Web said it.
+log.output_no = 出力を取得できませんでした：{why}
+log.output_empty = 何も出力されませんでした。
+log.output_screen = フルスクリーンのプログラムのように画面全体に描画したため、その内容はここには保存されていません。
+# The tools under the day: Find in this log (/ goes there), the order, whose lines, Failed, With notes, which terminal.
+log.find = このログを検索
+log.find_clear = 検索をクリア
+log.find_key = / キーでこのログを検索
+log.order_title = 行の並び順
+log.order_old = 古い順
+log.order_new = 新しい順
+log.who_title = 誰の行か
+log.who_all = 全員
+log.who_you = あなた
+log.who_ai = AI
+log.who_note = コマンドを実行した人、またはその下にノートを書いた人です。
+log.only_failed = 失敗のみ
+log.with_notes = ノートあり
+log.terminals_title = どのターミナルか
+log.terminals_all = すべてのターミナル
+log.terminals_one = 1 つのターミナル
+# With filters on, on the right of the day: 2 of 8 commands · With notes, and Clear.
+log.shown = other: {n} 件中 {shown} 件のコマンド
+log.clear = 解除
+log.none_shown = このフィルターに合う行はありません。
+# What Find in this log found: In all of web-01’s log, a year back: 3 commands and 2 notes, on 2 days. {back} is log.keep_year or log.keep_days; {what} is log.found_commands, or log.found_both; {days} is log.found_days.
+log.found = {machine} のログ全体（過去 {back}）：<b>{what}</b>、{days}
+log.found_commands = other: コマンド {n} 件
+log.found_notes = other: ノート {n} 件
+log.found_both = {commands}、{notes}
+log.found_days = other: {n} 日分
+log.found_none = {machine} のログ（過去 {back}）に「{text}」は見つかりませんでした。
+log.found_cut = 表示しきれないほど見つかりました。最初の {n} 件だけを表示しています。語句を追加して絞り込んでください。
+log.found_among = {machine} のログで見つかった最初の {n} 件：<b>{what}</b>、{days}
+# {why} is what went wrong, as tTerm Web said it.
+log.no_find = ログを検索できませんでした：{why}
+log.back_to_day = 日の表示に戻る
+log.open_day = この日を開く
+
+# ------------------------------------------------------------ reason: why a terminal ended (reasons.ts)
+# What tTerm Web says when a terminal ends by itself, under a terminal that ended and in the log (log.ended_why). {machine} and {mac} are machines' names, {code} a number, {why} what the system said, as it said it.
+reason.stopped = tTerm Web が停止しました。
+reason.closed = 閉じられました。
+reason.closed_early = 開く前に閉じられました。
+reason.shell_code = シェルがコード {code} で終了しました。
+reason.link_closed = {machine} への接続が閉じられました。
+reason.link_lost = {machine} への接続が切れました：{why}
+reason.removed = {machine} は tTerm Web から削除されました。
+reason.agent_off = {machine} は現在接続されていません。エージェントが実行されていません。そのコンピューターでエージェントを起動してから、もう一度ターミナルを開いてください。
+reason.mac_off = {mac} は現在接続されていません。Mac から開くか、tTerm for Mac を起動してから、もう一度このターミナルを開いてください。
+# A computer's terminal that waited for its agent; a terminal that did not open; the Mac, when its name is not known (reason.mac_off).
+reason.away_long = {machine} が 12 時間以内に戻らなかったため、このターミナルは終了しました。
+reason.came_back_without = {machine} はこのターミナルなしで戻りました。エージェントが再起動されたか、コンピューターが起動したまま 1 時間以上オフラインでした。
+reason.agent_stopped = {machine} のエージェントが停止したため、このターミナルは終了しました。
+reason.no_open = {machine} でターミナルを開けませんでした：{why}
+reason.the_mac = Mac
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.

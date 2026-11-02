@@ -23,6 +23,12 @@ and the log keeps who redacted it, when and why.
 Lines are kept as long as the project keeps its journal (a year), what the
 commands printed as long as it keeps output (30 days). A note and a
 redaction leave with their line.
+
+From 0.1.21 a log is looked through as well: Find in this log, over all the
+days it keeps (`find`), and search over the logs of every machine the
+person reads (`found_in_logs`, for search.py). What a command printed opens
+under its line, from its block, while the block is kept: a line says so,
+and the width the command ran at.
 """
 from __future__ import annotations
 
@@ -51,6 +57,12 @@ DAY_MAX = 1000
 #: A day as the page asks for it: its own midnight to the next, 23 to 25
 #: hours where the clocks change; never more than this.
 SPAN_MAX = dt.timedelta(hours=26)
+#: Find in this log (0.1.21): commands sent back at most, words looked for.
+FIND_MAX = 200
+FIND_WORDS = 8
+#: Search (0.1.21): log lines and notes looked at, and sent back of each.
+LOGS_SCAN = 400
+LOGS_FOUND = 40
 #: A note from the feed may name a block whose line is still being written
 #: (the block of a command that just ended): looked for again this often.
 LATE_TRIES = 4
@@ -431,55 +443,52 @@ async def machine_of(conn: asyncpg.Connection, machine_id: uuid.UUID,
     return row
 
 
-async def day(pool: asyncpg.Pool, user_id: uuid.UUID, machine_id: uuid.UUID,
-              start: dt.datetime, end: dt.datetime) -> dict:
-    """The machine's log from `start` to `end` (the page's day): its lines,
-    oldest first, each command with its notes; and when the nearest lines
-    before and after are, for the page to go there."""
-    if not start < end <= start + SPAN_MAX:
-        raise Invalid("A day of the log is from one midnight to the next.")
-    async with pool.acquire() as conn:
-        machine = await machine_of(conn, machine_id, user_id)
-        roles = await _roles(conn, user_id)
-        mine = list(roles)
-        rows = await conn.fetch(
-            """
-            SELECT j.id, j.at, j.kind, j.user_id, j.author, j.ai, j.project_id,
-                   j.terminal_id, j.details, t.name AS terminal, x.text,
-                   x.redacted_at, x.redacted_by, x.reason,
-                   CASE WHEN j.kind = 'command.ran' AND j.user_id = $5 THEN
-                       EXISTS (SELECT 1 FROM blocks b
-                               WHERE b.terminal_id = j.terminal_id
-                                 AND b.seq_start = (j.details->>'seq')::bigint
-                                 AND b.output IS NOT NULL
-                                 AND b.expires_at > now())
-                   ELSE false END AS output
-            FROM journal j
-            LEFT JOIN terminals t ON t.id = j.terminal_id
-            LEFT JOIN log_texts x ON x.id = j.text_id
-            WHERE j.machine_id = $1 AND j.at >= $2 AND j.at < $3
-              AND j.kind = ANY($4::text[]) AND j.expires_at > now()
-              AND j.project_id = ANY($6::uuid[])
-            ORDER BY j.at, j.id
-            LIMIT $7
-            """, machine_id, start, end, list(KINDS), user_id, mine,
-            DAY_MAX + 1)
-        cut = len(rows) > DAY_MAX
-        rows = rows[:DAY_MAX]
-        notes = await _notes(conn, [r["id"] for r in rows
-                                    if r["kind"] == "command.ran"])
-        near = """
-            SELECT {pick}(at) FROM journal
-            WHERE machine_id = $1 AND at {cmp} $2 AND kind = ANY($3::text[])
-              AND expires_at > now() AND project_id = ANY($4::uuid[])
-        """
-        before = await conn.fetchval(near.format(pick="max", cmp="<"),
-                                     machine_id, start, list(KINDS), mine)
-        after = await conn.fetchval(near.format(pick="min", cmp=">="),
-                                    machine_id, end, list(KINDS), mine)
-        who = ({r["user_id"] for r in rows} | {r["redacted_by"] for r in rows}
-               | {n["user_id"] for n in notes} | {n["redacted_by"] for n in notes})
-        people = await _people(conn, who, user_id)
+#: A line of a log as the page draws it: who, its words, how it ended, and
+#: whether what it printed is still kept, in the person's own terminal,
+#: with the width it ran at: it opens under the line (0.1.21). The query
+#: that adds to it takes $1 for the machine, $2 for the person and $3 for
+#: the projects they are in.
+_LINES = """
+    SELECT j.id, j.at, j.kind, j.user_id, j.author, j.ai, j.project_id,
+           j.terminal_id, j.details, t.name AS terminal, x.text,
+           x.redacted_at, x.redacted_by, x.reason,
+           coalesce(ob.kept, false) AS output, ob.cols
+    FROM journal j
+    LEFT JOIN terminals t ON t.id = j.terminal_id
+    LEFT JOIN log_texts x ON x.id = j.text_id
+    LEFT JOIN LATERAL (
+        SELECT true AS kept, b.cols FROM blocks b
+        WHERE j.kind = 'command.ran' AND j.user_id = $2
+          AND b.terminal_id = j.terminal_id
+          AND b.seq_start = (j.details->>'seq')::bigint
+          AND b.output IS NOT NULL AND b.expires_at > now()
+        LIMIT 1) ob ON true
+"""
+
+
+def _about(machine: asyncpg.Record) -> dict:
+    """The machine and its project as its log names them, the person's role
+    there, and how long the project keeps lines and what commands print."""
+    return {
+        "machine": {"id": str(machine["id"]), "name": machine["name"],
+                    "kind": machine["kind"],
+                    "projectId": str(machine["project_id"]),
+                    "code": machine["code"], "project": machine["project"]},
+        "role": machine["role"],
+        "keep": {"lines": machine["journal_days"],
+                 "output": machine["output_days"]},
+    }
+
+
+async def _entries(conn: asyncpg.Connection, rows: list[asyncpg.Record],
+                   user_id: uuid.UUID, roles: dict[uuid.UUID, str]) -> list[dict]:
+    """Lines as the page draws them: each command with its notes, the
+    terminals opened and ended."""
+    notes = await _notes(conn, [r["id"] for r in rows
+                                if r["kind"] == "command.ran"])
+    who = ({r["user_id"] for r in rows} | {r["redacted_by"] for r in rows}
+           | {n["user_id"] for n in notes} | {n["redacted_by"] for n in notes})
+    people = await _people(conn, who, user_id)
     by_entry: dict[int, list[dict]] = {}
     for n in notes:
         by_entry.setdefault(n["about"], []).append(_note(n, people))
@@ -494,29 +503,200 @@ async def day(pool: asyncpg.Pool, user_id: uuid.UUID, machine_id: uuid.UUID,
                                "name": r["terminal"] or "1"}
                               if r["terminal_id"] else None)}
         if r["kind"] == "command.ran":
+            kept = bool(r["output"]) and r["redacted_at"] is None
             entry.update({
                 "command": r["text"], "redacted": _redacted(r, people),
                 "exit": d.get("exit"), "ms": d.get("ms"),
                 "cwd": d.get("cwd") or "", "home": d.get("home") or "",
                 "branch": d.get("branch") or "", "seq": d.get("seq"),
-                "output": bool(r["output"]) and r["redacted_at"] is None,
+                "output": kept, "cols": r["cols"] if kept else None,
                 "notes": by_entry.get(r["id"], []),
                 "canNote": role in WRITERS, "canRedact": role in MANAGERS})
         elif r["kind"] == "terminal.closed":
             entry["reason"] = d.get("reason") or ""
         entries.append(entry)
-    return {
-        "machine": {"id": str(machine["id"]), "name": machine["name"],
-                    "kind": machine["kind"],
-                    "projectId": str(machine["project_id"]),
-                    "code": machine["code"], "project": machine["project"]},
-        "role": machine["role"],
-        "keep": {"lines": machine["journal_days"],
-                 "output": machine["output_days"]},
-        "from": _ms(start), "to": _ms(end),
-        "before": _ms(before), "after": _ms(after),
-        "entries": entries, "cut": cut,
-    }
+    return entries
+
+
+async def day(pool: asyncpg.Pool, user_id: uuid.UUID, machine_id: uuid.UUID,
+              start: dt.datetime, end: dt.datetime) -> dict:
+    """The machine's log from `start` to `end` (the page's day): its lines,
+    oldest first, each command with its notes; and when the nearest lines
+    before and after are, for the page to go there."""
+    if not start < end <= start + SPAN_MAX:
+        raise Invalid("A day of the log is from one midnight to the next.")
+    async with pool.acquire() as conn:
+        machine = await machine_of(conn, machine_id, user_id)
+        roles = await _roles(conn, user_id)
+        mine = list(roles)
+        rows = await conn.fetch(
+            _LINES + """
+            WHERE j.machine_id = $1 AND j.project_id = ANY($3::uuid[])
+              AND j.at >= $4 AND j.at < $5 AND j.kind = ANY($6::text[])
+              AND j.expires_at > now()
+            ORDER BY j.at, j.id
+            LIMIT $7
+            """, machine_id, user_id, mine, start, end, list(KINDS),
+            DAY_MAX + 1)
+        cut = len(rows) > DAY_MAX
+        entries = await _entries(conn, rows[:DAY_MAX], user_id, roles)
+        near = """
+            SELECT {pick}(at) FROM journal
+            WHERE machine_id = $1 AND at {cmp} $2 AND kind = ANY($3::text[])
+              AND expires_at > now() AND project_id = ANY($4::uuid[])
+        """
+        before = await conn.fetchval(near.format(pick="max", cmp="<"),
+                                     machine_id, start, list(KINDS), mine)
+        after = await conn.fetchval(near.format(pick="min", cmp=">="),
+                                    machine_id, end, list(KINDS), mine)
+    return {**_about(machine), "from": _ms(start), "to": _ms(end),
+            "before": _ms(before), "after": _ms(after),
+            "entries": entries, "cut": cut}
+
+
+def _like(word: str) -> str:
+    """The pattern that finds a word anywhere, its own % and _ as
+    themselves (as search.py looks for words)."""
+    word = word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{word}%"
+
+
+async def find(pool: asyncpg.Pool, user_id: uuid.UUID, machine_id: uuid.UUID,
+               words: list[str], *, newest: bool = False) -> dict:
+    """Find in this log (0.1.21): the machine's commands, as far back as
+    their projects keep them, with every word in the command, or every word
+    in a note under it; redacted words are in neither. Each with its notes,
+    as a day has them; the oldest first, or the newest. The words as search
+    makes them (search.words): lower case, each once.
+
+    The words are looked for in the commands and in the notes apart, each
+    way with the trigram index of log_texts (017), and only then are the
+    lines found taken, in their order."""
+    words = [w for w in words if w][:FIND_WORDS]
+    if not words:
+        raise Invalid("Type what to look for.")
+    order = "DESC" if newest else "ASC"
+    has = " ".join(f"AND x.text ILIKE ${i + 4}" for i in range(len(words)))
+    async with pool.acquire() as conn:
+        machine = await machine_of(conn, machine_id, user_id)
+        roles = await _roles(conn, user_id)
+        rows = await conn.fetch(
+            _LINES + f"""
+            WHERE j.id IN (
+                SELECT c.id FROM journal c JOIN log_texts x ON x.id = c.text_id
+                WHERE c.machine_id = $1 AND c.kind = 'command.ran'
+                  AND c.expires_at > now() {has}
+                UNION
+                SELECT n.about FROM journal n JOIN log_texts x ON x.id = n.text_id
+                WHERE n.machine_id = $1 AND n.kind = 'log.note'
+                  AND n.expires_at > now() {has})
+              AND j.machine_id = $1 AND j.project_id = ANY($3::uuid[])
+              AND j.kind = 'command.ran' AND j.expires_at > now()
+            ORDER BY j.at {order}, j.id {order}
+            LIMIT {FIND_MAX + 1}
+            """, machine_id, user_id, list(roles), *[_like(w) for w in words])
+        cut = len(rows) > FIND_MAX
+        entries = await _entries(conn, rows[:FIND_MAX], user_id, roles)
+    return {**_about(machine), "words": words, "entries": entries, "cut": cut}
+
+
+#: The projects a person is in, as a query has them ($1, the person): they
+#: read the lines written in these, and open the logs of the machines that
+#: are in these now.
+_IN = ("(SELECT project_id FROM project_members WHERE user_id = $1 "
+       "AND (until IS NULL OR until > now()))")
+
+
+def _where(row: asyncpg.Record) -> dict:
+    return {"machineId": str(row["machine_id"]), "machine": row["machine"],
+            "machineKind": row["machine_kind"],
+            "projectId": str(row["project_id"]), "code": row["code"],
+            "project": row["project"]}
+
+
+async def found_in_logs(conn: asyncpg.Connection, user_id: uuid.UUID,
+                        words: list[str]) -> tuple[list[dict], bool]:
+    """For search (0.1.21), in the logs the person reads, as far back as
+    their projects keep them: the commands with every word in them, the
+    latest run of each on each machine with how many runs there were, and
+    the notes with every word in them; the latest first. Whether there was
+    more than is sent."""
+    likes = [_like(w) for w in words]
+    has = " ".join(f"AND x.text ILIKE ${i + 2}" for i in range(len(words)))
+    lines = await conn.fetch(
+        f"""
+        SELECT j.id, j.at, j.user_id, j.details, t.name AS terminal,
+               x.text AS command, m.id AS machine_id, m.name AS machine,
+               m.kind AS machine_kind, p.id AS project_id, p.code,
+               p.name AS project
+        FROM journal j
+        JOIN log_texts x ON x.id = j.text_id
+        JOIN machines m ON m.id = j.machine_id
+        JOIN projects p ON p.id = m.project_id
+        LEFT JOIN terminals t ON t.id = j.terminal_id
+        WHERE j.kind = 'command.ran' AND j.expires_at > now()
+          AND j.project_id IN {_IN} AND m.project_id IN {_IN}
+          AND m.removed_at IS NULL AND p.deleted_at IS NULL {has}
+        ORDER BY j.at DESC, j.id DESC
+        LIMIT {LOGS_SCAN}
+        """, user_id, *likes)
+    has = " ".join(f"AND nx.text ILIKE ${i + 2}" for i in range(len(words)))
+    said = await conn.fetch(
+        f"""
+        SELECT n.id, n.at, n.user_id, n.author, n.ai, nx.text,
+               j.id AS entry, j.at AS line_at, x.text AS command,
+               m.id AS machine_id, m.name AS machine, m.kind AS machine_kind,
+               p.id AS project_id, p.code, p.name AS project
+        FROM journal n
+        JOIN log_texts nx ON nx.id = n.text_id
+        JOIN journal j ON j.id = n.about
+        LEFT JOIN log_texts x ON x.id = j.text_id
+        JOIN machines m ON m.id = j.machine_id
+        JOIN projects p ON p.id = m.project_id
+        WHERE n.kind = 'log.note' AND n.expires_at > now()
+          AND j.expires_at > now()
+          AND j.project_id IN {_IN} AND m.project_id IN {_IN}
+          AND m.removed_at IS NULL AND p.deleted_at IS NULL {has}
+        ORDER BY n.at DESC, n.id DESC
+        LIMIT {LOGS_SCAN}
+        """, user_id, *likes)
+    runs: dict[tuple, dict] = {}
+    for r in lines:
+        key = (r["command"], r["machine_id"])
+        if key in runs:
+            runs[key]["runs"] += 1
+            continue
+        d = json.loads(r["details"]) if isinstance(r["details"], str) else r["details"]
+        runs[key] = {"kind": "line", "entry": r["id"], "at": _ms(r["at"]),
+                     "user": r["user_id"], "command": r["command"],
+                     "exit": d.get("exit"), "cwd": d.get("cwd") or "",
+                     "home": d.get("home") or "", "branch": d.get("branch") or "",
+                     "terminal": r["terminal"] or "1", "runs": 1, **_where(r)}
+    listed = list(runs.values())[:LOGS_FOUND]
+    under = await _notes(conn, [x["entry"] for x in listed])
+    notes = [{"kind": "note", "id": r["id"], "at": _ms(r["at"]),
+              "user": r["user_id"], "author": r["author"], "ai": r["ai"],
+              "text": r["text"], "entry": r["entry"],
+              "lineAt": _ms(r["line_at"]), "command": r["command"], **_where(r)}
+             for r in said[:LOGS_FOUND]]
+    people = await _people(conn, {x["user"] for x in listed}
+                           | {x["user"] for x in notes}
+                           | {n["user_id"] for n in under}, user_id)
+    first: dict[int, dict] = {}
+    count: dict[int, int] = {}
+    for n in under:
+        count[n["about"]] = count.get(n["about"], 0) + 1
+        if n["about"] not in first and n["text"] is not None:
+            first[n["about"]] = _note(n, people)
+    for x in listed:
+        x["by"] = people.get(x.pop("user"))
+        x["notes"] = count.get(x["entry"], 0)
+        x["note"] = first.get(x["entry"])
+    for x in notes:
+        x["by"] = people.get(x.pop("user"))
+    more = (len(lines) >= LOGS_SCAN or len(runs) > LOGS_FOUND
+            or len(said) > LOGS_FOUND)
+    return listed + notes, more
 
 
 async def of_blocks(pool: asyncpg.Pool, terminal_id: uuid.UUID,

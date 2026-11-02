@@ -1086,6 +1086,7 @@ menus.name_example = Ad esempio, Runbook
 # its groups.
 search.kind_commands = Comandi
 search.kind_output = Output
+search.kind_logs = Log
 search.kind_notes = Note
 search.kind_terminals = Terminali
 search.kind_machines = Macchine
@@ -1094,6 +1095,8 @@ search.kind_actions = Azioni
 # The kind of the line chosen, on top of the preview beside the list.
 search.label_command = Comando
 search.label_output = Output
+search.label_log_line = Riga di log
+search.label_log_note = Nota in un log
 search.label_note = Nota
 search.label_terminal = Terminale
 search.label_machine = Macchina
@@ -1104,6 +1107,7 @@ search.label_action = Azione
 search.nothing_for = Nessun risultato per “{text}”.
 search.nothing_in_commands = Nessun risultato per “{text}” in Comandi.
 search.nothing_in_output = Nessun risultato per “{text}” in Output.
+search.nothing_in_logs = Nessun risultato per “{text}” in Log.
 search.nothing_in_notes = Nessun risultato per “{text}” in Note.
 search.nothing_in_terminals = Nessun risultato per “{text}” in Terminali.
 search.nothing_in_machines = Nessun risultato per “{text}” in Macchine.
@@ -1127,6 +1131,9 @@ search.row_branch = Branch
 search.row_status = Stato
 search.row_when = Quando
 search.row_terminal = Terminale
+search.row_who = Chi
+search.row_notes = Note
+search.row_under = Sotto
 # {terminal} is the terminal as its tab names it, P/web-01 · deploy; {when}
 # is when it ended: 10:46, yesterday 17:38, 2 Oct 09:12.
 search.terminal_ended = {terminal}, terminato: {when}
@@ -1134,6 +1141,9 @@ search.terminal_ended = {terminal}, terminato: {when}
 # into the line of the terminal in front, not run.
 search.open_in_terminal = Apri nel suo terminale
 search.into_line = Inserisci nella riga
+# 0.1.21: a line of a machine's log, or a note under one. {command} is the line's command.
+search.open_in_log = Apri nel log
+search.under = sotto {command}
 # A note found: where it is (its project and folder), when it was edited.
 search.row_in = Posizione
 search.row_edited = Ultima modifica
@@ -1148,7 +1158,7 @@ search.all = one: {n} risultato | other: {n} risultati
 search.all_more = one: {n}+ risultati | other: {n}+ risultati
 # The window, and its field.
 search.label = Cerca
-search.placeholder = Comandi, output, note, terminali, macchine…
+search.placeholder = Comandi, output, log, note, terminali, macchine…
 search.close_title = Chiudi (Esc)
 # The buttons above the list; All is the first of them.
 search.filters = Cosa cercare
@@ -1156,17 +1166,19 @@ search.kind_all = Tutti
 # The list of what was found, for screen readers.
 search.found = Risultati
 search.nothing_typed = Non hai ancora scritto nulla: ecco cosa avevi aperto e cosa esegui più spesso qui.
-search.looks_in = La ricerca guarda in tutti i comandi di tutti i tuoi terminali e nel loro output, nelle note, nei terminali, nelle macchine e nei progetti.
+search.looks_in = La ricerca guarda in tutti i comandi di tutti i tuoi terminali e nel loro output, nei log delle tue macchine, nelle note, nei terminali, nelle macchine e nei progetti.
 search.everything = Cerca in tutto
 # With Output, Notes or Commands chosen and nothing typed yet.
 search.type_output = Digita una parola da cercare nell'output dei comandi.
 search.type_notes = Digita una parola da cercare nelle note.
 search.type_commands = Digita una parola da cercare nei comandi.
+search.type_logs = Digita una parola da cercare nei log delle tue macchine.
 # Beside the list while nothing is chosen: what to type (c: nginx,
 # o: timed out…), and what each keeps to.
 search.tips = Un prefisso limita la ricerca a un tipo
 search.tip_commands = comandi
 search.tip_output = output dei comandi
+search.tip_logs = log delle macchine
 search.tip_notes = note
 search.tip_terminals = terminali
 search.tip_machines = macchine
@@ -1185,6 +1197,7 @@ search.keys_next = <kbd>Tab</kbd> tipo successivo
 search.prefixes_title = t: terminali, m: macchine, p: progetti
 search.prefix_commands = <code>c:</code> comandi
 search.prefix_output = <code>o:</code> output
+search.prefix_logs = <code>l:</code> log
 search.prefix_notes = <code>n:</code> note
 search.prefix_actions = <code>></code> azioni
 
@@ -1356,7 +1369,7 @@ log.ended = {who} ha terminato {name}
 log.ended_why = {name} è terminato: {why}
 # A command's line under the mouse.
 log.output = Output
-log.output_title = Apri nel suo terminale
+log.output_title = Mostra qui sotto ciò che ha stampato
 log.output_gone = output non conservato
 # {days} is log.keep_days or log.keep_year.
 log.output_gone_title = L'output di un comando si conserva per {days}
@@ -1408,6 +1421,70 @@ log.old_banner = <b>L'output di questi comandi non è più conservato:</b> resta
 log.no_open = Impossibile aprire il log: {why}
 log.gone_title = Questo log non c'è più
 log.gone_text = La sua macchina è stata rimossa o spostata in un progetto di cui non fai parte.
+# 0.1.21 (the canvas, version 95): what a command printed opens under its line. Hide output closes it again.
+log.hide_output = Nascondi output
+log.hide_output_title = Nascondi ciò che ha stampato
+# Under the output: 27 lines · Show all 27 lines · Copy output (block.copy_output).
+log.output_lines = one: {n} riga | other: {n} righe
+log.output_all = one: Mostra {n} riga | other: Mostra tutte le {n} righe
+log.output_fold = Riduci
+log.output_lost = Ciò che ha stampato non è più conservato.
+# {why} is what went wrong, as tTerm Web said it.
+log.output_no = Impossibile ottenere ciò che ha stampato: {why}
+log.output_empty = Non ha stampato nulla.
+log.output_screen = Ha disegnato su tutto lo schermo, come un programma a schermo intero: qui non viene conservato.
+# The tools under the day: Find in this log (/ goes there), the order, whose lines, Failed, With notes, which terminal.
+log.find = Cerca in questo log
+log.find_clear = Cancella la ricerca
+log.find_key = Premi / per cercare in questo log
+log.order_title = L’ordine delle righe
+log.order_old = Prima le più vecchie
+log.order_new = Prima le più recenti
+log.who_title = Di chi
+log.who_all = Tutti
+log.who_you = Tu
+log.who_ai = IA
+log.who_note = Chi ha eseguito il comando o ha scritto una nota sotto.
+log.only_failed = Non riusciti
+log.with_notes = Con note
+log.terminals_title = Quale terminale
+log.terminals_all = Tutti i terminali
+log.terminals_one = Un terminale
+# With filters on, on the right of the day: 2 of 8 commands · With notes, and Clear.
+log.shown = one: {shown} di {n} comando | other: {shown} di {n} comandi
+log.clear = Azzera
+log.none_shown = Niente qui con questi filtri.
+# What Find in this log found: In all of web-01’s log, a year back: 3 commands and 2 notes, on 2 days. {back} is log.keep_year or log.keep_days; {what} is log.found_commands, or log.found_both; {days} is log.found_days.
+log.found = In tutto il log di {machine}, fino a {back} fa: <b>{what}</b>, {days}
+log.found_commands = one: {n} comando | other: {n} comandi
+log.found_notes = one: {n} nota | other: {n} note
+log.found_both = {commands} e {notes}
+log.found_days = one: in {n} giorno | other: in {n} giorni
+log.found_none = Nessun risultato per “{text}” nel log di {machine}, fino a {back} fa.
+log.found_cut = È stato trovato più di quanto mostrato qui, solo i primi {n}. Aggiungi una parola per restringere.
+log.found_among = Tra i primi {n} risultati nel log di {machine}: <b>{what}</b>, {days}
+# {why} is what went wrong, as tTerm Web said it.
+log.no_find = Impossibile cercare nel log: {why}
+log.back_to_day = Torna al giorno
+log.open_day = Apri il giorno
+
+# ------------------------------------------------------------ reason: why a terminal ended (reasons.ts)
+# What tTerm Web says when a terminal ends by itself, under a terminal that ended and in the log (log.ended_why). {machine} and {mac} are machines' names, {code} a number, {why} what the system said, as it said it.
+reason.stopped = tTerm Web si è fermato.
+reason.closed = Chiuso.
+reason.closed_early = Chiuso prima di aprirsi.
+reason.shell_code = La shell è terminata con il codice {code}.
+reason.link_closed = La connessione a {machine} è stata chiusa.
+reason.link_lost = La connessione a {machine} si è interrotta: {why}
+reason.removed = {machine} è stata rimossa da tTerm Web.
+reason.agent_off = {machine} non è connessa ora: il suo agente non è in esecuzione. Avvia l’agente su quel computer, poi apri di nuovo un terminale.
+reason.mac_off = {mac} non è connesso ora. Aprilo dal Mac, oppure avvia tTerm per Mac, poi apri di nuovo questo terminale.
+# A computer's terminal that waited for its agent; a terminal that did not open; the Mac, when its name is not known (reason.mac_off).
+reason.away_long = {machine} non è tornata entro 12 ore: questo terminale è terminato.
+reason.came_back_without = {machine} è tornata senza questo terminale: il suo agente è stato riavviato, oppure il computer è rimasto acceso e offline per più di un’ora.
+reason.agent_stopped = L’agente su {machine} è stato fermato: questo terminale è terminato.
+reason.no_open = Impossibile aprire un terminale su {machine}: {why}
+reason.the_mac = Il Mac
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.

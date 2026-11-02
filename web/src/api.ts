@@ -828,15 +828,63 @@ export interface FoundNote {
   hit: number;
 }
 
+/** Where a line of a log is (0.1.21): its machine and that machine's
+ * project, as search names them. */
+interface FoundInLog {
+  machineId: string;
+  machine: string;
+  machineKind: MachineKind;
+  projectId: string;
+  code: string;
+  project: string;
+}
+
+/** A command found in a log: the latest run of it on its machine. */
+export interface FoundLogLine extends FoundInLog {
+  kind: "line";
+  entry: number;
+  at: number;
+  by: LogPerson | null;
+  command: string;
+  exit: number | null;
+  cwd: string;
+  home: string;
+  branch: string;
+  terminal: string;
+  runs: number;
+  /** Notes under it, and the first of them. */
+  notes: number;
+  note: LogNote | null;
+}
+
+/** A note found in a log, under its line. */
+export interface FoundLogNote extends FoundInLog {
+  kind: "note";
+  id: number;
+  at: number;
+  by: LogPerson | null;
+  author: "person" | "ai" | "tterm";
+  ai: string | null;
+  text: string;
+  entry: number;
+  lineAt: number;
+  /** The line's command; null when it was redacted. */
+  command: string | null;
+}
+
+export type FoundLog = FoundLogLine | FoundLogNote;
+
 export interface Found {
   /** The words searched for, in lower case. */
   words: string[];
   commands: FoundBlock[];
   output: FoundBlock[];
   notes: FoundNote[];
+  /** The machines' logs (0.1.21). */
+  logs: FoundLog[];
   /** Nothing typed: the commands run most on the machine asked about. */
   recent: FoundBlock[];
-  more: { commands?: boolean; output?: boolean; notes?: boolean };
+  more: { commands?: boolean; output?: boolean; notes?: boolean; logs?: boolean };
 }
 
 export async function searchAll(query: string, near: string | null,
@@ -1038,6 +1086,9 @@ export interface LogEntry {
   seq?: number;
   /** What it printed is still kept, in the person's own terminal. */
   output?: boolean;
+  /** The width it ran at, when what it printed is kept: it opens under
+   * the line drawn at that width (0.1.21). */
+  cols?: number | null;
   notes?: LogNote[];
   canNote?: boolean;
   canRedact?: boolean;
@@ -1065,6 +1116,19 @@ export interface LogDay {
 
 export class LogGone extends CoreError {}
 
+/** Find in this log (0.1.21): the machine's commands, as far back as they
+ * are kept, with every word in the command or in the notes under it. */
+export interface LogFound {
+  machine: LogDay["machine"];
+  role: Role;
+  keep: LogDay["keep"];
+  /** The words looked for, in lower case. */
+  words: string[];
+  entries: LogEntry[];
+  /** More was found than is sent. */
+  cut: boolean;
+}
+
 /** Commands each machine ran since this browser's midnight, by its id: the
  * Logs folder of the sidebar. */
 export async function loadLogToday(): Promise<Record<string, number>> {
@@ -1084,14 +1148,36 @@ export async function loadLog(machineId: string, start: number,
       headers: { accept: "application/json", ...(background ? BACKGROUND : {}) },
       cache: "no-store",
     });
+  if (response.status === 404) return logGone(response);
+  return (await check(response)).json();
+}
+
+async function logGone(response: Response): Promise<never> {
+  let why = "";
+  try {
+    why = (await response.json()).error ?? "";
+  } catch {
+    // The status says it.
+  }
+  throw new LogGone(why, 404);
+}
+
+export async function findInLog(machineId: string, query: string,
+  newest: boolean, signal?: AbortSignal): Promise<LogFound> {
+  const params = new URLSearchParams({ q: query });
+  if (newest) params.set("newest", "1");
+  const response = await fetch(`/api/machines/${machineId}/log/find?${params}`,
+    { headers: { accept: "application/json" }, cache: "no-store", signal });
   if (response.status === 404) {
-    let why = "";
+    // The log is gone when the core says so; a core without Find in this
+    // log answers 404 too, and that is only a search that did not work.
+    let why: string | undefined;
     try {
-      why = (await response.json()).error ?? "";
+      why = (await response.clone().json()).error;
     } catch {
-      // The status says it.
+      // Not the core's answer.
     }
-    throw new LogGone(why, 404);
+    if (why !== undefined) return logGone(response);
   }
   return (await check(response)).json();
 }

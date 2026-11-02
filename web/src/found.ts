@@ -2,6 +2,8 @@
 // words searched for. The terminal or the note, in its tab, goes to that
 // block and marks it, and the words in it, until search opens something
 // else. Kept here rather than in the address: a reload starts without it.
+// From 0.1.21 also a line of a machine's log: its log goes to the line's day
+// and lights the line.
 
 import { useSyncExternalStore } from "react";
 
@@ -25,8 +27,18 @@ export interface FoundInNote {
   n: number;
 }
 
+export interface FoundInLog {
+  machineId: string;
+  /** The line: its id, and when it ran, for its day. */
+  entry: number;
+  at: number;
+  words: string[];
+  n: number;
+}
+
 let inTerminal: FoundInTerminal | null = null;
 let inNote: FoundInNote | null = null;
+let inLog: FoundInLog | null = null;
 let count = 0;
 const listeners = new Set<() => void>();
 
@@ -43,6 +55,7 @@ export function foundBlock(terminalId: string, seq: number, words: string[],
   inOutput: boolean): void {
   inTerminal = { terminalId, seq, words, inOutput, n: ++count };
   inNote = null;
+  inLog = null;
   changed();
 }
 
@@ -50,6 +63,15 @@ export function foundNote(noteId: string, blockId: string | null,
   words: string[]): void {
   inNote = { noteId, blockId, words, n: ++count };
   inTerminal = null;
+  inLog = null;
+  changed();
+}
+
+export function foundLine(machineId: string, entry: number, at: number,
+  words: string[]): void {
+  inLog = { machineId, entry, at, words, n: ++count };
+  inTerminal = null;
+  inNote = null;
   changed();
 }
 
@@ -68,6 +90,11 @@ export function useFoundBlock(terminalId: string): FoundInTerminal | null {
 export function useFoundNote(noteId: string): FoundInNote | null {
   return useSyncExternalStore(subscribe,
     () => (inNote?.noteId === noteId ? inNote : null));
+}
+
+export function useFoundLine(machineId: string): FoundInLog | null {
+  return useSyncExternalStore(subscribe,
+    () => (inLog?.machineId === machineId ? inLog : null));
 }
 
 /** The latest opening gone to. The mark stays until search opens something

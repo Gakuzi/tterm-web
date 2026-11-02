@@ -3,8 +3,10 @@
 The palette (Cmd+K) finds terminals, machines, projects and things to do on
 the page itself, which has them all. What only the core has is here: every
 command of every terminal of the person's, ended ones too, as long as its
-project keeps output (output_days); what those commands printed; and notes,
-whole, in the projects the person is in.
+project keeps output (output_days); what those commands printed; notes,
+whole, in the projects the person is in; and, from 0.1.21, the logs of the
+machines: the commands run there and the notes under them, as long as the
+project keeps its journal (a year), in the projects the person is in.
 
 A query is words: each must be there, in any order and any case, and a word
 may sit inside another (`cert` finds `certbot`). The page ranks what comes
@@ -26,6 +28,8 @@ import uuid
 import zlib
 
 import asyncpg
+
+from . import logs
 
 log = logging.getLogger("tterm.search")
 
@@ -337,21 +341,24 @@ async def recent(db: asyncpg.Connection, user_id: uuid.UUID,
 async def search(pool: asyncpg.Pool, user_id: uuid.UUID, query: str, *,
                  near: uuid.UUID | None = None) -> dict:
     """Everything of the person's with all the words of `query` in it:
-    commands, output and notes, the latest first. Nothing typed: the
-    commands they run most on the machine `near`."""
+    commands, output, the machines' logs and notes, the latest first.
+    Nothing typed: the commands they run most on the machine `near`."""
     ws = words(query)
     async with pool.acquire() as db:
         if not ws:
             return {"words": [], "commands": [], "output": [], "notes": [],
-                    "more": {}, "recent": await recent(db, user_id, near)}
+                    "logs": [], "more": {},
+                    "recent": await recent(db, user_id, near)}
         # One after another, on one connection: a person typing fast takes
-        # one of the core's connections, not three.
+        # one of the core's connections, not four.
         commands, more_c = await _commands(db, user_id, ws)
         output, more_o = await _output(db, user_id, ws)
         notes, more_n = await _notes(db, user_id, ws)
+        found, more_l = await logs.found_in_logs(db, user_id, ws)
     return {"words": ws, "commands": commands, "output": output,
-            "notes": notes, "recent": [],
-            "more": {"commands": more_c, "output": more_o, "notes": more_n}}
+            "notes": notes, "logs": found, "recent": [],
+            "more": {"commands": more_c, "output": more_o, "notes": more_n,
+                     "logs": more_l}}
 
 
 # ------------------------------------------------------ the text of blocks

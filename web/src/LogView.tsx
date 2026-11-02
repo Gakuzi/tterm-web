@@ -7,30 +7,45 @@
 // who, when and why. Lines are kept a year, what commands printed 30 days
 // (the project's journal_days and output_days).
 //
+// From 0.1.21 (the canvas, version 95): what a command printed opens under
+// its line, here and not in its terminal, which has most likely ended by
+// then (every release of tTerm Web ends them). Under the day, a row of
+// tools: Find in this log, over every day the log keeps, the order of the
+// lines, and which of them show: whose, the failed ones, those with notes,
+// one terminal's.
+//
 // Like a note, the log stays on the page behind its tab. While it shows
 // today and is in front, it looks again now and then for new lines.
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
-  addLogNote, loadLog, LogGone, redactLog, type LogDay, type LogEntry, type LogNote, type Me,
-  type Project,
+  addLogNote, blockOutput, findInLog, loadLog, LogGone, redactLog, type LogDay, type LogEntry,
+  type LogFound, type LogNote, type Me, type Project,
 } from "./api";
 import { duration, shortPath } from "./BlockView";
 import { toClipboard } from "./briefly";
 import { colorClass, terminalName } from "./colors";
 import { Confirm } from "./Confirm";
+import { goneThere, useFoundLine, wentThere } from "./found";
 import { useT, type Translate } from "./i18n";
 import {
-  Branch, Calendar, ChevronLeft, ChevronRight, Copy, Cross, Erase, History, Lines, Link,
-  Lock, NoteAdd, TerminalIcon,
+  Branch, Calendar, ChevronDown, ChevronLeft, ChevronRight, Close, Collapse, Copy, Cross, Erase,
+  History, Lines, Link, Lock, NoteAdd, Order, Search, TerminalIcon,
 } from "./icons";
 import {
   dayStart, fromIsoDay, isoDay, lineLink, linkedLine, logChanged, onLogChange, plainly,
-  redactions, shiftDay,
+  redactions, shiftDay, type LogChange,
 } from "./logday";
+import {
+  authorsOf, byDay, failedLine, filtering, hasWords, NO_FILTER, shows, terminalsOf,
+  type LogFilter,
+} from "./logfilter";
 import { RedactedMark, redactedLine, stampOf, Thread, whoOf } from "./LogNotes";
+import { marked } from "./marks";
 import { MenuButton } from "./Menus";
 import { Avatar } from "./ProjectPage";
+import { reasonText } from "./reasons";
+import { plainText, renderOutput, type Rendered } from "./render";
 import { clock } from "./time";
 
 /** While today is in front, how often to look for new lines. */
@@ -39,14 +54,18 @@ const LOOK_MS = 30_000;
 const LIT_MS = 2400;
 /** The reason a person ending a terminal gives (core/terminals.py). */
 const CLOSED_BY_HAND = "Closed."; // i18n-ignore
+/** How long typing in Find in this log may pause before the core is asked. */
+const FIND_AFTER_MS = 250;
+/** Lines of what a command printed shown before Show all. */
+const FOLD_LINES = 12;
+/** The order of the lines, as this browser last had it. */
+const ORDER_KEY = "tterm.log.newest";
 
 interface Props {
   machineId: string;
   active: boolean;
   me: Me;
   projects: Project[];
-  /** Output: the terminal of a line, at its block. */
-  onOutput: (terminalId: string, seq: number) => void;
   onCloseTab: () => void;
   notify: (text: string) => void;
 }
@@ -86,6 +105,133 @@ function codeSpan(text: string): string {
   return ticks ? `${fence} ${text} ${fence}` : `${fence}${text}${fence}`;
 }
 
+/** Newest first, as this browser last had it: a viewer's convenience. */
+function savedNewest(): boolean {
+  try {
+    return localStorage.getItem(ORDER_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveNewest(newest: boolean): void {
+  try {
+    localStorage.setItem(ORDER_KEY, newest ? "1" : "0");
+  } catch {
+    // Not kept: the order is then as at first next time.
+  }
+}
+
+/** Lines as a change elsewhere on the page leaves them: a note written
+ * from a terminal's feed, words redacted there. */
+function changedLines(entries: LogEntry[], change: LogChange): LogEntry[] {
+  return entries.map((e) => {
+    if (e.id !== change.entry) return e;
+    if (change.kind === "note") {
+      return (e.notes ?? []).some((n) => n.id === change.note.id) ? e
+        : { ...e, notes: [...(e.notes ?? []), change.note] };
+    }
+    if (change.what === "command") {
+      return { ...e, command: null, redacted: change.redacted, output: false, cols: null };
+    }
+    return {
+      ...e, notes: (e.notes ?? []).map((n) => (n.id === change.id
+        ? { ...n, text: null, redacted: change.redacted } : n)),
+    };
+  });
+}
+
+/** What a command printed, under its line (0.1.21): drawn at the width it
+ * ran at, as its block in the terminal draws it; a long one folded to its
+ * first lines, with Show all; Copy output. */
+function OutputBox(props: { entry: LogEntry; notify: (text: string) => void }) {
+  const t = useT();
+  const { entry } = props;
+  const terminalId = entry.terminal?.id ?? null;
+  const [rendered, setRendered] = useState<Rendered | null>(null);
+  const [gone, setGone] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [all, setAll] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    if (terminalId === null || entry.seq === undefined) return;
+    let live = true;
+    setProblem(null);
+    blockOutput(terminalId, entry.seq)
+      .then(async (data) => {
+        if (!live) return;
+        if (data === null) {
+          setGone(true);
+          return;
+        }
+        const drawn = await renderOutput(data, entry.cols ?? 80);
+        if (live) setRendered(drawn);
+      })
+      .catch((e) => {
+        if (live) setProblem((e as Error).message);
+      });
+    return () => {
+      live = false;
+    };
+  }, [terminalId, entry.seq, entry.cols, attempt]);
+
+  if (problem) {
+    return (
+      <div className="log-out">
+        <div className="log-out-note" role="alert">
+          <span>{t("log.output_no", { why: problem })}</span>
+          <button type="button" className="log-act" onClick={() => setAttempt((n) => n + 1)}>
+            {t("common.try_again")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+  if (gone) {
+    return <div className="log-out"><div className="log-out-note">{t("log.output_lost")}</div></div>;
+  }
+  if (!rendered) {
+    return (
+      <div className="log-out" aria-busy="true">
+        <div className="log-out-note"><span className="spinner" aria-hidden="true" /></div>
+      </div>
+    );
+  }
+  const lines = rendered.lines;
+  const folded = !all && lines.length > FOLD_LINES;
+  const html = (folded ? lines.slice(0, FOLD_LINES) : lines).map((l) => l.html).join("\n");
+  const copy = async () => {
+    if (!await toClipboard(plainText(rendered))) props.notify(t("feed.copy_refused"));
+  };
+  return (
+    <div className={folded ? "log-out folded" : "log-out"}>
+      {lines.length > 0 ? (
+        <pre className="out" dangerouslySetInnerHTML={{ __html: html }} />
+      ) : (
+        <div className="log-out-note">
+          {rendered.alt ? t("log.output_screen") : t("log.output_empty")}
+        </div>
+      )}
+      {lines.length > 0 && (
+        <div className="log-out-foot">
+          <span className="log-out-size">{t("log.output_lines", { n: lines.length })}</span>
+          {lines.length > FOLD_LINES && (
+            <button type="button" className="log-act" aria-expanded={all}
+              onClick={() => setAll((was) => !was)}>
+              {all ? <Collapse size={13} /> : <ChevronDown size={13} />}
+              {all ? t("log.output_fold") : t("log.output_all", { n: lines.length })}
+            </button>
+          )}
+          <button type="button" className="log-act" onClick={() => void copy()}>
+            <Copy size={13} />{t("block.copy_output")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function LogView(props: Props) {
   const t = useT();
   const { machineId, me, active } = props;
@@ -110,6 +256,23 @@ export function LogView(props: Props) {
   const [picking, setPicking] = useState(false);
   const page = useRef<HTMLDivElement>(null);
   const asked = useRef(0);
+  // Days loaded so far, and how many there were when a line was asked for:
+  // the line is looked for in a day loaded after that, not in one kept from
+  // before (a tab behind does not look for new lines).
+  const loads = useRef(0);
+  const linkAfter = useRef(0);
+  // The tools (0.1.21): which lines show, their order, what is looked for
+  // in the whole log and what was found, the lines whose output is open.
+  const [filter, setFilter] = useState<LogFilter>(NO_FILTER);
+  const [newest, setNewest] = useState(savedNewest);
+  const [query, setQuery] = useState("");
+  const [found, setFound] = useState<LogFound | null>(null);
+  const [finding, setFinding] = useState(false);
+  const [findProblem, setFindProblem] = useState<string | null>(null);
+  const [findAttempt, setFindAttempt] = useState(0);
+  const [opened, setOpened] = useState<ReadonlySet<number>>(() => new Set());
+  const findField = useRef<HTMLInputElement>(null);
+  const looking = query.trim().length > 0;
   const end = shiftDay(start, 1);
   const today = dayStart(Date.now());
 
@@ -118,6 +281,7 @@ export function LogView(props: Props) {
     loadLog(machineId, start, end, background)
       .then((day) => {
         if (mine !== asked.current) return;
+        loads.current += 1;
         setLog(day);
         setProblem(null);
         setGone(false);
@@ -146,6 +310,52 @@ export function LogView(props: Props) {
     };
   }, [active, start, today, load]);
 
+  // Find in this log: a moment after typing pauses, and again in the other
+  // order. An answer overtaken by a later question is dropped.
+  useEffect(() => {
+    const text = query.trim();
+    if (!text) {
+      setFound(null);
+      setFindProblem(null);
+      setFinding(false);
+      return;
+    }
+    if (!active) return;
+    const controller = new AbortController();
+    setFinding(true);
+    const timer = window.setTimeout(() => {
+      findInLog(machineId, text, newest, controller.signal)
+        .then((got) => {
+          setFound(got);
+          setFindProblem(null);
+        })
+        .catch((e) => {
+          if (controller.signal.aborted) return;
+          if (e instanceof LogGone) setGone(true);
+          else setFindProblem((e as Error).message);
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setFinding(false);
+        });
+    }, FIND_AFTER_MS);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query, newest, machineId, active, findAttempt]);
+
+  /** A line asked for by a link, by search, or among what was found: its
+   * day, fresh, with nothing filtered out, and the line lit. */
+  const goToLine = useCallback((entry: number, at: number) => {
+    setQuery("");
+    setWriting(null);
+    setFilter(NO_FILTER);
+    setStart(dayStart(at));
+    setLinked(entry);
+    linkAfter.current = loads.current;
+    setAttempt((n) => n + 1);
+  }, []);
+
   // A link to another line of this log, opened while it is here.
   useEffect(() => {
     if (!active) return;
@@ -153,22 +363,31 @@ export function LogView(props: Props) {
       if (location.pathname !== `/l/${machineId}`) return;
       const line = linkedLine(location.hash);
       if (!line) return;
-      setStart(dayStart(line.at));
-      setLinked(line.entry);
+      goToLine(line.entry, line.at);
     };
     window.addEventListener("hashchange", follow);
     return () => window.removeEventListener("hashchange", follow);
-  }, [active, machineId]);
+  }, [active, machineId, goToLine]);
+
+  // A line search opened (0.1.21): its day, and the line lit, once.
+  const fromSearch = useFoundLine(machineId);
+  useEffect(() => {
+    if (!fromSearch || wentThere(fromSearch.n)) return;
+    goneThere(fromSearch.n);
+    goToLine(fromSearch.entry, fromSearch.at);
+  }, [fromSearch, goToLine]);
 
   // The linked line, once its day is drawn: there, and lit for a moment.
+  // Not there yet in a day kept from before: the fresh one is waited for.
   useEffect(() => {
-    if (linked === null || !log || !active || log.from !== start) return;
+    if (linked === null || !log || !active || log.from !== start || looking) return;
     const el = page.current?.querySelector<HTMLElement>(`#e${linked}`);
+    if (!el && loads.current <= linkAfter.current) return;
     setLinked(null);
     if (!el) return;
     el.scrollIntoView({ block: "center" });
     setLit(linked);
-  }, [linked, log, active, start]);
+  }, [linked, log, active, start, looking]);
   useEffect(() => {
     if (lit === null) return;
     const timer = window.setTimeout(() => setLit(null), LIT_MS);
@@ -176,30 +395,51 @@ export function LogView(props: Props) {
   }, [lit]);
 
   // What changed elsewhere on this page: a note from a terminal's feed,
-  // words redacted there.
+  // words redacted there; in the day and in what was found.
   useEffect(() => onLogChange((change) => {
-    setLog((day) => day && {
-      ...day,
-      entries: day.entries.map((e) => {
-        if (e.id !== change.entry) return e;
-        if (change.kind === "note") {
-          return (e.notes ?? []).some((n) => n.id === change.note.id) ? e
-            : { ...e, notes: [...(e.notes ?? []), change.note] };
-        }
-        if (change.what === "command") {
-          return { ...e, command: null, redacted: change.redacted, output: false };
-        }
-        return {
-          ...e, notes: (e.notes ?? []).map((n) => (n.id === change.id
-            ? { ...n, text: null, redacted: change.redacted } : n)),
-        };
-      }),
-    });
+    setLog((day) => day && { ...day, entries: changedLines(day.entries, change) });
+    setFound((got) => got && { ...got, entries: changedLines(got.entries, change) });
   }), []);
+
+  // "/" goes to Find in this log, as in many logs and lists, while the keys
+  // are not in a field and nothing is open over the page.
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey ||
+          event.defaultPrevented) return;
+      const at = document.activeElement;
+      if (at?.closest("input, textarea, select, [contenteditable='true']")) return;
+      if (document.querySelector(".palette-backdrop, .scrim")) return;
+      event.preventDefault();
+      findField.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active]);
 
   const go = (to: number) => {
     setWriting(null);
     setStart(dayStart(to));
+  };
+
+  /** A found line's day, with the line lit: what was looked for gives way. */
+  const openAt = (e: LogEntry) => goToLine(e.id, e.at);
+
+  const toggleOutput = (id: number) => {
+    setOpened((was) => {
+      const next = new Set(was);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const turnOrder = () => {
+    setNewest((was) => {
+      saveNewest(!was);
+      return !was;
+    });
   };
 
   const saveNote = async (entry: LogEntry, text: string): Promise<boolean> => {
@@ -231,22 +471,53 @@ export function LogView(props: Props) {
   };
 
   const machine = props.projects.flatMap((p) => p.machines).find((m) => m.id === machineId);
-  const name = log?.machine.name ?? machine?.name ?? "";
+  const name = log?.machine.name ?? found?.machine.name ?? machine?.name ?? "";
   const project = props.projects.find((p) => p.id === log?.machine.projectId) ??
     props.projects.find((p) => p.machines.some((m) => m.id === machineId));
   const entries = log?.from === start ? log.entries : [];
   const commands = entries.filter((e) => e.kind === "command.ran");
-  const failed = commands.filter((e) => e.exit !== null && e.exit !== undefined && e.exit !== 0);
+  const failed = commands.filter(failedLine);
   const noteCount = commands.reduce((n, e) => n + (e.notes?.length ?? 0), 0);
   const lost = commands.some((e) => !e.output && !e.redacted && e.by?.id === me.id);
+  const words = looking ? (found?.words ?? []) : [];
+  // The lines the tools are for: the day's, or what was found; then those
+  // that show, in their order (what was found comes in the order asked).
+  const pool = looking ? (found?.entries ?? []) : entries;
+  const visible = pool.filter((e) => shows(e, filter, me.id));
+  const ordered = !looking && newest ? [...visible].reverse() : visible;
+  const authors = authorsOf(pool, me.id);
+  const terms = terminalsOf(pool);
+  const filtered = filtering(filter);
 
-  const dayName = start === today ? t("log.day_today", { day: fullDay(start, t) })
-    : start === shiftDay(today, -1) ? t("log.day_yesterday", { day: fullDay(start, t) })
-    : fullDay(start, t);
+  const dayLabel = (day: number) => day === today
+    ? t("log.day_today", { day: fullDay(day, t) })
+    : day === shiftDay(today, -1) ? t("log.day_yesterday", { day: fullDay(day, t) })
+    : fullDay(day, t);
+  const dayName = dayLabel(start);
   const counted = [
     t("log.commands", { n: commands.length }),
     ...(failed.length ? [t("log.failed", { n: failed.length })] : []),
     ...(noteCount ? [t("count.notes", { n: noteCount })] : []),
+  ].join(" · ");
+
+  // Who and which terminal, as their chips say them.
+  const people = new Map(authors.people.map((p) => [p.id, p.firstName]));
+  const whoLabel = filter.who === "all" ? t("log.who_all")
+    : filter.who === "me" ? t("log.who_you")
+    : filter.who === "ai" ? t("log.who_ai")
+    : people.get(filter.who) ?? t("log.someone");
+  const termLabel = (x: { name: string; at: number }) => {
+    const plain = terminalName(x.name, t);
+    // Two terminals of the same name (on different days): when each began.
+    return terms.filter((y) => y.name === x.name).length > 1 ? `${plain} · ${stampOf(x.at, t)}` : plain;
+  };
+  const chosenTerm = terms.find((x) => x.id === filter.terminal);
+  const shownFilters = [
+    ...(filter.who !== "all" ? [whoLabel] : []),
+    ...(filter.failed ? [t("log.only_failed")] : []),
+    ...(filter.notes ? [t("log.with_notes")] : []),
+    ...(filter.terminal !== null
+      ? [chosenTerm ? termLabel(chosenTerm) : t("log.terminals_one")] : []),
   ].join(" · ");
 
   // The day as Markdown: its lines, and the notes under them.
@@ -258,19 +529,18 @@ export function LogView(props: Props) {
         out.push(`- ${at} ${eventText(e)}`);
         continue;
       }
-      const words = e.redacted ? redactedLine(e.redacted, me, t)
+      const said = e.redacted ? redactedLine(e.redacted, me, t)
         : codeSpan(plainly(e.command ?? ""));
       const side = [
-        ...(e.exit !== null && e.exit !== undefined && e.exit !== 0
-          ? [t("block.exit", { code: String(e.exit) })] : []),
+        ...(failedLine(e) ? [t("block.exit", { code: String(e.exit) })] : []),
         ...(e.ms !== null && e.ms !== undefined ? [duration(e.ms)] : []),
         ...(e.cwd ? [shortPath(e.cwd, e.home)] : []),
         ...(e.branch ? [e.branch] : []),
       ];
-      out.push(`- ${at} ${[words, ...side].join(" · ")}`);
+      out.push(`- ${at} ${[said, ...side].join(" · ")}`);
       for (const n of e.notes ?? []) {
-        const said = n.redacted ? redactedLine(n.redacted, me, t) : n.text ?? "";
-        out.push(`  - ${noteWho(n)} · ${stampOf(n.at, t)}: ${said.replace(/\n/g, "\n    ")}`);
+        const note = n.redacted ? redactedLine(n.redacted, me, t) : n.text ?? "";
+        out.push(`  - ${noteWho(n)} · ${stampOf(n.at, t)}: ${note.replace(/\n/g, "\n    ")}`);
       }
     }
     return out.join("\n") + "\n";
@@ -291,7 +561,7 @@ export function LogView(props: Props) {
       return mine ? t("log.ended_you", { name: term })
         : t("log.ended", { who: e.by!.firstName, name: term });
     }
-    return t("log.ended_why", { name: term, why: e.reason });
+    return t("log.ended_why", { name: term, why: reasonText(e.reason, t) });
   }
 
   const noteMenu = (entry: LogEntry, note: LogNote) => note.redacted ? null : (
@@ -332,14 +602,33 @@ export function LogView(props: Props) {
         </div>
       );
     }
-    const bad = e.exit !== null && e.exit !== undefined && e.exit !== 0;
+    const bad = failedLine(e);
     const mine = e.by?.id === me.id;
     const here = writing === e.id;
+    const open = opened.has(e.id) && !!e.output;
+    const command = plainly(e.command ?? "");
+    const classes = ["log-line", ...(lit === e.id ? ["lit"] : []), ...(here ? ["writing"] : []),
+      ...(open ? ["open"] : []), ...(looking ? ["found"] : [])].join(" ");
     return (
       <Fragment key={e.id}>
-        <div id={`e${e.id}`}
-          className={`log-line${lit === e.id ? " lit" : ""}${here ? " writing" : ""}`}>
-          <span className="log-time">{clock(e.at)}</span>
+        <div id={looking ? undefined : `e${e.id}`} className={classes}
+          onClick={looking ? (event) => {
+            // A line found: its day, at the line. Not when a button of it,
+            // its menu or text being selected had the click.
+            // i18n-ignore
+            if ((event.target as Element).closest("button, a, input, .menu")) return;
+            if (window.getSelection()?.toString()) return;
+            openAt(e);
+          } : undefined}>
+          {looking ? (
+            <button type="button" className="log-time log-open" title={t("log.open_day")}
+              aria-label={`${t("log.open_day")}: ${dayLabel(dayStart(e.at))}, ${clock(e.at)}`}
+              onClick={() => openAt(e)}>
+              {clock(e.at)}
+            </button>
+          ) : (
+            <span className="log-time">{clock(e.at)}</span>
+          )}
           <Avatar who={e.by} me={me} size="xs" />
           <span className="log-mark">
             {bad ? <Cross size={10} /> : <span className="dot" aria-hidden="true" />}
@@ -349,8 +638,8 @@ export function LogView(props: Props) {
               <RedactedMark redacted={e.redacted} me={me} />
             </span>
           ) : (
-            <code className="log-cmd" tabIndex={0} title={plainly(e.command ?? "")}>
-              {plainly(e.command ?? "")}
+            <code className="log-cmd" tabIndex={0} title={command}>
+              {words.length ? marked(command, words, "log-hit") : command}
             </code>
           )}
           <span className="log-side">
@@ -361,13 +650,15 @@ export function LogView(props: Props) {
             <span className="log-term">{terminalName(e.terminal?.name ?? "1", t)}</span>
             <span className="log-acts">
               {e.output && e.terminal && e.seq !== undefined ? (
-                <button type="button" className="log-act" title={t("log.output_title")}
-                  onClick={() => props.onOutput(e.terminal!.id, e.seq!)}>
-                  <Lines size={13} />{t("log.output")}
+                <button type="button" className={open ? "log-act on" : "log-act"}
+                  aria-expanded={open}
+                  title={open ? t("log.hide_output_title") : t("log.output_title")}
+                  onClick={() => toggleOutput(e.id)}>
+                  <Lines size={13} />{open ? t("log.hide_output") : t("log.output")}
                 </button>
               ) : mine && !e.redacted && (
                 <span className="log-gone"
-                  title={t("log.output_gone_title", { days: kept(log?.keep.output ?? 30, t) })}>
+                  title={t("log.output_gone_title", { days: kept(log?.keep.output ?? found?.keep.output ?? 30, t) })}>
                   {t("log.output_gone")}
                 </span>
               )}
@@ -419,14 +710,133 @@ export function LogView(props: Props) {
             </span>
           </span>
         </div>
+        {open && <OutputBox entry={e} notify={props.notify} />}
         <Thread notes={e.notes ?? []} me={me} canWrite={!!e.canNote} writing={here}
           onWrite={() => setWriting(e.id)} onCancel={() => setWriting(null)}
           onSave={(text) => saveNote(e, text)}
           menuOf={e.canRedact ? (n) => noteMenu(e, n) : undefined}
+          words={words}
           className="log-note" />
       </Fragment>
     );
   };
+
+  const radio = (key: string, on: boolean, label: string, choose: () => void,
+    close: () => void) => (
+    <button key={key} type="button" className="menu-item" role="menuitemradio"
+      aria-checked={on}
+      onClick={() => {
+        close();
+        choose();
+      }}>
+      <span className="menu-radio" aria-hidden="true" />
+      <span className="menu-text">{label}</span>
+    </button>
+  );
+
+  // The row of tools under the day: the same while Find in this log shows
+  // what it found, the filters then for that.
+  const tools = (
+    <div className="log-tools">
+      <label className={looking ? "log-find on" : "log-find"}>
+        <Search size={14} />
+        <input ref={findField} value={query} placeholder={t("log.find")}
+          aria-label={t("log.find")} spellCheck={false} autoComplete="off"
+          onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (query) setQuery("");
+            else event.currentTarget.blur();
+          }} />
+        {finding && looking && <span className="spinner" aria-hidden="true" />}
+        {query ? (
+          <button type="button" className="icon-button small" aria-label={t("log.find_clear")}
+            title={t("log.find_clear")}
+            onClick={() => {
+              setQuery("");
+              findField.current?.focus();
+            }}>
+            <Close size={13} />
+          </button>
+        ) : (
+          <kbd title={t("log.find_key")}>/</kbd>
+        )}
+      </label>
+      <button type="button" className={newest ? "log-chip on" : "log-chip"}
+        title={t("log.order_title")} onClick={turnOrder}>
+        <Order size={13} />{newest ? t("log.order_new") : t("log.order_old")}
+      </button>
+      <MenuButton label={t("log.who_title")} align="left" className="log-drop"
+        face={{
+          // i18n-ignore
+          className: filter.who !== "all" ? "log-chip on" : "log-chip",
+          content: <>{whoLabel}<ChevronDown size={12} className="down" /></>,
+        }}>
+        {(close) => (
+          <>
+            {radio("all", filter.who === "all", t("log.who_all"),
+              () => setFilter((f) => ({ ...f, who: "all" })), close)}
+            {radio("me", filter.who === "me", t("log.who_you"),
+              () => setFilter((f) => ({ ...f, who: "me" })), close)}
+            {authors.people.map((p) => radio(p.id, filter.who === p.id, p.name,
+              () => setFilter((f) => ({ ...f, who: p.id })), close))}
+            {(authors.ai || filter.who === "ai") && radio("ai", filter.who === "ai",
+              t("log.who_ai"), () => setFilter((f) => ({ ...f, who: "ai" })), close)}
+            <div className="menu-line" />
+            <div className="menu-note"><span>{t("log.who_note")}</span></div>
+          </>
+        )}
+      </MenuButton>
+      <button type="button" className={filter.failed ? "log-chip on" : "log-chip"}
+        aria-pressed={filter.failed}
+        onClick={() => setFilter((f) => ({ ...f, failed: !f.failed }))}>
+        {t("log.only_failed")}
+      </button>
+      <button type="button" className={filter.notes ? "log-chip on" : "log-chip"}
+        aria-pressed={filter.notes}
+        onClick={() => setFilter((f) => ({ ...f, notes: !f.notes }))}>
+        {t("log.with_notes")}
+      </button>
+      {(terms.length > 1 || filter.terminal !== null) && (
+        <>
+          <span className="sep" aria-hidden="true" />
+          <MenuButton label={t("log.terminals_title")} align="left" className="log-drop"
+            face={{
+              // i18n-ignore
+              className: filter.terminal !== null ? "log-chip on" : "log-chip",
+              content: (
+                <>
+                  {filter.terminal === null ? t("log.terminals_all")
+                    : chosenTerm ? termLabel(chosenTerm) : t("log.terminals_one")}
+                  <ChevronDown size={12} className="down" />
+                </>
+              ),
+            }}>
+            {(close) => (
+              <>
+                {radio("all", filter.terminal === null, t("log.terminals_all"),
+                  () => setFilter((f) => ({ ...f, terminal: null })), close)}
+                {terms.map((x) => radio(x.id, filter.terminal === x.id, termLabel(x),
+                  () => setFilter((f) => ({ ...f, terminal: x.id })), close))}
+              </>
+            )}
+          </MenuButton>
+        </>
+      )}
+    </div>
+  );
+
+  // What Find in this log found: how much, and by day.
+  const foundNotes = visible.reduce((n, e) =>
+    n + (e.notes ?? []).filter((x) => hasWords(x.text, words)).length, 0);
+  const foundWhat = foundNotes
+    ? t("log.found_both", { commands: t("log.found_commands", { n: visible.length }),
+      notes: t("log.found_notes", { n: foundNotes }) })
+    : t("log.found_commands", { n: visible.length });
+  const groups = looking ? byDay(ordered) : [];
+  const back = kept(found?.keep.lines ?? log?.keep.lines ?? 365, t);
 
   let body;
   if (gone) {
@@ -457,7 +867,7 @@ export function LogView(props: Props) {
             className="note-menu">
             {(close) => (
               <button type="button" className="menu-item" role="menuitem"
-                disabled={!log}
+                disabled={!log || looking}
                 onClick={() => {
                   close();
                   void copy(markdown());
@@ -476,59 +886,77 @@ export function LogView(props: Props) {
             output: kept(log?.keep.output ?? 30, t),
           })}</span>
         </p>
-        <div className="log-day">
-          {/* The day before with lines, and the day after with lines, or
-              today: a year of days goes by quickly that way. */}
-          <button type="button" className="icon-button small" aria-label={t("log.day_before")}
-            title={t("log.day_before")}
-            disabled={!!log && log.from === start && log.before === null}
-            onClick={() => go(log?.from === start && log.before !== null
-              ? log.before : shiftDay(start, -1))}>
-            <ChevronLeft size={15} />
-          </button>
-          <button type="button" className="icon-button small" aria-label={t("log.day_after")}
-            title={t("log.day_after")} disabled={start >= today}
-            onClick={() => go(log?.from === start
-              ? (log.after !== null ? Math.min(log.after, today) : today)
-              : shiftDay(start, 1))}>
-            <ChevronRight size={15} />
-          </button>
-          <span className="log-day-name">{dayName}</span>
-          {start !== today && (
-            <button type="button" className="log-chip" onClick={() => go(today)}>
-              {t("log.today")}
+        {!looking && (
+          <div className="log-day">
+            {/* The day before with lines, and the day after with lines, or
+                today: a year of days goes by quickly that way. */}
+            <button type="button" className="icon-button small" aria-label={t("log.day_before")}
+              title={t("log.day_before")}
+              disabled={!!log && log.from === start && log.before === null}
+              onClick={() => go(log?.from === start && log.before !== null
+                ? log.before : shiftDay(start, -1))}>
+              <ChevronLeft size={15} />
             </button>
-          )}
-          <span className={picking ? "log-pick open" : "log-pick"}>
-            <button type="button" className="log-chip"
-              onClick={() => {
-                const field = pick.current;
-                if (!field) return;
-                // The browser's own calendar; where it has none to open by
-                // itself (Safari before 16), the field in the chip's place.
-                try {
-                  field.showPicker();
-                } catch {
-                  setPicking(true);
-                  window.setTimeout(() => field.focus(), 0);
-                }
-              }}>
-              <Calendar size={13} />{t("log.pick_day")}
+            <button type="button" className="icon-button small" aria-label={t("log.day_after")}
+              title={t("log.day_after")} disabled={start >= today}
+              onClick={() => go(log?.from === start
+                ? (log.after !== null ? Math.min(log.after, today) : today)
+                : shiftDay(start, 1))}>
+              <ChevronRight size={15} />
             </button>
-            <input ref={pick} type="date" tabIndex={picking ? 0 : -1}
-              aria-label={t("log.pick_day")} onBlur={() => setPicking(false)}
-              value={isoDay(start)} max={isoDay(today)}
-              onChange={(e) => {
-                const chosen = fromIsoDay(e.target.value);
-                if (chosen !== null && chosen <= today) {
-                  setPicking(false);
-                  go(chosen);
-                }
-              }} />
-          </span>
-          {entries.length > 0 && <span className="log-day-count">{counted}</span>}
-        </div>
-        {problem && (
+            <span className="log-day-name">{dayName}</span>
+            {start !== today && (
+              <button type="button" className="log-chip" onClick={() => go(today)}>
+                {t("log.today")}
+              </button>
+            )}
+            <span className={picking ? "log-pick open" : "log-pick"}>
+              <button type="button" className="log-chip"
+                onClick={() => {
+                  const field = pick.current;
+                  if (!field) return;
+                  // The browser's own calendar; where it has none to open by
+                  // itself (Safari before 16), the field in the chip's place.
+                  try {
+                    field.showPicker();
+                  } catch {
+                    setPicking(true);
+                    window.setTimeout(() => field.focus(), 0);
+                  }
+                }}>
+                <Calendar size={13} />{t("log.pick_day")}
+              </button>
+              <input ref={pick} type="date" tabIndex={picking ? 0 : -1}
+                aria-label={t("log.pick_day")} onBlur={() => setPicking(false)}
+                value={isoDay(start)} max={isoDay(today)}
+                onChange={(e) => {
+                  const chosen = fromIsoDay(e.target.value);
+                  if (chosen !== null && chosen <= today) {
+                    setPicking(false);
+                    go(chosen);
+                  }
+                }} />
+            </span>
+            {entries.length > 0 && (
+              <span className="log-day-count">
+                {filtered ? (
+                  <>
+                    <b>{t("log.shown", {
+                      shown: String(visible.filter((e) => e.kind === "command.ran").length),
+                      n: commands.length,
+                    })}</b>
+                    {` · ${shownFilters}`}
+                    <button type="button" className="log-clear" onClick={() => setFilter(NO_FILTER)}>
+                      {t("log.clear")}
+                    </button>
+                  </>
+                ) : counted}
+              </span>
+            )}
+          </div>
+        )}
+        {tools}
+        {problem && !looking && (
           <div className="error-box" role="alert">
             <span>{t("log.no_open", { why: problem })}</span>
             <button type="button" className="button-plain"
@@ -540,28 +968,95 @@ export function LogView(props: Props) {
             </button>
           </div>
         )}
-        {lost && log && (
-          <div className="log-banner">
-            <Lines size={15} />
-            <span>{t.rich("log.old_banner", {
-              b: (inner) => <b>{inner}</b>,
-              output: kept(log.keep.output, t), lines: kept(log.keep.lines, t),
-            })}</span>
-          </div>
-        )}
-        {log?.from === start && (entries.length ? (
-          <div className="log-list">{entries.map(line)}</div>
+        {looking ? (
+          <>
+            {findProblem && (
+              <div className="error-box" role="alert">
+                <span>{t("log.no_find", { why: findProblem })}</span>
+                <button type="button" className="button-plain"
+                  onClick={() => {
+                    setFindProblem(null);
+                    setFindAttempt((n) => n + 1);
+                  }}>
+                  {t("common.try_again")}
+                </button>
+              </div>
+            )}
+            {found && (
+              <div className="log-found">
+                {visible.length ? (
+                  <span>{found.cut ? t.rich("log.found_among", {
+                    b: (inner) => <b>{inner}</b>, machine: name, n: found.entries.length,
+                    what: foundWhat, days: t("log.found_days", { n: groups.length }),
+                  }) : t.rich("log.found", {
+                    b: (inner) => <b>{inner}</b>, machine: name, back, what: foundWhat,
+                    days: t("log.found_days", { n: groups.length }),
+                  })}</span>
+                ) : (
+                  <span>{found.entries.length && filtered ? t("log.none_shown")
+                    : t("log.found_none", { text: query.trim(), machine: name, back })}</span>
+                )}
+                {filtered && (
+                  <button type="button" className="log-clear" onClick={() => setFilter(NO_FILTER)}>
+                    {t("log.clear")}
+                  </button>
+                )}
+                <button type="button" className="log-clear back" onClick={() => setQuery("")}>
+                  {t("log.back_to_day")}
+                </button>
+              </div>
+            )}
+            {groups.length > 0 && (
+              <div className="log-list">
+                {groups.map((g) => (
+                  <Fragment key={g.start}>
+                    <div className="log-dayhead">
+                      <span>{dayLabel(g.start)}</span>
+                      <span className="rule" aria-hidden="true" />
+                      <button type="button" className="log-clear"
+                        onClick={() => {
+                          setQuery("");
+                          go(g.start);
+                        }}>
+                        {t("log.open_day")}
+                      </button>
+                    </div>
+                    {g.entries.map(line)}
+                  </Fragment>
+                ))}
+              </div>
+            )}
+            {found?.cut && (
+              <p className="log-empty">{t("log.found_cut", { n: found.entries.length })}</p>
+            )}
+          </>
         ) : (
-          <p className="log-empty">
-            {log.before === null && start === today
-              ? t("log.nothing_yet", { machine: name })
-              : t("log.nothing_day", { machine: name })}
-          </p>
-        ))}
-        {log?.from === start && log.cut && (
-          <p className="log-empty">{t("log.cut", { n: entries.length })}</p>
+          <>
+            {lost && log && (
+              <div className="log-banner">
+                <Lines size={15} />
+                <span>{t.rich("log.old_banner", {
+                  b: (inner) => <b>{inner}</b>,
+                  output: kept(log.keep.output, t), lines: kept(log.keep.lines, t),
+                })}</span>
+              </div>
+            )}
+            {log?.from === start && (ordered.length ? (
+              <div className="log-list">{ordered.map(line)}</div>
+            ) : (
+              <p className="log-empty">
+                {entries.length && filtered ? t("log.none_shown")
+                  : log.before === null && start === today
+                  ? t("log.nothing_yet", { machine: name })
+                  : t("log.nothing_day", { machine: name })}
+              </p>
+            ))}
+            {log?.from === start && log.cut && (
+              <p className="log-empty">{t("log.cut", { n: entries.length })}</p>
+            )}
+            {!log && !problem && <div className="note-loading" aria-busy="true" />}
+          </>
         )}
-        {!log && !problem && <div className="note-loading" aria-busy="true" />}
       </>
     );
   }

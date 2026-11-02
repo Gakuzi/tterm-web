@@ -8,6 +8,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { LogNote, LogPerson, Me, Redaction } from "./api";
 import { useT, type Translate } from "./i18n";
 import { Bubble, Erase, Spark } from "./icons";
+import { marked } from "./marks";
 import { Avatar } from "./ProjectPage";
 import { clock, day } from "./time";
 
@@ -112,6 +113,8 @@ function Message(props: {
   me: Me;
   /** The ⋯ of the note, for those who may redact it. */
   menu?: ReactNode;
+  /** Words Find in this log looked for, marked (0.1.21). */
+  words?: string[];
 }) {
   const t = useT();
   const { note, me } = props;
@@ -138,7 +141,9 @@ function Message(props: {
           <span>{redactedLine(note.redacted, me, t)}</span>
         </div>
       ) : (
-        <div className="lmsg-text">{note.text}</div>
+        <div className="lmsg-text">
+          {props.words?.length ? marked(note.text ?? "", props.words, "log-hit") : note.text}
+        </div>
       )}
     </div>
   );
@@ -156,6 +161,8 @@ export function Thread(props: {
   onSave: (text: string) => Promise<boolean>;
   /** The ⋯ of each note, if any. */
   menuOf?: (note: LogNote) => ReactNode;
+  /** Words to mark in the notes: what Find in this log looked for. */
+  words?: string[];
   className: string;
 }) {
   const t = useT();
@@ -167,7 +174,7 @@ export function Thread(props: {
   return (
     <div className={notes.length ? props.className : `${props.className} empty`}>
       {notes.map((n) => (
-        <Message key={n.id} note={n} me={me} menu={props.menuOf?.(n)} />
+        <Message key={n.id} note={n} me={me} menu={props.menuOf?.(n)} words={props.words} />
       ))}
       {props.writing ? (
         <NoteEdit key="edit" reply={notes.length > 0} onSave={props.onSave}

@@ -1086,6 +1086,7 @@ menus.name_example = 例如：运维手册
 # its groups.
 search.kind_commands = 命令
 search.kind_output = 输出
+search.kind_logs = 日志
 search.kind_notes = 笔记
 search.kind_terminals = 终端
 search.kind_machines = 机器
@@ -1094,6 +1095,8 @@ search.kind_actions = 操作
 # The kind of the line chosen, on top of the preview beside the list.
 search.label_command = 命令
 search.label_output = 输出
+search.label_log_line = 日志行
+search.label_log_note = 日志中的笔记
 search.label_note = 笔记
 search.label_terminal = 终端
 search.label_machine = 机器
@@ -1104,6 +1107,7 @@ search.label_action = 操作
 search.nothing_for = 没有找到“{text}”。
 search.nothing_in_commands = 在“命令”中没有找到“{text}”。
 search.nothing_in_output = 在“输出”中没有找到“{text}”。
+search.nothing_in_logs = 在“日志”中没有找到“{text}”。
 search.nothing_in_notes = 在“笔记”中没有找到“{text}”。
 search.nothing_in_terminals = 在“终端”中没有找到“{text}”。
 search.nothing_in_machines = 在“机器”中没有找到“{text}”。
@@ -1127,6 +1131,9 @@ search.row_branch = 分支
 search.row_status = 状态
 search.row_when = 时间
 search.row_terminal = 终端
+search.row_who = 谁
+search.row_notes = 笔记
+search.row_under = 所属
 # {terminal} is the terminal as its tab names it, P/web-01 · deploy; {when}
 # is when it ended: 10:46, yesterday 17:38, 2 Oct 09:12.
 search.terminal_ended = {terminal}，{when} 结束
@@ -1134,6 +1141,9 @@ search.terminal_ended = {terminal}，{when} 结束
 # into the line of the terminal in front, not run.
 search.open_in_terminal = 在所属终端中打开
 search.into_line = 放入输入行
+# 0.1.21: a line of a machine's log, or a note under one. {command} is the line's command.
+search.open_in_log = 在日志中打开
+search.under = 在 {command} 下
 # A note found: where it is (its project and folder), when it was edited.
 search.row_in = 位置
 search.row_edited = 上次编辑
@@ -1148,7 +1158,7 @@ search.all = other: 全部 {n} 项
 search.all_more = other: 全部 {n}+ 项
 # The window, and its field.
 search.label = 搜索
-search.placeholder = 命令、输出、笔记、终端、机器…
+search.placeholder = 命令、输出、日志、笔记、终端、机器…
 search.close_title = 关闭（Esc）
 # The buttons above the list; All is the first of them.
 search.filters = 搜索范围
@@ -1156,17 +1166,19 @@ search.kind_all = 全部
 # The list of what was found, for screen readers.
 search.found = 搜索结果
 search.nothing_typed = 还没有输入内容：下面是你最近打开的内容，以及你在这台机器上最常运行的命令。
-search.looks_in = 搜索范围包括你每个终端中的每条命令及其输出，以及笔记、终端、机器和项目。
+search.looks_in = 搜索范围包括你每个终端中的每条命令及其输出、你的机器的日志，以及笔记、终端、机器和项目。
 search.everything = 搜索全部
 # With Output, Notes or Commands chosen and nothing typed yet.
 search.type_output = 输入关键词，搜索命令的输出。
 search.type_notes = 输入关键词，搜索笔记。
 search.type_commands = 输入关键词，搜索命令。
+search.type_logs = 输入关键词，搜索你的机器的日志。
 # Beside the list while nothing is chosen: what to type (c: nginx,
 # o: timed out…), and what each keeps to.
 search.tips = 在开头加上前缀，只搜索一类内容
 search.tip_commands = 命令
 search.tip_output = 命令的输出
+search.tip_logs = 机器的日志
 search.tip_notes = 笔记
 search.tip_terminals = 终端
 search.tip_machines = 机器
@@ -1185,6 +1197,7 @@ search.keys_next = <kbd>Tab</kbd> 下一类
 search.prefixes_title = t: 终端，m: 机器，p: 项目
 search.prefix_commands = <code>c:</code> 命令
 search.prefix_output = <code>o:</code> 输出
+search.prefix_logs = <code>l:</code> 日志
 search.prefix_notes = <code>n:</code> 笔记
 search.prefix_actions = <code>></code> 操作
 
@@ -1356,7 +1369,7 @@ log.ended = {name} 由 {who} 结束
 log.ended_why = {name} 已结束：{why}
 # A command's line under the mouse.
 log.output = 输出
-log.output_title = 在所属终端中打开
+log.output_title = 在这一行下方查看输出
 log.output_gone = 输出未保留
 # {days} is log.keep_days or log.keep_year.
 log.output_gone_title = 输出保留 {days}
@@ -1408,6 +1421,70 @@ log.old_banner = <b>这些命令的输出已不再保留。</b>输出保留 {out
 log.no_open = 无法打开日志：{why}
 log.gone_title = 这份日志不存在
 log.gone_text = 它所属的机器已被移除，或被移到了你未加入的项目中。
+# 0.1.21 (the canvas, version 95): what a command printed opens under its line. Hide output closes it again.
+log.hide_output = 隐藏输出
+log.hide_output_title = 隐藏它打印的内容
+# Under the output: 27 lines · Show all 27 lines · Copy output (block.copy_output).
+log.output_lines = other: {n} 行
+log.output_all = other: 显示全部 {n} 行
+log.output_fold = 收起
+log.output_lost = 它打印的内容已不再保留。
+# {why} is what went wrong, as tTerm Web said it.
+log.output_no = 无法获取它打印的内容：{why}
+log.output_empty = 它没有打印任何内容。
+log.output_screen = 它像全屏程序那样占用了整个屏幕：这部分不会保留在这里。
+# The tools under the day: Find in this log (/ goes there), the order, whose lines, Failed, With notes, which terminal.
+log.find = 在此日志中查找
+log.find_clear = 清除搜索
+log.find_key = 按 / 在此日志中查找
+log.order_title = 行的顺序
+log.order_old = 最早的在前
+log.order_new = 最新的在前
+log.who_title = 谁的行
+log.who_all = 所有人
+log.who_you = 你
+log.who_ai = AI
+log.who_note = 运行该命令或在其下写笔记的人。
+log.only_failed = 失败的
+log.with_notes = 有笔记的
+log.terminals_title = 哪个终端
+log.terminals_all = 所有终端
+log.terminals_one = 一个终端
+# With filters on, on the right of the day: 2 of 8 commands · With notes, and Clear.
+log.shown = other: {n} 条命令中的 {shown} 条
+log.clear = 清除筛选
+log.none_shown = 在这些筛选条件下没有内容。
+# What Find in this log found: In all of web-01’s log, a year back: 3 commands and 2 notes, on 2 days. {back} is log.keep_year or log.keep_days; {what} is log.found_commands, or log.found_both; {days} is log.found_days.
+log.found = 在 {machine} 的整个日志中（最近 {back}）：<b>{what}</b>，{days}
+log.found_commands = other: {n} 条命令
+log.found_notes = other: {n} 篇笔记
+log.found_both = {commands}和{notes}
+log.found_days = other: 分布在 {n} 天
+log.found_none = 在 {machine} 的日志中（最近 {back}）没有找到“{text}”。
+log.found_cut = 找到的结果比这里显示的多，只显示前 {n} 条。添加关键词以缩小范围。
+log.found_among = 在 {machine} 的日志中找到的前 {n} 条中：<b>{what}</b>，{days}
+# {why} is what went wrong, as tTerm Web said it.
+log.no_find = 无法在日志中查找：{why}
+log.back_to_day = 返回当天
+log.open_day = 打开这一天
+
+# ------------------------------------------------------------ reason: why a terminal ended (reasons.ts)
+# What tTerm Web says when a terminal ends by itself, under a terminal that ended and in the log (log.ended_why). {machine} and {mac} are machines' names, {code} a number, {why} what the system said, as it said it.
+reason.stopped = tTerm Web 已停止。
+reason.closed = 已关闭。
+reason.closed_early = 在打开前已关闭。
+reason.shell_code = Shell 以代码 {code} 结束。
+reason.link_closed = 与 {machine} 的连接已关闭。
+reason.link_lost = 与 {machine} 的连接已断开：{why}
+reason.removed = {machine} 已从 tTerm Web 中移除。
+reason.agent_off = {machine} 当前未连接：它的代理没有运行。请在那台电脑上启动代理，然后重新打开终端。
+reason.mac_off = {mac} 当前未连接。请从 Mac 上打开，或启动 tTerm for Mac，然后重新打开此终端。
+# A computer's terminal that waited for its agent; a terminal that did not open; the Mac, when its name is not known (reason.mac_off).
+reason.away_long = {machine} 在 12 小时内没有回来：此终端已结束。
+reason.came_back_without = {machine} 回来时没有这个终端：它的代理已重启，或电脑保持开机但离线超过一小时。
+reason.agent_stopped = {machine} 上的代理已停止：此终端已结束。
+reason.no_open = 无法在 {machine} 上打开终端：{why}
+reason.the_mac = Mac
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.

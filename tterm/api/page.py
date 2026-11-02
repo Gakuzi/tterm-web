@@ -1230,6 +1230,20 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         except logs.Refused as exc:
             return log_refused(exc)
 
+    @app.get("/api/machines/{machine_id}/log/find")
+    async def machine_log_find(machine_id: uuid.UUID, q: str = "",
+                               newest: bool = False,
+                               session: auth.Session = Depends(signed_in)) -> Response:
+        """Find in this log (0.1.21): the machine's commands, as far back as
+        they are kept, with every word of `q` in the command or in the notes
+        under it; the oldest first, or the newest."""
+        try:
+            return _json(await logs.find(
+                pool, session.person.id, machine_id,
+                search.words(q[:search.QUERY_MAX]), newest=newest))
+        except logs.Refused as exc:
+            return log_refused(exc)
+
     @app.post("/api/log/notes")
     async def log_note(body: LogNoteBody,
                        session: auth.Session = Depends(signed_in)) -> Response:

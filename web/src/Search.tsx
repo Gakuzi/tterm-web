@@ -13,46 +13,56 @@
 // Enter opens it: a command in its terminal, at its block, marked; a note
 // at the block with the words. Cmd+Enter puts a command into the line of the
 // terminal in front, without running it (the owner, 24.10: "Так и оставь").
+//
+// From 0.1.21 (the canvas, version 95) it also looks in the machines' logs,
+// a year back: the commands run there and the notes under them, l: in
+// front. Enter opens the log at the line, lit.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { searchAll, type Found, type FoundBlock, type FoundNote } from "./api";
+import {
+  searchAll, type Found, type FoundBlock, type FoundLog, type FoundNote, type LogPerson,
+} from "./api";
 import { shortPath } from "./BlockView";
+import { plainly } from "./logday";
 import { useT, type Translate } from "./i18n";
-import { Doc, ListCheck, Output, Search as SearchIcon } from "./icons";
+import { Bubble, Doc, ListCheck, Output, Search as SearchIcon, Spark } from "./icons";
 import { marked } from "./marks";
 import { titled } from "./noteText";
 import { MAC } from "./tabs";
 import { when } from "./time";
 
 export type SearchKind =
-  | "commands" | "output" | "notes" | "terminals" | "machines" | "projects"
+  | "commands" | "output" | "logs" | "notes" | "terminals" | "machines" | "projects"
   | "actions";
 type Filter = "all" | SearchKind;
 
-const KINDS: SearchKind[] = ["commands", "output", "notes", "terminals",
+const KINDS: SearchKind[] = ["commands", "output", "logs", "notes", "terminals",
   "machines", "projects", "actions"];
 const TITLES: Record<SearchKind, string> = {
   commands: "search.kind_commands", output: "search.kind_output",
+  logs: "search.kind_logs",
   notes: "search.kind_notes", terminals: "search.kind_terminals",
   machines: "search.kind_machines", projects: "search.kind_projects",
   actions: "search.kind_actions",
 };
 const LABELS: Record<SearchKind, string> = {
   commands: "search.label_command", output: "search.label_output",
+  logs: "search.label_log_line",
   notes: "search.label_note", terminals: "search.label_terminal",
   machines: "search.label_machine", projects: "search.label_project",
   actions: "search.label_action",
 };
 const NOTHING_IN: Record<SearchKind, string> = {
   commands: "search.nothing_in_commands", output: "search.nothing_in_output",
+  logs: "search.nothing_in_logs",
   notes: "search.nothing_in_notes", terminals: "search.nothing_in_terminals",
   machines: "search.nothing_in_machines", projects: "search.nothing_in_projects",
   actions: "search.nothing_in_actions",
 };
 /** A word in front keeps to one kind. */
 const PREFIXES: [string, SearchKind][] = [["c:", "commands"], ["o:", "output"],
-  ["n:", "notes"], ["t:", "terminals"], ["m:", "machines"], ["p:", "projects"],
-  [">", "actions"]];
+  ["l:", "logs"], ["n:", "notes"], ["t:", "terminals"], ["m:", "machines"],
+  ["p:", "projects"], [">", "actions"]];
 const FILTERS: Filter[] = ["all", ...KINDS];
 /** Of each kind, in All. */
 const IN_ALL = 3;
@@ -91,8 +101,11 @@ interface Props {
   /** The machine of the terminal in front, if one is. */
   near: { id: string; name: string } | null;
   onOpenBlock: (block: FoundBlock, words: string[], inOutput: boolean) => void;
-  onPaste: (block: FoundBlock) => void;
+  /** A command into the line: one search found in a terminal, or in a log. */
+  onPaste: (what: Pick<FoundBlock, "command" | "machineId" | "machine">) => void;
   onOpenNote: (note: FoundNote, words: string[]) => void;
+  /** A line of a machine's log: its log, at the line (0.1.21). */
+  onOpenLine: (machineId: string, entry: number, at: number, words: string[]) => void;
   onClose: () => void;
 }
 
@@ -126,6 +139,9 @@ interface Row {
   preview: () => Preview;
   open: () => void;
   paste?: () => void;
+  /** A command on a machine: the same one under Commands and under Logs,
+   * listed once in All (0.1.21). */
+  same?: string;
 }
 
 interface Group {
@@ -186,8 +202,14 @@ function Dot({ kind }: { kind: "ok" | "fail" | "none" }) {
   return <span className={`sr-dot ${kind}`} aria-hidden="true" />;
 }
 
-const EMPTY: Found = { words: [], commands: [], output: [], notes: [], recent: [],
-  more: {} };
+const EMPTY: Found = { words: [], commands: [], output: [], notes: [], logs: [],
+  recent: [], more: {} };
+
+/** A note's first line, as a row shows it. */
+function firstLine(text: string): string {
+  const line = text.split("\n", 1)[0];
+  return line.length > 160 ? `${line.slice(0, 160)}…` : line;
+}
 
 const kbd = (inner: ReactNode) => <kbd>{inner}</kbd>;
 const code = (inner: ReactNode) => <code>{inner}</code>;
@@ -283,6 +305,7 @@ export function Search(props: Props) {
           score: (kind === "commands" ? Math.max(1, score(b.command, sub, words, false)) : 2) + near_,
           at: b.startedAt ?? 0,
           open, paste,
+          same: kind === "commands" ? `${b.machineId}\n${b.command}` : undefined,
           preview: () => ({
             label: t(LABELS[kind]), title: b.command, mono: true, dot: dotOf(b),
             rows: ([
@@ -301,6 +324,75 @@ export function Search(props: Props) {
           }),
         };
       });
+
+  // The machines' logs (0.1.21): a command, the latest run of it on its
+  // machine, or a note under a line. Both open the log at the line.
+  const who = (p: LogPerson | null) => !p ? t("log.someone") : p.me ? t("log.you") : p.firstName;
+  const logRows = (): Row[] => (found.logs ?? [])
+    .filter((x) => stale(x.kind === "line" ? x.command : x.text))
+    .map((x: FoundLog): Row => {
+      const where = `${x.code}/${x.machine}`;
+      const log = t("log.tab", { machine: where });
+      const open = () => {
+        close();
+        props.onOpenLine(x.machineId, x.entry, x.kind === "line" ? x.at : x.lineAt, words);
+      };
+      if (x.kind === "line") {
+        // As the log shows a command: marks that turn text around (U+202E)
+        // seen for what they are, in someone else's command above all.
+        const command = plainly(x.command);
+        const dot = x.exit === 0 ? "ok" : x.exit === null ? "none" : "fail";
+        const state = x.exit === null ? t("search.stopped")
+          : t("search.exit", { code: String(x.exit) });
+        const sub = [log, who(x.by), when(x.at, t),
+          x.runs > 1 ? t("search.runs", { n: x.runs }) : ""].filter(Boolean).join(" · ");
+        const paste = () => {
+          close();
+          props.onPaste({ command: x.command, machineId: x.machineId, machine: x.machine });
+        };
+        const said = x.note ? `${x.note.author === "ai"
+          ? (!x.note.by || x.note.by.me ? t("log.ai_for_you")
+            : t("log.ai_for", { who: x.note.by.firstName }))
+          : who(x.note.by)}: ${x.note.text ?? ""}` : "";
+        return {
+          key: `logs:line:${x.entry}`, kind: "logs", title: command, mono: true, sub,
+          icon: <Dot kind={dot} />,
+          score: Math.max(1, score(x.command, sub, words, false)), at: x.at, open, paste,
+          same: `${x.machineId}\n${x.command}`,
+          preview: () => ({
+            label: t("search.label_log_line"), title: command, mono: true, dot,
+            rows: ([
+              [t("search.row_machine"), where], [t("search.row_who"), who(x.by)],
+              [t("search.row_when"), when(x.at, t)], [t("search.row_status"), state],
+              [t("search.row_folder"), shortPath(x.cwd, x.home)],
+              [t("search.row_branch"), x.branch],
+              [t("search.row_notes"), x.notes ? t("count.notes", { n: x.notes }) : ""],
+            ] as [string, string][]).filter((r) => r[1]),
+            lines: said ? [{ text: said, hit: false }] : [],
+            acts: [{ label: t("search.open_in_log"), keys: "Enter", run: open, primary: true },
+              { label: t("search.into_line"), keys: PASTE_KEYS, run: paste, primary: false }],
+          }),
+        };
+      }
+      const by = x.author === "ai"
+        ? (!x.by || x.by.me ? t("log.ai_for_you") : t("log.ai_for", { who: x.by.firstName }))
+        : who(x.by);
+      const under = x.command === null ? t("block.state_redacted") : plainly(x.command);
+      return {
+        key: `logs:note:${x.id}`, kind: "logs", title: firstLine(x.text), mono: false,
+        sub: [by, t("search.under", { command: under }), log, when(x.at, t)].join(" · "),
+        icon: x.author === "ai" ? <Spark size={15} /> : <Bubble size={15} />,
+        score: 1.5, at: x.at, open,
+        preview: () => ({
+          label: t("search.label_log_note"), title: firstLine(x.text), mono: false,
+          rows: [[t("search.row_machine"), where], [t("search.row_who"), by],
+            [t("search.row_when"), when(x.at, t)], [t("search.row_under"), under]],
+          lines: x.text.split("\n").slice(0, 8).map((l) => ({
+            text: l, hit: words.every((w) => l.toLowerCase().includes(w)) })),
+          acts: [{ label: t("search.open_in_log"), keys: "Enter", run: open, primary: true }],
+        }),
+      };
+    });
 
   const noteRows = (): Row[] => {
     const rows = found.notes.filter((n) => stale(`${n.title}\n${n.lines.map((l) => l.text).join("\n")}`))
@@ -360,12 +452,13 @@ export function Search(props: Props) {
   // Everything found, by kind: a few hundred lines at most, ranked afresh
   // as the page draws.
   const byKind: Record<SearchKind, Row[]> = {
-    commands: [], output: [], notes: [], terminals: [], machines: [], projects: [],
+    commands: [], output: [], logs: [], notes: [], terminals: [], machines: [], projects: [],
     actions: [],
   };
   if (words.length) {
     byKind.commands = blockRows(found.commands, "commands");
     byKind.output = blockRows(found.output, "output");
+    byKind.logs = logRows();
     byKind.notes = noteRows();
     for (const e of props.entries) {
       if (e.kind === "notes") continue;
@@ -394,16 +487,22 @@ export function Search(props: Props) {
     } else if (filter === "commands" && near) {
       groups.push({ kind: "here", title: t("search.yours_on", { machine: near.name }),
         rows: blockRows(found.recent, "commands") });
-    } else if (filter !== "commands" && filter !== "output" && filter !== "notes") {
+    } else if (filter !== "commands" && filter !== "output" && filter !== "notes" &&
+        filter !== "logs") {
       groups.push({ kind: filter, title: t(TITLES[filter]),
         rows: props.entries.filter((e) => e.kind === filter).map((e) => localRow(e, 1)) });
     }
   } else if (filter === "all") {
-    const best = (k: SearchKind) => byKind[k][0]?.score ?? 0;
+    // A command listed under Commands is not listed again under Logs: in
+    // All once, under Logs (l:) with the rest of the log.
+    const commandsHere = new Set(byKind.commands.map((r) => r.same));
+    const inAll = (k: SearchKind) => k !== "logs" ? byKind[k]
+      : byKind.logs.filter((r) => !r.same || !commandsHere.has(r.same));
+    const best = (k: SearchKind) => inAll(k)[0]?.score ?? 0;
     const order = KINDS.map((k, i) => [k, i] as const)
       .sort((a, b) => best(b[0]) - best(a[0]) || a[1] - b[1]).map((x) => x[0]);
     for (const k of order) {
-      const rows = byKind[k];
+      const rows = inAll(k);
       if (!rows.length) continue;
       groups.push({ kind: k, title: t(TITLES[k]), rows: rows.slice(0, IN_ALL),
         more: rows.length > IN_ALL ? (moreOf(k) ? t("search.all_more", { n: rows.length })
@@ -557,9 +656,10 @@ export function Search(props: Props) {
               </div>
             )}
             {!words.length && (filter === "output" || filter === "notes" ||
-              (filter === "commands" && !near)) && (
+              filter === "logs" || (filter === "commands" && !near)) && (
               <p className="sr-note">{filter === "output" ? t("search.type_output")
-                : filter === "notes" ? t("search.type_notes") : t("search.type_commands")}</p>
+                : filter === "notes" ? t("search.type_notes")
+                : filter === "logs" ? t("search.type_logs") : t("search.type_commands")}</p>
             )}
           </div>
           <div className="sr-preview" aria-live="polite">
@@ -606,6 +706,7 @@ export function Search(props: Props) {
                 <dl className="sr-rows">
                   {/* i18n-ignore */}
                   {([["c: nginx", "search.tip_commands"], ["o: timed out", "search.tip_output"],
+                    ["l: certbot", "search.tip_logs"],
                     ["n: rollback", "search.tip_notes"], ["t: deploy", "search.tip_terminals"],
                     ["m: web-01", "search.tip_machines"], ["p: personal", "search.tip_projects"],
                     ["> theme", "search.tip_actions"]] as [string, string][]).map(([k, v]) => [
@@ -628,6 +729,7 @@ export function Search(props: Props) {
           <span className="sr-prefixes" title={t("search.prefixes_title")}>
             <span>{t.rich("search.prefix_commands", { code })}</span>
             <span>{t.rich("search.prefix_output", { code })}</span>
+            <span>{t.rich("search.prefix_logs", { code })}</span>
             <span>{t.rich("search.prefix_notes", { code })}</span>
             <span>{t.rich("search.prefix_actions", { code })}</span>
           </span>

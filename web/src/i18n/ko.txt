@@ -1086,6 +1086,7 @@ menus.name_example = 예: 런북
 # its groups.
 search.kind_commands = 명령
 search.kind_output = 출력
+search.kind_logs = 로그
 search.kind_notes = 노트
 search.kind_terminals = 터미널
 search.kind_machines = 머신
@@ -1094,6 +1095,8 @@ search.kind_actions = 동작
 # The kind of the line chosen, on top of the preview beside the list.
 search.label_command = 명령
 search.label_output = 출력
+search.label_log_line = 로그 줄
+search.label_log_note = 로그의 노트
 search.label_note = 노트
 search.label_terminal = 터미널
 search.label_machine = 머신
@@ -1104,6 +1107,7 @@ search.label_action = 동작
 search.nothing_for = ‘{text}’에 대한 결과가 없어요.
 search.nothing_in_commands = 명령에서 ‘{text}’에 대한 결과가 없어요.
 search.nothing_in_output = 출력에서 ‘{text}’에 대한 결과가 없어요.
+search.nothing_in_logs = 로그에서 ‘{text}’에 대한 결과가 없어요.
 search.nothing_in_notes = 노트에서 ‘{text}’에 대한 결과가 없어요.
 search.nothing_in_terminals = 터미널에서 ‘{text}’에 대한 결과가 없어요.
 search.nothing_in_machines = 머신에서 ‘{text}’에 대한 결과가 없어요.
@@ -1127,6 +1131,9 @@ search.row_branch = 브랜치
 search.row_status = 상태
 search.row_when = 시각
 search.row_terminal = 터미널
+search.row_who = 누가
+search.row_notes = 노트
+search.row_under = 대상
 # {terminal} is the terminal as its tab names it, P/web-01 · deploy; {when}
 # is when it ended: 10:46, yesterday 17:38, 2 Oct 09:12.
 search.terminal_ended = {terminal}, {when}에 종료됨
@@ -1134,6 +1141,9 @@ search.terminal_ended = {terminal}, {when}에 종료됨
 # into the line of the terminal in front, not run.
 search.open_in_terminal = 해당 터미널에서 열기
 search.into_line = 입력 줄에 넣기
+# 0.1.21: a line of a machine's log, or a note under one. {command} is the line's command.
+search.open_in_log = 로그에서 열기
+search.under = {command} 아래
 # A note found: where it is (its project and folder), when it was edited.
 search.row_in = 위치
 search.row_edited = 마지막 편집
@@ -1148,7 +1158,7 @@ search.all = other: 전체 {n}개
 search.all_more = other: 전체 {n}개 이상
 # The window, and its field.
 search.label = 검색
-search.placeholder = 명령, 출력, 노트, 터미널, 머신…
+search.placeholder = 명령, 출력, 로그, 노트, 터미널, 머신…
 search.close_title = 닫기 (Esc)
 # The buttons above the list; All is the first of them.
 search.filters = 검색 대상
@@ -1156,17 +1166,19 @@ search.kind_all = 전체
 # The list of what was found, for screen readers.
 search.found = 검색 결과
 search.nothing_typed = 아직 입력한 내용이 없어요. 최근에 열었던 항목과 여기서 가장 자주 실행한 명령을 보여 드려요.
-search.looks_in = 내 모든 터미널의 모든 명령과 그 출력, 노트, 터미널, 머신, 프로젝트에서 검색해요.
+search.looks_in = 내 모든 터미널의 모든 명령과 그 출력, 머신 로그, 노트, 터미널, 머신, 프로젝트에서 검색해요.
 search.everything = 전체 검색
 # With Output, Notes or Commands chosen and nothing typed yet.
 search.type_output = 명령 출력에서 찾을 단어를 입력하세요.
 search.type_notes = 노트에서 찾을 단어를 입력하세요.
 search.type_commands = 명령에서 찾을 단어를 입력하세요.
+search.type_logs = 머신 로그에서 찾을 단어를 입력하세요.
 # Beside the list while nothing is chosen: what to type (c: nginx,
 # o: timed out…), and what each keeps to.
 search.tips = 앞에 접두어를 붙이면 한 종류만 찾아요
 search.tip_commands = 명령
 search.tip_output = 명령이 출력한 내용
+search.tip_logs = 머신 로그
 search.tip_notes = 노트
 search.tip_terminals = 터미널
 search.tip_machines = 머신
@@ -1185,6 +1197,7 @@ search.keys_next = <kbd>Tab</kbd> 다음 종류
 search.prefixes_title = t: 터미널, m: 머신, p: 프로젝트
 search.prefix_commands = <code>c:</code> 명령
 search.prefix_output = <code>o:</code> 출력
+search.prefix_logs = <code>l:</code> 로그
 search.prefix_notes = <code>n:</code> 노트
 search.prefix_actions = <code>></code> 동작
 
@@ -1356,7 +1369,7 @@ log.ended = {who} 님이 {name} 종료함
 log.ended_why = {name} 종료됨: {why}
 # A command's line under the mouse.
 log.output = 출력
-log.output_title = 해당 터미널에서 열기
+log.output_title = 출력을 이 줄 아래에 보기
 log.output_gone = 출력 보관 안 됨
 # {days} is log.keep_days or log.keep_year.
 log.output_gone_title = 출력은 {days} 동안 보관돼요
@@ -1408,6 +1421,70 @@ log.old_banner = <b>이 명령들이 출력한 내용은 더 이상 보관되지
 log.no_open = 로그를 열지 못했어요: {why}
 log.gone_title = 이 로그를 찾을 수 없어요
 log.gone_text = 이 로그의 머신이 제거됐거나, 내가 속하지 않은 프로젝트로 옮겨졌어요.
+# 0.1.21 (the canvas, version 95): what a command printed opens under its line. Hide output closes it again.
+log.hide_output = 출력 숨기기
+log.hide_output_title = 출력을 숨겨요
+# Under the output: 27 lines · Show all 27 lines · Copy output (block.copy_output).
+log.output_lines = other: {n}줄
+log.output_all = other: {n}줄 모두 보기
+log.output_fold = 접기
+log.output_lost = 출력은 더 이상 보관되지 않아요.
+# {why} is what went wrong, as tTerm Web said it.
+log.output_no = 출력을 가져오지 못했어요: {why}
+log.output_empty = 출력된 내용이 없어요.
+log.output_screen = 전체 화면 프로그램처럼 화면 전체에 그렸어요. 그 내용은 여기에 보관되지 않아요.
+# The tools under the day: Find in this log (/ goes there), the order, whose lines, Failed, With notes, which terminal.
+log.find = 이 로그에서 찾기
+log.find_clear = 검색 지우기
+log.find_key = /를 눌러 이 로그에서 찾기
+log.order_title = 줄 순서
+log.order_old = 오래된 순
+log.order_new = 최신 순
+log.who_title = 누구의 줄
+log.who_all = 모두
+log.who_you = 나
+log.who_ai = AI
+log.who_note = 명령을 실행했거나 그 아래에 노트를 쓴 사람이에요.
+log.only_failed = 실패만
+log.with_notes = 노트 있음
+log.terminals_title = 어느 터미널
+log.terminals_all = 모든 터미널
+log.terminals_one = 터미널 하나
+# With filters on, on the right of the day: 2 of 8 commands · With notes, and Clear.
+log.shown = other: 명령 {n}개 중 {shown}개
+log.clear = 필터 해제
+log.none_shown = 이 필터에 맞는 줄이 없어요.
+# What Find in this log found: In all of web-01’s log, a year back: 3 commands and 2 notes, on 2 days. {back} is log.keep_year or log.keep_days; {what} is log.found_commands, or log.found_both; {days} is log.found_days.
+log.found = {machine} 로그 전체(지난 {back}): <b>{what}</b>, {days}
+log.found_commands = other: 명령 {n}개
+log.found_notes = other: 노트 {n}개
+log.found_both = {commands}, {notes}
+log.found_days = other: {n}일에 걸쳐
+log.found_none = {machine} 로그(지난 {back})에서 ‘{text}’를 찾지 못했어요.
+log.found_cut = 여기 보이는 것보다 더 많이 찾았어요. 처음 {n}개만 보여요. 단어를 더해 범위를 좁혀 보세요.
+log.found_among = {machine} 로그에서 찾은 처음 {n}개 중: <b>{what}</b>, {days}
+# {why} is what went wrong, as tTerm Web said it.
+log.no_find = 로그를 검색하지 못했어요: {why}
+log.back_to_day = 날짜 보기로 돌아가기
+log.open_day = 이날 열기
+
+# ------------------------------------------------------------ reason: why a terminal ended (reasons.ts)
+# What tTerm Web says when a terminal ends by itself, under a terminal that ended and in the log (log.ended_why). {machine} and {mac} are machines' names, {code} a number, {why} what the system said, as it said it.
+reason.stopped = tTerm Web이 멈췄어요.
+reason.closed = 닫혔어요.
+reason.closed_early = 열리기 전에 닫혔어요.
+reason.shell_code = 셸이 코드 {code}(으)로 종료됐어요.
+reason.link_closed = {machine} 연결이 닫혔어요.
+reason.link_lost = {machine} 연결이 끊겼어요: {why}
+reason.removed = {machine}: tTerm Web에서 제거됐어요.
+reason.agent_off = {machine}: 지금 연결되어 있지 않아요. 에이전트가 실행 중이 아니에요. 그 컴퓨터에서 에이전트를 시작한 다음 터미널을 다시 여세요.
+reason.mac_off = {mac}: 지금 연결되어 있지 않아요. Mac에서 열거나 Mac용 tTerm을 시작한 다음 이 터미널을 다시 여세요.
+# A computer's terminal that waited for its agent; a terminal that did not open; the Mac, when its name is not known (reason.mac_off).
+reason.away_long = {machine}: 12시간 안에 돌아오지 않아 이 터미널이 종료됐어요.
+reason.came_back_without = {machine}: 이 터미널 없이 돌아왔어요. 에이전트가 다시 시작됐거나, 컴퓨터가 켜진 채로 1시간 넘게 오프라인이었어요.
+reason.agent_stopped = {machine}의 에이전트가 멈춰 이 터미널이 종료됐어요.
+reason.no_open = {machine}에서 터미널을 열지 못했어요: {why}
+reason.the_mac = Mac
 
 # ------------------------------------------------------------ terminal_view: a terminal under its tab (TerminalView.tsx)
 # A terminal's tab while its own name is not known yet.

@@ -20,6 +20,9 @@ export function MenuButton(props: {
   align?: "right" | "left";
   /** Opened on the first render: a board in the mockups, a check. */
   startOpen?: boolean;
+  /** Words on the button instead of the ⋯, in a class of its own (0.1.21:
+   * the chips of a machine's log); `label` is then its title. */
+  face?: { className: string; content: ReactNode };
 }) {
   const [open, setOpen] = useState(!!props.startOpen);
   const box = useRef<HTMLDivElement>(null);
@@ -68,8 +71,8 @@ export function MenuButton(props: {
   return (
     <div className={`menu-anchor ${props.className ?? ""}`} ref={box}>
       <button type="button"
-        className={open ? "icon-button small menu-button open" : "icon-button small menu-button"}
-        aria-label={props.label} title={props.title ?? props.label}
+        className={`${props.face?.className ?? "icon-button small"} menu-button${open ? " open" : ""}`}
+        aria-label={props.face ? undefined : props.label} title={props.title ?? props.label}
         aria-haspopup="menu" aria-expanded={open}
         onClick={(event) => {
           // Safari does not give a clicked button the keys: the arrows
@@ -77,7 +80,7 @@ export function MenuButton(props: {
           event.currentTarget.focus();
           setOpen((was) => !was);
         }}>
-        <Dots size={16} />
+        {props.face ? props.face.content : <Dots size={16} />}
       </button>
       {open && (
         <div className={props.align === "left" ? "menu left" : "menu"} role="menu">

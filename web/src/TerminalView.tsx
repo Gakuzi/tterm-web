@@ -28,6 +28,7 @@ import { SshStrip } from "./SshStrip";
 import { VaultLocked } from "./VaultLocked";
 import { useT } from "./i18n";
 import { ModeToggle } from "./InputLine";
+import { reasonText } from "./reasons";
 import type { Shown } from "./theme";
 import { since } from "./time";
 
@@ -269,7 +270,8 @@ export function TerminalView(props: Props) {
             <div className="ended-text">
               <strong>{missing && !info ? t("terminal_view.no_such")
                 : t("terminal_view.ended")}</strong>
-              <span>{info?.reason ?? t("terminal_view.not_running")}</span>
+              <span>{info?.reason ? reasonText(info.reason, t)
+                : t("terminal_view.not_running")}</span>
             </div>
             <div className="button-row">
               {info && props.machineThere(info.machineId) && (
