@@ -1367,6 +1367,8 @@ log.ended_you = 내가 {name} 종료함
 log.ended = {who} 님이 {name} 종료함
 # A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
 log.ended_why = {name} 종료됨: {why}
+log.moved_you = 내가 이 머신을 {from} 프로젝트에서 {to} 프로젝트로 옮김
+log.moved = {who} 님이 이 머신을 {from} 프로젝트에서 {to} 프로젝트로 옮김
 # A command's line under the mouse.
 log.output_gone = 출력 보관 안 됨
 # {days} is log.keep_days or log.keep_year.

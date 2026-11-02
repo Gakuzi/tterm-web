@@ -1367,6 +1367,8 @@ log.ended_you = {name} をあなたが終了しました
 log.ended = {name} を {who} が終了しました
 # A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
 log.ended_why = {name} が終了しました：{why}
+log.moved_you = このマシンを {from} から {to} へあなたが移動しました
+log.moved = このマシンを {from} から {to} へ {who} が移動しました
 # A command's line under the mouse.
 log.output_gone = 出力は保存されていません
 # {days} is log.keep_days or log.keep_year.

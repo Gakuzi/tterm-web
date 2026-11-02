@@ -1064,7 +1064,7 @@ export interface LogNote {
   redacted: Redaction | null;
 }
 
-export type LogKind = "terminal.opened" | "command.ran" | "terminal.closed";
+export type LogKind = "terminal.opened" | "command.ran" | "terminal.closed" | "machine.moved";
 
 /** A line of the log: a terminal opened or ended, or a command that ran,
  * with how it ended, where, and the notes under it. */
@@ -1094,6 +1094,9 @@ export interface LogEntry {
   canRedact?: boolean;
   /** Why a terminal ended. */
   reason?: string;
+  /** A move to another project (0.1.23): the projects by their names then. */
+  from?: string;
+  to?: string;
 }
 
 export interface LogDay {

@@ -1260,10 +1260,11 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     @app.post("/api/log/{entry_id}/redact")
     async def log_redact(entry_id: int, body: RedactBody,
                          session: auth.Session = Depends(signed_in)) -> Response:
-        """The words of a line or a note go for good, by the project's owner
-        or an admin; the log keeps who, when and why. A command's go from
-        every line of the project with the same words, and the terminals
-        of those that are running forget them too."""
+        """The words of a line or a note go for good, by the owner or an
+        admin of the project the machine is in now (0.1.23); the log keeps
+        who, when and why. A command's go from every line with the same
+        words of the machines in that project, and the terminals of those
+        that are running forget them too."""
         try:
             done = await logs.redact(pool, session.person.id, entry_id,
                                      body.reason)

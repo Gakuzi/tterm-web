@@ -1,7 +1,7 @@
 {
   "name": "tterm-web-page",
   "private": true,
-  "version": "0.1.22",
+  "version": "0.1.23",
   "description": "The page of tTerm Web: the terminal in the browser.",
   "license": "AGPL-3.0-only",
   "type": "module",

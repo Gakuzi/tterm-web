@@ -12,8 +12,13 @@ Under a line, notes (`log.note`), by a person or by an AI on a person's
 behalf: the AI then may do no more than that person may. What is written
 is never changed or taken back; a note is answered with another. Everyone
 in the project reads the log, the owner, admins and members write notes,
-an observer only reads. One sees the lines written in projects one is in:
-a machine moved into a project brings no one there the lines from before.
+an observer only reads.
+
+The log is the machine's (0.1.23): whoever is in the project the machine is
+in now reads all of it, writes under it and redacts in it as their role
+there says, whichever project a line was written in. A machine moved to
+another project takes its log along, and the old project keeps none of it:
+deleting it takes none of it away. The move is a line of the log too.
 
 A password or a token that got into a command or a note is redacted by the
 project's owner or an admin (`log.redacted`): its words go for good, from
@@ -44,8 +49,12 @@ import asyncpg
 
 from . import accounts, photos
 
-#: The lines of a machine's log.
-KINDS = ("terminal.opened", "command.ran", "terminal.closed")
+#: The lines of a machine's log: from 0.1.23 its moves to another project
+#: too, each once (the journal has a row of it in both projects).
+KINDS = ("terminal.opened", "command.ran", "terminal.closed", "machine.moved")
+#: A move as the project it went to has it (compared as text: a row with
+#: no such project, or none at all, is not shown, and fails nothing).
+_ONCE = "(j.kind <> 'machine.moved' OR j.project_id::text = j.details->>'to')"
 #: Who may write notes; who may redact (as notes.WRITERS and MANAGERS).
 WRITERS = ("owner", "admin", "member")
 MANAGERS = ("owner", "admin")
@@ -190,14 +199,23 @@ async def command_ran(conn: asyncpg.Connection, *, project_id: uuid.UUID,
         _json(details), expires_at, text_id)
 
 
-async def _role(conn: asyncpg.Connection, project_id: uuid.UUID | None,
-                user_id: uuid.UUID) -> str | None:
-    if project_id is None:
+async def _now(conn: asyncpg.Connection, machine_id: uuid.UUID | None,
+               user_id: uuid.UUID) -> asyncpg.Record | None:
+    """The project a machine is in now and the person's role there (0.1.23):
+    what they may do in its log. None when they are not in it, or the
+    machine or the project is gone."""
+    if machine_id is None:
         return None
-    return await conn.fetchval(
-        "SELECT role FROM project_members WHERE project_id = $1 "
-        "AND user_id = $2 AND (until IS NULL OR until > now())",
-        project_id, user_id)
+    return await conn.fetchrow(
+        """
+        SELECT m.project_id, pm.role
+        FROM machines m
+        JOIN projects p ON p.id = m.project_id
+        JOIN project_members pm ON pm.project_id = m.project_id
+                               AND pm.user_id = $2
+        WHERE m.id = $1 AND m.removed_at IS NULL AND p.deleted_at IS NULL
+          AND (pm.until IS NULL OR pm.until > now())
+        """, machine_id, user_id)
 
 
 _ENTRY = """
@@ -237,10 +255,10 @@ async def add_note(pool: asyncpg.Pool, user_id: uuid.UUID, text: object, *,
         async with pool.acquire() as conn, conn.transaction():
             entry = await conn.fetchrow(_ENTRY.format(where=where), *args)
             if entry is not None:
-                role = await _role(conn, entry["project_id"], user_id)
-                if role is None:
+                now = await _now(conn, entry["machine_id"], user_id)
+                if now is None:
                     raise NotFound("No such line in the log.")
-                if role not in WRITERS:
+                if now["role"] not in WRITERS:
                     raise NotAllowed("An observer reads the log and does not "
                                      "write in it.")
                 text_id, fp = await _text(conn, text, entry["expires_at"])
@@ -274,11 +292,14 @@ async def redact(pool: asyncpg.Pool, user_id: uuid.UUID, entry_id: int,
                  reason: object) -> dict:
     """Redacts the words of a line or a note: they go for good, and with a
     command's, its block's command and output (the feed and search). The
-    log keeps who did it, when and why. By the project's owner and admins.
+    log keeps who did it, when and why. By the owner and admins of the
+    project the machine is in now.
 
-    A command's words go from every line of the project that has them too:
-    a password typed twice, or run again, is the same password, and the
-    input line's history and search would still offer it.
+    A command's words go from every line that has them of the machines in
+    that project too, those taken out of tTerm as well (their blocks are
+    still in their terminals' feeds and in search until they expire): a
+    password typed twice, or run again, is the same password, and the input
+    line's history and search would still offer it.
 
     What came of it, for the page and for the terminals, if they are
     running, to forget the commands too: the kind, the terminal and the
@@ -289,7 +310,7 @@ async def redact(pool: asyncpg.Pool, user_id: uuid.UUID, entry_id: int,
     async with pool.acquire() as conn, conn.transaction():
         row = await conn.fetchrow(
             """
-            SELECT id, kind, project_id, machine_id, terminal_id, expires_at,
+            SELECT id, kind, machine_id, terminal_id, expires_at,
                    text_id, about, (details->>'seq')::bigint AS seq
             FROM journal
             WHERE id = $1 AND kind IN ('command.ran', 'log.note')
@@ -297,10 +318,10 @@ async def redact(pool: asyncpg.Pool, user_id: uuid.UUID, entry_id: int,
             """, entry_id)
         if row is None:
             raise NotFound("No such line in the log.")
-        role = await _role(conn, row["project_id"], user_id)
-        if role is None:
+        now = await _now(conn, row["machine_id"], user_id)
+        if now is None:
             raise NotFound("No such line in the log.")
-        if role not in MANAGERS:
+        if now["role"] not in MANAGERS:
             raise NotAllowed("Only the project's owner and admins redact.")
         what = "command" if row["kind"] == "command.ran" else "note"
         words = await conn.fetchval(
@@ -310,15 +331,17 @@ async def redact(pool: asyncpg.Pool, user_id: uuid.UUID, entry_id: int,
         # and the second finds it done.
         lines = await conn.fetch(
             """
-            SELECT j.id, j.machine_id, j.terminal_id, j.expires_at, j.text_id,
-                   (j.details->>'seq')::bigint AS seq, x.redacted_at
+            SELECT j.id, j.project_id, j.machine_id, j.terminal_id,
+                   j.expires_at, j.text_id, (j.details->>'seq')::bigint AS seq,
+                   x.redacted_at
             FROM journal j JOIN log_texts x ON x.id = j.text_id
             WHERE j.id = $1
-               OR ($2 AND j.project_id = $3 AND j.kind = 'command.ran'
-                   AND j.expires_at > now() AND x.text = $4)
+               OR ($2 AND j.kind = 'command.ran' AND j.expires_at > now()
+                   AND x.text = $4 AND j.machine_id IN (
+                       SELECT id FROM machines WHERE project_id = $3))
             ORDER BY x.id
             FOR UPDATE OF x
-            """, row["id"], what == "command", row["project_id"], words)
+            """, row["id"], what == "command", now["project_id"], words)
         asked = next((x for x in lines if x["id"] == row["id"]), None)
         if asked is None or asked["redacted_at"] is not None:
             raise Taken("This is redacted already.")
@@ -339,7 +362,7 @@ async def redact(pool: asyncpg.Pool, user_id: uuid.UUID, entry_id: int,
                                      about)
                 VALUES ($1, $2, 'log.redacted', $3, $4, $5::jsonb, $6,
                         'person', $7)
-                """, row["project_id"], user_id, line["machine_id"],
+                """, line["project_id"], user_id, line["machine_id"],
                 line["terminal_id"], _json(details), line["expires_at"],
                 line["id"])
             if what == "command" and line["terminal_id"] is not None:
@@ -384,15 +407,6 @@ async def _people(conn: asyncpg.Connection, ids: set[uuid.UUID],
         "photo": (photos.url_for(r["id"], r["updated_at"])
                   if r["updated_at"] is not None else None),
         "me": r["id"] == viewer} for r in rows}
-
-
-async def _roles(conn: asyncpg.Connection,
-                 user_id: uuid.UUID) -> dict[uuid.UUID, str]:
-    """The person's projects and their role in each: they see the lines
-    written in these."""
-    return {r["project_id"]: r["role"] for r in await conn.fetch(
-        "SELECT project_id, role FROM project_members WHERE user_id = $1 "
-        "AND (until IS NULL OR until > now())", user_id)}
 
 
 def _redacted(row: asyncpg.Record, people: dict) -> dict | None:
@@ -446,10 +460,9 @@ async def machine_of(conn: asyncpg.Connection, machine_id: uuid.UUID,
 #: A line of a log as the page draws it: who, its words, how it ended, and
 #: whether what it printed is still kept, in the person's own terminal,
 #: with the width it ran at: it opens under the line (0.1.21). The query
-#: that adds to it takes $1 for the machine, $2 for the person and $3 for
-#: the projects they are in.
+#: that adds to it takes $1 for the machine and $2 for the person.
 _LINES = """
-    SELECT j.id, j.at, j.kind, j.user_id, j.author, j.ai, j.project_id,
+    SELECT j.id, j.at, j.kind, j.user_id, j.author, j.ai,
            j.terminal_id, j.details, t.name AS terminal, x.text,
            x.redacted_at, x.redacted_by, x.reason,
            coalesce(ob.kept, false) AS output, ob.cols
@@ -481,9 +494,10 @@ def _about(machine: asyncpg.Record) -> dict:
 
 
 async def _entries(conn: asyncpg.Connection, rows: list[asyncpg.Record],
-                   user_id: uuid.UUID, roles: dict[uuid.UUID, str]) -> list[dict]:
+                   user_id: uuid.UUID, role: str | None) -> list[dict]:
     """Lines as the page draws them: each command with its notes, the
-    terminals opened and ended."""
+    terminals opened and ended, the machine's moves; what the person may do
+    under them, by their role where the machine is now."""
     notes = await _notes(conn, [r["id"] for r in rows
                                 if r["kind"] == "command.ran"])
     who = ({r["user_id"] for r in rows} | {r["redacted_by"] for r in rows}
@@ -495,7 +509,6 @@ async def _entries(conn: asyncpg.Connection, rows: list[asyncpg.Record],
     entries = []
     for r in rows:
         d = json.loads(r["details"]) if isinstance(r["details"], str) else r["details"]
-        role = roles.get(r["project_id"])
         entry = {"id": r["id"], "kind": r["kind"], "at": _ms(r["at"]),
                  "by": people.get(r["user_id"]), "author": r["author"],
                  "ai": r["ai"],
@@ -514,6 +527,10 @@ async def _entries(conn: asyncpg.Connection, rows: list[asyncpg.Record],
                 "canNote": role in WRITERS, "canRedact": role in MANAGERS})
         elif r["kind"] == "terminal.closed":
             entry["reason"] = d.get("reason") or ""
+        elif r["kind"] == "machine.moved":
+            # The projects by their names then, as the move had them.
+            entry.update({"from": d.get("fromName") or "",
+                          "to": d.get("toName") or ""})
         entries.append(entry)
     return entries
 
@@ -527,28 +544,24 @@ async def day(pool: asyncpg.Pool, user_id: uuid.UUID, machine_id: uuid.UUID,
         raise Invalid("A day of the log is from one midnight to the next.")
     async with pool.acquire() as conn:
         machine = await machine_of(conn, machine_id, user_id)
-        roles = await _roles(conn, user_id)
-        mine = list(roles)
         rows = await conn.fetch(
-            _LINES + """
-            WHERE j.machine_id = $1 AND j.project_id = ANY($3::uuid[])
-              AND j.at >= $4 AND j.at < $5 AND j.kind = ANY($6::text[])
-              AND j.expires_at > now()
+            _LINES + f"""
+            WHERE j.machine_id = $1 AND j.at >= $3 AND j.at < $4
+              AND j.kind = ANY($5::text[]) AND j.expires_at > now() AND {_ONCE}
             ORDER BY j.at, j.id
-            LIMIT $7
-            """, machine_id, user_id, mine, start, end, list(KINDS),
-            DAY_MAX + 1)
+            LIMIT $6
+            """, machine_id, user_id, start, end, list(KINDS), DAY_MAX + 1)
         cut = len(rows) > DAY_MAX
-        entries = await _entries(conn, rows[:DAY_MAX], user_id, roles)
-        near = """
-            SELECT {pick}(at) FROM journal
-            WHERE machine_id = $1 AND at {cmp} $2 AND kind = ANY($3::text[])
-              AND expires_at > now() AND project_id = ANY($4::uuid[])
+        entries = await _entries(conn, rows[:DAY_MAX], user_id, machine["role"])
+        near = f"""
+            SELECT {{pick}}(j.at) FROM journal j
+            WHERE j.machine_id = $1 AND j.at {{cmp}} $2
+              AND j.kind = ANY($3::text[]) AND j.expires_at > now() AND {_ONCE}
         """
         before = await conn.fetchval(near.format(pick="max", cmp="<"),
-                                     machine_id, start, list(KINDS), mine)
+                                     machine_id, start, list(KINDS))
         after = await conn.fetchval(near.format(pick="min", cmp=">="),
-                                    machine_id, end, list(KINDS), mine)
+                                    machine_id, end, list(KINDS))
     return {**_about(machine), "from": _ms(start), "to": _ms(end),
             "before": _ms(before), "after": _ms(after),
             "entries": entries, "cut": cut}
@@ -576,10 +589,9 @@ async def find(pool: asyncpg.Pool, user_id: uuid.UUID, machine_id: uuid.UUID,
     if not words:
         raise Invalid("Type what to look for.")
     order = "DESC" if newest else "ASC"
-    has = " ".join(f"AND x.text ILIKE ${i + 4}" for i in range(len(words)))
+    has = " ".join(f"AND x.text ILIKE ${i + 3}" for i in range(len(words)))
     async with pool.acquire() as conn:
         machine = await machine_of(conn, machine_id, user_id)
-        roles = await _roles(conn, user_id)
         rows = await conn.fetch(
             _LINES + f"""
             WHERE j.id IN (
@@ -590,19 +602,18 @@ async def find(pool: asyncpg.Pool, user_id: uuid.UUID, machine_id: uuid.UUID,
                 SELECT n.about FROM journal n JOIN log_texts x ON x.id = n.text_id
                 WHERE n.machine_id = $1 AND n.kind = 'log.note'
                   AND n.expires_at > now() {has})
-              AND j.machine_id = $1 AND j.project_id = ANY($3::uuid[])
+              AND j.machine_id = $1
               AND j.kind = 'command.ran' AND j.expires_at > now()
             ORDER BY j.at {order}, j.id {order}
             LIMIT {FIND_MAX + 1}
-            """, machine_id, user_id, list(roles), *[_like(w) for w in words])
+            """, machine_id, user_id, *[_like(w) for w in words])
         cut = len(rows) > FIND_MAX
-        entries = await _entries(conn, rows[:FIND_MAX], user_id, roles)
+        entries = await _entries(conn, rows[:FIND_MAX], user_id, machine["role"])
     return {**_about(machine), "words": words, "entries": entries, "cut": cut}
 
 
 #: The projects a person is in, as a query has them ($1, the person): they
-#: read the lines written in these, and open the logs of the machines that
-#: are in these now.
+#: read the logs of the machines that are in these now, all of each.
 _IN = ("(SELECT project_id FROM project_members WHERE user_id = $1 "
        "AND (until IS NULL OR until > now()))")
 
@@ -635,7 +646,7 @@ async def found_in_logs(conn: asyncpg.Connection, user_id: uuid.UUID,
         JOIN projects p ON p.id = m.project_id
         LEFT JOIN terminals t ON t.id = j.terminal_id
         WHERE j.kind = 'command.ran' AND j.expires_at > now()
-          AND j.project_id IN {_IN} AND m.project_id IN {_IN}
+          AND m.project_id IN {_IN}
           AND m.removed_at IS NULL AND p.deleted_at IS NULL {has}
         ORDER BY j.at DESC, j.id DESC
         LIMIT {LOGS_SCAN}
@@ -655,7 +666,7 @@ async def found_in_logs(conn: asyncpg.Connection, user_id: uuid.UUID,
         JOIN projects p ON p.id = m.project_id
         WHERE n.kind = 'log.note' AND n.expires_at > now()
           AND j.expires_at > now()
-          AND j.project_id IN {_IN} AND m.project_id IN {_IN}
+          AND m.project_id IN {_IN}
           AND m.removed_at IS NULL AND p.deleted_at IS NULL {has}
         ORDER BY n.at DESC, n.id DESC
         LIMIT {LOGS_SCAN}
@@ -706,16 +717,20 @@ async def of_blocks(pool: asyncpg.Pool, terminal_id: uuid.UUID,
     if not seqs:
         return {}
     async with pool.acquire() as conn:
-        roles = await _roles(conn, user_id)
+        now = await _now(conn, await conn.fetchval(
+            "SELECT machine_id FROM terminals WHERE id = $1", terminal_id),
+            user_id)
+        if now is None:
+            return {}
         rows = await conn.fetch(
             """
-            SELECT j.id, (j.details->>'seq')::bigint AS seq, j.project_id,
+            SELECT j.id, (j.details->>'seq')::bigint AS seq,
                    x.redacted_at, x.redacted_by, x.reason
             FROM journal j JOIN log_texts x ON x.id = j.text_id
             WHERE j.terminal_id = $1 AND j.kind = 'command.ran'
               AND (j.details->>'seq')::bigint = ANY($2::bigint[])
-              AND j.expires_at > now() AND j.project_id = ANY($3::uuid[])
-            """, terminal_id, seqs, list(roles))
+              AND j.expires_at > now()
+            """, terminal_id, seqs)
         notes = await _notes(conn, [r["id"] for r in rows])
         who = ({r["redacted_by"] for r in rows} | {n["user_id"] for n in notes}
                | {n["redacted_by"] for n in notes})
@@ -725,22 +740,24 @@ async def of_blocks(pool: asyncpg.Pool, terminal_id: uuid.UUID,
         by_entry.setdefault(n["about"], []).append(_note(n, people))
     return {r["seq"]: {"entry": r["id"], "notes": by_entry.get(r["id"], []),
                        "redacted": _redacted(r, people),
-                       "canNote": roles.get(r["project_id"]) in WRITERS}
+                       "canNote": now["role"] in WRITERS}
             for r in rows}
 
 
 async def counts(pool: asyncpg.Pool, user_id: uuid.UUID,
                  since: dt.datetime) -> dict[str, int]:
     """Commands run on each machine since `since` (the page's midnight),
-    for the Logs folder of the sidebar: of the lines the person sees."""
+    for the Logs folder of the sidebar: of the machines in the person's
+    projects, all of each log (0.1.23)."""
     rows = await pool.fetch(
         """
-        SELECT machine_id, count(*) AS n FROM journal
-        WHERE kind = 'command.ran' AND at >= $1 AND expires_at > now()
-          AND machine_id IS NOT NULL
-          AND project_id IN (SELECT project_id FROM project_members
-                             WHERE user_id = $2
-                               AND (until IS NULL OR until > now()))
-        GROUP BY machine_id
+        SELECT j.machine_id, count(*) AS n FROM journal j
+        JOIN machines m ON m.id = j.machine_id
+        WHERE j.kind = 'command.ran' AND j.at >= $1 AND j.expires_at > now()
+          AND m.removed_at IS NULL
+          AND m.project_id IN (SELECT project_id FROM project_members
+                               WHERE user_id = $2
+                                 AND (until IS NULL OR until > now()))
+        GROUP BY j.machine_id
         """, since, user_id)
     return {str(r["machine_id"]): r["n"] for r in rows}

@@ -1367,6 +1367,8 @@ log.ended_you = Sen sonlandırdın: {name}
 log.ended = {who} sonlandırdı: {name}
 # A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
 log.ended_why = {name} sonlandı: {why}
+log.moved_you = Bu makineyi sen taşıdın: {from} projesinden {to} projesine
+log.moved = Bu makineyi {who} taşıdı: {from} projesinden {to} projesine
 # A command's line under the mouse.
 log.output_gone = çıktı saklanmadı
 # {days} is log.keep_days or log.keep_year.

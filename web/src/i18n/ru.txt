@@ -1367,6 +1367,8 @@ log.ended_you = {name} завершён тобой
 log.ended = {name} завершён: {who}
 # A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
 log.ended_why = {name} завершился: {why}
+log.moved_you = Машина перенесена тобой из проекта {from} в проект {to}
+log.moved = Машина перенесена из проекта {from} в проект {to}: {who}
 # A command's line under the mouse.
 log.output_gone = вывод не сохранился
 # {days} is log.keep_days or log.keep_year.

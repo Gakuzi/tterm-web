@@ -1367,6 +1367,8 @@ log.ended_you = Finalizaste {name}
 log.ended = {who} finalizó {name}
 # A terminal that ended by itself: the shell exited, the connection went. {why} is what tTerm Web said, as it said it.
 log.ended_why = {name} finalizó: {why}
+log.moved_you = Moviste esta máquina de {from} a {to}
+log.moved = {who} movió esta máquina de {from} a {to}
 # A command's line under the mouse.
 log.output_gone = salida no conservada
 # {days} is log.keep_days or log.keep_year.

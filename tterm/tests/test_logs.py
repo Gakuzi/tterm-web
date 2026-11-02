@@ -2,7 +2,8 @@
 people and by an AI on a person's behalf, redaction, who may do what, how
 long it all stays, and the lines brought in from the blocks of before. From
 0.1.21: Find in this log, the logs in search, and what a line needs for its
-output to open under it."""
+output to open under it. From 0.1.23: the log is the machine's, and goes
+with it to another project."""
 import datetime as dt
 import hashlib
 import json
@@ -14,7 +15,7 @@ from pathlib import Path
 
 import asyncpg
 
-from ..core import accounts, auth, db, logs, search
+from ..core import accounts, auth, db, logs, projects, search
 from .harness import request, shell_server
 from .test_feed import _saved
 from .test_terminals import (CHANGE, _ca_public, _home, _login_shell,
@@ -318,13 +319,14 @@ async def test_find_in_a_log_and_the_logs_in_search(h):
         assert len((await logs.find(pool, me.id, machine, ["xoxb"]))["entries"]) == 1
         await logs.redact(pool, me.id, token["note"]["id"], "a token")
         assert (await logs.find(pool, me.id, machine, ["xoxb"]))["entries"] == []
-        # A line written in a project one is not in (the machine was there
-        # then) is not found here.
+        # A line written in another project, while the machine was there,
+        # is the machine's too (0.1.23): whoever reads its log finds it.
         theirs_project = (await accounts.projects_of(pool, stranger.id))[0]["id"]
         await _ran(pool, uuid.UUID(theirs_project), stranger.id, machine, terminal, 50,
                    "cat config/production.json", at=old - dt.timedelta(days=1), block=False)
-        assert all(e["command"] != "cat config/production.json" for e in
-                   (await logs.find(pool, me.id, machine, ["production.json"]))["entries"])
+        assert [e["command"] for e in (await logs.find(
+            pool, me.id, machine, ["production.json"]))["entries"]][0] == \
+            "cat config/production.json"
         await _refused(logs.Invalid, logs.find(pool, me.id, machine, []))
         await _refused(logs.NotFound, logs.find(pool, stranger.id, machine,
                                                 ["build"]))
@@ -353,7 +355,8 @@ async def test_find_in_a_log_and_the_logs_in_search(h):
         assert [(x["command"], x["machine"], x["runs"]) for x in lines] == [
             ("cat config/production.json", "web-02", 1),
             (cp, "web-01", 2),
-            ("vim config/production.json", "web-01", 1)], lines
+            ("vim config/production.json", "web-01", 1),
+            ("cat config/production.json", "web-01", 1)], lines
         latest = lines[1]
         assert latest["entry"] != first_cp and latest["by"]["me"]
         assert latest["cwd"] == "/srv/app" and latest["branch"] == "main"
@@ -375,7 +378,7 @@ async def test_find_in_a_log_and_the_logs_in_search(h):
             got, _ = await logs.found_in_logs(conn, stranger.id, ["production"])
             assert got == []
             got, _ = await logs.found_in_logs(conn, anna.id, ["production"])
-            assert len(got) == 5
+            assert len(got) == 6
         # A line with notes says how many and the first of them.
         async with pool.acquire() as conn:
             got, _ = await logs.found_in_logs(conn, me.id, ["npm", "build"])
@@ -389,7 +392,7 @@ async def test_find_in_a_log_and_the_logs_in_search(h):
             got, _ = await logs.found_in_logs(conn, me.id, ["production.json"])
         assert "web-02" not in {x["machine"] for x in got}
         everything = await search.search(pool, me.id, "production.json")
-        assert len(everything["logs"]) == 4 and everything["more"]["logs"] is False
+        assert len(everything["logs"]) == 5 and everything["more"]["logs"] is False
         assert (await search.search(pool, me.id, ""))["logs"] == []
 
 
@@ -509,27 +512,132 @@ async def test_who_reads_writes_and_redacts(h):
         assert kinds == ["log.note", "log.note", "log.redacted"], kinds
 
 
-async def test_a_moved_machine_brings_no_one_its_old_lines(h):
+async def test_a_moved_machine_takes_its_log_along(h):
+    """0.1.23: the log is the machine's. Whoever is in the project it is in
+    now reads all of it and writes and redacts in it as their role there
+    says; the old project keeps none of it, and its deletion takes none of
+    it away. The move is a line of the log, once."""
     async with h.pool() as pool:
         me, personal = await _owner(pool)
         async with pool.acquire() as conn:
+            lab = await accounts.create_project(conn, me.id, "Lab", "L")
             team = await accounts.create_project(conn, me.id, "Team", "T")
         anna = await _person(pool, "anna@example.com", "Anna Admin")
+        bob = await _person(pool, "bob@example.com", "Bob Lab")
+        # Carl: an admin of Lab, only an observer in Team.
+        carl = await _person(pool, "carl@example.com", "Carl Both")
         await _join(pool, team, anna, "admin")
-        machine, terminal = await _computer(pool, personal, me.id)
-        await _ran(pool, personal, me.id, machine, terminal, 1, "cat ~/.secret")
-        await pool.execute("UPDATE machines SET project_id = $2 WHERE id = $1",
-                           machine, team)
-        await _ran(pool, team, me.id, machine, terminal, 9, "uptime")
+        await _join(pool, lab, bob, "member")
+        await _join(pool, lab, carl, "admin")
+        await _join(pool, team, carl, "observer")
+        machine, terminal = await _computer(pool, lab, me.id)
+        before = await _ran(pool, lab, me.id, machine, terminal, 1,
+                            "mysql -pHunter2 app")
+        await logs.add_note(pool, bob.id, "I ran the migration after it.",
+                            entry_id=before)
+        # The same words on another machine of Team, and on one of Personal.
+        mate, mate_terminal = await _computer(pool, team, me.id, "db-01")
+        same = await _ran(pool, team, me.id, mate, mate_terminal, 3,
+                          "mysql -pHunter2 app")
+        home, home_terminal = await _computer(pool, personal, me.id, "mini")
+        kept = await _ran(pool, personal, me.id, home, home_terminal, 4,
+                          "mysql -pHunter2 app")
+        # And on a machine that stays in Lab, and on one of Team that then
+        # leaves it: neither is Team's when Anna redacts.
+        stay, stay_terminal = await _computer(pool, lab, me.id, "lab-02")
+        stays = await _ran(pool, lab, me.id, stay, stay_terminal, 5,
+                           "mysql -pHunter2 app")
+        left_team, left_terminal = await _computer(pool, team, me.id, "db-02")
+        went = await _ran(pool, team, me.id, left_team, left_terminal, 6,
+                          "mysql -pHunter2 app")
+        await projects.move_machine(pool, me.id, left_team, personal)
+        await projects.move_machine(pool, me.id, machine, team)
+        after = await _ran(pool, team, me.id, machine, terminal, 9, "uptime")
         start, end = _today()
         a = dt.datetime.fromtimestamp(start / 1000, dt.UTC)
         b = dt.datetime.fromtimestamp(end / 1000, dt.UTC)
-        mine = await logs.day(pool, me.id, machine, a, b)
-        theirs = await logs.day(pool, anna.id, machine, a, b)
-        assert [e["command"] for e in mine["entries"]] == \
-            ["cat ~/.secret", "uptime"]
-        assert [e["command"] for e in theirs["entries"]] == ["uptime"]
-        assert await logs.counts(pool, anna.id, a) == {str(machine): 1}
+
+        for person in (me, anna):
+            log = await logs.day(pool, person.id, machine, a, b)
+            kinds = [(e["kind"], e.get("command")) for e in log["entries"]]
+            assert kinds == [("command.ran", "mysql -pHunter2 app"),
+                             ("machine.moved", None), ("command.ran", "uptime")], kinds
+            moved = log["entries"][1]
+            assert (moved["from"], moved["to"]) == ("Lab", "Team")
+            assert moved["by"]["name"] == "Denis Gerasimenko"
+            old = log["entries"][0]
+            assert old["canNote"] and old["canRedact"], \
+                "rights as the role where the machine is now"
+            assert [n["text"] for n in old["notes"]] == ["I ran the migration after it."]
+        # Carl's role is the one in Team, where the machine is now: he reads,
+        # and does not write or redact, though he is an admin of Lab.
+        log = await logs.day(pool, carl.id, machine, a, b)
+        old = log["entries"][0]
+        assert old["command"] == "mysql -pHunter2 app"
+        assert not old["canNote"] and not old["canRedact"]
+        await _refused(logs.NotAllowed, logs.add_note(
+            pool, carl.id, "From Lab", entry_id=before))
+        await _refused(logs.NotAllowed, logs.redact(pool, carl.id, before, "x"))
+        assert not (await logs.of_blocks(pool, terminal, carl.id, [1]))[1]["canNote"]
+        # Bob was in Lab, not in Team: the machine and its log left with it.
+        await _refused(logs.NotFound, logs.day(pool, bob.id, machine, a, b))
+        await _refused(logs.NotFound, logs.add_note(
+            pool, bob.id, "Still here?", entry_id=before))
+        await _refused(logs.NotFound, logs.find(pool, bob.id, machine, ["mysql"]))
+        async with pool.acquire() as conn:
+            got, _ = await logs.found_in_logs(conn, bob.id, ["migration"])
+            assert got == [], "Bob's own note, on a machine he is no longer with"
+            got, _ = await logs.found_in_logs(conn, bob.id, ["mysql"])
+            assert {x["machine"] for x in got} == {"lab-02"}
+            got, _ = await logs.found_in_logs(conn, anna.id, ["hunter2"])
+            assert {(x["kind"], x["machine"]) for x in got} == \
+                {("line", "web-01"), ("line", "db-01")}
+            got, _ = await logs.found_in_logs(conn, anna.id, ["migration"])
+            assert [(x["kind"], x["machine"], x["text"]) for x in got] == \
+                [("note", "web-01", "I ran the migration after it.")]
+        assert await logs.counts(pool, anna.id, a) == {str(machine): 2, str(mate): 1}
+        assert await logs.counts(pool, bob.id, a) == {str(stay): 1}
+        found = await logs.find(pool, anna.id, machine, ["hunter2"])
+        assert [e["id"] for e in found["entries"]] == [before]
+        # Anna, an admin of Team, writes under the line from Lab, and
+        # redacts it: with it the same words on Team's machines, not on
+        # Personal's.
+        await logs.add_note(pool, anna.id, "Moved to Team on purpose.", entry_id=before)
+        done = await logs.redact(pool, anna.id, before, "a password")
+        assert [x["id"] for x in done["also"]] == [same], done["also"]
+        left = await pool.fetch(
+            "SELECT j.id, x.text FROM journal j JOIN log_texts x ON x.id = j.text_id "
+            "WHERE j.id = ANY($1::bigint[]) ORDER BY j.id",
+            [before, same, kept, stays, went])
+        assert [r["text"] for r in left] == [None, None] + ["mysql -pHunter2 app"] * 3, \
+            "not Lab's, nor the line of a machine that left Team"
+        trace = await pool.fetch(
+            "SELECT about, project_id FROM journal WHERE kind = 'log.redacted' "
+            "ORDER BY about")
+        assert {(r["about"], r["project_id"]) for r in trace} == \
+            {(before, lab), (same, team)}, "each trace in its line's journal"
+        # The feed of its terminal: the notes, as Team's people may write.
+        feed = await logs.of_blocks(pool, terminal, anna.id, [1, 9])
+        assert set(feed) == {1, 9} and feed[1]["canNote"]
+        assert len(feed[1]["notes"]) == 2
+        assert await logs.of_blocks(pool, terminal, bob.id, [1, 9]) == {}
+        # A machine taken out of tTerm is not counted.
+        await pool.execute("UPDATE machines SET removed_at = now() WHERE id = $1", stay)
+        assert await logs.counts(pool, bob.id, a) == {}
+        # Lab deleted, empty now: nothing of the log goes with it.
+        await projects.delete(pool, me.id, lab)
+        log = await logs.day(pool, me.id, machine, a, b)
+        assert [e["id"] for e in log["entries"] if e["kind"] == "command.ran"] == \
+            [before, after]
+        assert await logs.counts(pool, me.id, a) == {
+            str(machine): 2, str(mate): 1, str(home): 1, str(left_team): 1}
+        # Moved once more, back home: one line for each move.
+        await projects.move_machine(pool, me.id, machine, personal)
+        log = await logs.day(pool, me.id, machine, a, b)
+        moves = [(e["from"], e["to"]) for e in log["entries"]
+                 if e["kind"] == "machine.moved"]
+        assert moves == [("Lab", "Team"), ("Team", "Personal")], moves
+        await _refused(logs.NotFound, logs.day(pool, anna.id, machine, a, b))
 
 
 # ------------------------------------------------------------ keeping

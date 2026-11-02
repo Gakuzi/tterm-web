@@ -21,6 +21,10 @@
 // same way, and stays until it is cleared: a click on a found line opens
 // it there, and its day is a step of its own, Open the day.
 //
+// From 0.1.23 the log is the machine's (the owner, 02.11, 11:25): in the
+// project it is in now, all of it, the lines written before it moved
+// there too; a move is a line.
+//
 // Like a note, the log stays on the page behind its tab. While it shows
 // today and is in front, it looks again now and then for new lines.
 
@@ -40,7 +44,7 @@ import { goneThere, useFoundLine, wentThere } from "./found";
 import { useT, type Translate } from "./i18n";
 import {
   Branch, Bubble, Calendar, ChevronDown, ChevronLeft, ChevronRight, Close, Collapse, Copy, Cross,
-  Erase, History, Lines, Link, Lock, NoteAdd, Order, Search, TerminalIcon,
+  Erase, Folder, History, Lines, Link, Lock, NoteAdd, Order, Search, TerminalIcon,
 } from "./icons";
 import {
   dayStart, fromIsoDay, isoDay, lineLink, linkedLine, logChanged, onLogChange, plainly,
@@ -620,6 +624,12 @@ export function LogView(props: Props) {
   function eventText(e: LogEntry): string {
     const term = terminalName(e.terminal?.name ?? "1", t);
     const mine = !e.by || e.by.id === me.id;
+    if (e.kind === "machine.moved") {
+      // The projects by their names then (0.1.23).
+      const where = { from: e.from ?? "", to: e.to ?? "" };
+      return mine ? t("log.moved_you", where)
+        : t("log.moved", { who: e.by!.firstName, ...where });
+    }
     if (e.kind === "terminal.opened") {
       return mine ? t("log.opened_you", { name: term })
         : t("log.opened", { who: e.by!.firstName, name: term });
@@ -661,10 +671,14 @@ export function LogView(props: Props) {
 
   const line = (e: LogEntry) => {
     if (e.kind !== "command.ran") {
+      // A terminal opened or ended; the machine moved to another project.
+      const moved = e.kind === "machine.moved";
+      const classes = ["log-event", ...(moved ? ["moved"] : []),
+        ...(lit === e.id ? ["lit"] : [])].join(" ");
       return (
-        <div key={e.id} id={`e${e.id}`} className={lit === e.id ? "log-event lit" : "log-event"}>
+        <div key={e.id} id={`e${e.id}`} className={classes}>
           <span className="log-time">{clock(e.at)}</span>
-          <TerminalIcon size={14} />
+          {moved ? <Folder size={14} /> : <TerminalIcon size={14} />}
           <span>{eventText(e)}</span>
         </div>
       );

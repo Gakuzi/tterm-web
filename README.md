@@ -4,7 +4,11 @@ tTerm in the browser: a real terminal with command blocks, for people who work
 with servers and for their teams. Projects, roles, a journal of who ran what,
 and watching a colleague's terminal, always with them knowing.
 
-**Status:** early development. Version 0.1.22 keeps each line of a
+**Status:** early development. Version 0.1.23 makes a machine's log the
+machine's own: moved to another project, the machine takes all of it
+along, the lines written before the move too, and the move is a line of
+it; whoever is in the project the machine is in now reads all of it, and
+deleting the project it left takes none of it away. Version 0.1.22 keeps each line of a
 machine's log to one line, the command cut short where it is long and
 how many notes are under it; a click on it opens the command in full,
 what it printed and the notes, and a click again closes it. Lines Find
