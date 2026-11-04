@@ -74,6 +74,9 @@ interface Props {
   terminalId: string;
   /** The tab in front; the others are on the page, hidden. */
   active: boolean;
+  /** Grows when the Settings window over the page closes (0.1.27): the
+   * terminal in front takes the keys back. */
+  refocus?: number;
   shownTheme: Shown;
   onStatus: (id: string, status: TabStatus) => void;
   onCloseTab: (id: string) => void;
@@ -227,6 +230,7 @@ export function TerminalView(props: Props) {
             <div className="classic-wrap">
               <ClassicTerminal key={`c-${terminalId}`} terminalId={terminalId}
                 shownTheme={shownTheme} ended={isEnded} active={active}
+                refocus={props.refocus}
                 events={events} paste={props.paste} notify={props.notify} />
             </div>
             {!isEnded && (
@@ -243,6 +247,7 @@ export function TerminalView(props: Props) {
         ) : (
           <FeedTerminal key={`f-${terminalId}`} terminalId={terminalId}
             shownTheme={shownTheme} ended={isEnded} active={active}
+            refocus={props.refocus}
             events={events} machine={machine} home={info?.home ?? ""}
             onClassic={() => choose("classic")} notify={props.notify}
             paste={props.paste} me={props.me}

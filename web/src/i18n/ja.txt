@@ -159,7 +159,7 @@ account_menu.about = tTerm について
 account_menu.site = tterm.net サイト
 account_menu.telegram = Telegram チャンネル
 account_menu.whats_new = 最新情報
-# An item of the menu, and the title of the list of languages.
+# An item of the menu, the title of the list of languages, and a group of Settings › General.
 language.item = 言語
 
 # ------------------------------------------------------------ support: Get help › Write to support, a message to tTerm's support (SupportDialog.tsx)
@@ -196,11 +196,9 @@ support.sent_title = 送信しました
 support.sent = <b>{email}</b> に返信します。メッセージの控えをこのアドレスにお送りしました。
 
 # ------------------------------------------------------------ settings (Settings.tsx)
-# The page, and the item of the account's menu that opens it.
+# The window, and the item of the account's menu that opens it.
 settings.title = 設定
 settings.appearance = 外観
-settings.appearance_local = このコンピューターに保存されます。「システム」を選ぶと、このコンピューターの設定に従います。プロジェクトの色は、コードバッジだけに付けるか、サイドバーのプロジェクト全体に付けるかを選べます。
-settings.appearance_account = アカウントに保存されます。「システム」を選ぶと、使っているそれぞれのコンピューターの設定に従います。プロジェクトの色は、コードバッジだけに付けるか、サイドバーのプロジェクト全体に付けるかを選べます。
 settings.theme = テーマ
 settings.theme_system = システム
 settings.theme_light = ライト
@@ -208,12 +206,41 @@ settings.theme_dark = ダーク
 settings.tints = プロジェクトの色
 settings.tint_badge = コードバッジ
 settings.tint_block = プロジェクト全体
+# The window's sections and their groups, on its left (0.1.27). The group of tTerm for Mac's own sections is named as app_link.mac.
+settings.general = 一般
+settings.group_preferences = 環境設定
+settings.group_security = セキュリティ
+# For screen readers: the list of the sections.
+settings.sections = 設定のセクション
+# The search over Settings, and what it says when no section has the words typed.
+settings.search = 検索
+settings.nothing = 見つかりませんでした
+# Under Appearance: where it is kept; the second, in the app before signing in.
+settings.appearance_saved = アカウントに保存され、すべてのデバイスで使われます。
+settings.appearance_saved_local = このコンピューターに保存されます。
+# Under Theme; the second, in the app before signing in. "System" is named as the choice is (settings.theme_system).
+settings.theme_note = 「システム」を選ぶと、使っているそれぞれのコンピューターの設定に従います。
+settings.theme_note_local = 「システム」を選ぶと、このコンピューターの設定に従います。
+# Under Project colors.
+settings.tints_note = プロジェクトの色は、コードバッジだけに付けるか、サイドバーのプロジェクト全体に付けるかを選べます。
+# The row of the language, in the group language.item; "Language" is the item of the account's menu (language.item).
+settings.language = 表示言語
+settings.language_note = アカウントメニューの「言語」でも同じように選べます。
+# Settings › Plan, under the plan: where payment will be, faded until there are paid plans.
+settings.payment = お支払い
+settings.payment_row = 支払い方法と請求書
+settings.payment_note = 有料プランの開始とともに、ここに表示されます。
+# Words the search finds a section by, besides its name; never shown. In English, then in the language.
+settings.keys_words = ssh keys vault password passphrase servers 鍵 キー 保管庫 パスワード パスフレーズ サーバー
+settings.devices_words = devices browsers sessions signed in forget sign out デバイス ブラウザー セッション サインイン 登録解除 サインアウト
+settings.computer_words = this computer mac connection このコンピューター 接続
+settings.updates_words = updates version new restart check アップデート バージョン 新しい 再起動 確認
 
 # ------------------------------------------------------------ devices (Devices.tsx)
 devices.title = デバイス
 
 # ------------------------------------------------------------ account (Account.tsx)
-# The page, and the item of the account's menu that opens it.
+# Settings › Account, the palette's item for it, and the title of the name on top of the account's menu, which opens it.
 account.title = アカウント
 
 # ------------------------------------------------------------ app: the page's frame, toasts and dialogs (App.tsx)
@@ -339,10 +366,10 @@ app.action.delete_note = このノートを削除
 app.action.delete_note_hint = 「{folder}」から
 app.action.theme_dark = ダークテーマに切り替え
 app.action.theme_light = ライトテーマに切り替え
-app.action.settings_hint_local = テーマ、プロジェクトの色
-app.action.settings_hint = テーマ、プロジェクトの色、デバイス
+app.action.settings_hint_local = テーマ、プロジェクトの色、言語
+app.action.settings_hint = テーマ、言語、プラン、SSH 鍵、デバイス
 app.action.sign_in_hint = サーバー、プロジェクト、チーム
-app.action.account_hint = 名前、写真、プラン
+app.action.account_hint = 名前、写真、メールアドレス
 app.action.sign_out_hint = このブラウザーでのサインインを解除
 # Search words: keep the English words, add the language's own after them.
 app.action.add_machine_words = new server computer connect 新規 追加 マシン サーバー コンピューター 接続
@@ -682,10 +709,10 @@ account.no_limits = 上限なし
 # A meter of the plan, beside its label (Machines, Open terminals): 3 of 50.
 account.used_of = {used} / {limit}
 account.used_no_limit = {used}（上限なし）
-# The title of Close at the top of Account and Settings.
+# The title of Close at the top of Move to cloud.
 account.close_title = 元の画面に戻る
 account.photo_removed = 写真を削除しました。イニシャルの表示に戻ります。
-# For screen readers: the card with one's name and photo.
+# Settings › Account: the group of the photo, the name and the address.
 account.profile = プロフィール
 account.change_photo = 写真を変更
 account.add_photo = 写真を追加
@@ -693,13 +720,13 @@ account.your_name = お名前
 account.saving = 保存中…
 account.edit_name = 名前を編集
 account.remove_photo = 写真を削除
-# Under the photo's buttons: what the photo is for.
+# Under Photo, in Settings › Account: what the photo is for.
 account.photo_hint = 名前の横に、イニシャルの代わりに表示されます。
 # For screen readers: the file chooser for the photo.
 account.choose_photo = 写真を選択
 # Under one's email address. {email} is support's address.
 account.address_note = このメールアドレスでサインインします。変更するには、<link>{email}</link> までご連絡ください。
-# The section of the plan; its name (Free) stays as it is.
+# Settings › Plan, and its group; the plan's name (Free) stays as it is.
 account.plan = プラン
 account.plan_note = 開発期間中、tTerm は無料です。ほかのプランはここに表示される予定で、何かが変わる前にお知らせします。
 # The labels of the plan's two meters.
@@ -708,6 +735,12 @@ account.open_terminals = 開いているターミナル
 account.photo_saved = 写真を設定しました。サイドバーの下とそのメニューに表示されます。
 # {email} is support's address.
 account.delete_note = アカウントを削除するには、サインインに使っているメールアドレスから {email} までご連絡ください。
+# Settings › Account (0.1.27): the labels of its rows, and the group of deleting the account and its row.
+account.photo = 写真
+account.name = 名前
+account.email = メールアドレス
+account.delete_title = アカウントの削除
+account.delete = アカウントを削除
 
 # ------------------------------------------------------------ devices: where one is signed in, in Settings (Devices.tsx)
 # On the sign-in screen, after this very device was forgotten.

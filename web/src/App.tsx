@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Account } from "./Account";
 import { AddMachine } from "./AddMachine";
 import { AppLinkWindow, AppWelcome } from "./AppSignIn";
 import {
@@ -45,6 +44,7 @@ import { ProjectPage } from "./ProjectPage";
 import { Search, type LocalEntry } from "./Search";
 import { alone, deletesNote, manages, writes } from "./rights";
 import { Settings } from "./Settings";
+import { settingsAt, type SettingsSection } from "./settingsSearch";
 import { Sidebar, type AccountPage } from "./Sidebar";
 import { SignIn } from "./SignIn";
 import { socket } from "./socket";
@@ -79,10 +79,11 @@ const COMPUTERS_MS = 10_000;
 const LISTS_MS = 60_000;
 
 /** /t/<id> is a terminal, /n/<id> a note, /p/<id> a project's page (tabs.ts),
- * /account the account page (0.0.10), /settings Settings (0.1.4) and, in
- * the app, /move Move to cloud (0.1.17); anything else is the machines
- * page. */
-const PAGE_PATH = /^\/(settings|account|move)\/?$/;
+ * in the app /move Move to cloud (0.1.17); anything else is the machines
+ * page. /settings/<section> is the Settings window over the page it was
+ * opened on (from 0.1.27, Settings.tsx; /account, the account's page until
+ * then, is its Account). */
+const PAGE_PATH = /^\/(move)\/?$/;
 
 /** The page of the account's menu at this address, if it is one. */
 function pageOf(path: string): AccountPage | null {
@@ -124,8 +125,8 @@ function dotOf(status: TabStatus | undefined, known: TerminalInfo | undefined,
   return "open";
 }
 
-/** The step in the history of Account or Settings: where it was opened
- * from. */
+/** The step in the history of Settings or Move to cloud: where it was
+ * opened from. */
 interface PageMark {
   pageFrom: string;
 }
@@ -361,14 +362,20 @@ export function App() {
   const pruned = useRef(false);
   /** Notes made on this page: their tab puts the caret in the title. */
   const fresh = useRef(new Set<string>());
+  /** The address of the page shown: with the Settings window open, the one
+   * it was opened on, which stays under it. Opened by its address, the page
+   * it was opened from, if this tab remembers one, or the machines page. */
+  const lastView = useRef(settingsAt(location.pathname) === null ? location.pathname
+    : (history.state as PageMark | null)?.pageFrom ?? "/");
   /** The tab last shown in the sidebar, unfolded. Not the one the page
    * opens with: what was folded stays so over a reload. */
-  const revealed = useRef<string | null>(tabOfPath(location.pathname));
+  const revealed = useRef<string | null>(tabOfPath(lastView.current));
   /** Who was signed in on this page last, and with which address. */
   const lastUser = useRef<string | null>(null);
   const lastEmail = useRef<string | null>(null);
-  /** Each opening of Account or Settings shows it afresh: devices that came
-   * or went meanwhile, what the plan counts now. */
+  /** Each opening of Move to cloud shows it afresh; the Settings window is
+   * new each time it opens anyway: devices that came or went meanwhile,
+   * what the plan counts now. */
   const [pageVisit, setPageVisit] = useState(0);
   const stateNow = useRef<State | null>(null);
   stateNow.current = state;
@@ -404,7 +411,7 @@ export function App() {
             p.folders.flatMap((f) => f.notes.map((n) => n.id))));
           const projects = new Set(loaded.projects.map((p) => p.id));
           const machines = new Set(loaded.projects.flatMap((p) => p.machines.map((m) => m.id)));
-          const here = tabOfPath(location.pathname);
+          const here = tabOfPath(lastView.current);
           setTabs((ts) => ts.filter((tab) => {
             if (tab === here) return true;
             const kind = tabKind(tab);
@@ -542,9 +549,27 @@ export function App() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  // The Settings window (0.1.27) is over the page it was opened on, which
+  // stays as it was under it.
+  const settingsSection = settingsAt(path);
+  const settingsOpen = settingsSection !== null;
+  const settingsOpenNow = useRef(settingsOpen);
+  settingsOpenNow.current = settingsOpen;
+  if (!settingsOpen) lastView.current = path;
+  const viewPath = settingsOpen ? lastView.current : path;
+  // Closed, it gives the keys back to the terminal under it, as the
+  // terminal's tab coming to the front would; not to one under a dialog.
+  const [refocus, setRefocus] = useState(0);
+  const wasOpen = useRef(settingsOpen);
+  useEffect(() => {
+    if (wasOpen.current && !settingsOpen &&
+        !document.querySelector(".scrim, .palette-backdrop")) setRefocus((n) => n + 1);
+    wasOpen.current = settingsOpen;
+  }, [settingsOpen]);
+
   // A terminal, a note or a project's page opened by its address gets a
   // tab; the tabs are remembered.
-  const current = tabOfPath(path);
+  const current = tabOfPath(viewPath);
   useEffect(() => {
     if (current) setTabs((ts) => withTab(ts, current));
   }, [current]);
@@ -1042,6 +1067,9 @@ export function App() {
       if (!shortcut(event, "k")) return;
       event.preventDefault();
       event.stopPropagation();
+      // The Settings window is over everything: the palette waits for it
+      // to close.
+      if (settingsOpenNow.current) return;
       setPicking(false);
       setPalette((was) => !was);
     };
@@ -1152,28 +1180,29 @@ export function App() {
     }
     return null;
   }, [state]);
-  const shownPage = current ? null : pageOf(path);
+  const shownPage = current ? null : pageOf(viewPath);
   // Move to cloud is the app's, signed in (0.1.17).
-  const pageOpen = (local && shownPage === "account") ||
-    (shownPage === "move" && (local || !state?.app)) ? null : shownPage;
-  const title = front
+  const pageOpen = shownPage === "move" && (local || !state?.app) ? null : shownPage;
+  const title = settingsOpen ? `${t("settings.title")} · tTerm`
+    : front
     ? `${front.kind === "terminal" && front.code ? `${front.code}/` : ""}${front.label} · tTerm`
-    : pageOpen === "settings" ? `${t("settings.title")} · tTerm`
-    : pageOpen === "move" ? `${t("move.title")} · tTerm`
-    : pageOpen === "account" ? `${t("account.title")} · tTerm` : "tTerm";
+    : pageOpen === "move" ? `${t("move.title")} · tTerm` : "tTerm";
   useEffect(() => {
     document.title = title;
   }, [title]);
-  // No Account before signing in: its address gives way to the machines
-  // page, so that signing in later does not open it there; nor Move to
-  // cloud outside the app.
+  // Move to cloud outside the app gives way to the machines page.
   const appNow = !!state?.app;
   useEffect(() => {
-    if (!state) return;
-    if ((local && shownPage === "account") || (shownPage === "move" && (local || !appNow))) {
-      navigate("/", true);
+    if (!state || settingsOpen) return;
+    if (shownPage === "move" && (local || !appNow)) navigate("/", true);
+  }, [local, shownPage, navigate, appNow, state, settingsOpen]);
+  // /account, the account's page until 0.1.27, is Settings › Account now:
+  // the address says so, in the same step of the history.
+  useEffect(() => {
+    if (/^\/account\/?$/.test(path)) {
+      navigate("/settings/account", true, history.state as PageMark | null);
     }
-  }, [local, shownPage, navigate, appNow, state]);
+  }, [path, navigate]);
   // Signed in meanwhile: New project and Add machine are themselves again.
   useEffect(() => {
     if (!local) setNeedAccount(null);
@@ -1181,16 +1210,13 @@ export function App() {
   // The app updating itself (0.1.15, Updates.tsx); and tTerm's menu's
   // Check for Updates…, which opens Settings at Updates (the app's shim).
   const updates = useAppUpdate(inAppNow);
-  const openPageNow = useRef<(which: AccountPage) => void>(() => {});
+  const openSettingsNow = useRef<(section: SettingsSection | "") => void>(() => {});
   useEffect(() => {
     const onApp = (event: Event) => {
       const action = (event as CustomEvent<{ action?: string }>).detail?.action;
       if (action !== "updates") return;
-      openPageNow.current("settings");
+      openSettingsNow.current("updates");
       updates.look();
-      window.setTimeout(() => {
-        document.getElementById("st-updates")?.scrollIntoView({ block: "start" });
-      }, 60);
     };
     window.addEventListener("tterm-app", onApp);
     return () => window.removeEventListener("tterm-app", onApp);
@@ -1253,9 +1279,9 @@ export function App() {
     if (!pinned) setOpen(false);
     then();
   };
-  /** Settings or Account, from the menu of the account or the palette.
-   * One of them over the other takes its place in the history, so that
-   * Close goes back to where the first was opened from. */
+  /** Move to cloud, from the menu of the account or the palette. Opened
+   * from the Settings window, it takes the window's place in the history,
+   * so that Close goes back to where the window was opened from. */
   const openPage = (which: AccountPage) => {
     if (!pinned) setOpen(false);
     setPalette(false);
@@ -1264,18 +1290,37 @@ export function App() {
     const was = pageOf(location.pathname);
     if (was === which) return;
     const mark = history.state as PageMark | null;
-    if (was) navigate(`/${which}`, true, mark);
+    if (was || settingsAt(location.pathname) !== null) navigate(`/${which}`, true, mark);
     else navigate(`/${which}`, false, { pageFrom: location.pathname });
   };
-  openPageNow.current = openPage;
-  /** Back to where the page was opened from: the step before it in the
-   * history, which its entry remembers (Back and Forward keep that right).
-   * Opened by its address, as a bookmark, to the machines page instead,
-   * never out of tTerm. */
+  /** The Settings window (0.1.27), at a section ("" for the first), over the
+   * page shown: from the menu of the account, the palette or the app's own
+   * menu. Opening takes a step in the history, so that Back closes it;
+   * another section, open already, takes the same step. */
+  const openSettings = (section: SettingsSection | "") => {
+    // Not over another window, which would stay over it or under it in the
+    // order they are drawn, not the one they opened in: the palette, under
+    // such a window anyway, and the app's Check for Updates… wait for it.
+    if (document.querySelector(".scrim:not(.settings-scrim)")) return;
+    if (!pinned) setOpen(false);
+    setPalette(false);
+    setPicking(false);
+    const to = section ? `/settings/${section}` : "/settings";
+    if (settingsAt(location.pathname) !== null) {
+      navigate(to, true, history.state as PageMark | null);
+    } else {
+      navigate(to, false, { pageFrom: location.pathname });
+    }
+  };
+  openSettingsNow.current = openSettings;
+  /** Back to where the page or the window was opened from: the step before
+   * it in the history, which its entry remembers (Back and Forward keep
+   * that right). Opened by its address, as a bookmark, to the page under
+   * the window, or else the machines page, never out of tTerm. */
   const closePage = () => {
     const mark = history.state as PageMark | null;
     if (mark?.pageFrom) history.back();
-    else navigate("/", true);
+    else navigate(settingsOpen ? lastView.current : "/", true);
   };
   /** Sign in, in the app before signing in: its engine signs in with the
    * browser, or says why it cannot yet. */
@@ -1533,7 +1578,7 @@ export function App() {
         hint: local ? t("app.action.settings_hint_local") : t("app.action.settings_hint"),
         icon: <Gear size={15} />,
         words: local ? t("app.action.settings_words_local") : t("app.action.settings_words"),
-        run: () => openPage("settings"),
+        run: () => openSettings(""),
       },
       ...(state.app && !local ? [{
         key: "move",
@@ -1556,7 +1601,7 @@ export function App() {
         hint: t("app.action.account_hint"),
         icon: <Person size={15} />,
         words: t("app.action.account_words"),
-        run: () => openPage("account"),
+        run: () => openSettings("account"),
       }, {
         key: "sign-out",
         label: t("account_menu.sign_out"),
@@ -1648,7 +1693,7 @@ export function App() {
     <UpdateState.Provider value={updates}>
     <MoveContext.Provider value={moveFrame}>
     <div className={`${pinned ? "app pinned" : "app"}${tint === "block" ? " tint-block" : ""}`}>
-      <TabBar sidebarButton={sidebarButton} tabs={tabViews}
+      <TabBar sidebarButton={sidebarButton} tabs={tabViews} inert={settingsOpen}
         update={<UpdatePill />}
         current={current} onSelect={(tab) => navigate(tabPath(tab))}
         onClose={closeTab}
@@ -1677,9 +1722,12 @@ export function App() {
         onRename={renameTab}
         onStopRename={stopRenaming} />
 
-      <div className="stage">
+      {/* Under the Settings window the page stays as it was, but Tab does
+          not reach it: nothing typed there goes to a terminal under it. */}
+      <div className="stage" inert={settingsOpen}>
         {shownTabs.filter(isTerminalTab).map((id) => (
           <TerminalView key={id} terminalId={id} active={id === current}
+            refocus={refocus}
             shownTheme={shownTheme} onStatus={onStatus} onCloseTab={closeTab}
             onOpenNew={(machineId, instead, cwd) =>
               startTerminal(machineId, instead, undefined, cwd)}
@@ -1746,27 +1794,6 @@ export function App() {
                 </div>
               </div>
             )}
-          </div>
-        )}
-        {pageOpen === "account" && (
-          <div className="page-scroll">
-            <Account key={pageVisit} me={state.me} onRenamed={renamed}
-              onPhoto={(photo) => setState((was) => (was
-                ? { ...was, me: { ...was.me, photo } } : was))}
-              notify={notYet} onClose={closePage} />
-          </div>
-        )}
-        {pageOpen === "settings" && (
-          <div className="page-scroll">
-            <Settings key={pageVisit} local={local} here={hereMachine} theme={theme}
-              onTheme={chooseTheme} tint={tint} onTint={chooseTint}
-              onSignedOut={(note) => {
-                // This device forgotten: nothing of the person stays here.
-                forgetDrafts();
-                forgetSupportDraft();
-                endSession(note);
-              }} onClose={closePage}
-              notify={notYet} projects={projects} />
           </div>
         )}
         {pageOpen === "move" && (
@@ -1855,9 +1882,10 @@ export function App() {
           onNewProject={() => away(startProject)()}
           local={local}
           cutOff={cutOff}
-          page={pageOpen}
-          onSettings={() => openPage("settings")}
-          onAccount={() => openPage("account")}
+          page={settingsOpen ? "settings" : pageOpen}
+          inert={settingsOpen}
+          onSettings={() => openSettings("")}
+          onAccount={() => openSettings("account")}
           onSignOut={() => void signOutHere().catch(() => {})}
           onSignIn={signInHere}
           language={t.lang}
@@ -1907,6 +1935,25 @@ export function App() {
       )}
 
       {linkWindow}
+
+      {/* Before Write to support, which opens from it (Delete account). */}
+      {settingsSection !== null && (
+        <Settings section={settingsSection}
+          onSection={(section) => navigate(section ? `/settings/${section}` : "/settings",
+            true, history.state as PageMark | null)}
+          onClose={closePage} local={local} here={hereMachine} me={state.me}
+          theme={theme} onTheme={chooseTheme} tint={tint} onTint={chooseTint}
+          language={t.lang} onLanguage={chooseLanguage} onRenamed={renamed}
+          onPhoto={(photo) => setState((was) => (was
+            ? { ...was, me: { ...was.me, photo } } : was))}
+          onSignedOut={(note) => {
+            // This device forgotten: nothing of the person stays here.
+            forgetDrafts();
+            forgetSupportDraft();
+            endSession(note);
+          }}
+          notify={notYet} projects={projects} onSupport={() => setSupporting(true)} />
+      )}
 
       {supporting && (
         <SupportDialog me={state.me} local={local} inApp={inAppNow}

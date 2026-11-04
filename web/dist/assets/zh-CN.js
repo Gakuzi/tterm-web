@@ -159,7 +159,7 @@ account_menu.about = 关于我们
 account_menu.site = tterm.net 网站
 account_menu.telegram = Telegram 频道
 account_menu.whats_new = 更新内容
-# An item of the menu, and the title of the list of languages.
+# An item of the menu, the title of the list of languages, and a group of Settings › General.
 language.item = 语言
 
 # ------------------------------------------------------------ support: Get help › Write to support, a message to tTerm's support (SupportDialog.tsx)
@@ -196,11 +196,9 @@ support.sent_title = 消息已发送
 support.sent = 我们会回复到 <b>{email}</b>。你的消息副本已经发到这个邮箱。
 
 # ------------------------------------------------------------ settings (Settings.tsx)
-# The page, and the item of the account's menu that opens it.
+# The window, and the item of the account's menu that opens it.
 settings.title = 设置
 settings.appearance = 外观
-settings.appearance_local = 保存在这台电脑上。“跟随系统”会使用这台电脑的设置。项目的颜色会填充其代号标记，或为侧边栏中的整个项目着色。
-settings.appearance_account = 保存在你的账号中。“跟随系统”会使用你所用的每台电脑各自的设置。项目的颜色会填充其代号标记，或为侧边栏中的整个项目着色。
 settings.theme = 主题
 settings.theme_system = 跟随系统
 settings.theme_light = 浅色
@@ -208,12 +206,41 @@ settings.theme_dark = 深色
 settings.tints = 项目颜色
 settings.tint_badge = 代号标记
 settings.tint_block = 整个项目
+# The window's sections and their groups, on its left (0.1.27). The group of tTerm for Mac's own sections is named as app_link.mac.
+settings.general = 通用
+settings.group_preferences = 偏好
+settings.group_security = 安全
+# For screen readers: the list of the sections.
+settings.sections = 设置分区
+# The search over Settings, and what it says when no section has the words typed.
+settings.search = 搜索
+settings.nothing = 没有找到
+# Under Appearance: where it is kept; the second, in the app before signing in.
+settings.appearance_saved = 保存在你的账号中，在你所有设备上生效。
+settings.appearance_saved_local = 保存在这台电脑上。
+# Under Theme; the second, in the app before signing in. "System" is named as the choice is (settings.theme_system).
+settings.theme_note = “跟随系统”会使用你所用的每台电脑各自的设置。
+settings.theme_note_local = “跟随系统”会使用这台电脑的设置。
+# Under Project colors.
+settings.tints_note = 项目的颜色会填充其代号标记，或为侧边栏中的整个项目着色。
+# The row of the language, in the group language.item; "Language" is the item of the account's menu (language.item).
+settings.language = 界面语言
+settings.language_note = 在账号菜单的“语言”中也可以选择。
+# Settings › Plan, under the plan: where payment will be, faded until there are paid plans.
+settings.payment = 付款
+settings.payment_row = 付款方式和发票
+settings.payment_note = 推出付费方案后会显示在这里。
+# Words the search finds a section by, besides its name; never shown. In English, then in the language.
+settings.keys_words = ssh keys vault password passphrase servers 密钥 保险库 密码 密码短语 服务器
+settings.devices_words = devices browsers sessions signed in forget sign out 设备 浏览器 会话 登录 移除 退出
+settings.computer_words = this computer mac connection 这台电脑 连接
+settings.updates_words = updates version new restart check 更新 版本 新 重启 检查
 
 # ------------------------------------------------------------ devices (Devices.tsx)
 devices.title = 设备
 
 # ------------------------------------------------------------ account (Account.tsx)
-# The page, and the item of the account's menu that opens it.
+# Settings › Account, the palette's item for it, and the title of the name on top of the account's menu, which opens it.
 account.title = 账号
 
 # ------------------------------------------------------------ app: the page's frame, toasts and dialogs (App.tsx)
@@ -339,10 +366,10 @@ app.action.delete_note = 删除当前笔记
 app.action.delete_note_hint = 从 {folder} 中删除
 app.action.theme_dark = 切换到深色主题
 app.action.theme_light = 切换到浅色主题
-app.action.settings_hint_local = 主题、项目颜色
-app.action.settings_hint = 主题、项目颜色、设备
+app.action.settings_hint_local = 主题、项目颜色、语言
+app.action.settings_hint = 主题、语言、方案、密钥、设备
 app.action.sign_in_hint = 你的服务器、项目和团队
-app.action.account_hint = 名字、头像和方案
+app.action.account_hint = 名字、头像和邮箱
 app.action.sign_out_hint = 这个浏览器将不再记住你
 # Search words: keep the English words, add the language's own after them.
 app.action.add_machine_words = new server computer connect 新建 新增 服务器 电脑 连接
@@ -682,10 +709,10 @@ account.no_limits = 无限制
 # A meter of the plan, beside its label (Machines, Open terminals): 3 of 50.
 account.used_of = {used}/{limit}
 account.used_no_limit = {used}，无上限
-# The title of Close at the top of Account and Settings.
+# The title of Close at the top of Move to cloud.
 account.close_title = 返回之前的位置
 account.photo_removed = 头像已移除：重新显示你的姓名缩写。
-# For screen readers: the card with one's name and photo.
+# Settings › Account: the group of the photo, the name and the address.
 account.profile = 个人资料
 account.change_photo = 更换头像
 account.add_photo = 添加头像
@@ -693,13 +720,13 @@ account.your_name = 你的名字
 account.saving = 正在保存…
 account.edit_name = 编辑名字
 account.remove_photo = 移除头像
-# Under the photo's buttons: what the photo is for.
+# Under Photo, in Settings › Account: what the photo is for.
 account.photo_hint = 头像显示在你的名字旁边，代替你的姓名缩写。
 # For screen readers: the file chooser for the photo.
 account.choose_photo = 选择图片
 # Under one's email address. {email} is support's address.
 account.address_note = 你用这个邮箱登录。如需更改，请写信至 <link>{email}</link>。
-# The section of the plan; its name (Free) stays as it is.
+# Settings › Plan, and its group; the plan's name (Free) stays as it is.
 account.plan = 方案
 account.plan_note = tTerm 在开发期间免费。其他方案会出现在这里，在任何变化之前，我们都会先通知你。
 # The labels of the plan's two meters.
@@ -708,6 +735,12 @@ account.open_terminals = 打开的终端
 account.photo_saved = 头像已更新：显示在侧边栏底部及其菜单中。
 # {email} is support's address.
 account.delete_note = 如需删除账号，请用你登录所用的邮箱写信至 {email}。
+# Settings › Account (0.1.27): the labels of its rows, and the group of deleting the account and its row.
+account.photo = 头像
+account.name = 名字
+account.email = 邮箱
+account.delete_title = 账号删除
+account.delete = 删除账号
 
 # ------------------------------------------------------------ devices: where one is signed in, in Settings (Devices.tsx)
 # On the sign-in screen, after this very device was forgotten.

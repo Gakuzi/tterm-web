@@ -4,7 +4,17 @@ tTerm in the browser: a real terminal with command blocks, for people who work
 with servers and for their teams. Projects, roles, a journal of who ran what,
 and watching a colleague's terminal, always with them knowing.
 
-**Status:** early development. Version 0.1.26 opens the vault of SSH
+**Status:** early development. Version 0.1.27 makes Settings a window
+over the page, as Claude's own settings are: on the left a search and the
+sections, Preferences (General, Account, Plan) and Security (Keys,
+Devices), and in tTerm for Mac its own, This computer and Updates; on the
+right the section chosen, in rows. Each section has its address,
+/settings/<section>; ×, Esc or a click beside the window close it, and
+the page under it stays as it was. The search keeps the sections that
+have the words typed and lights their rows. Account is in Settings now:
+the name on top of the account's menu opens it, and /account too; under
+the plan there will be payment, once there are paid plans. On a phone
+the window is the screen. Version 0.1.26 opens the vault of SSH
 keys with a vault password, in any browser and with no Mac: the person
 makes it up when the vault is made, tTerm never sees it and gives its
 encrypted lock only to a device that proves it knows the password, ten
@@ -443,9 +453,10 @@ after eight hours without anything done, and the quick code brings you back,
 or with its device; the terminals keep running, and the page asks to sign in
 again at once. Sign out, in the menu of the account at the bottom of the
 sidebar, makes the browser forget you as well: next time it is a code from
-email, which is also how you switch to another account. Settings lists the
-trusted browsers, forgets one, or forgets them all. Each sign-in from a
-browser tTerm Web does not know is told by email. Only hashes are kept: of the codes and quick codes
+email, which is also how you switch to another account. Settings › Devices
+lists the trusted browsers, forgets one, or forgets them all. Each sign-in
+from a browser tTerm Web does not know is told by email, with a link
+straight to Settings › Devices. Only hashes are kept: of the codes and quick codes
 with a secret of the server's that is not in the database (`auth.key`), and
 of the session and device keys, long and random, plain ones. The cookies are `HttpOnly` and
 `SameSite=Strict`, and on https `__Host-` and `Secure`. Each person sees

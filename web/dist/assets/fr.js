@@ -159,7 +159,7 @@ account_menu.about = À propos
 account_menu.site = Site tterm.net
 account_menu.telegram = Chaîne Telegram
 account_menu.whats_new = Nouveautés
-# An item of the menu, and the title of the list of languages.
+# An item of the menu, the title of the list of languages, and a group of Settings › General.
 language.item = Langue
 
 # ------------------------------------------------------------ support: Get help › Write to support, a message to tTerm's support (SupportDialog.tsx)
@@ -196,11 +196,9 @@ support.sent_title = Message envoyé
 support.sent = Nous vous répondrons à <b>{email}</b>. Une copie de votre message s’y trouve déjà.
 
 # ------------------------------------------------------------ settings (Settings.tsx)
-# The page, and the item of the account's menu that opens it.
+# The window, and the item of the account's menu that opens it.
 settings.title = Paramètres
 settings.appearance = Apparence
-settings.appearance_local = Ces choix sont enregistrés sur cet ordinateur. L’option Système suit le réglage de cet ordinateur. La couleur d’un projet remplit la pastille de son code, ou teinte tout le projet dans la barre latérale.
-settings.appearance_account = Ces choix sont enregistrés dans votre compte. L’option Système suit le réglage de chaque ordinateur que vous utilisez. La couleur d’un projet remplit la pastille de son code, ou teinte tout le projet dans la barre latérale.
 settings.theme = Thème
 settings.theme_system = Système
 settings.theme_light = Clair
@@ -208,12 +206,41 @@ settings.theme_dark = Sombre
 settings.tints = Couleurs des projets
 settings.tint_badge = Pastille du code
 settings.tint_block = Projet entier
+# The window's sections and their groups, on its left (0.1.27). The group of tTerm for Mac's own sections is named as app_link.mac.
+settings.general = Général
+settings.group_preferences = Préférences
+settings.group_security = Sécurité
+# For screen readers: the list of the sections.
+settings.sections = Sections des paramètres
+# The search over Settings, and what it says when no section has the words typed.
+settings.search = Rechercher
+settings.nothing = Aucun résultat
+# Under Appearance: where it is kept; the second, in the app before signing in.
+settings.appearance_saved = Ces choix sont enregistrés dans votre compte, sur tous vos appareils.
+settings.appearance_saved_local = Ces choix sont enregistrés sur cet ordinateur.
+# Under Theme; the second, in the app before signing in. "System" is named as the choice is (settings.theme_system).
+settings.theme_note = L’option Système suit le réglage de chaque ordinateur que vous utilisez.
+settings.theme_note_local = L’option Système suit le réglage de cet ordinateur.
+# Under Project colors.
+settings.tints_note = La couleur d’un projet remplit la pastille de son code, ou teinte tout le projet dans la barre latérale.
+# The row of the language, in the group language.item; "Language" is the item of the account's menu (language.item).
+settings.language = Langue de l’interface
+settings.language_note = Le même choix se trouve dans le menu du compte, sous Langue.
+# Settings › Plan, under the plan: where payment will be, faded until there are paid plans.
+settings.payment = Paiement
+settings.payment_row = Moyen de paiement et factures
+settings.payment_note = Ils apparaîtront ici avec les offres payantes.
+# Words the search finds a section by, besides its name; never shown. In English, then in the language.
+settings.keys_words = ssh keys vault password passphrase servers clés coffre mot de passe phrase secrète serveurs
+settings.devices_words = devices browsers sessions signed in forget sign out appareils navigateurs connecté oublier déconnecter
+settings.computer_words = this computer mac connection cet ordinateur connexion
+settings.updates_words = updates version new restart check mises à jour nouvelle redémarrer vérifier
 
 # ------------------------------------------------------------ devices (Devices.tsx)
 devices.title = Appareils
 
 # ------------------------------------------------------------ account (Account.tsx)
-# The page, and the item of the account's menu that opens it.
+# Settings › Account, the palette's item for it, and the title of the name on top of the account's menu, which opens it.
 account.title = Compte
 
 # ------------------------------------------------------------ app: the page's frame, toasts and dialogs (App.tsx)
@@ -339,10 +366,10 @@ app.action.delete_note = Supprimer cette note
 app.action.delete_note_hint = du dossier {folder}
 app.action.theme_dark = Passer au thème sombre
 app.action.theme_light = Passer au thème clair
-app.action.settings_hint_local = thème, couleurs des projets
-app.action.settings_hint = thème, couleurs des projets, appareils
+app.action.settings_hint_local = thème, couleurs des projets, langue
+app.action.settings_hint = thème, langue, offre, clés, appareils
 app.action.sign_in_hint = vos serveurs, vos projets et votre équipe
-app.action.account_hint = nom, photo et offre
+app.action.account_hint = nom, photo et adresse e-mail
 app.action.sign_out_hint = ce navigateur vous oublie
 # Search words: keep the English words, add the language's own after them.
 app.action.add_machine_words = new server computer connect nouveau nouvelle serveur ordinateur connecter ajouter
@@ -682,10 +709,10 @@ account.no_limits = Aucune limite
 # A meter of the plan, beside its label (Machines, Open terminals): 3 of 50.
 account.used_of = {used} sur {limit}
 account.used_no_limit = {used}, sans limite
-# The title of Close at the top of Account and Settings.
+# The title of Close at the top of Move to cloud.
 account.close_title = Revenir là où vous étiez
 account.photo_removed = Photo supprimée\xA0: vos initiales sont de retour.
-# For screen readers: the card with one's name and photo.
+# Settings › Account: the group of the photo, the name and the address.
 account.profile = Profil
 account.change_photo = Changer de photo
 account.add_photo = Ajouter une photo
@@ -693,13 +720,13 @@ account.your_name = Votre nom
 account.saving = Enregistrement…
 account.edit_name = Modifier le nom
 account.remove_photo = Supprimer la photo
-# Under the photo's buttons: what the photo is for.
+# Under Photo, in Settings › Account: what the photo is for.
 account.photo_hint = Elle s’affiche à côté de votre nom, à la place de vos initiales.
 # For screen readers: the file chooser for the photo.
 account.choose_photo = Choisir une photo
 # Under one's email address. {email} is support's address.
 account.address_note = Vous vous connectez avec cette adresse. Pour la changer, écrivez à <link>{email}</link>.
-# The section of the plan; its name (Free) stays as it is.
+# Settings › Plan, and its group; the plan's name (Free) stays as it is.
 account.plan = Offre
 account.plan_note = tTerm est gratuit tant que nous le construisons. D’autres offres apparaîtront ici, et nous vous préviendrons avant tout changement.
 # The labels of the plan's two meters.
@@ -708,6 +735,12 @@ account.open_terminals = Terminaux ouverts
 account.photo_saved = Votre photo est en place\xA0: en bas de la barre latérale et dans son menu.
 # {email} is support's address.
 account.delete_note = Pour supprimer votre compte, écrivez à {email} depuis l’adresse avec laquelle vous vous connectez.
+# Settings › Account (0.1.27): the labels of its rows, and the group of deleting the account and its row.
+account.photo = Photo
+account.name = Nom
+account.email = Adresse e-mail
+account.delete_title = Suppression du compte
+account.delete = Supprimer le compte
 
 # ------------------------------------------------------------ devices: where one is signed in, in Settings (Devices.tsx)
 # On the sign-in screen, after this very device was forgotten.

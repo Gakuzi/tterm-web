@@ -576,3 +576,11 @@ export const Plane = (p: Props) => (
     <path d="M9.5 13.5L21 4" />
   </Stroke>
 );
+
+/** A card: the plan, and where payment will be (Settings, 0.1.27). */
+export const Card = (p: Props) => (
+  <Stroke {...p}>
+    <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
+    <path d="M2.5 10h19M6.5 15h4" />
+  </Stroke>
+);

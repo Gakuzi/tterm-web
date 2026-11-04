@@ -1,9 +1,9 @@
 // A person's round badge with their photo, or else their initials (0.1.7).
 // The photo goes only where the name is written next to it: the account at
-// the bottom of the sidebar, its menu, Account, a note's editor. Where the
-// badge alone has to say whose something is (terminals in the sidebar and
-// on a project's page), the initials stay: they say it at a glance, a
-// picture does not (the owner, 24.10).
+// the bottom of the sidebar, its menu, Settings › Account, a note's editor.
+// Where the badge alone has to say whose something is (terminals in the
+// sidebar and on a project's page), the initials stay: they say it at a
+// glance, a picture does not (the owner, 24.10).
 //
 // In the app (0.1.8) its window does not load tTerm's addresses itself: the
 // photo is fetched, as the page's requests are, through the app, and shown
@@ -15,7 +15,7 @@ import { InApp } from "./local";
 interface Props {
   initials: string;
   photo?: string | null;
-  /** Its size and colour: mine, big, huge. */
+  /** Its size and colour: mine, menu-avatar, settings-face. */
   className?: string;
 }
 

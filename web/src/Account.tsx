@@ -1,32 +1,20 @@
-// The account page (0.0.10), from 0.1.4 one of two pages behind the menu of
-// the account at the bottom of the sidebar, as approved on the canvas of
-// 21.10: the name, which the person changes here, the address and how to
-// change it; the plan and what counts against it; how to delete the
-// account. The theme, project colors, devices and support's address are on
-// Settings (Settings.tsx), and Sign out is in the menu itself. Tabs stay
-// above it; Close or Esc goes back.
+// The account (0.0.10), from 0.1.27 two sections of the Settings window
+// (row 133, the canvas of 03.11, version 107) instead of a page of its own:
+// Account – the photo (0.1.7, cut to a circle in PhotoDialog), the name,
+// which the person changes here, the address and how to change it, and how
+// to delete the account; Plan – the plan and what counts against it, and
+// under it, faded, where payment will be. Sign out is in the account's menu.
 //
-// From 0.1.7 one's own photo too, as approved on the canvas of 23.10: the
-// photo, or the initials, with a camera on it; Change photo and Remove
-// photo, or Add a photo; the photo is cut to a circle in PhotoDialog.
+// PageHead and useEscCloses stay for the pages that are still pages: Move to
+// cloud, in the app (MoveToCloud.tsx).
 
 import { useEffect, useRef, useState } from "react";
-import {
-  loadAccount, removePhoto, saveName, type AccountInfo, type Me,
-} from "./api";
+import { removePhoto, saveName, type AccountInfo, type Me } from "./api";
 import { Face } from "./Face";
 import { list, useT, type Translate } from "./i18n";
-import { Camera, Close } from "./icons";
+import { Close } from "./icons";
 import { PhotoDialog } from "./PhotoDialog";
-
-interface Props {
-  me: Me;
-  onRenamed: (named: { name: string; firstName: string; initials: string }) => void;
-  /** A new photo, or null when it was removed. */
-  onPhoto: (photo: string | null) => void;
-  notify: (text: string) => void;
-  onClose: () => void;
-}
+import { Group, Row } from "./SettingsRows";
 
 /** What a photo may be when chosen: the page makes the 256-pixel JPEG of it
  * itself. */
@@ -45,18 +33,21 @@ function limitsText(limits: AccountInfo["plan"]["limits"], t: Translate): string
     : t("account.no_limits");
 }
 
-function Meter(props: { label: string; used: number; most: number | null }) {
-  const { label, used, most } = props;
+/** The plan's row, as words: its name and what it allows. */
+export function planLine(info: AccountInfo, t: Translate): string {
+  return `${info.plan.name} ${limitsText(info.plan.limits, t)}`;
+}
+
+/** How much of a limit is used: the number over its bar. */
+function Meter(props: { used: number; most: number | null }) {
+  const { used, most } = props;
   const t = useT();
   const share = most ? Math.min(100, (used / most) * 100) : 0;
   return (
-    <div className="meter">
-      <span className="meter-text">
-        <strong>{label}</strong>
-        <span>
-          {most !== null ? t("account.used_of", { used, limit: most })
-            : t("account.used_no_limit", { used })}
-        </span>
+    <span className="settings-meter">
+      <span>
+        {most !== null ? t("account.used_of", { used, limit: most })
+          : t("account.used_no_limit", { used })}
       </span>
       {most !== null && (
         <span className="meter-bar" aria-hidden="true">
@@ -64,13 +55,12 @@ function Meter(props: { label: string; used: number; most: number | null }) {
             style={{ width: `${share}%` }} />
         </span>
       )}
-    </div>
+    </span>
   );
 }
 
 /** Esc goes back, unless a dialog or the palette is open over the page, or
- * a field has the keys (its own Esc puts it back). Account and Settings
- * alike. */
+ * a field has the keys (its own Esc puts it back). Move to cloud. */
 export function useEscCloses(onClose: () => void, busy: { current: boolean }) {
   const close = useRef(onClose);
   close.current = onClose;
@@ -86,7 +76,7 @@ export function useEscCloses(onClose: () => void, busy: { current: boolean }) {
   }, [busy]);
 }
 
-/** The title of Account and Settings, with Close and its Esc. */
+/** The title of a page, with Close and its Esc. */
 export function PageHead(props: { title: string; id: string; onClose: () => void }) {
   const t = useT();
   return (
@@ -102,18 +92,30 @@ export function PageHead(props: { title: string; id: string; onClose: () => void
   );
 }
 
-export function Account(props: Props) {
-  const { me } = props;
+/** Settings › Account: the photo, the name, the address; deleting the
+ * account goes through support, from the address one signs in with. */
+export function AccountPane(props: {
+  me: Me;
+  /** Support's address, as tTerm Web has it. */
+  support: string;
+  onRenamed: (named: { name: string; firstName: string; initials: string }) => void;
+  /** A new photo, or null when it was removed. */
+  onPhoto: (photo: string | null) => void;
+  notify: (text: string) => void;
+  /** Write to support, for deleting the account. */
+  onSupport: () => void;
+  /** The name being typed: Esc is the field's, not the window's. */
+  editing: { current: boolean };
+}) {
+  const { me, support } = props;
   const t = useT();
-  const [info, setInfo] = useState<AccountInfo | null>(null);
-  const [problem, setProblem] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(me.name);
   const [nameProblem, setNameProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const editingNow = useRef(false);
-  editingNow.current = editing;
+  props.editing.current = editing;
   const nameInput = useRef<HTMLInputElement>(null);
+  const editButton = useRef<HTMLButtonElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const [photoProblem, setPhotoProblem] = useState<string | null>(null);
   /** The photo chosen, loaded, while it is being cut to a circle. */
@@ -121,15 +123,11 @@ export function Account(props: Props) {
   const [removing, setRemoving] = useState(false);
 
   useEffect(() => {
-    loadAccount().then(setInfo)
-      .catch((error: Error) => setProblem(error.message));
-  }, []);
-
-  useEscCloses(props.onClose, editingNow);
-
-  useEffect(() => {
     if (editing) nameInput.current?.select();
   }, [editing]);
+  useEffect(() => () => {
+    props.editing.current = false;
+  }, []);
 
   const startEdit = () => {
     setDraft(me.name);
@@ -139,6 +137,7 @@ export function Account(props: Props) {
   const cancelEdit = () => {
     setEditing(false);
     setNameProblem(null);
+    window.requestAnimationFrame(() => editButton.current?.focus());
   };
   const save = async () => {
     if (saving) return;
@@ -151,6 +150,7 @@ export function Account(props: Props) {
     try {
       props.onRenamed(await saveName(draft));
       setEditing(false);
+      window.requestAnimationFrame(() => editButton.current?.focus());
     } catch (error) {
       setNameProblem((error as Error).message);
     } finally {
@@ -201,64 +201,12 @@ export function Account(props: Props) {
     }
   };
 
-  const support = info?.legal.support ?? SUPPORT;
-
   return (
-    <main className="account-view" aria-labelledby="ac-title">
-      <PageHead title={t("account.title")} id="ac-title" onClose={props.onClose} />
-
-      <section className="account-card profile-card" aria-label={t("account.profile")}>
-        <div className="profile-row">
-          <button type="button" className="profile-photo" onClick={choosePhoto}
-            title={me.photo ? t("account.change_photo") : t("account.add_photo")}
-            aria-label={me.photo ? t("account.change_photo") : t("account.add_photo")}>
-            <Face initials={me.initials} photo={me.photo} className="huge mine" />
-            <span className="photo-badge" aria-hidden="true"><Camera size={13} /></span>
-          </button>
-          {editing ? (
-            <form className="profile-edit" onSubmit={(event) => {
-              event.preventDefault();
-              void save();
-            }}>
-              <label className="profile-label">
-                <span>{t("account.your_name")}</span>
-                <input ref={nameInput} className="text-input" name="name"
-                  autoComplete="name" maxLength={100} value={draft}
-                  disabled={saving}
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape") {
-                      event.preventDefault();
-                      cancelEdit();
-                    }
-                  }} />
-              </label>
-              <span className="button-row profile-buttons">
-                <button type="submit" className="button-accent"
-                  disabled={saving || !draft.trim()}>
-                  {saving ? t("account.saving") : t("common.save")}
-                </button>
-                <button type="button" className="button-plain quiet"
-                  disabled={saving} onClick={cancelEdit}>
-                  {t("common.cancel")}
-                </button>
-              </span>
-            </form>
-          ) : (
-            <>
-              <span className="profile-text">
-                <strong>{me.name}</strong>
-                {me.email && <span>{me.email}</span>}
-              </span>
-              <button type="button" className="button-plain small"
-                onClick={startEdit}>
-                {t("account.edit_name")}
-              </button>
-            </>
-          )}
-        </div>
-        {nameProblem && <div className="error-box" role="alert">{nameProblem}</div>}
-        <div className="profile-photo-row">
+    <>
+      <Group title={t("account.profile")}>
+        <Row label={t("account.photo")} note={t("account.photo_hint")}
+          after={photoProblem && <div className="error-box" role="alert">{photoProblem}</div>}>
+          <Face initials={me.initials} photo={me.photo} className="settings-face mine" />
           {me.photo ? (
             <>
               <button type="button" className="button-plain small" onClick={choosePhoto}>
@@ -274,52 +222,69 @@ export function Account(props: Props) {
               {t("account.add_photo")}
             </button>
           )}
-          <span className="hint">{t("account.photo_hint")}</span>
-        </div>
-        {photoProblem && <div className="error-box" role="alert">{photoProblem}</div>}
-        <input ref={fileInput} type="file" accept={PHOTO_TYPES.join(",")} hidden
-          aria-label={t("account.choose_photo")}
-          onChange={(event) => {
-            chosen(event.target.files?.[0]);
-            // The same file chosen again is news too.
-            event.target.value = "";
-          }} />
-        <p className="profile-note">
-          {t.rich("account.address_note", {
-            email: support,
-            link: (inner) => <a href={`mailto:${support}`}>{inner}</a>,
-          })}
-        </p>
-      </section>
-
-      <section className="account-section" aria-labelledby="ac-plan">
-        <div className="account-section-head">
-          <h2 id="ac-plan">{t("account.plan")}</h2>
-          <p>
-            {t("account.plan_note")}
-          </p>
-        </div>
-        <div className="account-card plan-card">
-          {info ? (
-            <>
-              <div className="plan-line">
-                <span className="plan-badge">{info.plan.name}</span>
-                <span>{limitsText(info.plan.limits, t)}</span>
-              </div>
-              <div className="meters">
-                <Meter label={t("account.machines")} used={info.usage.machines}
-                  most={info.plan.limits.machines} />
-                <Meter label={t("account.open_terminals")} used={info.usage.terminals}
-                  most={info.plan.limits.terminals} />
-              </div>
-            </>
-          ) : problem ? (
-            <div className="error-box" role="alert">{problem}</div>
+          <input ref={fileInput} type="file" accept={PHOTO_TYPES.join(",")} hidden
+            aria-label={t("account.choose_photo")}
+            onChange={(event) => {
+              chosen(event.target.files?.[0]);
+              // The same file chosen again is news too.
+              event.target.value = "";
+            }} />
+        </Row>
+        <Row label={t("account.name")}
+          after={nameProblem && <div className="error-box" role="alert">{nameProblem}</div>}>
+          {editing ? (
+            <form className="settings-name" onSubmit={(event) => {
+              event.preventDefault();
+              void save();
+            }}>
+              <input ref={nameInput} className="text-input" name="name"
+                aria-label={t("account.your_name")} autoComplete="name" maxLength={100}
+                value={draft} disabled={saving}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    cancelEdit();
+                  }
+                }} />
+              <button type="submit" className="button-accent"
+                disabled={saving || !draft.trim()}>
+                {saving ? t("account.saving") : t("common.save")}
+              </button>
+              <button type="button" className="button-plain quiet"
+                disabled={saving} onClick={cancelEdit}>
+                {t("common.cancel")}
+              </button>
+            </form>
           ) : (
-            <div className="waiting"><span className="spinner" />{t("common.loading")}</div>
+            <>
+              <span className="settings-value">{me.name}</span>
+              <button ref={editButton} type="button" className="button-plain small"
+                onClick={startEdit}>
+                {t("account.edit_name")}
+              </button>
+            </>
           )}
-        </div>
-      </section>
+        </Row>
+        {me.email && (
+          <Row label={t("account.email")}
+            note={t.rich("account.address_note", {
+              email: support,
+              link: (inner) => <a href={`mailto:${support}`}>{inner}</a>,
+            })}
+            noteWords={t("account.address_note", { email: support }).replace(/<\/?link>/g, "")}>
+            <span className="settings-value muted">{me.email}</span>
+          </Row>
+        )}
+      </Group>
+
+      <Group title={t("account.delete_title")}>
+        <Row label={t("account.delete")} note={t("account.delete_note", { email: support })}>
+          <button type="button" className="button-plain small" onClick={props.onSupport}>
+            {t("account_menu.write_support")}
+          </button>
+        </Row>
+      </Group>
 
       {cropping && (
         <PhotoDialog image={cropping}
@@ -330,12 +295,44 @@ export function Account(props: Props) {
           }}
           onCancel={() => setCropping(null)} />
       )}
+    </>
+  );
+}
 
-      <footer className="account-foot">
-        <span className="hint">
-          {t("account.delete_note", { email: support })}
-        </span>
-      </footer>
-    </main>
+/** Settings › Plan: the plan and how much of it is used; under it, faded,
+ * where payment will be once there are paid plans. */
+export function PlanPane(props: { info: AccountInfo | null; problem: string | null }) {
+  const { info, problem } = props;
+  const t = useT();
+  return (
+    <>
+      <Group title={t("account.plan")}>
+        {info ? (
+          <>
+            <Row label={planLine(info, t)}
+              labelNode={(
+                <span className="settings-plan">
+                  <span className="plan-badge">{info.plan.name}</span>
+                  {limitsText(info.plan.limits, t)}
+                </span>
+              )}
+              note={t("account.plan_note")} />
+            <Row label={t("account.machines")}>
+              <Meter used={info.usage.machines} most={info.plan.limits.machines} />
+            </Row>
+            <Row label={t("account.open_terminals")}>
+              <Meter used={info.usage.terminals} most={info.plan.limits.terminals} />
+            </Row>
+          </>
+        ) : problem ? (
+          <div className="error-box" role="alert">{problem}</div>
+        ) : (
+          <div className="waiting"><span className="spinner" />{t("common.loading")}</div>
+        )}
+      </Group>
+      <Group title={t("settings.payment")} faded>
+        <Row label={t("settings.payment_row")} note={t("settings.payment_note")} />
+      </Group>
+    </>
   );
 }

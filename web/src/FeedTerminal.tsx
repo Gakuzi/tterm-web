@@ -154,6 +154,9 @@ interface Props {
   ended: boolean;
   /** Its tab is in front: only then does it take the keys. */
   active: boolean;
+  /** Grows when the Settings window over it closes (0.1.27): it takes the
+   * keys back, as when its tab comes to the front. */
+  refocus?: number;
   /** Its machine's name, once it is known. */
   machine?: string;
   /** The home directory as tTerm Web knows it, for a terminal whose shell
@@ -785,7 +788,7 @@ export function FeedTerminal(props: Props) {
     } else if (p === "prompt" || p === "running") {
       line?.focus();
     }
-  }, [props.active, props.ended]);
+  }, [props.active, props.ended, props.refocus]);
 
   // The feed sticks to its bottom while you are there.
   useLayoutEffect(() => {

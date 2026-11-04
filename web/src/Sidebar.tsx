@@ -31,7 +31,8 @@
 // menu has Move to cloud, in a Mac's browser Download tTerm for Mac: from
 // 0.1.19 at the bottom, right above Sign out. From 0.1.20 a project's notes
 // start with Logs, written by tTerm: the log of each of its machines, with
-// how many commands ran there today.
+// how many commands ran there today. From 0.1.27 (row 133) the menu has no
+// Account: the name and address on top of it open Settings › Account.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { Machine, Me, Project, TerminalInfo } from "./api";
@@ -103,9 +104,10 @@ interface Props {
   local: boolean;
   /** The app signed in, without the connection to tTerm (0.1.6). */
   cutOff?: boolean;
-  /** The page of the account's menu shown now, if one is (0.1.4). */
+  /** What of the account's menu is open now, if anything is (0.1.4). */
   page: AccountPage | null;
   onSettings: () => void;
+  /** Settings › Account, from the name on top of the menu (0.1.27). */
   onAccount: () => void;
   onSignOut: () => void;
   /** In the app before signing in: sign in with the browser. */
@@ -118,11 +120,14 @@ interface Props {
   onMove: () => void;
   /** Get help > Write to support (0.1.25). */
   onSupport: () => void;
+  /** Under the Settings window (0.1.27), pinned: out of the keys' way. */
+  inert?: boolean;
 }
 
-/** The pages behind the menu of the account at the bottom (0.1.4); Move to
- * cloud from 0.1.17, in the app. */
-export type AccountPage = "settings" | "account" | "move";
+/** What the menu of the account at the bottom opens (0.1.4): Settings, from
+ * 0.1.27 a window with Account in it; Move to cloud from 0.1.17, in the
+ * app. */
+export type AccountPage = "settings" | "move";
 
 /** tTerm for Mac (0.1.17): Download in the menu opens the site's download
  * page in the language shown; from 0.1.18 only in a Mac's browser, and until
@@ -368,7 +373,7 @@ export function Sidebar(props: Props) {
   });
 
   return (
-    <aside className="sidebar" aria-label={t("sidebar.label")}
+    <aside className="sidebar" aria-label={t("sidebar.label")} inert={props.inert}
       onMouseEnter={props.onMouseEnter} onMouseLeave={props.onMouseLeave}>
       <div className="sidebar-head">
         <button type="button" className="brand-button" onClick={props.onHome}
@@ -575,7 +580,8 @@ const SWITCH_MS = 180;
  * the offers where there are any, a line, Sign out; no lines between the
  * items. An item with › shows its list beside the menu while the mouse is
  * on it or on the list; with the keys, → or Enter opens it and ← or Esc goes
- * back. */
+ * back. From 0.1.27 Account is in Settings: the name and address on top
+ * open it there (the canvas of 03.11, version 107). */
 function AccountPlace(props: {
   me: Me;
   local: boolean;
@@ -886,18 +892,18 @@ function AccountPlace(props: {
             </>
           ) : (
             <>
-              <div className="menu-head with-avatar">
+              <button type="button" role="menuitem" className="menu-head with-avatar link"
+                title={t("account.title")} onClick={pick(props.onAccount)}>
                 <Face initials={me.initials} photo={me.photo} className="mine menu-avatar" />
                 <span className="menu-head-text">
                   <strong id="account-menu-name">{me.name}</strong>
                   {me.email && <span id="account-menu-note">{me.email}</span>}
                 </span>
-              </div>
+                <ChevronRight size={15} className="menu-head-go" />
+              </button>
               <div className="menu-line" role="separator" />
               <MenuItem icon={<Gear size={15} />} text={t("settings.title")}
                 current={props.page === "settings"} onClick={pick(props.onSettings)} />
-              <MenuItem icon={<Person size={15} />} text={t("account.title")}
-                current={props.page === "account"} onClick={pick(props.onAccount)} />
               {helpItems}
               {/* The offers, on their tint, at the bottom, right above Sign out
                   (0.1.19, the owner's choice): Move to cloud in the app,

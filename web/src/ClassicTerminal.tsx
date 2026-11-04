@@ -43,6 +43,9 @@ interface Props {
   ended: boolean;
   /** Its tab is in front: only then does it take the keys. */
   active: boolean;
+  /** Grows when the Settings window over it closes (0.1.27): it takes the
+   * keys back, as when its tab comes to the front. */
+  refocus?: number;
   events: ViewEvents;
   /** A command search put here (0.1.7): typed at the prompt, not run. */
   paste?: { text: string; n: number } | null;
@@ -256,7 +259,7 @@ export function ClassicTerminal(props: Props) {
   useEffect(() => {
     if (!props.active) channelRef.current?.unfocus();
     if (props.active && !props.ended) term.current?.focus();
-  }, [props.active, props.ended]);
+  }, [props.active, props.ended, props.refocus]);
 
   return (
     <div className="terminal-box classic-box" ref={box}

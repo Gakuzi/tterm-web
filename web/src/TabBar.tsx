@@ -64,6 +64,8 @@ export interface SaveLine {
 
 interface Props {
   sidebarButton: ReactNode;
+  /** Under the Settings window (0.1.27): out of the keys' way. */
+  inert?: boolean;
   tabs: TabView[];
   current: string | null;
   onSelect: (id: string) => void;
@@ -107,7 +109,7 @@ export function TabBar(props: Props) {
   const t = useT();
   const plus = useRef<HTMLDivElement>(null);
   return (
-    <header className="topbar tab-bar">
+    <header className="topbar tab-bar" inert={props.inert}>
       {props.sidebarButton}
       <nav className="tabs" aria-label={t("tabs.label")}>
         {props.tabs.map((tab) => {

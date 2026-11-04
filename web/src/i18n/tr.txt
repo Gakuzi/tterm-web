@@ -159,7 +159,7 @@ account_menu.about = Hakkımızda
 account_menu.site = tterm.net sitesi
 account_menu.telegram = Telegram kanalı
 account_menu.whats_new = Yenilikler
-# An item of the menu, and the title of the list of languages.
+# An item of the menu, the title of the list of languages, and a group of Settings › General.
 language.item = Dil
 
 # ------------------------------------------------------------ support: Get help › Write to support, a message to tTerm's support (SupportDialog.tsx)
@@ -196,11 +196,9 @@ support.sent_title = Mesaj gönderildi
 support.sent = <b>{email}</b> adresine yanıt vereceğiz. Mesajının bir kopyası zaten orada.
 
 # ------------------------------------------------------------ settings (Settings.tsx)
-# The page, and the item of the account's menu that opens it.
+# The window, and the item of the account's menu that opens it.
 settings.title = Ayarlar
 settings.appearance = Görünüm
-settings.appearance_local = Bu bilgisayara kaydedilir. Sistem seçeneği bu bilgisayarın ayarına uyar. Projenin rengi kod rozetini doldurur ya da kenar çubuğunda projenin tamamını renklendirir.
-settings.appearance_account = Hesabına kaydedilir. Sistem seçeneği, kullandığın her bilgisayarın kendi ayarına uyar. Projenin rengi kod rozetini doldurur ya da kenar çubuğunda projenin tamamını renklendirir.
 settings.theme = Tema
 settings.theme_system = Sistem
 settings.theme_light = Açık
@@ -208,12 +206,41 @@ settings.theme_dark = Koyu
 settings.tints = Proje renkleri
 settings.tint_badge = Kod rozeti
 settings.tint_block = Tüm proje
+# The window's sections and their groups, on its left (0.1.27). The group of tTerm for Mac's own sections is named as app_link.mac.
+settings.general = Genel
+settings.group_preferences = Tercihler
+settings.group_security = Güvenlik
+# For screen readers: the list of the sections.
+settings.sections = Ayarların bölümleri
+# The search over Settings, and what it says when no section has the words typed.
+settings.search = Ara
+settings.nothing = Hiçbir şey bulunamadı
+# Under Appearance: where it is kept; the second, in the app before signing in.
+settings.appearance_saved = Hesabına kaydedilir, tüm cihazlarında geçerli olur.
+settings.appearance_saved_local = Bu bilgisayara kaydedilir.
+# Under Theme; the second, in the app before signing in. "System" is named as the choice is (settings.theme_system).
+settings.theme_note = Sistem seçeneği, kullandığın her bilgisayarın kendi ayarına uyar.
+settings.theme_note_local = Sistem seçeneği bu bilgisayarın ayarına uyar.
+# Under Project colors.
+settings.tints_note = Projenin rengi kod rozetini doldurur ya da kenar çubuğunda projenin tamamını renklendirir.
+# The row of the language, in the group language.item; "Language" is the item of the account's menu (language.item).
+settings.language = Arayüz dili
+settings.language_note = Aynı seçim hesap menüsünde, Dil altında da var.
+# Settings › Plan, under the plan: where payment will be, faded until there are paid plans.
+settings.payment = Ödeme
+settings.payment_row = Ödeme yöntemi ve faturalar
+settings.payment_note = Ücretli planlarla birlikte burada görünecek.
+# Words the search finds a section by, besides its name; never shown. In English, then in the language.
+settings.keys_words = ssh keys vault password passphrase servers anahtarlar kasa parola sunucular
+settings.devices_words = devices browsers sessions signed in forget sign out cihazlar tarayıcılar oturumlar giriş unut çıkış
+settings.computer_words = this computer mac connection bu bilgisayar bağlantı
+settings.updates_words = updates version new restart check güncellemeler sürüm yeni yeniden başlat denetle
 
 # ------------------------------------------------------------ devices (Devices.tsx)
 devices.title = Cihazlar
 
 # ------------------------------------------------------------ account (Account.tsx)
-# The page, and the item of the account's menu that opens it.
+# Settings › Account, the palette's item for it, and the title of the name on top of the account's menu, which opens it.
 account.title = Hesap
 
 # ------------------------------------------------------------ app: the page's frame, toasts and dialogs (App.tsx)
@@ -339,10 +366,10 @@ app.action.delete_note = Bu notu sil
 app.action.delete_note_hint = {folder} klasöründen
 app.action.theme_dark = Koyu temaya geç
 app.action.theme_light = Açık temaya geç
-app.action.settings_hint_local = tema, proje renkleri
-app.action.settings_hint = tema, proje renkleri, cihazlar
+app.action.settings_hint_local = tema, proje renkleri, dil
+app.action.settings_hint = tema, dil, plan, anahtarlar, cihazlar
 app.action.sign_in_hint = sunucuların, projelerin ve ekibin
-app.action.account_hint = ad, fotoğraf ve plan
+app.action.account_hint = ad, fotoğraf ve e-posta
 app.action.sign_out_hint = bu tarayıcı seni unutur
 # Search words: keep the English words, add the language's own after them.
 app.action.add_machine_words = new server computer connect yeni sunucu bilgisayar bağla ekle makine
@@ -682,10 +709,10 @@ account.no_limits = Sınır yok
 # A meter of the plan, beside its label (Machines, Open terminals): 3 of 50.
 account.used_of = {used} / {limit}
 account.used_no_limit = {used}, sınır yok
-# The title of Close at the top of Account and Settings.
+# The title of Close at the top of Move to cloud.
 account.close_title = Geldiğin yere dön
 account.photo_removed = Fotoğraf kaldırıldı: baş harflerin geri geldi.
-# For screen readers: the card with one's name and photo.
+# Settings › Account: the group of the photo, the name and the address.
 account.profile = Profil
 account.change_photo = Fotoğrafı değiştir
 account.add_photo = Fotoğraf ekle
@@ -693,13 +720,13 @@ account.your_name = Adın
 account.saving = Kaydediliyor…
 account.edit_name = Adı düzenle
 account.remove_photo = Fotoğrafı kaldır
-# Under the photo's buttons: what the photo is for.
+# Under Photo, in Settings › Account: what the photo is for.
 account.photo_hint = Adının yanında, baş harflerinin yerine görünür.
 # For screen readers: the file chooser for the photo.
 account.choose_photo = Fotoğraf seç
 # Under one's email address. {email} is support's address.
 account.address_note = Bu adresle giriş yaparsın. Değiştirmek için <link>{email}</link> adresine yaz.
-# The section of the plan; its name (Free) stays as it is.
+# Settings › Plan, and its group; the plan's name (Free) stays as it is.
 account.plan = Plan
 account.plan_note = tTerm biz geliştirirken ücretsiz. Diğer planlar burada görünecek; bir şey değişmeden önce sana haber vereceğiz.
 # The labels of the plan's two meters.
@@ -708,6 +735,12 @@ account.open_terminals = Açık terminaller
 account.photo_saved = Fotoğrafın yüklendi: kenar çubuğunun altında ve menüsünde görünür.
 # {email} is support's address.
 account.delete_note = Hesabını silmek için giriş yaptığın adresten {email} adresine yaz.
+# Settings › Account (0.1.27): the labels of its rows, and the group of deleting the account and its row.
+account.photo = Fotoğraf
+account.name = Ad
+account.email = E-posta
+account.delete_title = Hesabı silme
+account.delete = Hesabı sil
 
 # ------------------------------------------------------------ devices: where one is signed in, in Settings (Devices.tsx)
 # On the sign-in screen, after this very device was forgotten.

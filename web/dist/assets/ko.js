@@ -159,7 +159,7 @@ account_menu.about = tTerm 소개
 account_menu.site = tterm.net 사이트
 account_menu.telegram = Telegram 채널
 account_menu.whats_new = 새 소식
-# An item of the menu, and the title of the list of languages.
+# An item of the menu, the title of the list of languages, and a group of Settings › General.
 language.item = 언어
 
 # ------------------------------------------------------------ support: Get help › Write to support, a message to tTerm's support (SupportDialog.tsx)
@@ -196,11 +196,9 @@ support.sent_title = 메시지를 보냈어요
 support.sent = <b>{email}</b> 주소로 답장해 드릴게요. 보내신 메시지의 사본도 이미 그 주소로 보냈어요.
 
 # ------------------------------------------------------------ settings (Settings.tsx)
-# The page, and the item of the account's menu that opens it.
+# The window, and the item of the account's menu that opens it.
 settings.title = 설정
 settings.appearance = 모양
-settings.appearance_local = 이 컴퓨터에 저장돼요. 시스템을 고르면 이 컴퓨터의 설정을 따라요. 프로젝트 색상은 코드 배지를 채우거나, 사이드바에서 프로젝트 전체에 칠해져요.
-settings.appearance_account = 계정에 저장돼요. 시스템을 고르면 사용하는 컴퓨터마다 그 컴퓨터의 설정을 따라요. 프로젝트 색상은 코드 배지를 채우거나, 사이드바에서 프로젝트 전체에 칠해져요.
 settings.theme = 테마
 settings.theme_system = 시스템
 settings.theme_light = 라이트
@@ -208,12 +206,41 @@ settings.theme_dark = 다크
 settings.tints = 프로젝트 색상
 settings.tint_badge = 코드 배지
 settings.tint_block = 프로젝트 전체
+# The window's sections and their groups, on its left (0.1.27). The group of tTerm for Mac's own sections is named as app_link.mac.
+settings.general = 일반
+settings.group_preferences = 환경설정
+settings.group_security = 보안
+# For screen readers: the list of the sections.
+settings.sections = 설정 섹션
+# The search over Settings, and what it says when no section has the words typed.
+settings.search = 검색
+settings.nothing = 찾은 항목이 없어요
+# Under Appearance: where it is kept; the second, in the app before signing in.
+settings.appearance_saved = 계정에 저장되어 모든 기기에 적용돼요.
+settings.appearance_saved_local = 이 컴퓨터에 저장돼요.
+# Under Theme; the second, in the app before signing in. "System" is named as the choice is (settings.theme_system).
+settings.theme_note = 시스템을 고르면 사용하는 컴퓨터마다 그 컴퓨터의 설정을 따라요.
+settings.theme_note_local = 시스템을 고르면 이 컴퓨터의 설정을 따라요.
+# Under Project colors.
+settings.tints_note = 프로젝트 색상은 코드 배지를 채우거나, 사이드바에서 프로젝트 전체에 칠해져요.
+# The row of the language, in the group language.item; "Language" is the item of the account's menu (language.item).
+settings.language = 인터페이스 언어
+settings.language_note = 계정 메뉴의 ‘언어’에서도 똑같이 고를 수 있어요.
+# Settings › Plan, under the plan: where payment will be, faded until there are paid plans.
+settings.payment = 결제
+settings.payment_row = 결제 수단과 청구서
+settings.payment_note = 유료 요금제가 생기면 여기에 표시돼요.
+# Words the search finds a section by, besides its name; never shown. In English, then in the language.
+settings.keys_words = ssh keys vault password passphrase servers 키 보관함 비밀번호 암호 문구 서버
+settings.devices_words = devices browsers sessions signed in forget sign out 기기 브라우저 세션 로그인 지우기 로그아웃
+settings.computer_words = this computer mac connection 이 컴퓨터 연결
+settings.updates_words = updates version new restart check 업데이트 버전 새 재시작 확인
 
 # ------------------------------------------------------------ devices (Devices.tsx)
 devices.title = 기기
 
 # ------------------------------------------------------------ account (Account.tsx)
-# The page, and the item of the account's menu that opens it.
+# Settings › Account, the palette's item for it, and the title of the name on top of the account's menu, which opens it.
 account.title = 계정
 
 # ------------------------------------------------------------ app: the page's frame, toasts and dialogs (App.tsx)
@@ -339,10 +366,10 @@ app.action.delete_note = 이 노트 삭제
 app.action.delete_note_hint = {folder} 폴더에서
 app.action.theme_dark = 다크 테마로 전환
 app.action.theme_light = 라이트 테마로 전환
-app.action.settings_hint_local = 테마, 프로젝트 색상
-app.action.settings_hint = 테마, 프로젝트 색상, 기기
+app.action.settings_hint_local = 테마, 프로젝트 색상, 언어
+app.action.settings_hint = 테마, 언어, 요금제, SSH 키, 기기
 app.action.sign_in_hint = 서버, 프로젝트, 팀
-app.action.account_hint = 이름, 사진, 요금제
+app.action.account_hint = 이름, 사진, 이메일
 app.action.sign_out_hint = 이 브라우저에서 로그인 정보가 지워져요
 # Search words: keep the English words, add the language's own after them.
 app.action.add_machine_words = new server computer connect 새 서버 컴퓨터 연결 머신 추가
@@ -682,10 +709,10 @@ account.no_limits = 제한 없음
 # A meter of the plan, beside its label (Machines, Open terminals): 3 of 50.
 account.used_of = {used}/{limit}
 account.used_no_limit = {used}, 제한 없음
-# The title of Close at the top of Account and Settings.
+# The title of Close at the top of Move to cloud.
 account.close_title = 이전 화면으로 돌아가기
 account.photo_removed = 사진을 제거했어요. 다시 이니셜이 표시돼요.
-# For screen readers: the card with one's name and photo.
+# Settings › Account: the group of the photo, the name and the address.
 account.profile = 프로필
 account.change_photo = 사진 변경
 account.add_photo = 사진 추가
@@ -693,13 +720,13 @@ account.your_name = 이름
 account.saving = 저장 중…
 account.edit_name = 이름 편집
 account.remove_photo = 사진 제거
-# Under the photo's buttons: what the photo is for.
+# Under Photo, in Settings › Account: what the photo is for.
 account.photo_hint = 이니셜 대신 이름 옆에 표시돼요.
 # For screen readers: the file chooser for the photo.
 account.choose_photo = 사진 선택
 # Under one's email address. {email} is support's address.
 account.address_note = 이 주소로 로그인해요. 주소를 바꾸려면 <link>{email}</link>으로 메일을 보내 주세요.
-# The section of the plan; its name (Free) stays as it is.
+# Settings › Plan, and its group; the plan's name (Free) stays as it is.
 account.plan = 요금제
 account.plan_note = tTerm을 만드는 동안은 무료예요. 다른 요금제가 생기면 여기에 표시되고, 바뀌는 게 있으면 미리 알려 드릴게요.
 # The labels of the plan's two meters.
@@ -708,6 +735,12 @@ account.open_terminals = 열린 터미널
 account.photo_saved = 사진을 등록했어요. 사이드바 아래쪽과 메뉴에 표시돼요.
 # {email} is support's address.
 account.delete_note = 계정을 삭제하려면 로그인할 때 쓰는 주소에서 {email}으로 메일을 보내 주세요.
+# Settings › Account (0.1.27): the labels of its rows, and the group of deleting the account and its row.
+account.photo = 사진
+account.name = 이름
+account.email = 이메일
+account.delete_title = 계정 삭제
+account.delete = 계정 삭제하기
 
 # ------------------------------------------------------------ devices: where one is signed in, in Settings (Devices.tsx)
 # On the sign-in screen, after this very device was forgotten.

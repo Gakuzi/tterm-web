@@ -93,8 +93,9 @@ def sign_in_email(*, to: str, label: str, ip: str, at: dt.datetime,
     """The note about a sign-in with a code from this address, in a
     browser tTerm Web did not know: what it was, and what to do if it was
     not the person. Forget all devices is on Settings (from 0.1.4; before
-    that on the account page). From 0.1.6 also about an app on a computer
-    that a browser signed in to the account allowed (`app`)."""
+    that on the account page), and from 0.1.27 the link opens Settings at
+    Devices. From 0.1.6 also about an app on a computer that a browser
+    signed in to the account allowed (`app`)."""
     subject = "New sign-in to tTerm"
     if app:
         lead = (f"{label} signed in as {to}: a browser signed in to this "
@@ -114,7 +115,7 @@ def sign_in_email(*, to: str, label: str, ip: str, at: dt.datetime,
     if ip:
         rows.append(("Address", ip))
     rows.append(("Time", when(at)))
-    settings = page_url.rstrip("/") + "/settings"
+    settings = page_url.rstrip("/") + "/settings/devices"
     step2 = ("Change the password of this email, because whoever signed in "
              "could read it.")
     text = ("New sign-in to tTerm\n\n"

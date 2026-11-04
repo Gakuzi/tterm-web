@@ -3377,7 +3377,10 @@ code {
 
 /* The account page (0.0.10), as approved on the canvas: one column, with
    the trusted devices and Forget all devices in one block. From 0.1.4 two
-   pages in the same column: Account (the name, the plan) and Settings. */
+   pages in the same column: Account (the name, the plan) and Settings;
+   from 0.1.27 both are in the Settings window (at the end of this file),
+   and the column is Move to cloud's, in the app. The sections of Settings
+   below keep their look inside the window. */
 .account-view {
   width: 100%;
   max-width: 760px;
@@ -3455,88 +3458,7 @@ code {
   color: var(--dim);
 }
 
-/* The profile: the avatar, the name and the address, and Edit name. */
-.profile-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 18px;
-}
-
-.profile-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.avatar.big {
-  width: 48px;
-  height: 48px;
-  font-size: 15px;
-}
-
-.profile-text {
-  flex: 1 1 240px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
-.profile-text strong {
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.profile-text span {
-  font-size: 13px;
-  color: var(--dim);
-}
-
-.profile-edit {
-  flex: 1 1 320px;
-  min-width: 0;
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.profile-label {
-  flex: 1 1 220px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dim);
-}
-
-.profile-note {
-  margin: 0 0 0 88px;
-  font-size: 12px;
-  color: var(--faint);
-}
-
 /* The plan, and how much of it is used. */
-.plan-card {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 18px;
-}
-
-.plan-line {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  font-size: 13px;
-  color: var(--dim);
-}
 
 .plan-badge {
   height: 26px;
@@ -3549,34 +3471,6 @@ code {
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.02em;
-}
-
-.meters {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px 24px;
-}
-
-.meter {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.meter-text {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.meter-text strong {
-  font-weight: 600;
-}
-
-.meter-text span {
-  color: var(--dim);
 }
 
 .meter-bar {
@@ -3699,18 +3593,6 @@ code {
 }
 
 /* The theme: three choices side by side. */
-.theme-card {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 14px;
-  padding: 14px 16px;
-}
-
-.theme-label {
-  flex: 1 1 160px;
-  font-weight: 600;
-}
 
 .segmented {
   display: flex;
@@ -3744,25 +3626,6 @@ code {
   color: var(--ink);
 }
 
-.account-foot {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 4px;
-  font-size: 13px;
-}
-
-.account-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 18px;
-}
-
-.account-links a {
-  font-weight: 600;
-  text-decoration: none;
-}
-
 .button-plain.small {
   flex: none;
   height: 34px;
@@ -3775,14 +3638,6 @@ code {
   .account-view {
     padding: 24px 16px 56px;
     gap: 28px;
-  }
-
-  .meters {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .profile-note {
-    margin-left: 0;
   }
 }
 
@@ -5135,11 +4990,6 @@ code {
   font-weight: 600;
 }
 
-/* Project colors in Settings: "Whole project" on one line. */
-.theme-card .segmented button {
-  white-space: nowrap;
-}
-
 /* ------------------------------ naming a terminal elsewhere (0.1.2) */
 
 /* In the sidebar: the terminal's row becomes the field, the keys under it. */
@@ -5612,73 +5462,6 @@ img.avatar.photo {
   width: 36px;
   height: 36px;
   font-size: 12px;
-}
-
-/* On Account: 72 pixels, a camera on its edge; a click chooses a photo. */
-.avatar.huge {
-  width: 72px;
-  height: 72px;
-  font-size: 20px;
-}
-
-.profile-photo {
-  position: relative;
-  flex: none;
-  display: flex;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  cursor: pointer;
-}
-
-.profile-photo:focus-visible {
-  outline: 2px solid var(--amber);
-  outline-offset: 3px;
-}
-
-.photo-badge {
-  position: absolute;
-  right: -2px;
-  bottom: -2px;
-  width: 26px;
-  height: 26px;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--surface);
-  border-radius: 50%;
-  background: var(--raised);
-  color: var(--ink);
-}
-
-.profile-photo:hover .photo-badge {
-  background: var(--line);
-}
-
-.profile-photo-row {
-  margin-left: 88px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.profile-photo-row .hint {
-  margin-left: 4px;
-}
-
-.profile-card > .error-box {
-  margin-left: 88px;
-}
-
-@media (max-width: 560px) {
-  .profile-photo-row,
-  .profile-photo-row .hint,
-  .profile-card > .error-box {
-    margin-left: 0;
-  }
 }
 
 /* The photo cut to a circle: drag it, zoom it, see it as others will. */
@@ -8935,4 +8718,489 @@ mark.log-hit {
  * instead (Sidebar.tsx). */
 .menu.lang-list.help-list {
   width: 250px;
+}
+
+/* ----------------------------------- the Settings window (0.1.27, row 133)
+ * As on the canvas of 03.11 (version 107), after Claude's own settings:
+ * a window over the page, the search and the sections in groups on the
+ * left, the one chosen on the right in rows, a name and a line under it,
+ * and what it is set to. On a phone the window is the screen. */
+
+.scrim .dialog.settings-dialog {
+  width: min(1060px, calc(100vw - 64px));
+  max-width: none;
+  height: min(860px, calc(100vh - 72px));
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.settings-top {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 58px;
+  padding: 0 14px 0 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-top h2 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font: 700 16px var(--font-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 252px minmax(0, 1fr);
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px;
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+
+.settings-search {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--ground);
+  color: var(--faint);
+}
+
+.settings-search.typed {
+  color: var(--ink);
+}
+
+.settings-search:focus-within {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px var(--amber-ring);
+}
+
+.settings-search svg {
+  flex: none;
+}
+
+.settings-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font: 500 14px var(--font-ui);
+  appearance: none;
+}
+
+.settings-search input::placeholder {
+  color: var(--faint);
+}
+
+/* The browser's own × that empties the field, in grey. */
+.settings-search input::-webkit-search-cancel-button {
+  filter: grayscale(1);
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.settings-items,
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-group-title {
+  margin: 16px 10px 6px;
+  font: 600 12px var(--font-ui);
+  color: var(--faint);
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink);
+  font: 600 14px var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-item svg {
+  flex: none;
+  color: var(--dim);
+}
+
+.settings-item:hover,
+.settings-item.current {
+  background: var(--raised);
+}
+
+.settings-item.current svg {
+  color: var(--ink);
+}
+
+.settings-item-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The way into a section, on a phone only. */
+.settings-item .settings-more {
+  display: none;
+  color: var(--faint);
+}
+
+.settings-nothing {
+  margin: 0;
+  padding: 10px 11px;
+  font: 500 13px/1.5 var(--font-ui);
+  color: var(--faint);
+}
+
+.settings-pane {
+  min-width: 0;
+  padding: 24px 30px 44px;
+  overflow-y: auto;
+}
+
+.settings-section + .settings-section {
+  margin-top: 30px;
+}
+
+.settings-section h3 {
+  margin: 0 0 4px;
+  font: 700 16px var(--font-ui);
+}
+
+.settings-section-note {
+  max-width: 620px;
+  margin: 0 0 6px;
+  font: 500 13px/1.5 var(--font-ui);
+  color: var(--dim);
+}
+
+/* Not there yet: Payment, until the paid plans. */
+.settings-section.faded {
+  opacity: 0.55;
+}
+
+.settings-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-row:last-child {
+  border-bottom: 0;
+}
+
+/* A row the search found. */
+.settings-row.found {
+  margin: 0 -12px;
+  padding-right: 12px;
+  padding-left: 12px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--amber-tint), transparent 70%);
+}
+
+.settings-row > .error-box {
+  margin-top: 10px;
+}
+
+.settings-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  min-height: 40px;
+}
+
+.settings-label {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font: 600 14px var(--font-ui);
+  color: var(--ink);
+}
+
+.settings-label small {
+  max-width: 470px;
+  font: 500 12.5px/1.45 var(--font-ui);
+  color: var(--dim);
+}
+
+.settings-label small a {
+  color: var(--amber-ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.settings-label small a:hover {
+  text-decoration: underline;
+}
+
+.settings-control {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  font: 600 14px var(--font-ui);
+  color: var(--ink);
+}
+
+.settings-control .segmented button {
+  white-space: nowrap;
+}
+
+.settings-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-value.muted {
+  color: var(--dim);
+  font-weight: 500;
+}
+
+.avatar.settings-face {
+  width: 40px;
+  height: 40px;
+  font-size: 13px;
+}
+
+/* The name, being changed: the field and its buttons in the row. */
+.settings-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-name .text-input {
+  width: 240px;
+  height: 36px;
+  font-size: 14px;
+}
+
+.settings-plan {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.settings-plan .plan-badge {
+  flex: none;
+}
+
+.settings-meter {
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 7px;
+}
+
+.settings-meter .meter-bar {
+  width: 100%;
+}
+
+/* The language: the browser's own list, in tTerm's look. */
+.settings-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.settings-select select {
+  height: 34px;
+  padding: 0 32px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: 600 14px var(--font-ui);
+  cursor: pointer;
+  appearance: none;
+}
+
+.settings-select select:hover {
+  background: var(--raised);
+}
+
+.settings-select svg {
+  position: absolute;
+  right: 9px;
+  color: var(--dim);
+  pointer-events: none;
+}
+
+/* Keys, Devices, This computer and Updates, as they are, in the window. */
+.settings-pane .account-section {
+  gap: 10px;
+}
+
+.settings-pane .account-section + .account-section {
+  margin-top: 30px;
+}
+
+.settings-pane .account-section-head h2 {
+  font: 700 16px var(--font-ui);
+}
+
+.settings-pane .account-section-head p {
+  max-width: 620px;
+}
+
+.settings-pane .account-card {
+  border: 1px solid var(--line);
+  background: transparent;
+}
+
+/* The account's menu: the name on top opens Settings › Account. */
+.menu-head.link {
+  width: 100%;
+  margin: 0 0 2px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-head.link:hover,
+.menu-head.link:focus-visible {
+  background: var(--raised);
+  outline: none;
+}
+
+.menu-head-go {
+  flex: none;
+  margin-left: auto;
+  color: var(--faint);
+}
+
+/* On a phone the window is the screen: the sections first, then the one
+ * chosen, with the way back to them. */
+@media (max-width: 640px) {
+  .scrim.settings-scrim {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .scrim .dialog.settings-dialog {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .settings-body {
+    display: block;
+    overflow-y: auto;
+  }
+
+  .settings-nav {
+    padding: 14px 14px 24px;
+    border-right: 0;
+    overflow: visible;
+  }
+
+  .settings-item {
+    min-height: 46px;
+    font-size: 15px;
+  }
+
+  .settings-item .settings-more {
+    display: block;
+  }
+
+  .settings-pane {
+    padding: 18px 18px 40px;
+    overflow: visible;
+  }
+
+  .settings-line {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .settings-label {
+    flex: none;
+    width: 100%;
+  }
+
+  .settings-control {
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+
+  .settings-meter {
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .settings-name .text-input {
+    width: 100%;
+  }
+
+  .settings-top.inside {
+    padding-left: 8px;
+  }
+
+  .settings-top.inside h2 {
+    margin-right: auto;
+    margin-left: 4px;
+  }
+}
+
+/* A phone on its side: the window is the screen too, with both columns. */
+@media (max-height: 500px) {
+  .scrim.settings-scrim {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .scrim .dialog.settings-dialog {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
 }

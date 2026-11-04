@@ -1,9 +1,11 @@
 // The browsers where the person signs in with a quick code, on the account
-// page (from 0.0.10; a dialog of its own in 0.0.9). Forget one, and there
-// it is email again; Forget all devices ends every session and forgets them
-// all, so that one word means the same for one and for all. From 0.1.6 tTerm
-// on a computer, signed in with the browser, is a device too: Forget signs
-// it out, and it shows this computer only until it signs in again.
+// page (from 0.0.10; a dialog of its own in 0.0.9; from 0.1.27 Settings ›
+// Devices, whose window keeps the list over its sections). Forget one, and
+// there it is email again; Forget all devices ends every session and
+// forgets them all, so that one word means the same for one and for all.
+// From 0.1.6 tTerm on a computer, signed in with the browser, is a device
+// too: Forget signs it out, and it shows this computer only until it signs
+// in again.
 
 import { useState } from "react";
 import { forgetAllDevices, forgetDevice, type Device } from "./api";
@@ -13,6 +15,8 @@ import { agoLong } from "./time";
 
 interface Props {
   devices: Device[];
+  /** One forgotten: the list goes on without it. */
+  onForgotten: (id: string) => void;
   /** This browser is signed out now, and why. */
   onSignedOut: (note: string) => void;
   notify: (text: string) => void;
@@ -25,7 +29,7 @@ function handheld(label: string): boolean {
 
 export function DevicesSection(props: Props) {
   const t = useT();
-  const [devices, setDevices] = useState<Device[]>(props.devices);
+  const { devices } = props;
   const [problem, setProblem] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -38,7 +42,7 @@ export function DevicesSection(props: Props) {
         props.onSignedOut(t("devices.this_forgotten"));
         return;
       }
-      setDevices((all) => all.filter((d) => d.id !== device.id));
+      props.onForgotten(device.id);
       props.notify(device.kind === "app"
         ? t("devices.app_signed_out", { device: device.label })
         : t("devices.forgotten", { device: device.label }));

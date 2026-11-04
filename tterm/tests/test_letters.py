@@ -46,8 +46,10 @@ def test_the_sign_in_email_says_what_and_what_to_do():
         assert "17 October 2026, 17:54 UTC" in part, part
         assert "Forget all devices" in part and "anna@example.com" in part
     # The button and the text lead straight to Settings, where Forget all
-    # devices is (0.1.4); the button keeps its size in Outlook too.
-    assert f'href="{PAGE}/settings"' in e.html and f"{PAGE}/settings" in e.text
+    # devices is (0.1.4), from 0.1.27 at Devices; the button keeps its size
+    # in Outlook too.
+    assert f'href="{PAGE}/settings/devices"' in e.html
+    assert f"{PAGE}/settings/devices" in e.text
     assert "Open Settings in tTerm" in e.text and ">Open Settings</a>" in e.html
     assert 'bgcolor="#E9A33F"' in e.html and "mso-padding-alt" in e.html
     assert "about every sign-in from a browser it did not know" in e.text
