@@ -115,6 +115,20 @@ def create_connect_app(pool: asyncpg.Pool, signer: SignerClient,
         return PlainTextResponse(script, headers={"content-type": "text/plain; charset=utf-8",
                                                   "cache-control": "no-store"})
 
+    @app.get("/c/{token}.bat")
+    async def computer_installer_bat(token: str) -> Response:
+        """One-click batch/exe installer for Windows."""
+        problem = await machines.check_token(pool, token, kind="computer")
+        if problem:
+            return PlainTextResponse(f'@echo off\r\necho {problem}\r\npause\r\n',
+                                     headers={"content-type": "text/plain; charset=utf-8",
+                                              "cache-control": "no-store",
+                                              "content-disposition": "attachment; filename=tterm-setup.bat"})
+        content = machines.render_computer_installer_bat(token=token, connect_url=connect_url)
+        return PlainTextResponse(content, headers={"content-type": "text/plain; charset=utf-8",
+                                                   "cache-control": "no-store",
+                                                   "content-disposition": "attachment; filename=tterm-setup.bat"})
+
     @app.get("/c/{token}")
     async def computer_installer(token: str) -> Response:
         """The agent's installer, for a person to run on their computer.

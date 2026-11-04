@@ -185,6 +185,22 @@ def refusal_ps1(message: str) -> str:
     return f'Write-Error "{escaped}"; exit 1\n'
 
 
+def render_computer_installer_bat(*, token: str, connect_url: str) -> str:
+    if not TOKEN_RE.match(token):
+        raise ValueError("bad token")
+    return (
+        "@echo off\r\n"
+        "chcp 65001 >nul\r\n"
+        "echo.\r\n"
+        "echo   Подключение компьютера к tTerm Web...\r\n"
+        "echo.\r\n"
+        f"powershell -NoProfile -ExecutionPolicy Bypass -Command \"irm {connect_url}/c/{token}.ps1 | iex\"\r\n"
+        "echo.\r\n"
+        "echo Готово! Окно закроется через 5 секунд...\r\n"
+        "timeout /t 5 >nul\r\n"
+    )
+
+
 def server_cleanup(principal: str | None, ca_id: str | None = None,
                    own_line: bool = True) -> str | None:
     """The command that takes tTerm Web's access back on a server that was

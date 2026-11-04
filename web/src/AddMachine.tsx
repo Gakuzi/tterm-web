@@ -13,7 +13,7 @@ import {
 } from "./api";
 import { useBriefly } from "./briefly";
 import { useT } from "./i18n";
-import { Check, Close, Computer, Copy, Server } from "./icons";
+import { Check, Close, Computer, Copy, Download, Server } from "./icons";
 
 const POLL_MS = 1500;
 
@@ -219,6 +219,19 @@ export function AddMachine(props: Props) {
                       ? "Запустите команду в обычном PowerShell от своего имени (без Administrator)." /* i18n-ignore */
                       : t("add_machine.hint_computer", { works })}
                   </span>
+                  {osPlatform === "windows" && install?.windowsCommand && (
+                    <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center" }}>
+                      <a
+                        href={install.windowsCommand.replace(/^irm\s+/, "").replace(/\.ps1\s+\|\s+iex$/, ".bat")}
+                        className="button-plain"
+                        download="tterm-setup.bat"
+                        style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}
+                      >
+                        <Download size={14} />
+                        Скачать установщик (tterm-setup.bat) {/* i18n-ignore */}
+                      </a>
+                    </div>
+                  )}
                   {install?.byHand && (
                     <details className="by-hand">
                       <summary>{t("add_machine.by_hand")}</summary>
