@@ -35,7 +35,7 @@ import { PRESSED_MS, toClipboard } from "./briefly";
 import { FONT, FONT_SIZE, HIGH, LOW, type ViewEvents } from "./ClassicTerminal";
 import { goneThere, takePaste, useFoundBlock, wentThere } from "./found";
 import { useT } from "./i18n";
-import { Warning } from "./icons";
+import { Check, Close, Spark, Warning } from "./icons";
 import { InputLine, type Phase, type Prompt } from "./InputLine";
 import { keepKeys, typingElsewhere, type Home } from "./keys";
 import { logChanged, onLogChange } from "./logday";
@@ -146,6 +146,7 @@ interface Pending {
   /** Run again on a block (0.1.13): the new block lights up for a moment,
    * wherever the feed was. */
   again?: boolean;
+  author?: { name: string; kind: "user" | "agent" | "guest" };
 }
 
 interface Props {
@@ -201,6 +202,7 @@ function fromStored(b: StoredBlock, cols: number, folded = false): FeedBlock {
     notes: b.notes ?? [],
     redacted: b.redacted ?? null,
     canNote: !!b.canNote,
+    author: b.author,
   };
 }
 
@@ -242,6 +244,7 @@ export function FeedTerminal(props: Props) {
   const [clipRows, setClipRows] = useState(1);
   const [cellHeight, setCellHeight] = useState(17);
   const [ask, setAsk] = useState<Confirm | null>(null);
+  const [guardAsk, setGuardAsk] = useState<{ command: string; requestId: string; author?: { name: string; kind: "user" | "agent" | "guest" } } | null>(null);
   const [history, setHistory] = useState<string[]>([]);
   const [restore, setRestore] =
     useState<{ text: string; n: number; from?: "search" } | null>(null);
@@ -625,6 +628,9 @@ export function FeedTerminal(props: Props) {
               rendered: null, partial: false, cut: false, stored: false,
               expanded: false, collapsed: false, ...NEW_LINE,
               canNote: !!ev.command.trim(),
+              author: (ev as unknown as { author?: { name: string; kind: "user" | "agent" | "guest" } }).author ||
+                st.pending?.author ||
+                { name: props.me.name || "Вы", kind: "user" }, // i18n-ignore
             });
             if (again) {
               // Ringed in amber, as a block a link opens: the eye finds it.
@@ -665,6 +671,10 @@ export function FeedTerminal(props: Props) {
         confirm: (question) => {
           clearPending();
           setAsk(question);
+        },
+        guardAsk: (ask) => {
+          clearPending();
+          setGuardAsk(ask);
         },
         refused: (command, reason) => {
           clearPending();
@@ -823,7 +833,7 @@ export function FeedTerminal(props: Props) {
   // ------------------------------------------------------------ actions
   /** Sends a command to the shell: whether it went. */
   const run = useCallback((command: string, confirmed = false,
-    again = false): boolean => {
+    again = false, author?: { name: string; kind: "user" | "agent" | "guest" }): boolean => {
     const st = s.current;
     const channel = chan.current;
     if (!channel) return false;
@@ -839,14 +849,15 @@ export function FeedTerminal(props: Props) {
     }
     setAsk(null);
     stick.current = true;
-    const pending: Pending = { command, chunks: [], timer: 0, again };
+    const auth = author || { name: props.me.name || "Вы", kind: "user" as const }; // i18n-ignore
+    const pending: Pending = { command, chunks: [], timer: 0, again, author: auth };
     pending.timer = window.setTimeout(() => {
       if (s.current.pending === pending) waitInput.current();
     }, INPUT_WAIT_MS);
     st.pending = pending;
-    channel.run(command, confirmed);
+    channel.run(command, confirmed, auth);
     return true;
-  }, [putBack, t]);
+  }, [putBack, t, props.me.name]);
 
   // The function that shows a command waiting for more of itself lives in
   // the terminal's effect; this reaches it.
@@ -1185,6 +1196,45 @@ export function FeedTerminal(props: Props) {
         </div>
         );
       })()}
+      {guardAsk && !props.ended && (
+        <div className="terminal-guard-card confirm-bar" role="alertdialog">
+          <Spark size={18} className="confirm-icon spark-glow" />
+          <div className="confirm-text">
+            <p>
+              <strong>{/* i18n-ignore */}Запрос команды от {guardAsk.author?.name || "ИИ-Агента"}</strong>
+              <span className="guard-mode-tag">{/* i18n-ignore */}Режим подтверждения (Guard Mode)</span>
+            </p>
+            <p>{/* i18n-ignore */}ИИ-Агент запрашивает разрешение на запуск следующей команды в этом терминале:</p>
+            <code>{guardAsk.command}</code>
+          </div>
+          <div className="button-row">
+            <button
+              type="button"
+              className="button-accent"
+              onClick={() => {
+                const cmd = guardAsk.command;
+                const author = guardAsk.author;
+                setGuardAsk(null);
+                run(cmd, true, false, author);
+              }}
+            >
+              <Check size={14} />
+              <span>{/* i18n-ignore */}Разрешить и запустить</span>
+            </button>
+            <button
+              type="button"
+              className="button-plain"
+              onClick={() => {
+                setGuardAsk(null);
+                props.notify("Команда ИИ-Агента отклонена"); // i18n-ignore
+              }}
+            >
+              <Close size={14} />
+              <span>{/* i18n-ignore */}Отклонить</span>
+            </button>
+          </div>
+        </div>
+      )}
       {!props.ended && (
         <InputLine terminalId={terminalId} phase={fullscreen ? "full" : phase}
           prompt={prompt} history={history} restore={restore} homeRef={homeRef}

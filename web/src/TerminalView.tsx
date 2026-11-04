@@ -39,6 +39,7 @@ import { KeysClosed } from "./KeysClosed";
 import { terminalName } from "./colors";
 import { gap, useT } from "./i18n";
 import { ModeToggle } from "./InputLine";
+import { TerminalHeader } from "./TerminalHeader";
 import { whatsNew } from "./links";
 import { reasonText, updatedTo } from "./reasons";
 import type { Shown } from "./theme";
@@ -236,6 +237,21 @@ export function TerminalView(props: Props) {
       inert={!active}>
       <div className={`terminal-area ${shownMode === "line" ? "feed-mode"
         : "classic-mode"}${isEnded ? " ended" : ""}`}>
+        <TerminalHeader
+          terminalId={terminalId}
+          info={info}
+          machineName={machine}
+          terminalLabel={info?.label ?? t("terminal_view.terminal")}
+          where={where}
+          running={running && !isEnded}
+          away={away}
+          isEnded={isEnded}
+          mode={shownMode}
+          noBlocks={noBlocks}
+          me={props.me}
+          onChooseMode={choose}
+          notify={props.notify}
+        />
         {shownMode === "classic" ? (
           <>
             <div className="classic-wrap">

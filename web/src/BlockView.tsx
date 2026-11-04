@@ -11,7 +11,7 @@ import type { LogNote, Me, Redaction } from "./api";
 import { useBriefly } from "./briefly";
 import { useT } from "./i18n";
 import {
-  Branch, Check, Close, Collapse, Copy, CopyText, Cross, Expand, Link, NoteAdd, Rerun,
+  Branch, Check, Close, Collapse, Copy, CopyText, Cross, Expand, Link, NoteAdd, Person, Rerun,
   Spark, Stop,
 } from "./icons";
 import { plainly } from "./logday";
@@ -53,6 +53,7 @@ export interface FeedBlock {
   notes: LogNote[];
   redacted: Redaction | null;
   canNote: boolean;
+  author?: { name: string; kind: "user" | "agent" | "guest" };
 }
 
 /** What a block's copy buttons copy. */
@@ -262,9 +263,11 @@ export function BlockView(props: Props) {
       aria-hidden="true" />;
   }
 
+  const authorClass = block.author?.kind ? ` block-by-${block.author.kind}` : "";
+
   return (
     <section id={`b${block.seqStart}`}
-      className={"block" + (running ? " live" : "") + (failed ? " failed" : "") +
+      className={"block" + authorClass + (running ? " live" : "") + (failed ? " failed" : "") +
         (props.flash ? " flash" : "") + (found ? " found" : "")}
       aria-label={what}>
       <div className="block-head">
@@ -276,6 +279,23 @@ export function BlockView(props: Props) {
           </code>
         )}
         <span className="block-meta">
+          {block.author && (
+            <span className={`chip-author chip-author-${block.author.kind}`}>
+              {block.author.kind === "agent" ? (
+                <>
+                  <Spark size={11} />
+                  <span>{block.author.name || "ИИ-Агент"}</span> {/* i18n-ignore */}
+                </>
+              ) : block.author.kind === "guest" ? (
+                <span>{/* i18n-ignore */}👥 {block.author.name || "Гость"}</span>
+              ) : (
+                <>
+                  <Person size={11} />
+                  <span>{block.author.name || "Вы"}</span> {/* i18n-ignore */}
+                </>
+              )}
+            </span>
+          )}
           {found && found.length > 0 && (
             <span className="found-pill">{t("block.found")}</span>
           )}

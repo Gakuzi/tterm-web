@@ -49,6 +49,7 @@ if os.path.exists(TTERM_CONFIG_PATH):
 
 TTERM_URL = os.environ.get("TTERM_URL", _config.get("url", "http://192.168.0.6:8290")).rstrip("/")
 TTERM_SESSION = os.environ.get("TTERM_SESSION", _config.get("session", "6COlOhrpS0FnUDpebkqrHXjTFMauwDYS4xQp17bgKbc"))
+ALLOWED_TERMINAL = os.environ.get("ALLOWED_TERMINAL", _config.get("allowed_terminal", ""))
 
 
 def _request(method: str, path: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -158,7 +159,10 @@ def read_terminal(terminal_id: str) -> str:
     return json.dumps(output, ensure_ascii=False, indent=2)
 
 
-async def _run_command_ws(terminal_id: str, command: str, timeout: float = 30.0) -> dict[str, Any]:
+async def _run_command_ws(terminal_id: str, command: str, timeout: float = 30.0, author: dict[str, Any] | None = None) -> dict[str, Any]:
+    if ALLOWED_TERMINAL and terminal_id != ALLOWED_TERMINAL:
+        raise PermissionError(f"Access denied: AI Agent is restricted to terminal {ALLOWED_TERMINAL}")
+
     ws_scheme = "wss" if TTERM_URL.startswith("https") else "ws"
     ws_host = TTERM_URL.split("://", 1)[1]
     ws_url = f"{ws_scheme}://{ws_host}/api/ws"
@@ -190,11 +194,13 @@ async def _run_command_ws(terminal_id: str, command: str, timeout: float = 30.0)
             "focus": True,
         }))
 
-        # Send command to run
+        # Send command to run with author metadata
+        auth_data = author or {"name": "Antigravity (ИИ)", "kind": "agent"}
         await ws.send(json.dumps({
             "op": "run",
             "ch": 1,
             "command": command,
+            "author": auth_data,
         }))
 
         start_time = time.time()
@@ -216,6 +222,21 @@ async def _run_command_ws(terminal_id: str, command: str, timeout: float = 30.0)
                         "command": command,
                     }
                 continue
+
+            if isinstance(msg, str):
+                try:
+                    data = json.loads(msg)
+                    if data.get("op") == "refused":
+                        raise RuntimeError(f"Command refused: {data.get('reason')}")
+                    if data.get("op") == "guard_ask":
+                        return {
+                            "exitCode": None,
+                            "output": "[Guard Mode] Команда ожидает подтверждения пользователя в веб-интерфейсе tTerm.",
+                            "command": command,
+                            "guard": True,
+                        }
+                except json.JSONDecodeError:
+                    pass
 
             if isinstance(msg, bytes) and len(msg) > 5 and msg[0] == 1:
                 last_text_output += msg[5:].decode("utf-8", "replace")

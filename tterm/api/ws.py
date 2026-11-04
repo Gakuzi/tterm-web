@@ -371,6 +371,28 @@ class PageSocket:
         if not isinstance(command, str):
             return
         self._did_something()
+        author = msg.get("author")
+        if author and isinstance(author, dict) and author.get("kind") == "agent":
+            if not getattr(watcher.terminal, "ai_access", True):
+                await self.json({"op": "refused", "ch": ch, "command": command,
+                                 "reason": "Доступ для ИИ-агентов к этому терминалу отозван пользователем."})
+                return
+            ai_mode = getattr(watcher.terminal, "ai_mode", "execute")
+            if ai_mode == "readonly":
+                await self.json({"op": "refused", "ch": ch, "command": command,
+                                 "reason": "Терминал находится в режиме «Только чтение» для ИИ. Выполнение команд заблокировано."})
+                return
+            if ai_mode == "guard" and msg.get("confirmed") is not True:
+                req_id = str(uuid.uuid4())
+                await self.json({
+                    "op": "guard_ask",
+                    "ch": ch,
+                    "command": command,
+                    "requestId": req_id,
+                    "author": author,
+                })
+                return
+
         # Checked as it will be typed: a control character in the middle of
         # a word must not hide it from the check and then vanish.
         command = clean_command(command)
@@ -383,6 +405,7 @@ class PageSocket:
                 return
         # Running a command is typing: this page becomes the one that types.
         watcher.focus()
+        watcher.terminal.set_next_author(author)
         why = watcher.terminal.run(command)
         if why is not None:
             await self.json({"op": "refused", "ch": ch, "command": command,

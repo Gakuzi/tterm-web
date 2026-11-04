@@ -208,6 +208,7 @@ class Block:
     started_at: dt.datetime
     #: The width it ran at: the page draws its output again at this width.
     cols: int = 80
+    author: dict | None = None
     started: float = field(default_factory=time.monotonic)
     head: bytearray = field(default_factory=bytearray)
     tail: deque = field(default_factory=deque)
@@ -335,6 +336,9 @@ class Terminal:
         self._chan: transport.Channel | None = None
         self._pending = bytearray()
         self._block: Block | None = None
+        self._next_author: dict | None = None
+        self.ai_access: bool = True
+        self.ai_mode: str = "execute"
         #: The last commands, to say which one a replay starts inside of.
         self._recent: deque[dict] = deque(maxlen=64)
         #: A command was typed by run() and the shell has not answered with a
@@ -368,6 +372,9 @@ class Terminal:
         agent went away. The shell waits there, and this for it."""
         return self.state == "open" and self._chan is not None and self._chan.away
 
+    def set_next_author(self, author: dict | None) -> None:
+        self._next_author = author
+
     def describe(self) -> dict:
         since = self._chan.since if self.away and self._chan is not None else None
         return {
@@ -391,6 +398,8 @@ class Terminal:
             "running": self._running(),
             "vault": self.vault_wait,
             "openedAt": self.opened_at.isoformat(timespec="seconds"),
+            "aiAccess": self.ai_access,
+            "aiMode": self.ai_mode,
         }
 
     def _running(self) -> dict | None:
@@ -400,7 +409,8 @@ class Terminal:
             return None
         return {"command": b.command, "cwd": b.cwd, "branch": b.branch,
                 "seqStart": b.seq_start, "cols": b.cols,
-                "at": int(b.started_at.timestamp() * 1000)}
+                "at": int(b.started_at.timestamp() * 1000),
+                "author": b.author}
 
     def block_at(self, seq: int) -> dict | None:
         """The command whose output goes on past the number `seq`: a replay
@@ -673,16 +683,18 @@ class Terminal:
                 # One line of several commands: the one before ended here.
                 self._finish_block(prev)
             self._typed = False
+            author = self._next_author
+            self._next_author = None
             self._event({"t": "C", "command": m.field(0), "prev": prev,
-                         "at": at})
+                         "at": at, "author": author})
             self._block = Block(command=m.field(0), cwd=self.cwd,
                                 branch=self.branch, seq_start=self.last_seq,
                                 started_at=dt.datetime.now(dt.UTC),
-                                cols=self.cols)
+                                cols=self.cols, author=author)
             self._recent.append({
                 "command": m.field(0), "cwd": self.cwd, "branch": self.branch,
                 "seqStart": self.last_seq, "seqEnd": None, "cols": self.cols,
-                "at": at})
+                "at": at, "author": author})
 
     def _finish_block(self, exit_code: int | None) -> int:
         """Saves the running command's block; returns how many bytes of
@@ -1092,6 +1104,7 @@ def _block_json(row: asyncpg.Record) -> dict:
         "cut": row["output_cut"],
         "partial": partial,
         "size": size,
+        "author": dict(row)["author"] if "author" in row else None,
         "output": base64.b64encode(tail).decode("ascii"),
     }
 

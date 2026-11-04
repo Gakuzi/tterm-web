@@ -1158,6 +1158,56 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         await terminal.close()
         return _json(terminal.describe())
 
+    @app.get("/api/terminals/{terminal_id}/access")
+    async def terminal_access_get(terminal_id: uuid.UUID,
+                                  session: auth.Session = Depends(signed_in)) -> Response:
+        """Terminal access permissions and RBAC state for AI agents and team."""
+        if terminals is None:
+            return _json({"error": "terminals are not running"}, 503)
+        terminal = terminals.get(terminal_id, session.person.id)
+        if terminal is None:
+            return _json({"error": "no such terminal"}, 404)
+        return _json({
+            "terminalId": str(terminal.id),
+            "machineId": str(terminal.machine.id),
+            "machineName": terminal.machine.name,
+            "label": terminal.label,
+            "aiAccess": getattr(terminal, "ai_access", True),
+            "aiMode": getattr(terminal, "ai_mode", "execute"),
+        })
+
+    @app.patch("/api/terminals/{terminal_id}/access")
+    async def terminal_access_patch(terminal_id: uuid.UUID,
+                                    data: dict,
+                                    session: auth.Session = Depends(signed_in)) -> Response:
+        """Updates AI and team access settings for this terminal."""
+        if terminals is None:
+            return _json({"error": "terminals are not running"}, 503)
+        terminal = terminals.get(terminal_id, session.person.id)
+        if terminal is None:
+            return _json({"error": "no such terminal"}, 404)
+        if "aiAccess" in data:
+            terminal.ai_access = bool(data["aiAccess"])
+        if "aiMode" in data and data["aiMode"] in ("execute", "guard", "readonly"):
+            terminal.ai_mode = str(data["aiMode"])
+        return _json({
+            "terminalId": str(terminal.id),
+            "aiAccess": terminal.ai_access,
+            "aiMode": terminal.ai_mode,
+        })
+
+    @app.post("/api/terminals/{terminal_id}/revoke_ai")
+    async def terminal_revoke_ai(terminal_id: uuid.UUID,
+                                 session: auth.Session = Depends(signed_in)) -> Response:
+        """Immediately revokes AI agent access to this terminal."""
+        if terminals is None:
+            return _json({"error": "terminals are not running"}, 503)
+        terminal = terminals.get(terminal_id, session.person.id)
+        if terminal is None:
+            return _json({"error": "no such terminal"}, 404)
+        terminal.ai_access = False
+        return _json({"ok": True, "revoked": True, "terminalId": str(terminal.id)})
+
     @app.get("/api/terminals/{terminal_id}/blocks")
     async def terminal_blocks(terminal_id: uuid.UUID, before: int | None = None,
                               limit: int = 60,

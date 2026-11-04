@@ -250,6 +250,8 @@ export interface TerminalInfo {
   /** Its machine is closed on this device (0.1.28): the core sends only
    * its name and where it is, not what it does. */
   locked?: boolean;
+  aiAccess?: boolean;
+  aiMode?: "execute" | "guard" | "readonly";
 }
 
 export interface RunningCommand {
@@ -259,6 +261,16 @@ export interface RunningCommand {
   seqStart: number;
   cols: number;
   at: number;
+  author?: { name: string; kind: "user" | "agent" | "guest" };
+}
+
+export interface TerminalAccess {
+  terminalId: string;
+  machineId: string;
+  machineName: string;
+  label: string;
+  aiAccess: boolean;
+  aiMode: "execute" | "guard" | "readonly";
 }
 
 /** A finished block as the database keeps it, with the end of its output. */
@@ -286,6 +298,7 @@ export interface StoredBlock {
   notes: LogNote[];
   redacted: Redaction | null;
   canNote: boolean;
+  author?: { name: string; kind: "user" | "agent" | "guest" };
 }
 
 export interface Feed {
@@ -1026,6 +1039,22 @@ export async function endTerminal(id: string): Promise<TerminalInfo | null> {
     { method: "DELETE", headers: { "x-tterm": "1" } });
   if (response.status === 404) return null;
   return (await check(response)).json();
+}
+
+export async function getTerminalAccess(terminalId: string): Promise<TerminalAccess> {
+  const response = await fetch(`/api/terminals/${terminalId}/access`, { cache: "no-store" });
+  return (await check(response)).json();
+}
+
+export async function updateTerminalAccess(
+  terminalId: string,
+  data: Partial<TerminalAccess>
+): Promise<TerminalAccess> {
+  return (await check(await fetch(`/api/terminals/${terminalId}/access`, change("PATCH", data)))).json();
+}
+
+export async function revokeTerminalAi(terminalId: string): Promise<{ ok: boolean; revoked: boolean }> {
+  return (await check(await fetch(`/api/terminals/${terminalId}/revoke_ai`, change("POST", {})))).json();
 }
 
 /** Takes a machine out of tTerm Web: its terminals end, a computer's agent
