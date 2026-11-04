@@ -12,7 +12,7 @@ import { useBriefly } from "./briefly";
 import { useT } from "./i18n";
 import {
   Branch, Check, Close, Collapse, Copy, CopyText, Cross, Expand, Link, NoteAdd, Rerun,
-  Stop,
+  Spark, Stop,
 } from "./icons";
 import { plainly } from "./logday";
 import { RedactedMark, Thread } from "./LogNotes";
@@ -80,6 +80,75 @@ interface Props {
   me: Me;
   /** A note under the block (0.1.20): whether it was saved. */
   onNote: (block: FeedBlock, text: string) => Promise<boolean>;
+  onRunFix?: (command: string) => void;
+}
+
+export function diagnoseError(command: string, exitCode: number | null): { reason: string; fix?: string } {
+  const cmd = command.trim();
+  const first = cmd.split(/\s+/)[0] || "";
+
+  if (exitCode === 127) {
+    return {
+      reason: `Команда «${first}» не найдена в системе. Проверьте правильность написания или установите нужный пакет.`, // i18n-ignore
+      fix: `which ${first}`,
+    };
+  }
+  if (exitCode === 126) {
+    return {
+      reason: `Недостаточно прав для запуска «${first}» (Permission Denied).`, // i18n-ignore
+      fix: `sudo ${cmd}`,
+    };
+  }
+  if (exitCode === 130) {
+    return {
+      reason: "Команда была прервана пользователем комбинацией клавиш Ctrl+C (сигнал SIGINT).", // i18n-ignore
+    };
+  }
+  if (exitCode === 137) {
+    return {
+      reason: "Процесс принудительно остановлен системой (сигнал SIGKILL / нехватка памяти Out of Memory).", // i18n-ignore
+    };
+  }
+  if (cmd.startsWith("git push")) {
+    return {
+      reason: "Отправка на GitHub отклонена. На удалённом сервере есть новые коммиты, которых нет в вашей локальной копии.", // i18n-ignore
+      fix: "git pull --rebase",
+    };
+  }
+  if (cmd.startsWith("git commit") && cmd.includes("-m")) {
+    return {
+      reason: "Не удалось создать коммит. Возможно, файлы не были добавлены в индекс через git add.", // i18n-ignore
+      fix: `git add -A && ${cmd}`,
+    };
+  }
+  if (cmd.startsWith("docker ") && !cmd.startsWith("sudo ")) {
+    return {
+      reason: "Для работы с Docker требуются права суперпользователя или добавление в группу docker.", // i18n-ignore
+      fix: `sudo ${cmd}`,
+    };
+  }
+  if (cmd.startsWith("apt ") || cmd.startsWith("apt-get ")) {
+    if (!cmd.startsWith("sudo ")) {
+      return {
+        reason: "Для установки и обновления пакетов apt требуются права администратора.", // i18n-ignore
+        fix: `sudo ${cmd}`,
+      };
+    }
+    return {
+      reason: "Ошибка базы данных apt. Возможно, процесс заблокирован другим активным обновлением.", // i18n-ignore
+      fix: "sudo fuser -vki /var/lib/dpkg/lock-frontend",
+    };
+  }
+  if (cmd.startsWith("systemctl ") && !cmd.startsWith("sudo ")) {
+    return {
+      reason: "Управление службами systemd требует повышенных привилегий.", // i18n-ignore
+      fix: `sudo ${cmd}`,
+    };
+  }
+  return {
+    reason: `Команда завершилась с ошибкой (код возврата: ${exitCode}). Проверьте параметры запуска.`, // i18n-ignore
+    fix: cmd.startsWith("sudo ") ? undefined : `sudo ${cmd}`,
+  };
 }
 
 export function shortPath(cwd: string, home?: string): string {
@@ -129,6 +198,7 @@ export function BlockView(props: Props) {
   const running = block.state !== "done";
   const failed = block.state === "done" && block.exitCode !== null &&
     block.exitCode !== 0;
+  const [aiHelpOpen, setAiHelpOpen] = useState(false);
   const lines = block.rendered?.lines ?? [];
   const shown = block.expanded ? lines : lines.slice(-SHOW_LINES);
   const hidden = lines.length - shown.length;
@@ -216,7 +286,18 @@ export function BlockView(props: Props) {
           )}
           {block.state === "running" && <span className="amber">{t("block.running")}</span>}
           {failed && (
-            <span className="red">{t("block.exit", { code: String(block.exitCode) })}</span>
+            <>
+              <span className="red">{t("block.exit", { code: String(block.exitCode) })}</span>
+              <button
+                type="button"
+                className="chip-ai-help"
+                title="Помощь ИИ: объяснить причину ошибки и предложить решение" // i18n-ignore
+                onClick={() => setAiHelpOpen(!aiHelpOpen)}
+              >
+                <Spark size={11} />
+                <span>Помощь ИИ</span> {/* i18n-ignore */}
+              </button>
+            </>
           )}
           {running && block.startedAt ? <Ticking since={block.startedAt} />
             : block.startedAt && block.finishedAt
@@ -301,6 +382,39 @@ export function BlockView(props: Props) {
           </div>
         )}
       </div>
+      {failed && aiHelpOpen && (() => {
+        const diag = diagnoseError(block.command, block.exitCode);
+        return (
+          <div className="block-ai-assist">
+            <div className="block-ai-head">
+              <Spark size={13} />
+              <span>Анализ ошибки от ИИ</span> {/* i18n-ignore */}
+            </div>
+            <div className="block-ai-desc">{diag.reason}</div>
+            <div className="block-ai-fix-row">
+              {diag.fix && props.onRunFix && (
+                <button
+                  type="button"
+                  className="ai-fix-button"
+                  onClick={() => props.onRunFix?.(diag.fix!)}
+                  title="Выполнить команду исправления в терминале" // i18n-ignore
+                >
+                  <Spark size={12} />
+                  <span>Исправить:</span> {/* i18n-ignore */}
+                  <code>{diag.fix}</code> {/* i18n-ignore */}
+                </button>
+              )}
+              <button
+                type="button"
+                className="button-plain small"
+                onClick={() => setAiHelpOpen(false)}
+              >
+                Скрыть {/* i18n-ignore */}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
       {live ? (
         <div className="live-clip" ref={props.clipRef}
           style={{ height: props.clipHeight ?? 0 }} />

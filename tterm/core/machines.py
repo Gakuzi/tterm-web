@@ -55,6 +55,8 @@ LOGIN = trust.LOGIN
 TEMPLATE = Path(__file__).resolve().parent.parent / "templates" / "install.sh"
 COMPUTER_TEMPLATE = (Path(__file__).resolve().parent.parent / "templates"
                      / "install_computer.sh")
+COMPUTER_TEMPLATE_PS1 = (Path(__file__).resolve().parent.parent / "templates"
+                         / "install_computer.ps1")
 #: Where a computer's installer takes the agent from, unless TTERM_SRC says
 #: otherwise when it runs: the released one, as the bot's installer does.
 AGENT_SOURCE = "https://raw.githubusercontent.com/tterm-net/tterm-agent/main/agent.py"
@@ -165,6 +167,24 @@ def render_computer_installer(*, token: str, connect_url: str) -> str:
             .replace("{{TOKEN}}", token))
 
 
+def computer_command_ps1(connect_url: str, token: str) -> str:
+    """What a Windows computer runs in PowerShell: irm .../c/<token>.ps1 | iex"""
+    return f"irm {connect_url}/c/{token}.ps1 | iex"
+
+
+def render_computer_installer_ps1(*, token: str, connect_url: str) -> str:
+    if not TOKEN_RE.match(token):
+        raise ValueError("bad token")
+    return (COMPUTER_TEMPLATE_PS1.read_text(encoding="utf-8")
+            .replace("{{HUB}}", hub_url(connect_url))
+            .replace("{{TOKEN}}", token))
+
+
+def refusal_ps1(message: str) -> str:
+    escaped = message.replace('"', '`"')
+    return f'Write-Error "{escaped}"; exit 1\n'
+
+
 def server_cleanup(principal: str | None, ca_id: str | None = None,
                    own_line: bool = True) -> str | None:
     """The command that takes tTerm Web's access back on a server that was
@@ -234,6 +254,7 @@ class Install:
     expires_at: dt.datetime
     #: For a computer: the agent started by hand with the same token.
     by_hand: str | None = None
+    windows_command: str | None = None
 
 
 async def create_install(pool: asyncpg.Pool, *, project_id: uuid.UUID,
@@ -262,7 +283,8 @@ async def create_install(pool: asyncpg.Pool, *, project_id: uuid.UUID,
                                user_id=user_id, details={"kind": kind})
     if kind == "computer":
         return Install(row["id"], token, computer_command(connect_url, token),
-                       row["expires_at"], agent_command(connect_url, token))
+                       row["expires_at"], agent_command(connect_url, token),
+                       windows_command=computer_command_ps1(connect_url, token))
     return Install(row["id"], token, command(connect_url, token),
                    row["expires_at"])
 

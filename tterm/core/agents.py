@@ -1146,8 +1146,9 @@ async def _read_passport_again(pool: asyncpg.Pool, machine_id: uuid.UUID,
                                link: AgentLink) -> None:
     """Reads a known computer's passport anew: tools come and go, sudo
     changes, and an older tTerm Web read less of it."""
+    ps = passport.POWERSHELL_SCRIPT if (link.os and link.os.lower().startswith("win")) else passport.SCRIPT
     try:
-        code, out, _ = await link.script(passport.SCRIPT, PASSPORT_TIMEOUT)
+        code, out, _ = await link.script(ps, PASSPORT_TIMEOUT)
     except LinkError as exc:
         log.info("could not read the passport of %s again: %s",
                  link.machine_name, exc)
@@ -1177,8 +1178,9 @@ async def _join(pool: asyncpg.Pool, claimed: asyncpg.Record,
     An agent that goes meanwhile is not added: its command works again
     when it comes back. One that is there but could not answer is added
     with what its hello said."""
+    ps = passport.POWERSHELL_SCRIPT if (link.os and link.os.lower().startswith("win")) else passport.SCRIPT
     try:
-        code, out, _ = await link.script(passport.SCRIPT, PASSPORT_TIMEOUT)
+        code, out, _ = await link.script(ps, PASSPORT_TIMEOUT)
         details = passport.parse(out.decode("utf-8", "replace"))
     except LinkError as exc:
         if link.gone:

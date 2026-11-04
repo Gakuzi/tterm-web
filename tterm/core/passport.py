@@ -53,6 +53,44 @@ if command -v bash >/dev/null 2>&1; then
 fi
 """
 
+POWERSHELL_SCRIPT = r"""
+$os = (Get-CimInstance Win32_OperatingSystem).Caption
+$os_ver = [System.Environment]::OSVersion.Version.ToString()
+$hostName = [System.Environment]::MachineName
+$arch = if ([System.Environment]::Is64BitOperatingSystem) { "x86_64" } else { "x86" }
+$cpus = [System.Environment]::ProcessorCount
+$mem = [math]::Round((Get-CimInstance Win32_OperatingSystem).TotalVisibleMemorySize)
+$drive = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -like "$($env:SystemDrive)*" } | Select-Object -First 1
+$free_kb = if ($drive) { [math]::Round($drive.Free / 1024) } else { 0 }
+$total_kb = if ($drive) { [math]::Round(($drive.Used + $drive.Free) / 1024) } else { 0 }
+
+"os=$os"
+"os_id=windows"
+"os_version=$os_ver"
+"hostname=$hostName"
+"arch=$arch"
+"shell=powershell.exe"
+"cpus=$cpus"
+"memory_kb=$mem"
+"disk_total_kb=$total_kb"
+"disk_free_kb=$free_kb"
+"sudo=yes"
+"systemd=no"
+"--commands--"
+"git"
+"powershell"
+"cmd"
+"dir"
+"cd"
+"cls"
+"ping"
+"ipconfig"
+"tasklist"
+"systeminfo"
+"curl"
+"tar"
+"""
+
 MARKER = "--commands--"
 
 _INTS = ("cpus", "memory_kb", "disk_total_kb", "disk_free_kb")

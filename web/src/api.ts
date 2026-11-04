@@ -354,6 +354,7 @@ export interface State {
 export interface Install {
   id: string;
   command: string;
+  windowsCommand?: string | null;
   /** For a computer: the agent started by hand, for trying one not yet
    * released. */
   byHand?: string | null;

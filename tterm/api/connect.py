@@ -102,6 +102,19 @@ def create_connect_app(pool: asyncpg.Pool, signer: SignerClient,
             connect_url=connect_url)
         return PlainTextResponse(script, headers=SCRIPT_HEADERS)
 
+    @app.get("/c/{token}.ps1")
+    async def computer_installer_ps1(token: str) -> Response:
+        """The PowerShell installer for Windows computers."""
+        problem = await machines.check_token(pool, token, kind="computer")
+        if problem:
+            return PlainTextResponse(machines.refusal_ps1(problem),
+                                     headers={"content-type": "text/plain; charset=utf-8",
+                                              "cache-control": "no-store"})
+        script = machines.render_computer_installer_ps1(token=token,
+                                                        connect_url=connect_url)
+        return PlainTextResponse(script, headers={"content-type": "text/plain; charset=utf-8",
+                                                  "cache-control": "no-store"})
+
     @app.get("/c/{token}")
     async def computer_installer(token: str) -> Response:
         """The agent's installer, for a person to run on their computer.

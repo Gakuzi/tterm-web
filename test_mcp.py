@@ -61,6 +61,18 @@ class TestTTermMcpServer(unittest.TestCase):
         self.assertIn("error", res)
         self.assertEqual(res["error"]["code"], -32601)
 
+    def test_windows_installer_template(self):
+        from pathlib import Path
+        template_file = Path(__file__).parent / "tterm" / "templates" / "install_computer.ps1"
+        self.assertTrue(template_file.exists())
+        content = template_file.read_text(encoding="utf-8")
+        self.assertIn("{{HUB}}", content)
+        self.assertIn("{{TOKEN}}", content)
+        rendered = content.replace("{{HUB}}", "http://192.168.0.6:8291").replace("{{TOKEN}}", "tok_test_123")
+        self.assertIn("tok_test_123", rendered)
+        self.assertIn("http://192.168.0.6:8291", rendered)
+        self.assertIn("tTerm Web: connecting this Windows computer", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()

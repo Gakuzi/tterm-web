@@ -37,6 +37,7 @@ export function AddMachine(props: Props) {
   const addable = projects.filter((p) => p.role === "owner" || p.role === "admin");
   const [projectId, setProjectId] = useState(props.projectId);
   const [kind, setKind] = useState<MachineKind>(props.kind);
+  const [osPlatform, setOsPlatform] = useState<"unix" | "windows">("unix");
   const [install, setInstall] = useState<Install | null>(null);
   const [status, setStatus] = useState<InstallStatus | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -177,10 +178,36 @@ export function AddMachine(props: Props) {
                 <span className="step-number" aria-hidden="true">1</span>
                 <div className="dialog-step">
                   <strong>{t("add_machine.run_computer")}</strong>
+                  <div className="platform-toggle" role="tablist">
+                    <button
+                      type="button"
+                      className={`platform-btn ${osPlatform === "unix" ? "active" : ""}`}
+                      onClick={() => setOsPlatform("unix")}
+                    >
+                      macOS / Linux {/* i18n-ignore */}
+                    </button>
+                    <button
+                      type="button"
+                      className={`platform-btn ${osPlatform === "windows" ? "active" : ""}`}
+                      onClick={() => setOsPlatform("windows")}
+                    >
+                      Windows (PowerShell) {/* i18n-ignore */}
+                    </button>
+                  </div>
                   <div className="command-box">
-                    <code>{install ? install.command : "…"}</code>
+                    <code>
+                      {install
+                        ? (osPlatform === "windows"
+                            ? (install.windowsCommand || install.command)
+                            : install.command)
+                        : "…"}
+                    </code>
                     <button type="button" className="button-accent"
-                      onClick={() => copy(install?.command, () => showCopied(true))}
+                      onClick={() => copy(
+                        osPlatform === "windows"
+                          ? (install?.windowsCommand || install?.command)
+                          : install?.command,
+                        () => showCopied(true))}
                       disabled={!install}>
                       {copied ? <Check size={14} className="pressed-mark" />
                         : <Copy size={14} />}
@@ -188,7 +215,9 @@ export function AddMachine(props: Props) {
                     </button>
                   </div>
                   <span className="hint">
-                    {t("add_machine.hint_computer", { works })}
+                    {osPlatform === "windows"
+                      ? "Запустите команду в обычном PowerShell от своего имени (без Administrator)." /* i18n-ignore */
+                      : t("add_machine.hint_computer", { works })}
                   </span>
                   {install?.byHand && (
                     <details className="by-hand">

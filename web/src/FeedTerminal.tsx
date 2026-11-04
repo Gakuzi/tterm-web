@@ -1136,6 +1136,7 @@ export function FeedTerminal(props: Props) {
               onCopyBlock={(x) => copy(blockText(x))}
               onCopyOutput={(x) => copy(x.rendered ? plainText(x.rendered) : "")}
               onRunAgain={(x) => run(x.command, false, true)}
+              onRunFix={(cmd) => run(cmd, false, true)}
               onCopyLink={(x) => copy(
                 `${location.origin}/t/${terminalId}#b${x.seqStart}`)}
               onToggle={(x) => {

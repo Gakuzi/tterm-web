@@ -962,6 +962,7 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         except ValueError as exc:
             return _json({"error": str(exc)}, 422)
         return _json({"id": str(install.id), "command": install.command,
+                      "windowsCommand": install.windows_command,
                       "byHand": install.by_hand,
                       "expiresAt": install.expires_at.isoformat(),
                       "minutes": machines.INSTALL_MINUTES}, 201)

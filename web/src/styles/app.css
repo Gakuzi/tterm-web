@@ -9336,3 +9336,299 @@ mark.log-hit {
   align-self: stretch;
   text-align: left;
 }
+
+/* ------------------------------------------------------------- Platform Toggle in Add Machine */
+.platform-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.platform-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--dim);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.platform-btn:hover {
+  background: var(--line);
+  color: var(--ink);
+}
+
+.platform-btn.active {
+  background: var(--amber-tint);
+  border-color: var(--amber);
+  color: var(--amber-ink);
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------- Git Bar in InputLine */
+.git-bar {
+  max-width: 1120px;
+  margin: 0 auto 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.git-bar-items {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.git-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--amber);
+  font-weight: 600;
+}
+
+.git-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.git-action-btn:hover:not(:disabled) {
+  background: var(--line);
+  border-color: var(--dim);
+}
+
+.git-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.git-action-commit {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.git-action-commit:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: #10b981;
+}
+
+.git-commit-popover {
+  max-width: 1120px;
+  margin: 0 auto 12px;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.git-commit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--raised);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.git-commit-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+}
+
+.git-commit-content {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.git-commit-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 13px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.git-commit-textarea:focus {
+  outline: none;
+  border-color: var(--focus);
+}
+
+.git-ai-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.git-ai-suggest-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  color: #a78bfa;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.git-ai-suggest-btn:hover {
+  background: rgba(139, 92, 246, 0.25);
+  border-color: #a78bfa;
+}
+
+.git-presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.git-preset-chip {
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--dim);
+  cursor: pointer;
+}
+
+.git-preset-chip:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.git-commit-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.git-push-accent {
+  background: #059669 !important;
+}
+
+.git-push-accent:hover {
+  background: #047857 !important;
+}
+
+/* ------------------------------------------------------------- AI Error Assistant in BlockView */
+.chip-ai-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  color: #a78bfa;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 6px;
+  transition: all 0.15s ease;
+}
+
+.chip-ai-help:hover {
+  background: rgba(139, 92, 246, 0.25);
+  border-color: #a78bfa;
+}
+
+.block-ai-assist {
+  margin: 6px 0 10px;
+  padding: 10px 14px;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.block-ai-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #c4b5fd;
+  font-size: 12px;
+}
+
+.block-ai-desc {
+  color: var(--ink);
+}
+
+.block-ai-fix-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-fix-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #059669;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ai-fix-button:hover {
+  background: #047857;
+}
+
+.ai-fix-button code {
+  font-family: var(--font-mono);
+  background: rgba(0, 0, 0, 0.2);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
