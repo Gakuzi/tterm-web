@@ -91,6 +91,11 @@ interface Props {
   onNewTerminal: (machine: Machine) => void;
   onGoTo: (terminalId: string) => void;
   onEndTerminal: (terminal: TerminalInfo) => void;
+  /** The machine being named here, if one is. */
+  renamingMachine?: string | null;
+  onStartRenameMachine?: (machineId: string) => void;
+  onRenameMachine?: (machineId: string, name: string) => void;
+  onStopRenameMachine?: () => void;
   /** The terminal being named here, if one is (0.1.2). */
   renaming: string | null;
   onStartRename: (terminalId: string) => void;
@@ -198,6 +203,24 @@ export function Sidebar(props: Props) {
     // Closed on this device (0.1.28): a lock for the "+", its terminals
     // dimmed.
     const shut = props.closed(m);
+    if (props.renamingMachine === m.id) {
+      return (
+        <div key={m.id} className="sb-group">
+          <div className="sb-rename" style={{ padding: "4px 8px" }}>
+            <div className="sb-rename-row">
+              {computer ? <Computer size={14} /> : <Server size={14} />}
+              <NameInput id={m.id} name={m.name} className="sb-rename-input"
+                onRename={(id, name) => props.onRenameMachine?.(id, name)}
+                onStop={() => props.onStopRenameMachine?.()} />
+            </div>
+            <span className="sb-rename-hint">
+              {/* i18n-ignore */}
+              Нажмите Enter для сохранения
+            </span>
+          </div>
+        </div>
+      );
+    }
     return (
       <div key={m.id} className="sb-group">
         <div className="sb-row">
@@ -216,7 +239,14 @@ export function Sidebar(props: Props) {
             {here ? (
               <span className="here-mark" aria-hidden="true"><Computer size={13} /></span>
             ) : computer ? <Computer size={14} /> : <Server size={14} />}
-            <span className="sb-text">{m.name}</span>
+            <span className="sb-text"
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                props.onStartRenameMachine?.(m.id);
+              }}
+              title="Двойной клик для переименования" /* i18n-ignore */>
+              {m.name}
+            </span>
             {m.method === "key" && (
               <span className="sb-key" title={t("sidebar.with_key")}>
                 <Key size={13} />

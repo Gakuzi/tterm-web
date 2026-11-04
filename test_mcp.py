@@ -22,6 +22,14 @@ class TestTTermMcpServer(unittest.TestCase):
         self.assertIn("tterm_list_terminals", tool_names)
         self.assertIn("tterm_run_command", tool_names)
         self.assertIn("tterm_exec", tool_names)
+        self.assertIn("tterm_rename_machine", tool_names)
+
+    @patch("mcp_server._request")
+    def test_rename_machine(self, mock_request):
+        mock_request.return_value = {"id": "m-123", "name": "Custom Server"}
+        res_str = mcp_server.rename_machine("m-123", "Custom Server")
+        res = json.loads(res_str)
+        self.assertEqual(res["name"], "Custom Server")
 
     @patch("mcp_server._request")
     def test_list_machines(self, mock_request):

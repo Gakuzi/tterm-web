@@ -106,6 +106,12 @@ def get_machine_info(machine_id: str) -> str:
     return json.dumps(machine, ensure_ascii=False, indent=2)
 
 
+def rename_machine(machine_id: str, new_name: str) -> str:
+    """Renames a machine in tTerm."""
+    res = _request("PATCH", f"/api/machines/{machine_id}", {"name": new_name})
+    return json.dumps(res, ensure_ascii=False, indent=2)
+
+
 def list_terminals() -> str:
     """Lists currently open terminals and active commands."""
     state = _request("GET", "/api/state")
@@ -314,6 +320,24 @@ TOOLS = [
         },
     },
     {
+        "name": "tterm_rename_machine",
+        "description": "Renames a machine in tTerm to a custom, user-friendly name.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "machine_id": {
+                    "type": "string",
+                    "description": "UUID of the machine to rename.",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "New friendly display name for the machine.",
+                },
+            },
+            "required": ["machine_id", "name"],
+        },
+    },
+    {
         "name": "tterm_list_terminals",
         "description": "Lists currently open terminal sessions in tTerm, including machine name, working directory, and running commands.",
         "inputSchema": {
@@ -337,6 +361,24 @@ TOOLS = [
                 },
             },
             "required": ["machine_id"],
+        },
+    },
+    {
+        "name": "tterm_rename_machine",
+        "description": "Renames a machine in tTerm to a custom, user-friendly name.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "machine_id": {
+                    "type": "string",
+                    "description": "UUID of the machine to rename.",
+                },
+                "name": {
+                    "type": "string",
+                    "description": "New friendly display name for the machine.",
+                },
+            },
+            "required": ["machine_id", "name"],
         },
     },
     {
@@ -450,6 +492,8 @@ def handle_request(req: dict[str, Any]) -> dict[str, Any] | None:
                 content = run_command(args["terminal_id"], args["command"], args.get("timeout", 30.0))
             elif name == "tterm_read_terminal":
                 content = read_terminal(args["terminal_id"])
+            elif name == "tterm_rename_machine":
+                content = rename_machine(args["machine_id"], args["name"])
             elif name == "tterm_exec":
                 content = json.dumps(exec_auto(args["command"], args.get("machine"), args.get("timeout", 30.0)), ensure_ascii=False, indent=2)
             else:
@@ -510,6 +554,7 @@ def main() -> None:
             print("Usage:")
             print("  mcp_server.py --list                 List connected machines")
             print("  mcp_server.py --terminals            List open terminals")
+            print("  mcp_server.py --rename <id> <name>   Rename machine")
             print("  mcp_server.py --open <machine_id>    Open new terminal")
             print("  mcp_server.py --run <term_id> <cmd>  Run command in terminal")
             print("  mcp_server.py --exec <cmd>           Auto-run command on active machine")
@@ -525,6 +570,11 @@ def main() -> None:
         if cmd == "--open":
             m_id = sys.argv[2]
             print(open_terminal(m_id))
+            sys.exit(0)
+        if cmd == "--rename":
+            m_id = sys.argv[2]
+            new_name = sys.argv[3]
+            print(rename_machine(m_id, new_name))
             sys.exit(0)
         if cmd == "--run":
             t_id = sys.argv[2]

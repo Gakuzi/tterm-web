@@ -5,7 +5,7 @@ import {
   CoreError, createFolder, createNote, createProject, deleteFolder, deleteNote,
   deleteProject, editProject, endTerminal, loadLogToday, loadNote, loadState, moveMachine,
   moveNote, NoteGone, onSignedOut, openTerminal, removeMachine, renameFolder,
-  renameTerminal, saveLanguage, saveProjectTint, saveTheme, SignedOut, signInApp, signOut,
+  renameMachine, renameTerminal, saveLanguage, saveProjectTint, saveTheme, SignedOut, signInApp, signOut,
   welcomeSeen, type Folder, type FoundBlock, type FoundNote,
   type Machine, type MachineKind, type Note, type NoteSummary, type Project,
   type ProjectFields, type ProjectTint, type State, type TerminalInfo,
@@ -344,6 +344,7 @@ export function App() {
   const [renaming, setRenaming] = useState<Renaming | null>(null);
   const renamingRef = useRef(renaming);
   renamingRef.current = renaming;
+  const [renamingMachine, setRenamingMachine] = useState<string | null>(null);
   const pinnedRef = useRef(pinned);
   pinnedRef.current = pinned;
   /** The mouse is over the sidebar. */
@@ -989,6 +990,26 @@ export function App() {
         notYet(say("app.no_rename", { why: e.message }));
       });
   }, [notYet, refresh, stopRenaming]);
+
+  /** A machine named in the sidebar. */
+  const onRenameMachine = useCallback((id: string, name: string) => {
+    renameMachine(id, name)
+      .then((info) => {
+        setRenamingMachine(null);
+        setState((s) => s && {
+          ...s,
+          projects: s.projects.map((p) => ({
+            ...p,
+            machines: p.machines.map((m) => (m.id === id ? { ...m, name: info.name } : m)),
+          })),
+        });
+        refresh();
+      })
+      .catch((e: Error) => {
+        setRenamingMachine(null);
+        notYet(say("app.no_rename", { why: e.message }));
+      });
+  }, [notYet, refresh]);
 
   // What open notes tell of themselves.
   const onSummary = useCallback((noteId: string, typed: Typed) => {
@@ -2020,6 +2041,14 @@ export function App() {
             }
           }}
           onEndTerminal={askEnd}
+          renamingMachine={renamingMachine}
+          onStartRenameMachine={(id) => {
+            cancelTimers();
+            setPicking(false);
+            setRenamingMachine(id);
+          }}
+          onRenameMachine={onRenameMachine}
+          onStopRenameMachine={() => setRenamingMachine(null)}
           renaming={renaming?.where === "side" ? renaming.id : null}
           onStartRename={(id) => {
             cancelTimers();

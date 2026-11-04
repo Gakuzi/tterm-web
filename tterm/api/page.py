@@ -224,6 +224,10 @@ class OwnLineBody(BaseModel):
     name: str = ""
 
 
+class MachinePatch(BaseModel):
+    name: str
+
+
 class LogNoteBody(BaseModel):
     """A note under a line of a machine's log (0.1.20): the line by its id,
     or, from a terminal's feed, by the terminal and the block's number."""
@@ -1017,6 +1021,22 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         return _json(await machines.take_back(
             pool, terminals.signer if terminals is not None else None,
             removed, who))
+
+    @app.patch("/api/machines/{machine_id}")
+    async def rename_machine(machine_id: uuid.UUID, body: MachinePatch,
+                             session: auth.Session = Depends(signed_in)) -> Response:
+        """Gives the machine a new name within its project."""
+        if (closed := await closed_machine(machine_id, session)) is not None:
+            return closed
+        try:
+            updated = await machines.rename(pool, session.person.id, machine_id, body.name)
+        except PermissionError as exc:
+            return _json({"error": str(exc)}, 403)
+        except ValueError as exc:
+            return _json({"error": str(exc)}, 400)
+        if updated is None:
+            return _json({"error": "no such machine"}, 404)
+        return _json(updated)
 
     @app.post("/api/machines/{machine_id}/move")
     async def move_machine(machine_id: uuid.UUID, body: MoveBody,

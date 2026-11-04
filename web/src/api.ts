@@ -971,6 +971,13 @@ export async function renameTerminal(id: string,
     change("PATCH", { name })))).json();
 }
 
+/** A name for a machine. */
+export async function renameMachine(id: string,
+  name: string): Promise<{ id: string; name: string }> {
+  return (await check(await fetch(`/api/machines/${id}`,
+    change("PATCH", { name })))).json();
+}
+
 export async function newInstall(projectId: string,
   kind: MachineKind = "server"): Promise<Install> {
   const response = await fetch("/api/installs",

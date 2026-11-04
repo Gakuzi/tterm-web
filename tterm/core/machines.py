@@ -669,6 +669,46 @@ async def remove(pool: asyncpg.Pool, user_id: uuid.UUID,
     return removal
 
 
+async def rename(pool: asyncpg.Pool, user_id: uuid.UUID,
+                 machine_id: uuid.UUID, name: str) -> dict | None:
+    """Gives a machine a new name within its project."""
+    name = name.strip()
+    if not name:
+        raise ValueError("Name cannot be empty")
+    if len(name) > 64:
+        raise ValueError("Name can be at most 64 characters")
+
+    async with pool.acquire() as conn, conn.transaction():
+        row = await conn.fetchrow(
+            """
+            SELECT m.id, m.name, m.project_id, pm.role
+            FROM machines m
+            JOIN project_members pm ON pm.project_id = m.project_id
+             AND pm.user_id = $2 AND (pm.until IS NULL OR pm.until > now())
+            WHERE m.id = $1 AND m.removed_at IS NULL
+            FOR UPDATE OF m
+            """, machine_id, user_id)
+        if row is None:
+            return None
+        if row["role"] not in ("owner", "admin", "member"):
+            raise PermissionError("Only members with write access can rename machines")
+
+        try:
+            await conn.execute(
+                "UPDATE machines SET name = $2 WHERE id = $1",
+                machine_id, name)
+        except asyncpg.UniqueViolationError:
+            raise ValueError(f"Another machine in this project is already named '{name}'")
+
+        await accounts.journal(conn, "machine.renamed",
+                               project_id=row["project_id"], user_id=user_id,
+                               machine_id=machine_id,
+                               details={"was": row["name"], "name": name})
+
+    log.info("machine.renamed: %s -> %s", row["name"], name)
+    return {"id": str(machine_id), "name": name}
+
+
 async def take_back(pool: asyncpg.Pool, signer: SignerClient | None,
                     removal: Removal, who: str) -> dict:
     """After a server is removed, tTerm Web takes its line out of the
