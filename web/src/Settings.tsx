@@ -31,9 +31,10 @@ import { DevicesSection } from "./Devices";
 import { LANGUAGES, useT, type Lang } from "./i18n";
 import {
   Card, ChevronDown, ChevronLeft, ChevronRight, Close, Computer, Devices, Download, Gear,
-  Key, Monitor, Moon, Person, Search, Sun,
+  Key, Monitor, Moon, Person, Search, Spark, Sun,
 } from "./icons";
-import { KeysSection } from "./Keys";
+import { KeysSection } from "./Keys.tsx";
+import { AiSection } from "./AiSection";
 import { InApp } from "./local";
 import { Group, Row, SearchWords } from "./SettingsRows";
 import { searchWords, sectionsFound, type SettingsSection } from "./settingsSearch";
@@ -204,6 +205,8 @@ export function Settings(props: Props) {
           item("keys", <Key size={18} />, t("keys.title"), [t("settings.keys_words")]),
           item("devices", <Devices size={18} />, t("devices.title"), [
             t("devices.forget_all"), t("settings.devices_words")]),
+          item("ai", <Spark size={18} />, "AI & MCP", [ // i18n-ignore
+            "ai", "mcp", "agents", "cursor", "claude", "терминал", "ии"]), // i18n-ignore
         ],
       });
     }
@@ -337,6 +340,8 @@ export function Settings(props: Props) {
         return props.here ? <ThisComputerSection here={props.here} /> : null;
       case "updates":
         return <UpdatesSection />;
+      case "ai":
+        return <AiSection notify={props.notify} />;
     }
   };
 
