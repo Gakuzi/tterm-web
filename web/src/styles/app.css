@@ -9204,3 +9204,135 @@ mark.log-hit {
     box-shadow: none;
   }
 }
+
+/* --------------------------------- keys open on this device (0.1.28, v3) */
+
+/* A machine closed here: a lock in place of its "+", amber, as the mockup
+   (LockFlow.dc) has it; its terminals and its log dimmed, each with a lock
+   and no count. */
+.sb-plus.sb-lock {
+  color: var(--amber-ink);
+}
+
+.sb-plus.sb-lock:hover {
+  color: var(--amber-hover);
+  background: var(--amber-tint);
+}
+
+.sb-leaf.closed .sb-text,
+.sb-leaf.closed .avatar,
+.sb-leaf.closed .sb-leaf-icon {
+  opacity: .55;
+}
+
+.sb-closed-lock {
+  flex: none;
+  color: var(--faint);
+}
+
+.tab-lock {
+  flex: none;
+  display: inline-flex;
+  color: var(--amber-ink);
+}
+
+/* The card of a closed tab stands where the tab's view would. */
+.terminal-view > .keys-closed {
+  overflow-y: auto;
+}
+
+.keys-closed .vault-locked-card {
+  max-width: 500px;
+}
+
+/* The pages of machines (the canvas, version 109): a machine closed here
+   says so, amber with its lock, and its button has the lock; its running
+   terminals are dimmed, each with a lock, as in the sidebar. */
+.machine-names .machine-closed {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 8px;
+  color: var(--amber-ink);
+  font-weight: 600;
+}
+
+.button-plain.running.closed .running-name {
+  opacity: .55;
+}
+
+.closed-lock {
+  flex: none;
+  color: var(--faint);
+}
+
+/* New terminal on a project's page: the lock in place of its "+". */
+.button-ghost.closed {
+  color: var(--amber-ink);
+}
+
+.button-ghost.closed:hover {
+  color: var(--amber-hover);
+  background: var(--amber-tint);
+}
+
+.pp-row.closed .pp-row-text strong,
+.pp-row.closed .avatar {
+  opacity: .55;
+}
+
+/* Removing or moving a machine closed here: the keys opened right in the
+   window, as the card of a tab opens them. */
+.keys-here {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--amber-ring);
+  border-radius: 12px;
+  background: var(--amber-tint);
+}
+
+.keys-here .keys-here-text {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.keys-here-text svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--amber-ink);
+}
+
+.keys-here .vault-input.big,
+.keys-here .button-plain.vault-show {
+  height: 44px;
+}
+
+.keys-here .button-accent.big {
+  align-self: center;
+  height: 44px;
+  padding: 0 22px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.keys-here .button-accent.big.vault-pass-go {
+  align-self: stretch;
+  justify-content: center;
+  gap: 10px;
+}
+
+.keys-here .vault-locked-links {
+  text-align: center;
+}
+
+.keys-here .error-box {
+  align-self: stretch;
+  text-align: left;
+}

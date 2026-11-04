@@ -1,11 +1,14 @@
 // Asking before what cannot be undone: removing a machine, ending a
 // terminal that runs. Cancel has the keys, so that Enter by habit does
-// nothing; the red button does it.
+// nothing; the red button does it. A machine closed on this device
+// (0.1.28) is removed only once the window has opened the keys: until then
+// there is no red button.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useBriefly } from "./briefly";
 import { useT } from "./i18n";
 import { Check, Close, Copy } from "./icons";
+import { useVaultWindowUp, vaultWindowUp } from "./VaultDialogs";
 
 interface Props {
   title: string;
@@ -21,6 +24,10 @@ interface Props {
   start?: string;
   /** The red button waits for that field. */
   ready?: boolean;
+  /** No red button yet: what it does waits for something the window
+   * itself asks for first, the keys of a machine closed on this device
+   * (04.11). Once it is there, Cancel has the keys again. */
+  blocked?: boolean;
 }
 
 export function Confirm(props: Props) {
@@ -35,7 +42,8 @@ export function Confirm(props: Props) {
   useEffect(() => {
     box.current?.querySelector<HTMLElement>(start)?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      // A vault window over this one (the Mac asked, say) takes Esc itself.
+      if (event.key === "Escape" && !vaultWindowUp()) {
         event.preventDefault();
         cancel.current();
       }
@@ -43,6 +51,17 @@ export function Confirm(props: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [start]);
+
+  // The keys opened in the window, or a vault window over it closed (the
+  // Keep question after the password): the red button is there, and Cancel
+  // has the keys again, as when it opened, unless something in the window
+  // has them.
+  const covered = useVaultWindowUp();
+  useEffect(() => {
+    const here = box.current;
+    if (covered || props.blocked || !here || here.contains(document.activeElement)) return;
+    here.querySelector<HTMLElement>(".confirm-cancel")?.focus();
+  }, [covered, props.blocked]);
 
   const go = async () => {
     setBusy(true);
@@ -72,11 +91,13 @@ export function Confirm(props: Props) {
         <div className="confirm-body">{props.children}</div>
         {problem && <div className="error-box" role="alert">{problem}</div>}
         <div className="button-row">
-          <button type="button" className="button-danger big"
-            disabled={busy || props.ready === false}
-            onClick={() => void go()}>
-            {props.confirm}
-          </button>
+          {!props.blocked && (
+            <button type="button" className="button-danger big"
+              disabled={busy || props.ready === false}
+              onClick={() => void go()}>
+              {props.confirm}
+            </button>
+          )}
           <button type="button" className="button-plain confirm-cancel"
             onClick={props.onCancel}>
             {t("common.cancel")}

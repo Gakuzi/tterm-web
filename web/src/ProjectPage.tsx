@@ -8,7 +8,11 @@
 // with teams, later. From 0.1.4, in the app before signing in (local.ts),
 // its computer has no menu; from 0.1.5 Add machine and the card about
 // Personal, with New project, are there as after signing in, and say what
-// signing in brings (NeedAccount.tsx).
+// signing in brings (NeedAccount.tsx). From 0.1.28 (the canvas, version
+// 109) a machine closed on this device has the lock in place of the "+" of
+// New terminal, as in the sidebar, and its terminals are dimmed, each with
+// a lock and "closed on this device" where its folder would be (the core
+// sends that device nothing of what they do).
 
 import { useEffect, useState } from "react";
 import type {
@@ -46,6 +50,8 @@ interface Props {
   /** The terminals running now, in every project. */
   terminals: TerminalInfo[];
   dotFor: (terminal: TerminalInfo) => Dot;
+  /** A machine closed on this device (0.1.28, keysHere.ts). */
+  closed: (machine: Machine) => boolean;
   onAddMachine: (projectId: string, kind?: MachineKind) => void;
   onOpenTerminal: (machineId: string) => void;
   onGoTo: (terminalId: string) => void;
@@ -104,14 +110,39 @@ export function NoteIcon({ note, size = 14 }: { note: NoteSummary; size?: number
   return note.total > 0 ? <ListCheck size={size} /> : <Doc size={size} />;
 }
 
-function TerminalRow({ term, me, dot, onGoTo, naming }: {
+function TerminalRow({ term, me, dot, shut, onGoTo, naming }: {
   term: TerminalInfo;
   me: Me;
   dot: Dot;
+  /** Its machine closed on this device (0.1.28): its card in its tab. */
+  shut: boolean;
   onGoTo: (id: string) => void;
   naming: Naming;
 }) {
   const t = useT();
+  if (shut) {
+    const name = terminalName(term.name, t);
+    return (
+      <li className="pp-row closed">
+        <Avatar who={null} me={me} size="small" />
+        <span className="pp-row-text">
+          <strong>{name}</strong>
+          <span className="pp-row-sub">
+            <Lock size={12} className="closed-lock" />
+            <span className="pp-ellipsis">{t("projectpage.closed")}</span>
+          </span>
+        </span>
+        <span className="pp-row-actions">
+          <button type="button" className="button-plain small"
+            title={t("sidebar.closed_title")}
+            aria-label={t("sidebar.closed_terminal", { label: name, machine: term.machine })}
+            onClick={() => onGoTo(term.id)}>
+            {t("projectpage.open")}
+          </button>
+        </span>
+      </li>
+    );
+  }
   const canRename = dot !== "ended";
   const where = term.cwd ? shortPath(term.cwd, term.home) : "";
   let text = [where, term.branch].filter(Boolean).join(" · ");
@@ -169,6 +200,8 @@ function MachineCard(props: {
   me: Me;
   terminals: TerminalInfo[];
   dotFor: (terminal: TerminalInfo) => Dot;
+  /** Closed on this device (0.1.28). */
+  shut: boolean;
   onOpenTerminal: (machineId: string) => void;
   onGoTo: (terminalId: string) => void;
   onRemoveMachine: (machine: Machine) => void;
@@ -178,7 +211,7 @@ function MachineCard(props: {
   /** The app before signing in: the computer it runs on stays. */
   local?: boolean;
 }) {
-  const { machine: m, project } = props;
+  const { machine: m, project, shut } = props;
   const t = useT();
   const computer = m.kind === "computer";
   const offline = computer && !m.online;
@@ -200,15 +233,17 @@ function MachineCard(props: {
           </span>
         )}
         <span className="pp-card-actions">
-          <button type="button" className="button-ghost small"
+          <button type="button" className={shut && !offline ? "button-ghost small closed" : "button-ghost small"}
             title={offline ? t("projectpage.offline_title", { machine: m.name })
+              : shut ? (computer ? t("sidebar.keys_closed_mac")
+                : t("sidebar.keys_closed_new", { name: m.name }))
               : t("projectpage.new_terminal_title", { machine: m.name })}
             onClick={() => (offline
               ? props.notYet(seen
                 ? t("projectpage.offline_wait_seen", { machine: m.name, seen })
                 : t("projectpage.offline_wait", { machine: m.name }))
               : props.onOpenTerminal(m.id))}>
-            <Plus size={14} />
+            {shut && !offline ? <Lock size={14} /> : <Plus size={14} />}
             {t("projectpage.new_terminal")}
           </button>
           {manages(project) && !props.local && (
@@ -244,7 +279,7 @@ function MachineCard(props: {
       <ul className="pp-rows">
         {props.terminals.map((term) => (
           <TerminalRow key={term.id} term={term} me={props.me} dot={props.dotFor(term)}
-            onGoTo={props.onGoTo} naming={props.naming} />
+            shut={shut} onGoTo={props.onGoTo} naming={props.naming} />
         ))}
         {props.terminals.length === 0 && (
           <li className="pp-empty">{t("projectpage.no_terminals")}</li>
@@ -402,7 +437,7 @@ export function ProjectPage(props: Props) {
             {project.machines.map((m) => (
               <MachineCard key={m.id} machine={m} project={project} me={me}
                 terminals={running.filter((term) => term.machineId === m.id)}
-                dotFor={props.dotFor} onOpenTerminal={props.onOpenTerminal}
+                dotFor={props.dotFor} shut={props.closed(m)} onOpenTerminal={props.onOpenTerminal}
                 onGoTo={props.onGoTo} onRemoveMachine={props.onRemoveMachine}
                 onMoveMachine={props.onMoveMachine} naming={naming}
                 notYet={props.notYet} local={props.local} />

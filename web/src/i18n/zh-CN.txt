@@ -127,6 +127,11 @@ sidebar.with_key = 用你保险库中的密钥打开
 # name, and its tip ({mac} is the Mac's name).
 sidebar.via_mac = 通过 Mac
 sidebar.via_title = 通过 {mac}，在它开机时可用
+sidebar.keys_closed_new = 这台设备上的密钥没有打开。打开密钥，并在 {name} 上打开新终端
+sidebar.keys_closed = 这台设备上的密钥没有打开。打开
+sidebar.keys_closed_mac = 从浏览器打开你 Mac 上的终端：只能在密钥已打开的地方。打开
+sidebar.closed_terminal = {machine} 上的 {label}：在这台设备上已关闭。打开密钥
+sidebar.closed_title = 在这台设备上已关闭：请打开密钥
 
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
@@ -403,6 +408,7 @@ app.remove.confirm = 移除 {name}
 app.remove.text = 它会从 tTerm Web 中消失，它的终端也会结束。在那里输入过的命令会保留在历史记录中。
 app.remove.computer = 它的代理会得知电脑已被移除，随后停止运行。如需重新连接这台电脑：点击“添加机器”，然后选择“电脑”。
 app.remove.server = tTerm Web 将不再登录它，并会在服务器上收回自己的访问权限。如果服务器没有响应，接下来会给出完成这一步的命令。
+app.remove.closed = {name} 在这台设备上已关闭：只有在密钥已打开的地方才能移除。请在这里打开密钥。
 app.end.title = 结束 {label}？
 app.end.confirm = 结束终端
 app.end.text = 它的 shell 会结束，其中运行的一切都会停止，就像关闭终端窗口一样。它运行过的内容会保留在标签页和历史记录中。
@@ -862,6 +868,7 @@ project_dialog.with_others = 与他人共享
 project_dialog.move_becomes = 在 {project} 中，它将显示为 {code}/{name}。它的终端会继续运行，机器本身不会有任何变化。
 # The same, when its name is taken there: {machine} is its name now, {name} the one it gets (web-01-2).
 project_dialog.move_becomes_taken = 在 {project} 中，它将显示为 {code}/{name}：那里已有名为 {machine} 的机器。它的终端会继续运行，机器本身不会有任何变化。
+project_dialog.move_closed = {machine} 在这台设备上已关闭：只有在密钥已打开的地方才能移动。请在这里打开密钥。
 # The button: {project} is the project's name.
 project_dialog.move_to = 移到 {project}
 # The button while there is nothing to pick (a verb).
@@ -942,6 +949,7 @@ projectpage.remove_machine = 移除机器
 # An item of a machine's menu.
 projectpage.move_machine = 移到其他项目
 projectpage.no_terminals = 没有打开的终端
+projectpage.closed = 在这台设备上已关闭
 # Who changed a note last, and when: {ago} is just now, 5 min ago, yesterday, on 12 Oct (time.*).
 projectpage.edited_you = 你，{ago}
 # The same, someone else: {name} is their first name.
@@ -1036,6 +1044,7 @@ machines.account = 用户
 machines.offline_seen = 离线，{seen}
 machines.offline = 离线
 machines.online = 在线
+machines.closed = 在这台设备上已关闭
 machines.offline_note = 这台电脑处于休眠或离线状态，或者它的代理没有运行。代理能够连接时，它会自动恢复；此页面会在十秒内更新状态。
 # On Open a terminal while the computer is offline.
 machines.offline_title = 它已离线：可能处于休眠状态，或代理没有运行
@@ -1415,6 +1424,7 @@ log.today_count = 今天 {n} 条
 # A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
 log.tab = {machine} 日志
 log.tab_title = {machine} 的日志
+log.closed_here = {machine} 的日志：在这台设备上已关闭。打开密钥
 log.close_tab = 关闭日志
 # The ⋯ over the page, and its one item.
 log.menu = 日志菜单
@@ -1602,6 +1612,7 @@ classic.several_lines = 这条命令有多行，经典模式会在每一行输�
 # ------------------------------------------------------------ tabs: the line of tabs on top (TabBar.tsx)
 # The tabs that are open, for screen readers.
 tabs.label = 已打开的标签页
+tabs.closed_here = 在这台设备上已关闭
 # Naming a terminal in its tab, after a double click.
 tabs.rename_title = 为这个终端命名
 tabs.rename_hint = Enter 保存，Esc 取消。名称会显示在侧边栏、标签页和项目页面上。
@@ -1850,6 +1861,7 @@ app_code.text_lost = 这台 Mac 已无法再自己打开你的保险库。请用
 # A vault with a password (0.1.26): opened here once with it.
 app_code.text_password = 这台 Mac 还不能自己打开你的保险库。请用保险库密码在这里打开它一次：之后这台 Mac 就能用触控 ID 打开它。
 app_code.text_lost_password = 这台 Mac 已无法再自己打开你的保险库。请用保险库密码在这里打开它一次：之后这台 Mac 就能重新用触控 ID 打开它。
+app_code.text_prove = 你的保险库里还没有密钥，所以 tTerm Web 需要保险库密码，才能确认这台 Mac 上的密钥已打开。输入一次即可，在保险库锁定之前一直有效。
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1905,10 +1917,30 @@ vault_locked.no_ed25519 = 这个浏览器无法用 Ed25519 密钥签名。请在
 vault_locked.not_here = 你的保险库已在这里打开，但这个浏览器无法打开 {key}。请在“设置”›“密钥”中从它的文件重新添加。
 vault_locked.its_key = 这台服务器的密钥
 
+# ------------------------------------------------------------ keys_closed: a tab of a machine closed on this device (KeysClosed.tsx, 0.1.28)
+keys_closed.tab = {machine} · 新终端
+keys_closed.tab_title = 这台设备上的密钥打开后，在 {machine} 上打开新终端
+keys_closed.close_tab = 关闭标签页：不打开新终端
+keys_closed.new_key_title = {machine} 用你的密钥打开
+keys_closed.new_key_text = 这台设备上的密钥还没有打开。就在这里打开它们，{machine} 上的新终端会立即打开。
+keys_closed.new_via_title = {machine} 通过 {mac} 打开
+keys_closed.new_via_text = 终端由你的 Mac 启动。从浏览器只能在密钥已打开的地方打开它：这是第二道锁，即使有人进入了你的邮箱，也无法通过 Mac 进入。
+keys_closed.new_mac_title = {mac} 上的终端
+keys_closed.new_mac_text = 从浏览器打开你 Mac 上的终端，只能在密钥已打开的地方：这是第二道锁，即使有人进入了你的邮箱，也无法在你的 Mac 上打开终端。
+keys_closed.log_title = {machine} 的日志在这台设备上已关闭
+keys_closed.log_text = 日志里有和终端相同的命令和输出，所以它也同样关闭。打开密钥后，日志就会打开。
+keys_closed.terminal_title = 这个终端在这台设备上已关闭
+keys_closed.terminal_text = {machine} 上的“{name}”正在运行，但在这里打开密钥之前，这里看不到它。打开密钥后，终端会从它现在的位置显示出来。
+keys_closed.open_new = 打开密钥和终端
+keys_closed.proving = 正在这台设备上打开密钥…
+keys_closed.refused = {machine} 在这台设备上已关闭：请打开密钥，然后重试。
+keys_closed.foot = 用你的密钥打开的服务器、通过你的 Mac 打开的服务器、Mac 本身以及它们的日志，只在你亲自打开密钥的地方显示：用密码、Touch ID 或在 Mac 上批准。用邮件中的验证码登录不会打开它们。在 Mac 本机的应用中，这台 Mac 自己的终端无需密码即可打开。
+
 # ------------------------------------------------------------ vault_problem: what went wrong with the vault (vault/store.ts)
 vault_problem.no_vault = 你还没有保险库。
 vault_problem.exists = 你已经有保险库了：请先打开它，再添加密钥。
 vault_problem.locked = 请先打开你的保险库。
+vault_problem.keys_closed = 只有在密钥已打开的地方才能更改保险库。请在这台设备上打开密钥，然后重试。
 # The vault password: {n} tries left (shown when 3 or fewer), {time} a
 # time of day, as the page shows times ("14:05").
 vault_problem.password_wrong = 这个密码无法打开你的保险库。请检查输入法和 Caps Lock。

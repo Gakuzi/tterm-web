@@ -934,6 +934,10 @@ class Session:
     #: The device as it signed in: "tTerm for Mac on MacBook-Pro-Denis" for
     #: the app (from 0.1.17, for the journal of the vault's signatures).
     label: str = ""
+    #: For the app: the computer it runs on, as it said by the computer's
+    #: own key (0.1.28, devices.computer_id); that computer and the servers
+    #: through it need no proof of open keys from it.
+    computer_id: uuid.UUID | None = None
 
 
 async def session(pool: asyncpg.Pool, token: str | None, *,
@@ -950,6 +954,7 @@ async def session(pool: asyncpg.Pool, token: str | None, *,
                s.last_seen_at < now() - $2::interval AS idle,
                s.last_seen_at < now() - $3::interval AS stale,
                d.forgotten_at IS NOT NULL AS forgotten,
+               CASE WHEN s.method = 'app' THEN d.computer_id END AS computer_id,
                u.name, u.theme, u.plan_id, u.email
         FROM sessions s
         JOIN users u ON u.id = s.user_id
@@ -968,7 +973,7 @@ async def session(pool: asyncpg.Pool, token: str | None, *,
     person = Person(row["user_id"], row["name"], row["theme"], row["plan_id"],
                     row["email"])
     return Session(row["id"], person, row["device_id"], row["method"], row["age"],
-                   row["label"] or "")
+                   row["label"] or "", row["computer_id"])
 
 
 async def app_signed_in(pool: asyncpg.Pool, user_id: uuid.UUID) -> bool:

@@ -15,6 +15,12 @@
 // while the vault is open in this browser, or a pairing waits, the socket
 // is held open even with no terminal on the page, so that the core can ask
 // it to sign a login.
+//
+// From 0.1.28 the core attaches a terminal of a guarded machine only on a
+// socket that proved the keys open on its device (vault.challenge,
+// vault.prove: src/vault/store.ts); otherwise it answers "locked", and the
+// tab shows its card. A socket back after a drop attaches its terminals
+// once the keys are proved open again on it (setGate).
 
 import {
   signedOutNow, type Redaction, type RunningCommand, type TerminalInfo,
@@ -63,6 +69,9 @@ export interface ChannelHandlers {
   /** A command of the terminal redacted in its machine's log (0.1.20):
    * `block` is the block's number. */
   redacted?: (block: number, redacted: Redaction) => void;
+  /** Its machine is closed on this device (0.1.28): the keys are not
+   * proved open here. Nothing of it came; the tab shows its card. */
+  locked?: () => void;
 }
 
 export interface Channel {
@@ -93,6 +102,9 @@ interface Open {
   rows: number;
   paused: boolean;
   focused: boolean;
+  /** The core said locked (0.1.28): attached again once the keys are
+   * proved open here. */
+  locked?: boolean;
 }
 
 type Listener = (connected: boolean) => void;
@@ -114,6 +126,9 @@ class Socket {
   private openListeners = new Set<() => void>();
   /** Reasons to stay connected with no channel (0.1.17): the vault. */
   private holds = 0;
+  /** What a socket back after a drop waits for before it attaches its
+   * terminals (0.1.28): the proof of the keys open here. */
+  private gate: (() => Promise<void> | null) | null = null;
   private signedOut = false;
   connected = false;
 
@@ -138,6 +153,23 @@ class Socket {
       held = false;
       this.holds -= 1;
     };
+  }
+
+  /** What a new socket waits for before it attaches the page's terminals:
+   * the vault's proof (a promise), or nothing (null). */
+  setGate(gate: () => Promise<void> | null): void {
+    this.gate = gate;
+  }
+
+  /** The keys proved open on this socket (vault.proven): the terminals the
+   * core said were locked are attached again. */
+  reattachLocked(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    for (const [ch, open] of this.channels) {
+      if (!open.locked) continue;
+      open.locked = false;
+      this.sendAttach(ch, open);
+    }
   }
 
   /** The vault's messages, as they come. */
@@ -230,11 +262,20 @@ class Socket {
     ws.onopen = () => {
       this.retry = 0;
       this.setConnected(true);
-      for (const [ch, open] of this.channels) {
-        open.paused = false;
-        this.sendAttach(ch, open);
-      }
+      // With the keys open here, the terminals once they are proved open
+      // on this socket too: otherwise a guarded one would be locked for a
+      // moment (0.1.28).
+      const wait = this.gate?.() ?? null;
       for (const listener of [...this.openListeners]) listener();
+      const attachAll = () => {
+        if (this.ws !== ws || ws.readyState !== WebSocket.OPEN) return;
+        for (const [ch, open] of this.channels) {
+          open.paused = false;
+          this.sendAttach(ch, open);
+        }
+      };
+      if (wait) void wait.then(attachAll);
+      else attachAll();
     };
     ws.onmessage = (event) => this.receive(event.data);
     ws.onclose = (event) => {
@@ -338,6 +379,10 @@ class Socket {
       case "gone":
         this.channels.delete(msg.ch as number);
         h.gone((msg.terminal as TerminalInfo | null) ?? null);
+        break;
+      case "locked":
+        open.locked = true;
+        h.locked?.();
         break;
     }
   }

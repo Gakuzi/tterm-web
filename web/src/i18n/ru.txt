@@ -127,6 +127,11 @@ sidebar.with_key = Открывается твоим ключом из хран�
 # name, and its tip ({mac} is the Mac's name).
 sidebar.via_mac = через Mac
 sidebar.via_title = Через {mac}, пока он включён
+sidebar.keys_closed_new = Ключи закрыты на этом устройстве. Открыть их и новый терминал на {name}
+sidebar.keys_closed = Ключи закрыты на этом устройстве. Открыть
+sidebar.keys_closed_mac = Терминал на твоём Mac из браузера – только там, где открыты ключи. Открыть
+sidebar.closed_terminal = {label} на {machine}: закрыт на этом устройстве. Открыть ключи
+sidebar.closed_title = Закрыт на этом устройстве: открой ключи
 
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
@@ -403,6 +408,7 @@ app.remove.confirm = Удалить {name}
 app.remove.text = Машина исчезнет из tTerm Web, а её терминалы завершатся. Набранные там команды останутся в истории.
 app.remove.computer = Агент узнает, что компьютер удалён, и остановится. Чтобы снова подключить компьютер: «Добавить машину», затем «Компьютер».
 app.remove.server = tTerm Web перестанет входить на сервер и уберёт свой доступ с самого сервера. Если сервер не ответит, следом появится команда, которая сделает это на нём.
+app.remove.closed = {name} закрыт на этом устройстве: удалить его можно только там, где открыты ключи. Открой их здесь.
 app.end.title = Завершить {label}?
 app.end.confirm = Завершить терминал
 app.end.text = Его шелл закроется, а всё, что в нём работает, остановится, как при закрытии окна терминала. Выполненные команды останутся во вкладке и в истории.
@@ -862,6 +868,7 @@ project_dialog.with_others = с другими
 project_dialog.move_becomes = В проекте {project} она станет {code}/{name}. Её терминалы продолжат работать, а на самой машине ничего не изменится.
 # The same, when its name is taken there: {machine} is its name now, {name} the one it gets (web-01-2).
 project_dialog.move_becomes_taken = В проекте {project} она станет {code}/{name}: имя {machine} там уже занято. Её терминалы продолжат работать, а на самой машине ничего не изменится.
+project_dialog.move_closed = {machine} закрыт на этом устройстве: перенести его можно только там, где открыты ключи. Открой их здесь.
 # The button: {project} is the project's name.
 project_dialog.move_to = Перенести в {project}
 # The button while there is nothing to pick (a verb).
@@ -942,6 +949,7 @@ projectpage.remove_machine = Удалить машину
 # An item of a machine's menu.
 projectpage.move_machine = Перенести в другой проект
 projectpage.no_terminals = Нет открытых терминалов
+projectpage.closed = закрыт на этом устройстве
 # Who changed a note last, and when: {ago} is just now, 5 min ago, yesterday, on 12 Oct (time.*).
 projectpage.edited_you = Ты, {ago}
 # The same, someone else: {name} is their first name.
@@ -1036,6 +1044,7 @@ machines.account = Пользователь
 machines.offline_seen = не в сети, {seen}
 machines.offline = не в сети
 machines.online = в сети
+machines.closed = закрыт на этом устройстве
 machines.offline_note = Компьютер спит или не в сети, либо не запущен его агент. Он вернётся сам, когда агент сможет подключиться; эта страница заметит это в течение десяти секунд.
 # On Open a terminal while the computer is offline.
 machines.offline_title = Компьютер не в сети: спит или не запущен агент
@@ -1415,6 +1424,7 @@ log.today_count = {n} сегодня
 # A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
 log.tab = {machine}: лог
 log.tab_title = Лог машины {machine}
+log.closed_here = Лог машины {machine}: закрыт на этом устройстве. Открыть ключи
 log.close_tab = Закрыть лог
 # The ⋯ over the page, and its one item.
 log.menu = Меню лога
@@ -1602,6 +1612,7 @@ classic.several_lines = В этой команде несколько строк
 # ------------------------------------------------------------ tabs: the line of tabs on top (TabBar.tsx)
 # The tabs that are open, for screen readers.
 tabs.label = Открытые вкладки
+tabs.closed_here = закрыто на этом устройстве
 # Naming a terminal in its tab, after a double click.
 tabs.rename_title = Назвать этот терминал
 tabs.rename_hint = Enter сохраняет, Esc отменяет. Имя видно в боковой панели, во вкладках и на странице проекта.
@@ -1850,6 +1861,7 @@ app_code.text_lost = Этот Mac больше не может сам откры
 # A vault with a password (0.1.26): opened here once with it.
 app_code.text_password = Этот Mac пока не может сам открыть хранилище. Открой его здесь один раз паролем хранилища, и дальше этот Mac будет открывать его с Touch ID.
 app_code.text_lost_password = Этот Mac больше не может сам открыть хранилище. Открой его здесь один раз паролем хранилища: тогда этот Mac снова будет открывать его с Touch ID.
+app_code.text_prove = В хранилище ещё нет ни одного ключа, поэтому tTerm Web нужен пароль хранилища, чтобы знать, что ключи открыты на этом Mac. Введи его один раз: этого хватит, пока хранилище не закроется.
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1905,10 +1917,30 @@ vault_locked.no_ed25519 = Этот браузер не умеет подписы
 vault_locked.not_here = Хранилище здесь открыто, но {key} в этом браузере не открывается. Добавь его снова из файла в Настройках, в разделе «Ключи».
 vault_locked.its_key = нужный ключ
 
+# ------------------------------------------------------------ keys_closed: a tab of a machine closed on this device (KeysClosed.tsx, 0.1.28)
+keys_closed.tab = {machine} · новый терминал
+keys_closed.tab_title = Новый терминал на {machine}, когда ключи откроются на этом устройстве
+keys_closed.close_tab = Закрыть вкладку: без нового терминала
+keys_closed.new_key_title = {machine} открывается твоим ключом
+keys_closed.new_key_text = На этом устройстве ключи ещё не открыты. Открой их прямо здесь, и сразу откроется новый терминал на {machine}.
+keys_closed.new_via_title = {machine} открывается через {mac}
+keys_closed.new_via_text = Терминал запустит твой Mac. Из браузера он открывается только там, где открыты ключи: это второй замок, чтобы никто, попав в твою почту, не вошёл через Mac.
+keys_closed.new_mac_title = Терминал на {mac}
+keys_closed.new_mac_text = Из браузера терминал на твоём Mac открывается только там, где открыты ключи: это второй замок, чтобы никто, попав в твою почту, не открыл терминал на твоём Mac.
+keys_closed.log_title = Лог машины {machine} закрыт на этом устройстве
+keys_closed.log_text = В логе те же команды и тот же вывод, что в терминале, поэтому он закрыт так же. Открой ключи, и лог откроется.
+keys_closed.terminal_title = Терминал закрыт на этом устройстве
+keys_closed.terminal_text = «{name}» на {machine} работает, но здесь его не видно, пока здесь не открыты ключи. Открой ключи, и терминал покажется с того места, где он сейчас.
+keys_closed.open_new = Открыть ключи и терминал
+keys_closed.proving = Открываю ключи на этом устройстве…
+keys_closed.refused = {machine} закрыт на этом устройстве: открой ключи и попробуй снова.
+keys_closed.foot = Серверы с твоим ключом, серверы через Mac, сам Mac и их логи видны там, где ты сам открыл ключи: паролем, Touch ID или подтверждением на Mac. Вход по коду из письма их не открывает. В приложении на самом Mac его терминалы открываются без пароля.
+
 # ------------------------------------------------------------ vault_problem: what went wrong with the vault (vault/store.ts)
 vault_problem.no_vault = У тебя пока нет хранилища.
 vault_problem.exists = У тебя уже есть хранилище: открой его, затем добавь ключ.
 vault_problem.locked = Сначала открой хранилище.
+vault_problem.keys_closed = Хранилище меняется только там, где открыты его ключи. Открой их на этом устройстве и попробуй снова.
 # The vault password: {n} tries left (shown when 3 or fewer), {time} a
 # time of day, as the page shows times ("14:05").
 vault_problem.password_wrong = Этот пароль не открывает хранилище. Проверь раскладку и Caps Lock.

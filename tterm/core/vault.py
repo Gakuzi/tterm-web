@@ -45,6 +45,7 @@ import logging
 import re
 import uuid
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 
 import asyncpg
 import asyncssh
@@ -285,6 +286,158 @@ def verify_ssh_signature(public_key: str, data: bytes, alg: bytes,
     if not key.verify(data, blob):
         raise ValueError("the vault signature did not verify")
     return blob
+
+
+# ---------------------------------------- keys open on this device (v3)
+
+#: What a device signs to prove that the keys are open there (0.1.28,
+#: vault-design.md v3): an SSHSIG blob (OpenSSH PROTOCOL.sshsig) of this
+#: namespace, over this message and the nonce its socket was given.
+PROOF_NAMESPACE = b"tterm-keys@tterm.net"
+PROOF_MESSAGE = b"tterm keys open v1\n"
+#: The random bytes of a socket's nonce.
+NONCE_LEN = 32
+#: The signature algorithms a proof may use, by the key's own type.
+PROOF_ALGS = {
+    "ssh-ed25519": ("ssh-ed25519",),
+    "ecdsa-sha2-nistp256": ("ecdsa-sha2-nistp256",),
+    "ecdsa-sha2-nistp384": ("ecdsa-sha2-nistp384",),
+    "ssh-rsa": ("rsa-sha2-512", "rsa-sha2-256"),
+}
+
+
+def new_nonce() -> str:
+    """A socket's nonce, as the device signs it: base64url text."""
+    return b64u(_random(NONCE_LEN))
+
+
+def proof_blob(nonce: str) -> bytes:
+    """The blob a device signs to prove its keys are open. It starts with
+    "SSHSIG"; an SSH login's data starts with a length (of the session id),
+    so neither can stand for the other."""
+    digest = hashlib.sha512(PROOF_MESSAGE + nonce.encode("ascii")).digest()
+    return (b"SSHSIG" + String(PROOF_NAMESPACE) + String(b"")
+            + String(b"sha512") + String(digest))
+
+
+async def prove_by_key(pool: asyncpg.Pool, user_id: uuid.UUID, *,
+                       nonce: str, fingerprint: object, alg: object,
+                       sig: object) -> str:
+    """A proof by a key: an active key of this person's vault, an algorithm
+    of its type, and a signature over proof_blob(nonce) that verifies with
+    its public half. The fingerprint, or Refused."""
+    if (not isinstance(fingerprint, str) or not fingerprint.startswith("SHA256:")
+            or len(fingerprint) > 100):
+        raise Refused("Say which key signed.")
+    if not isinstance(alg, str) or alg not in SIG_ALGS:
+        raise Refused("Say how the key signed.")
+    raw = decode_b64u(sig, most=RAW_SIG_MAX, least=1, what="signature")
+    row = await pool.fetchrow(
+        "SELECT k.public_key, k.type FROM vault_keys k "
+        "JOIN vaults v ON v.id = k.vault_id "
+        "WHERE v.user_id = $1 AND k.fingerprint = $2 AND k.removed_at IS NULL",
+        user_id, fingerprint)
+    if row is None:
+        raise NotFound("There is no such key in your vault.")
+    if alg not in PROOF_ALGS.get(row["type"], ()):
+        raise Refused("That key does not sign that way.")
+    try:
+        verify_ssh_signature(row["public_key"], proof_blob(nonce),
+                             alg.encode(), raw)
+    except ValueError:
+        raise Refused("That proof does not check out.") from None
+    return fingerprint
+
+
+def guarded(machine) -> bool:
+    """A machine a device reaches only with the keys open there (v3): a
+    server that opens with the person's key, one through their Mac, and a
+    computer with an agent. tTerm's line is not: signing in is enough."""
+    return machine.kind == "computer" or machine.login_method in ("key", "mac")
+
+
+#: Whether the person's keys guard anything: a vault that a device can
+#: prove open, by its password or by an active key (`guarding`).
+_GUARDING = """
+    EXISTS (SELECT 1 FROM vaults v WHERE v.user_id = $1
+            AND (v.password_check IS NOT NULL
+                 OR EXISTS (SELECT 1 FROM vault_keys k
+                            WHERE k.vault_id = v.id AND k.removed_at IS NULL)))
+"""
+
+
+async def guarding(conn, user_id: uuid.UUID) -> bool:
+    """Whether the person's guarded machines are closed on a device without
+    the proof (0.1.28): only with a vault that a device can prove open, by
+    its password or by a key. With no vault, or one with neither, no device
+    could ever prove it, and whoever signs in could make one themselves:
+    nothing is closed then, as before 0.1.28."""
+    return await conn.fetchval("SELECT " + _GUARDING, user_id)
+
+
+def exempt(computer_id: uuid.UUID | None, machine) -> bool:
+    """The app on its own computer (devices.computer_id, from the computer's
+    own key): that computer and the servers through it need no proof."""
+    return computer_id is not None and (
+        machine.id == computer_id
+        or getattr(machine, "via_machine_id", None) == computer_id)
+
+
+async def closed_machines(conn, user_id: uuid.UUID,
+                          computer_id: uuid.UUID | None, *,
+                          own_only: bool) -> list[uuid.UUID]:
+    """The guarded machines a device of the person sees nothing of while its
+    keys are not open (v3): for terminals, all of them (a person's
+    terminals are their own); for logs, only the person's own machines
+    (`own_only`), as other members read a log by their role. The app's own
+    computer and the servers through it apart; none while the person's
+    keys guard nothing (`guarding`)."""
+    rows = await conn.fetch(
+        """
+        SELECT m.id FROM machines m
+        WHERE (m.project_id IN (SELECT project_id FROM project_members
+                                WHERE user_id = $1)
+               OR m.id IN (SELECT machine_id FROM terminals WHERE owner_id = $1))
+          AND (m.kind = 'computer' OR m.login_method IN ('key', 'mac'))
+          AND (NOT $3 OR m.created_by = $1 OR m.created_by IS NULL)
+          AND ($2::uuid IS NULL
+               OR (m.id <> $2 AND m.via_machine_id IS DISTINCT FROM $2))
+          AND """ + _GUARDING, user_id, computer_id, own_only)
+    return [row["id"] for row in rows]
+
+
+async def guard_of(conn, user_id: uuid.UUID, *,
+                   machine_id: uuid.UUID | None = None,
+                   entry_id: int | None = None,
+                   terminal_id: uuid.UUID | None = None):
+    """What the check of open keys needs of a machine (0.1.28), found by
+    the machine, a line of its log, or a terminal on it; None if there is
+    no such one among the person's (a project of theirs, or a terminal of
+    theirs on it): someone else's machine is not named, whatever its id."""
+    if machine_id is not None:
+        where, arg = "m.id = $1", machine_id
+        source = "machines m"
+    elif entry_id is not None:
+        where, arg = "j.id = $1", entry_id
+        source = "journal j JOIN machines m ON m.id = j.machine_id"
+    elif terminal_id is not None:
+        where, arg = "t.id = $1", terminal_id
+        source = "terminals t JOIN machines m ON m.id = t.machine_id"
+    else:
+        return None
+    row = await conn.fetchrow(
+        f"""
+        SELECT m.id, m.name, m.kind, m.login_method, m.via_machine_id,
+               m.created_by
+        FROM {source}
+        WHERE {where}
+          AND (m.project_id IN (SELECT project_id FROM project_members
+                                WHERE user_id = $2
+                                  AND (until IS NULL OR until > now()))
+               OR m.id IN (SELECT machine_id FROM terminals
+                           WHERE owner_id = $2))
+        """, arg, user_id)
+    return SimpleNamespace(**dict(row)) if row is not None else None
 
 
 # --------------------------------------------------------------- the vault
@@ -608,7 +761,7 @@ async def set_recovery(pool: asyncpg.Pool, user_id: uuid.UUID, *,
 
 async def open_with_password(pool: asyncpg.Pool, user_id: uuid.UUID, *,
                              auth: object, device: str = "",
-                             ip: str = "") -> dict:
+                             ip: str = "", forgive: bool = True) -> dict:
     """The wrap of the vault key for the vault password, to a session that
     sends the password's proof: SHA-256 of it must be the check the core
     keeps, compared in constant time.
@@ -655,7 +808,12 @@ async def open_with_password(pool: asyncpg.Pool, user_id: uuid.UUID, *,
             refusal = TooSoon("Too many wrong passwords.", paused=True,
                               retryAt=max(until).isoformat())
         elif hmac.compare_digest(bytes(row["password_check"]), check):
-            if row["password_wrong"] or row["password_wrong_at"] is not None:
+            # A right one typed sets the hour's count to 0; a socket's proof
+            # with it (`forgive` false, 0.1.28) does not: the app sends it
+            # by itself on each new socket, and would give whoever guesses
+            # ten more tries each time.
+            if forgive and (row["password_wrong"]
+                            or row["password_wrong_at"] is not None):
                 await conn.execute(
                     "UPDATE vaults SET password_wrong = 0, "
                     "password_wrong_at = NULL WHERE id = $1", row["id"])
@@ -1079,12 +1237,20 @@ class VaultRelay:
         self._tick.set()
         self._tick = asyncio.Event()
 
-    def _capable(self, user_id: uuid.UUID, fingerprint: str) -> list:
+    def _capable(self, user_id: uuid.UUID, fingerprint: str,
+                 session_id: uuid.UUID | None) -> list:
+        """The sockets that can sign this login: only those of the session
+        that opened the terminal (0.1.28, v3). No other device is asked, the
+        person's Mac included: before, any of them signed for any session,
+        and a sign-in with a code from the email opened the person's key
+        servers while the Mac had its vault open."""
         return [s for s in self._sources
-                if s.user_id == user_id and fingerprint in s.vault_can()]
+                if s.user_id == user_id and session_id is not None
+                and getattr(s, "session_id", None) == session_id
+                and fingerprint in s.vault_can()]
 
     async def wait_capable(self, user_id: uuid.UUID, fingerprint: str,
-                           waiting) -> None:
+                           waiting, session_id: uuid.UUID | None) -> None:
         """Until a socket can sign with this key, saying meanwhile that the
         terminal waits for the vault (`waiting`, as sign_blob does). A key
         server's login waits here, before it dials (0.1.19): waiting inside
@@ -1095,7 +1261,7 @@ class VaultRelay:
         try:
             while True:
                 tick = self._tick
-                if self._capable(user_id, fingerprint):
+                if self._capable(user_id, fingerprint, session_id):
                     return
                 if not told:
                     waiting(True)
@@ -1138,7 +1304,8 @@ class VaultRelay:
     async def sign_blob(self, alg: bytes, data: bytes, *, public_key: str,
                         user_id: uuid.UUID, fingerprint: str, key_name: str,
                         machine: str, machine_id: uuid.UUID,
-                        project_id: uuid.UUID, waiting) -> bytes:
+                        project_id: uuid.UUID, waiting,
+                        session_id: uuid.UUID | None) -> bytes:
         """Gets the raw signature from a capable socket, builds the blob,
         verifies it with the public key, records vault.signed, and returns
         it. Asks one socket at a time (SIGN_TIMEOUT each); a socket that says
@@ -1151,7 +1318,7 @@ class VaultRelay:
         try:
             while True:
                 tick = self._tick
-                for source in self._capable(user_id, fingerprint):
+                for source in self._capable(user_id, fingerprint, session_id):
                     raw = await self._ask(source, fingerprint=fingerprint,
                                           alg=alg_name, data=data,
                                           machine=machine, key_name=key_name)

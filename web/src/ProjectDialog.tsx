@@ -1,7 +1,8 @@
 // The windows of projects of one's own (0.1.1), as on the canvas: a new
 // project and the pencil, with the name, the code and the color and how
 // they will look; moving a machine to another project; deleting a project.
-// From 0.1.2 also moving a note to another project.
+// From 0.1.2 also moving a note to another project. From 0.1.28 a machine
+// closed on this device moves only once the window has opened the keys.
 
 import {
   useEffect, useRef, useState, type FormEvent, type KeyboardEvent as KeyEvent,
@@ -18,15 +19,18 @@ import { list, useT } from "./i18n";
 import {
   Check, Close, Folder as FolderIcon, FolderPlus, People, Server,
 } from "./icons";
+import { KeysHere } from "./KeysClosed";
 import { alone } from "./rights";
+import { useVaultWindowUp, vaultWindowUp } from "./VaultDialogs";
 
-/** Esc closes the window, whatever has the keys inside it. */
+/** Esc closes the window, whatever has the keys inside it; a vault window
+ * over it (opening the keys, 0.1.28) takes Esc itself. */
 function useEscape(onClose: () => void) {
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !vaultWindowUp()) {
         event.preventDefault();
         close.current();
       }
@@ -232,6 +236,8 @@ export function MoveDialog(props: {
   machine: Machine;
   /** The projects it may go to: the person's own, but its own. */
   targets: Project[];
+  /** Closed on this device (0.1.28): the keys first, right here. */
+  closed?: boolean;
   onMove: (projectId: string) => Promise<void>;
   onCancel: () => void;
 }) {
@@ -245,12 +251,21 @@ export function MoveDialog(props: {
   useEffect(() => {
     group.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
   }, []);
+  // The keys opened in the window, or a vault window over it closed (the
+  // Keep question after the password): the chosen project has the keys
+  // again, as when it opened, unless something in the window has them.
+  const covered = useVaultWindowUp();
+  useEffect(() => {
+    const here = group.current?.closest("section");
+    if (covered || props.closed || !here || here.contains(document.activeElement)) return;
+    group.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+  }, [covered, props.closed]);
   const target = targets.find((p) => p.id === to);
   const name = target
     ? freeName(machine.name, target.machines.map((m) => m.name)) : machine.name;
 
   const move = async () => {
-    if (!target || busy) return;
+    if (!target || busy || props.closed) return;
     setBusy(true);
     setProblem(null);
     try {
@@ -290,16 +305,21 @@ export function MoveDialog(props: {
               code: target.code, name, machine: machine.name })}</span>
         </div>
       )}
+      {props.closed && (
+        <KeysHere text={t("project_dialog.move_closed", { machine: machine.name })} />
+      )}
       {problem && <div className="error-box" role="alert">{problem}</div>}
       <div className="button-row end">
         <button type="button" className="button-plain" onClick={props.onCancel}>
           {t("common.cancel")}
         </button>
-        <button type="button" className="button-accent big" disabled={!target || busy}
-          onClick={() => void move()}>
-          {target ? t("project_dialog.move_to", { project: target.name })
-            : t("project_dialog.move")}
-        </button>
+        {!props.closed && (
+          <button type="button" className="button-accent big" disabled={!target || busy}
+            onClick={() => void move()}>
+            {target ? t("project_dialog.move_to", { project: target.name })
+              : t("project_dialog.move")}
+          </button>
+        )}
       </div>
     </Window>
   );

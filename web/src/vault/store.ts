@@ -21,6 +21,14 @@
 // socket itself: the page does not sign and sends no vault.can; it asks the
 // engine (/api/app/vault…), and shows the Mac's side of a new browser's
 // request (vault.pairing).
+//
+// From 0.1.28 (vault-design.md v3) the keys open here are proved to the
+// core on the page's socket (proof.ts): with a key of the vault, over the
+// nonce the socket was given (vault.challenge), or with the vault password's
+// proof right after it was typed. Until then the core lets nothing of a
+// guarded machine reach this page (keys.ts); on Lock the proof goes
+// (vault.closed). In the app the engine proves on its own socket and tells
+// the page (vault.proven, vault.closed).
 
 import { useSyncExternalStore } from "react";
 import {
@@ -41,6 +49,7 @@ import {
 } from "./crypto.ts";
 import type { ReadKey } from "./keyfile.ts";
 import { cancelled, prfCreate, prfGet } from "./passkey.ts";
+import { PROOF_ALG, proofBlob } from "./proof.ts";
 import { ALGS, isUserauth, signerOf, type SigAlg, type Signer } from "./sign.ts";
 import { deviceLabel, passkeysHere, support, type Support } from "./support.ts";
 
@@ -50,6 +59,13 @@ export const IDLE_MS = 8 * 60 * 60 * 1000;
 const IDLE_CHECK_MS = 60_000;
 /** How often a new browser looks at its request, besides the socket. */
 const PAIR_POLL_MS = 2_000;
+/** How long a proof of open keys waits for the core's word, and a page for
+ * its socket's nonce, before it goes on without (0.1.28). */
+const PROOF_WAIT_MS = 8_000;
+const CHALLENGE_WAIT_MS = 6_000;
+/** On a socket back after a drop, its terminals are attached once the keys
+ * are proved open again on it, or after this long. */
+const GATE_MS = 3_000;
 /** The credential ids of the passkeys made in this browser, per person: a
  * convenience, so that the page knows which lock is this browser's. */
 const PASSKEYS_KEY = "tterm.vault.passkeys";
@@ -90,6 +106,13 @@ export function passwordWords(error: unknown): unknown {
  * page's words (answers.ts, refusedSaid). */
 function refusedWords(error: unknown, what: "make" | "set"): unknown {
   return error instanceof CoreError ? saidError(refusedSaid(error, what)) : error;
+}
+
+/** A change of the vault the core takes only from a device with its keys
+ * open (0.1.28: 423, "locked"), in the page's words. */
+function lockedWords(error: unknown): unknown {
+  return error instanceof CoreError && error.status === 423
+    ? new VaultError("vault_problem.keys_closed") : error;
 }
 
 /** Any other answer of the core on the way to a password: something that
@@ -199,6 +222,14 @@ export interface VaultState {
    * passkey lock can be made (false after it failed for good). */
   canKeep: boolean;
   request: MacRequest | null;
+  /** The core asks a device to prove its keys open (0.1.28): it lets
+   * nothing of a guarded machine reach one that did not. */
+  proofs: boolean;
+  /** This page's socket proved them open (in the app: the engine's). */
+  proven: boolean;
+  /** How many times a socket of this page was proved: a view the core
+   * said was locked tries again on each. */
+  provenN: number;
 }
 
 interface Me {
@@ -221,7 +252,7 @@ interface PairingInside {
 const EMPTY: VaultState = {
   ready: false, app: false, vault: null, open: false, openedBy: null, signable: [],
   unsignable: {}, support: null, hereLock: null, appVault: null, pairing: null,
-  offerPasskey: false, canKeep: false, request: null,
+  offerPasskey: false, canKeep: false, request: null, proofs: false, proven: false, provenN: 0,
 };
 
 function remembered(userId: string): string[] {
@@ -263,10 +294,21 @@ class Store {
   private lastActivity = Date.now();
   private idleTimer = 0;
   private generation = 0;
+  /** The nonce of this page's socket now (vault.challenge), while it is
+   * connected: what a proof by a key signs. */
+  private nonce: string | null = null;
+  /** Who waits for the core's word on a proof sent, in order. */
+  private proofWaiters: ((ok: boolean) => void)[] = [];
+  /** Who waits for the socket's nonce. */
+  private nonceWaiters: ((nonce: string | null) => void)[] = [];
+  /** A socket back after a drop: its terminals wait for the proof. */
+  private gateWaiters: (() => void)[] = [];
 
   constructor() {
     socket.onVault((message) => void this.onMessage(message));
     socket.onOpen(() => this.announce());
+    socket.onConnection((up) => this.connection(up));
+    socket.setGate(() => this.gate());
     onSignedOut(() => this.stop());
   }
 
@@ -303,16 +345,17 @@ class Store {
   }
 
   /** Signed in (again): the vault of this person. In the app the engine
-   * holds it. */
-  start(me: Me, app: boolean): void {
+   * holds it. `proofs`: the core asks for the proof of open keys (0.1.28). */
+  start(me: Me, app: boolean, proofs = false): void {
     if (this.me?.id === me.id && this.state.app === app) {
       this.me = me;
+      if (this.state.proofs !== proofs) this.set({ proofs });
       return;
     }
     this.stop();
     this.me = me;
     const generation = ++this.generation;
-    this.set({ ...EMPTY, app });
+    this.set({ ...EMPTY, app, proofs });
     void support().then((found) => {
       if (generation === this.generation) this.set({ support: found });
     });
@@ -342,6 +385,7 @@ class Store {
     this.me = null;
     this.state = EMPTY;
     this.keepDone();
+    this.settleProofs();
     for (const listener of [...this.listeners]) listener();
   }
 
@@ -428,6 +472,9 @@ class Store {
     const n = passwordLength(password);
     if (n < PASSWORD_MIN) throw new VaultError("vault_problem.password_short");
     if (n > PASSWORD_MAX || !wellFormed(password)) throw new VaultError("vault_problem.password_wrong");
+    // The socket, for the proof that follows (0.1.28): connected while the
+    // password is derived.
+    if (this.state.proofs) this.release ??= socket.hold();
     const vault = await loadVault().catch((error: unknown) => {
       throw somethingWords(error);
     });
@@ -441,6 +488,9 @@ class Store {
       const { wrap } = await openVaultPassword(b64u(auth)).catch((error: unknown) => {
         throw passwordWords(error);
       });
+      // The same proof on this page's socket: the keys are open here from
+      // now on, for the core too (0.1.28).
+      await this.proveByAuth(auth);
       try {
         return await unwrapPassword(kek, fromB64u(wrap), vault.id);
       } catch {
@@ -552,6 +602,7 @@ class Store {
     this.signers = fresh;
     this.set({ signable: [...fresh.keys()], unsignable });
     this.announce();
+    void this.proveIfNeeded();
   }
 
   /** Tells the core which keys this page signs for now (none: locked). */
@@ -641,14 +692,20 @@ class Store {
   lock(): void {
     if (this.state.app) {
       // The engine's answer is the state; a session that ended signs out.
+      // It takes back its proof itself (vault.closed).
+      this.set({ proven: false });
       void lockAppVault().catch(() => {}).finally(() => void this.refreshApp());
       return;
     }
     const was = !!this.vk;
+    const proven = this.state.proven;
     this.dropKeys();
     this.set({ open: false, openedBy: null, signable: [], unsignable: {}, offerPasskey: false,
-      canKeep: false });
+      canKeep: false, proven: false });
     if (was) this.announce();
+    // The proof goes with the keys (0.1.28): the core closes this page's
+    // guarded terminals at once.
+    if (proven || was) socket.send({ op: "vault.closed" });
     if (!this.pair) {
       this.release?.();
       this.release = null;
@@ -678,6 +735,9 @@ class Store {
           kdf: made.kdf, auth: b64u(made.auth), wrap: b64u(made.wrap) } }).catch((error: unknown) => {
           throw refusedWords(error, "make");
         }));
+        // Its password guards the keys from now on (0.1.28): proved on this
+        // page's socket at once, so that its first key goes in.
+        await this.proveByAuth(made.auth);
       } finally {
         wipe(made.auth);
       }
@@ -695,13 +755,18 @@ class Store {
     const sealed = await sealKey(this.vk, keyId, { v: 1, type: read.type, jwk: read.jwk,
       comment: read.comment });
     const vault = await addVaultKey({ id: keyId, name, type: read.type, publicKey: read.publicKey,
-      fingerprint: read.fingerprint, sealed: b64u(sealed), source: "file", sourceLabel: fileName });
+      fingerprint: read.fingerprint, sealed: b64u(sealed), source: "file", sourceLabel: fileName })
+      .catch((error: unknown) => {
+        throw lockedWords(error);
+      });
     this.applyVault(vault);
     await this.loadSigners();
   }
 
   async removeKey(id: string): Promise<void> {
-    await removeVaultKey(id);
+    await removeVaultKey(id).catch((error: unknown) => {
+      throw lockedWords(error);
+    });
     await this.reload();
   }
 
@@ -738,13 +803,16 @@ class Store {
     const now = this.state.vault ?? vault;
     const first = !now.password;
     try {
+      // Once the keys guard something, the core takes a password only from
+      // a device that proved them open (0.1.28).
+      await this.proveWithRaw(raw);
       const made = await makePassword(password, raw, now.id).catch((error: unknown) => {
         throw wasmWords(error);
       });
       try {
         this.applyVault(await setVaultPassword({ salt: b64u(made.salt), kdf: made.kdf,
           auth: b64u(made.auth), wrap: b64u(made.wrap) }).catch((error: unknown) => {
-          throw refusedWords(error, "set");
+          throw refusedWords(lockedWords(error), "set");
         }));
       } finally {
         wipe(made.auth);
@@ -844,8 +912,32 @@ class Store {
   // ----------------------------------------------------- the socket's ops
 
   private async onMessage(message: VaultMessage): Promise<void> {
+    // A socket's nonce is kept even before the page knows who is signed
+    // in: the socket can connect first, for a terminal's tab.
+    if (message.op === "vault.challenge") {
+      this.challenge(String(message.nonce ?? ""));
+      return;
+    }
     if (!this.me) return;
     switch (message.op) {
+      case "vault.proven": {
+        this.set({ proven: true, provenN: this.state.provenN + 1 });
+        this.proofWaiters.shift()?.(true);
+        socket.reattachLocked();
+        break;
+      }
+      case "vault.unproven":
+        this.set({ proven: false });
+        this.proofWaiters.shift()?.(false);
+        break;
+      case "vault.closed":
+        // From the engine, in the app: its vault locked, its proof went;
+        // locked from elsewhere than this page too, so it is read again.
+        if (this.state.app) {
+          this.set({ proven: false });
+          void this.refreshApp();
+        }
+        break;
       case "vault.sign":
         await this.sign(message);
         break;
@@ -865,6 +957,161 @@ class Store {
           this.set({ request: null });
         }
         break;
+      }
+    }
+  }
+
+  // ------------------------------------------ the proof of open keys (v3)
+
+  /** A new socket's nonce: in a browser with the vault open, the proof by a
+   * key at once (the keys shown open meanwhile, as they were); otherwise the
+   * keys are closed for this socket until they are proved. In the app the
+   * engine proves, and says so. */
+  private challenge(nonce: string): void {
+    this.nonce = nonce || null;
+    const waiting = this.nonceWaiters;
+    this.nonceWaiters = [];
+    for (const go of waiting) go(this.nonce);
+    if (!this.state.proofs) this.set({ proofs: true });
+    if (this.state.app) {
+      if (this.state.proven) this.set({ proven: false });
+      return;
+    }
+    if (this.canProve()) {
+      void this.proveByKey(nonce).finally(() => this.openGate());
+      return;
+    }
+    if (this.state.proven) this.set({ proven: false });
+    this.openGate();
+  }
+
+  /** The vault open here with a key to prove it by. */
+  private canProve(): boolean {
+    return !this.state.app && !!this.vk && this.signers.size > 0;
+  }
+
+  /** The socket connected, or gone. A proof lives as long as its socket: a
+   * key proves again on the next one; without one the keys show closed at
+   * once. */
+  private connection(up: boolean): void {
+    if (up) return;
+    this.nonce = null;
+    this.settleProofs();
+    if (this.state.proven && !this.state.app && !this.canProve()) this.set({ proven: false });
+  }
+
+  /** Whoever waited for a proof or a nonce goes on, without. */
+  private settleProofs(): void {
+    const proofs = this.proofWaiters;
+    const nonces = this.nonceWaiters;
+    this.proofWaiters = [];
+    this.nonceWaiters = [];
+    for (const go of proofs) go(false);
+    for (const go of nonces) go(null);
+    this.openGate();
+  }
+
+  /** On a socket back after a drop: its terminals are attached once the keys
+   * are proved open again, so that none of them is locked meanwhile. */
+  private gate(): Promise<void> | null {
+    if (!this.state.proofs || !this.canProve()) return null;
+    return new Promise((resolve) => {
+      const timer = window.setTimeout(done, GATE_MS);
+      function done() {
+        window.clearTimeout(timer);
+        resolve();
+      }
+      this.gateWaiters.push(done);
+    });
+  }
+
+  private openGate(): void {
+    const waiting = this.gateWaiters;
+    this.gateWaiters = [];
+    for (const go of waiting) go();
+  }
+
+  /** The socket's nonce, once it is connected (held here for it). */
+  private challenged(): Promise<string | null> {
+    if (this.nonce) return Promise.resolve(this.nonce);
+    this.release ??= socket.hold();
+    return new Promise((resolve) => {
+      const timer = window.setTimeout(() => done(null), CHALLENGE_WAIT_MS);
+      const done = (nonce: string | null) => {
+        window.clearTimeout(timer);
+        resolve(nonce);
+      };
+      this.nonceWaiters.push(done);
+    });
+  }
+
+  /** Sends a proof; the core's word on it (false without one in time). */
+  private sendProof(message: object): Promise<boolean> {
+    return new Promise((resolve) => {
+      const timer = window.setTimeout(() => done(false), PROOF_WAIT_MS);
+      const done = (ok: boolean) => {
+        window.clearTimeout(timer);
+        resolve(ok);
+      };
+      this.proofWaiters.push(done);
+      socket.send(message);
+    });
+  }
+
+  /** The proof by a key, when the core asks for proofs and the vault is
+   * open here: after the vault opens, and on each new socket. */
+  private async proveIfNeeded(): Promise<void> {
+    if (!this.state.proofs || this.state.proven || !this.canProve() || !this.nonce) return;
+    await this.proveByKey(this.nonce);
+  }
+
+  /** Signs the proof blob of `nonce` with a key of the vault open here. */
+  private async proveByKey(nonce: string): Promise<boolean> {
+    const blob = await proofBlob(nonce);
+    for (const [key, signer] of this.signers) {
+      const alg = PROOF_ALG[signer.type];
+      let sig: Bytes;
+      try {
+        sig = await signer.sign(alg, blob);
+      } catch {
+        continue;
+      }
+      // Another socket meanwhile: its own nonce, its own proof.
+      if (this.nonce !== nonce) return false;
+      return await this.sendProof({ op: "vault.prove", key, alg, sig: b64u(sig) });
+    }
+    return false;
+  }
+
+  /** The vault password's proof, just checked by the core: the same on the
+   * socket, unless the keys are proved open already. */
+  private async proveByAuth(auth: Bytes): Promise<void> {
+    if (this.state.app || !this.state.proofs || this.state.proven) return;
+    const text = b64u(auth);
+    if (!await this.challenged()) return;
+    await this.sendProof({ op: "vault.prove", auth: text });
+  }
+
+  /** VK's raw bytes in hand, the vault not open here (a password set with
+   * Touch ID or the recovery code): the proof by a key of the vault, opened
+   * just for it. A vault without keys proves nothing this way. */
+  private async proveWithRaw(raw: Bytes): Promise<void> {
+    const vault = this.state.vault;
+    if (this.state.app || !this.state.proofs || this.state.proven || !vault?.keys.length) return;
+    const nonce = await this.challenged();
+    if (!nonce) return;
+    const vk = await aesKey(raw);
+    const blob = await proofBlob(nonce);
+    for (const key of vault.keys) {
+      try {
+        const signer = await signerOf(await openKey(vk, key.id, fromB64u(key.sealed)));
+        const alg = PROOF_ALG[signer.type];
+        const sig = await signer.sign(alg, blob);
+        if (this.nonce !== nonce) return;
+        await this.sendProof({ op: "vault.prove", key: key.fingerprint, alg, sig: b64u(sig) });
+        return;
+      } catch {
+        continue;
       }
     }
   }

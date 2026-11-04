@@ -127,6 +127,11 @@ sidebar.with_key = Se abre con tu clave, desde tu bóveda
 # name, and its tip ({mac} is the Mac's name).
 sidebar.via_mac = vía Mac
 sidebar.via_title = A través de {mac}, mientras esté encendida
+sidebar.keys_closed_new = Las claves no están abiertas en este dispositivo. Ábrelas y abre un terminal nuevo en {name}
+sidebar.keys_closed = Las claves no están abiertas en este dispositivo. Ábrelas
+sidebar.keys_closed_mac = Un terminal en tu Mac desde un navegador: solo donde las claves están abiertas. Ábrelas
+sidebar.closed_terminal = {label} en {machine}: cerrado en este dispositivo. Abre las claves
+sidebar.closed_title = Cerrado en este dispositivo: abre las claves
 
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
@@ -403,6 +408,7 @@ app.remove.confirm = Quitar {name}
 app.remove.text = Desaparece de tTerm Web y sus terminales finalizan. Los comandos que se escribieron allí se quedan en el historial.
 app.remove.computer = Su agente se entera de que la computadora se quitó y se detiene. Para volver a conectarla: «Añadir una máquina» y luego «Computadora».
 app.remove.server = tTerm Web deja de iniciar sesión en él y retira su acceso en el propio servidor. Si el servidor no responde, a continuación verás el comando para hacerlo.
+app.remove.closed = {name} está cerrado en este dispositivo: solo se puede quitar donde las claves están abiertas. Ábrelas aquí.
 app.end.title = ¿Finalizar {label}?
 app.end.confirm = Finalizar la terminal
 app.end.text = Su shell termina y se detiene todo lo que se esté ejecutando, como al cerrar una ventana de terminal. Lo que ejecutó se queda en su pestaña y en el historial.
@@ -862,6 +868,7 @@ project_dialog.with_others = con otras personas
 project_dialog.move_becomes = En {project} pasará a ser {code}/{name}. Sus terminales siguen en marcha y en la propia máquina no cambia nada.
 # The same, when its name is taken there: {machine} is its name now, {name} the one it gets (web-01-2).
 project_dialog.move_becomes_taken = En {project} pasará a ser {code}/{name}: allí ya hay una máquina llamada {machine}. Sus terminales siguen en marcha y en la propia máquina no cambia nada.
+project_dialog.move_closed = {machine} está cerrado en este dispositivo: solo se puede mover donde las claves están abiertas. Ábrelas aquí.
 # The button: {project} is the project's name.
 project_dialog.move_to = Mover a {project}
 # The button while there is nothing to pick (a verb).
@@ -942,6 +949,7 @@ projectpage.remove_machine = Quitar máquina
 # An item of a machine's menu.
 projectpage.move_machine = Mover a otro proyecto
 projectpage.no_terminals = No hay terminales abiertas
+projectpage.closed = cerrado en este dispositivo
 # Who changed a note last, and when: {ago} is just now, 5 min ago, yesterday, on 12 Oct (time.*).
 projectpage.edited_you = Tú, {ago}
 # The same, someone else: {name} is their first name.
@@ -1036,6 +1044,7 @@ machines.account = Usuario
 machines.offline_seen = desconectada, {seen}
 machines.offline = desconectada
 machines.online = conectada
+machines.closed = cerrado en este dispositivo
 machines.offline_note = La computadora está en reposo o desconectada, o su agente no se está ejecutando. Volverá sola cuando su agente pueda conectarse; esta página lo detecta en menos de diez segundos.
 # On Open a terminal while the computer is offline.
 machines.offline_title = Está desconectada: en reposo, o su agente no se está ejecutando
@@ -1415,6 +1424,7 @@ log.today_count = {n} hoy
 # A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
 log.tab = {machine}: bitácora
 log.tab_title = Bitácora de {machine}
+log.closed_here = Bitácora de {machine}: cerrada en este dispositivo. Abre las claves
 log.close_tab = Cerrar la bitácora
 # The ⋯ over the page, and its one item.
 log.menu = Menú de la bitácora
@@ -1602,6 +1612,7 @@ classic.several_lines = Este comando tiene varias líneas, y el modo clásico ej
 # ------------------------------------------------------------ tabs: the line of tabs on top (TabBar.tsx)
 # The tabs that are open, for screen readers.
 tabs.label = Pestañas abiertas
+tabs.closed_here = cerrado en este dispositivo
 # Naming a terminal in its tab, after a double click.
 tabs.rename_title = Nombrar esta terminal
 tabs.rename_hint = Enter guarda, Esc cancela. El nombre aparece en la barra lateral, en las pestañas y en la página del proyecto.
@@ -1850,6 +1861,7 @@ app_code.text_lost = Esta Mac ya no puede abrir tu bóveda por sí sola. Ábrela
 # A vault with a password (0.1.26): opened here once with it.
 app_code.text_password = Esta Mac todavía no puede abrir tu bóveda por sí sola. Ábrela aquí una vez con la contraseña de la bóveda; a partir de entonces, esta Mac la abrirá con Touch ID.
 app_code.text_lost_password = Esta Mac ya no puede abrir tu bóveda por sí sola. Ábrela aquí una vez con la contraseña de la bóveda; después, esta Mac volverá a abrirla con Touch ID.
+app_code.text_prove = Tu bóveda todavía no tiene ninguna clave, así que tTerm Web necesita la contraseña de la bóveda para saber que las claves están abiertas en esta Mac. Escríbela una vez: basta hasta que la bóveda se cierre.
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1905,10 +1917,30 @@ vault_locked.no_ed25519 = Este navegador no puede firmar con claves Ed25519. Abr
 vault_locked.not_here = Tu bóveda está abierta aquí, pero {key} no se abre en este navegador. Vuelve a añadirla desde su archivo en Configuración › Claves.
 vault_locked.its_key = su clave
 
+# ------------------------------------------------------------ keys_closed: a tab of a machine closed on this device (KeysClosed.tsx, 0.1.28)
+keys_closed.tab = {machine} · terminal nuevo
+keys_closed.tab_title = Un terminal nuevo en {machine}, en cuanto se abran las claves en este dispositivo
+keys_closed.close_tab = Cerrar la pestaña: sin terminal nuevo
+keys_closed.new_key_title = {machine} se abre con tu clave
+keys_closed.new_key_text = Las claves aún no están abiertas en este dispositivo. Ábrelas aquí mismo y se abrirá enseguida un terminal nuevo en {machine}.
+keys_closed.new_via_title = {machine} se abre a través de {mac}
+keys_closed.new_via_text = Tu Mac inicia el terminal. Desde un navegador solo se abre donde las claves están abiertas: un segundo candado, para que nadie que haya entrado en tu correo entre a través del Mac.
+keys_closed.new_mac_title = Un terminal en {mac}
+keys_closed.new_mac_text = Desde un navegador, un terminal en tu Mac solo se abre donde las claves están abiertas: un segundo candado, para que nadie que haya entrado en tu correo abra un terminal en tu Mac.
+keys_closed.log_title = La bitácora de {machine} está cerrada en este dispositivo
+keys_closed.log_text = La bitácora tiene los mismos comandos y la misma salida que el terminal, así que está cerrada igual. Abre las claves y la bitácora se abrirá.
+keys_closed.terminal_title = Este terminal está cerrado en este dispositivo
+keys_closed.terminal_text = «{name}» en {machine} sigue en marcha, pero aquí no se ve hasta que las claves estén abiertas aquí. Abre las claves y el terminal aparecerá tal como está ahora.
+keys_closed.open_new = Abrir las claves y el terminal
+keys_closed.proving = Abriendo las claves en este dispositivo…
+keys_closed.refused = {machine} está cerrado en este dispositivo: abre las claves y vuelve a intentarlo.
+keys_closed.foot = Los servidores con tu clave, los servidores a través de tu Mac, el propio Mac y sus bitácoras se ven donde tú mismo abriste las claves: con la contraseña, con Touch ID o con la aprobación en el Mac. Iniciar sesión con un código del correo no las abre. En la app del propio Mac, sus propios terminales se abren sin contraseña.
+
 # ------------------------------------------------------------ vault_problem: what went wrong with the vault (vault/store.ts)
 vault_problem.no_vault = Aún no tienes una bóveda.
 vault_problem.exists = Ya tienes una bóveda: ábrela y luego añade la clave.
 vault_problem.locked = Primero abre tu bóveda.
+vault_problem.keys_closed = La bóveda solo cambia donde sus claves están abiertas. Ábrelas en este dispositivo y vuelve a intentarlo.
 # The vault password: {n} tries left (shown when 3 or fewer), {time} a
 # time of day, as the page shows times ("14:05").
 vault_problem.password_wrong = Esa contraseña no abre tu bóveda. Revisa la distribución del teclado y la tecla Bloq Mayús.

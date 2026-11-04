@@ -8,4 +8,4 @@ Everything runs from the repository root, not from inside the package:
     python -m tterm.tests    the checks
 """
 
-__version__ = "0.1.27"
+__version__ = "0.1.28"

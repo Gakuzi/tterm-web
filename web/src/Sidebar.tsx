@@ -32,7 +32,12 @@
 // 0.1.19 at the bottom, right above Sign out. From 0.1.20 a project's notes
 // start with Logs, written by tTerm: the log of each of its machines, with
 // how many commands ran there today. From 0.1.27 (row 133) the menu has no
-// Account: the name and address on top of it open Settings › Account.
+// Account: the name and address on top of it open Settings › Account. From
+// 0.1.28 (LockFlow.dc) a machine closed on this device, its keys not open
+// here, has a lock in place of its "+", which asks for them and then a
+// terminal; its terminals and its log are dimmed, each with a lock and no
+// count. "by tTerm" at Logs is words alone: a lock there would read as
+// closed.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { Machine, Me, Project, TerminalInfo } from "./api";
@@ -78,6 +83,9 @@ interface Props {
   current: string | null;
   terminals: TerminalInfo[];
   dotFor: (terminal: TerminalInfo) => Dot;
+  /** A machine closed on this device (0.1.28, keysHere.ts), and its log. */
+  closed: (machine: Machine) => boolean;
+  logClosed: (machine: Machine) => boolean;
   onOpenProject: (projectId: string) => void;
   onAddMachine: (projectId: string) => void;
   onNewTerminal: (machine: Machine) => void;
@@ -187,6 +195,9 @@ export function Sidebar(props: Props) {
     const via = viaMac ? projects.flatMap((p) => p.machines).find((x) => x.id === m.via?.id) : undefined;
     const viaOn = !!via && (via.here || !!via.online) && !waits;
     const viaName = m.via?.name || via?.name || t("vault.your_mac");
+    // Closed on this device (0.1.28): a lock for the "+", its terminals
+    // dimmed.
+    const shut = props.closed(m);
     return (
       <div key={m.id} className="sb-group">
         <div className="sb-row">
@@ -227,15 +238,41 @@ export function Sidebar(props: Props) {
               <span className={viaOn ? "sb-state on" : "sb-state away"} aria-hidden="true" />
             )}
           </button>
-          <button type="button" className="sb-plus"
-            aria-label={t("sidebar.new_terminal_on", { name: m.name })}
-            title={t("sidebar.new_terminal")}
-            onClick={() => props.onNewTerminal(m)}>
-            <Plus size={13} />
-          </button>
+          {shut ? (
+            <button type="button" className="sb-plus sb-lock"
+              aria-label={t("sidebar.keys_closed_new", { name: m.name })}
+              title={computer ? t("sidebar.keys_closed_mac") : t("sidebar.keys_closed")}
+              onClick={() => props.onNewTerminal(m)}>
+              <Lock size={13} />
+            </button>
+          ) : (
+            <button type="button" className="sb-plus"
+              aria-label={t("sidebar.new_terminal_on", { name: m.name })}
+              title={t("sidebar.new_terminal")}
+              onClick={() => props.onNewTerminal(m)}>
+              <Plus size={13} />
+            </button>
+          )}
         </div>
         {open && mine.map((term) => {
           const dot = dotFor(term);
+          if (shut) {
+            // Its card in its tab: no name to change, nothing to end here.
+            return (
+              <div key={term.id} className="sb-leaf-row">
+                <button type="button" className="sb-leaf closed"
+                  aria-current={current === term.id ? "page" : undefined}
+                  aria-label={t("sidebar.closed_terminal", { label: terminalName(term.name, t),
+                    machine: m.name })}
+                  title={t("sidebar.closed_title")}
+                  onClick={() => props.onGoTo(term.id)}>
+                  <Avatar who={null} me={me} size="xs" />
+                  <span className="sb-text">{terminalName(term.name, t)}</span>
+                  <Lock size={12} className="sb-closed-lock" />
+                </button>
+              </div>
+            );
+          }
           const canRename = dot !== "ended";
           if (canRename && props.renaming === term.id) {
             return (
@@ -306,25 +343,30 @@ export function Sidebar(props: Props) {
             <span className="sb-text">{label}</span>
           </button>
           <span className="sb-tag" title={t("log.by_tterm_title")}>
-            <Lock size={11} />{t("log.by_tterm")}
+            {t("log.by_tterm")}
           </span>
         </div>
-        {open && project.machines.map((m) => (
-          <button key={m.id} type="button" className="sb-leaf"
-            aria-current={current === logTab(m.id) ? "page" : undefined}
-            title={t("log.tab_title", { machine: m.name })}
-            onClick={() => props.onOpenLog(m.id)}>
-            <span className="sb-leaf-icon" aria-hidden="true">
-              {m.kind === "computer" ? <Computer size={14} /> : <Server size={14} />}
-            </span>
-            <span className="sb-text">{m.name}</span>
-            {!!props.logToday[m.id] && (
-              <span className="sb-progress">
-                {t("log.today_count", { n: props.logToday[m.id] })}
+        {open && project.machines.map((m) => {
+          const shut = props.logClosed(m);
+          return (
+            <button key={m.id} type="button" className={shut ? "sb-leaf closed" : "sb-leaf"}
+              aria-current={current === logTab(m.id) ? "page" : undefined}
+              aria-label={shut ? t("log.closed_here", { machine: m.name }) : undefined}
+              title={shut ? t("sidebar.closed_title") : t("log.tab_title", { machine: m.name })}
+              onClick={() => props.onOpenLog(m.id)}>
+              <span className="sb-leaf-icon" aria-hidden="true">
+                {m.kind === "computer" ? <Computer size={14} /> : <Server size={14} />}
               </span>
-            )}
-          </button>
-        ))}
+              <span className="sb-text">{m.name}</span>
+              {shut ? <Lock size={12} className="sb-closed-lock" />
+                : !!props.logToday[m.id] && (
+                  <span className="sb-progress">
+                    {t("log.today_count", { n: props.logToday[m.id] })}
+                  </span>
+                )}
+            </button>
+          );
+        })}
       </div>
     );
   };

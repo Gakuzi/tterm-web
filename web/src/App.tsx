@@ -11,7 +11,7 @@ import {
   type ProjectFields, type ProjectTint, type State, type TerminalInfo,
   type Theme,
 } from "./api";
-import { colorClass } from "./colors";
+import { colorClass, terminalName } from "./colors";
 import { Confirm, Removed } from "./Confirm";
 import { Finder, type FinderGroup, type FinderItem } from "./Finder";
 import { foundBlock, foundLine, foundNote } from "./found";
@@ -30,7 +30,9 @@ import { Machines } from "./Machines";
 import { MoveToCloud } from "./MoveToCloud";
 import { MoveContext, type MoveFrame } from "./SshStrip";
 import { VaultDialogHost } from "./VaultDialogs";
-import { vaultStore } from "./vault/store";
+import { useVault, vaultStore } from "./vault/store";
+import { closedHere, logClosedHere } from "./keysHere";
+import { KeysClosed, KeysHere } from "./KeysClosed";
 import { FolderDialog } from "./Menus";
 import { NeedAccount, type Need } from "./NeedAccount";
 import { forgetSupportDraft, SupportDialog } from "./SupportDialog";
@@ -50,7 +52,7 @@ import { SignIn } from "./SignIn";
 import { socket } from "./socket";
 import { TabBar, type Dot, type SaveLine, type TabView } from "./TabBar";
 import {
-  isTerminalTab, logTab, noteTab, projectTab, rememberedFolds, rememberedTabs,
+  isTerminalTab, keysTab, logTab, noteTab, projectTab, rememberedFolds, rememberedTabs,
   rememberFolds, rememberTabs, shortcut, tabKind, tabOfPath, tabPath,
   tabTarget, TABS_MAX,
 } from "./tabs";
@@ -250,6 +252,10 @@ function revealKeys(tab: string, state: State): string[] {
   const id = tabTarget(tab);
   const kind = tabKind(tab);
   if (kind === "project") return [`p:${id}`];
+  if (kind === "keys") {
+    const project = state.projects.find((p) => p.machines.some((m) => m.id === id));
+    return project ? [`p:${project.id}`, `m:${id}`] : [];
+  }
   if (kind === "log") {
     const project = state.projects.find((p) => p.machines.some((m) => m.id === id));
     return project ? [`p:${project.id}`, `l:${project.id}`] : [];
@@ -379,6 +385,11 @@ export function App() {
   const [pageVisit, setPageVisit] = useState(0);
   const stateNow = useRef<State | null>(null);
   stateNow.current = state;
+  // Keys open on this device (0.1.28): whether a machine is closed here,
+  // and the machines by id, for the callbacks below (set once the lists
+  // are there).
+  const closedRef = useRef<(machine: Machine) => boolean>(() => false);
+  const byIdRef = useRef(new Map<string, Machine>());
 
   const load = useCallback(() => {
     setProblem(null);
@@ -416,7 +427,7 @@ export function App() {
             if (tab === here) return true;
             const kind = tabKind(tab);
             if (kind === "terminal") return terminals.has(tab);
-            if (kind === "log") return machines.has(tabTarget(tab));
+            if (kind === "log" || kind === "keys") return machines.has(tabTarget(tab));
             return (kind === "note" ? notes : projects).has(tabTarget(tab));
           }));
         }
@@ -435,11 +446,12 @@ export function App() {
   const meId = state?.me.id ?? null;
   const vaultApp = !!state?.app;
   const vaultLocal = !!state?.local;
+  const vaultProofs = !!state?.proofs;
   useEffect(() => {
     const me = stateNow.current?.me;
     if (!meId || vaultLocal || !me) return;
-    vaultStore.start({ id: me.id, name: me.name, email: me.email }, vaultApp);
-  }, [meId, vaultApp, vaultLocal]);
+    vaultStore.start({ id: me.id, name: me.name, email: me.email }, vaultApp, vaultProofs);
+  }, [meId, vaultApp, vaultLocal, vaultProofs]);
 
   /** The session is over: the sign-in screen, and nothing of the page
    * behind it. A note from Sign out itself wins over one from the socket
@@ -662,12 +674,31 @@ export function App() {
   }, [navigate]);
   const closeTab = useCallback((tab: string) => closeTabs([tab]), [closeTabs]);
 
+  /** A lock pressed, or a new terminal asked for on a machine closed on
+   * this device (0.1.28, the owner's decisions of 03.11): a tab of its own
+   * whose card opens the keys; then the terminal comes in its place. One
+   * request at a time: another one replaces it. */
+  const askKeys = useCallback((machine: Machine) => {
+    const tab = keysTab(machine.id);
+    const others = shownRef.current.filter((x) => tabKind(x) === "keys" && x !== tab);
+    setTabs((ts) => withTab(ts.filter((x) => !others.includes(x)), tab));
+    navigate(tabPath(tab));
+  }, [navigate]);
+
   /** A new terminal on the machine, in a new tab. Opened from an ended
    * terminal (`instead`), it takes that one's tab and its address: Back
    * does not bring the ended one back; and from 0.1.24 it starts in the
-   * folder that one was in (`cwd`). */
+   * folder that one was in (`cwd`). On a machine closed on this device
+   * (0.1.28) the keys are asked for first; `failed`, when it could not be
+   * made. */
   const startTerminal = useCallback((machineId: string, instead?: string,
-    then?: (terminalId: string) => void, cwd?: string) => {
+    then?: (terminalId: string) => void, cwd?: string, failed?: () => void) => {
+    const machine = byIdRef.current.get(machineId);
+    const asked = !!instead && tabKind(instead) === "keys";
+    if (machine && !asked && closedRef.current(machine)) {
+      askKeys(machine);
+      return;
+    }
     const { cols, rows } = guessSize();
     const project = stateNow.current?.projects.find((p) =>
       p.machines.some((m) => m.id === machineId));
@@ -685,12 +716,20 @@ export function App() {
           ? ts.map((id) => (id === instead ? terminal.id : id))
           : withTab(ts, terminal.id)));
         navigate(`/t/${terminal.id}`,
-          !!instead && location.pathname === `/t/${instead}`);
+          !!instead && location.pathname === tabPath(instead));
         refresh();
         then?.(terminal.id);
       })
-      .catch((e: Error) => notYet(say("app.no_terminal", { why: e.message })));
-  }, [navigate, refresh, notYet, unfold]);
+      .catch((e: Error) => {
+        // Closed here after all, for the core: the card asks for the keys.
+        if (e instanceof CoreError && e.status === 423 && machine && !asked) {
+          askKeys(machine);
+          return;
+        }
+        notYet(say("app.no_terminal", { why: e.message }));
+        failed?.();
+      });
+  }, [navigate, refresh, notYet, unfold, askKeys]);
 
   /** A new terminal from a machine's "+": an offline computer says so. */
   const newTerminal = useCallback((machine: Machine) => {
@@ -1089,6 +1128,60 @@ export function App() {
   const projects = useMemo(() => (state ? withLive(state.projects, live) : []),
     [state, live]);
 
+  // Keys open on this device (0.1.28, keysHere.ts): what is closed here
+  // while they are not.
+  const keys = useVault();
+  const byId = useMemo(() => new Map(projects.flatMap((p) => p.machines)
+    .map((m): [string, Machine] => [m.id, m])), [projects]);
+  const isClosed = useCallback((m: Machine) => closedHere(m, keys, byId), [keys, byId]);
+  const isLogClosed = useCallback((m: Machine) => logClosedHere(m, keys, byId), [keys, byId]);
+  closedRef.current = isClosed;
+  byIdRef.current = byId;
+  // The keys opened or closed here: the lists again, as the core gives them
+  // now (its terminals in full or by name, the logs' counts of today).
+  const provenNow = keys.proven;
+  const provedBefore = useRef(provenNow);
+  useEffect(() => {
+    if (provedBefore.current === provenNow) return;
+    provedBefore.current = provenNow;
+    refresh();
+  }, [provenNow, refresh]);
+  /** A terminal's machine is closed here: as the lists say, or as the core
+   * said of a terminal on a machine they do not have. */
+  const terminalClosed = (terminal: TerminalInfo | undefined) => {
+    if (!terminal) return false;
+    const machine = byId.get(terminal.machineId);
+    return machine ? isClosed(machine) : !!terminal.locked;
+  };
+
+  // The request for a new terminal (0.1.28): once the keys are open here,
+  // the terminal is made, only if its tab is in front; one left behind
+  // another tab goes (the owner, 03.11, 22:25).
+  const requestTab = shownTabs.find((tab) => tabKind(tab) === "keys") ?? null;
+  const requestMachine = requestTab ? byId.get(tabTarget(requestTab)) : undefined;
+  const requestOpen = !!requestMachine && !isClosed(requestMachine);
+  const fulfilled = useRef<string | null>(null);
+  useEffect(() => {
+    if (!requestTab || !state) return;
+    if (!requestMachine) {
+      closeTabs([requestTab], true);
+      return;
+    }
+    // Not before the vault is known: until then a machine looks open, and a
+    // page loaded on a request's address would make it, and be refused.
+    if (!keys.ready || !requestOpen) return;
+    const once = `${requestTab}:${keys.provenN}`;
+    if (fulfilled.current === once) return;
+    fulfilled.current = once;
+    if (current === requestTab) {
+      startTerminal(requestMachine.id, requestTab, undefined, undefined,
+        () => closeTabs([requestTab], true));
+    } else {
+      closeTabs([requestTab], true);
+    }
+  }, [requestTab, requestMachine, requestOpen, current, state, keys.provenN, keys.ready,
+    closeTabs, startTerminal]);
+
   // Each tab as the bar shows it.
   const liveTerminals = useMemo(() => state?.terminals ?? [], [state]);
   const tabViews: TabView[] = shownTabs.map((tab): TabView => {
@@ -1116,15 +1209,28 @@ export function App() {
     }
     if (kind === "log") {
       const project = projects.find((p) => p.machines.some((m) => m.id === id));
-      const machine = project?.machines.find((m) => m.id === id)?.name ?? "";
+      const found = project?.machines.find((m) => m.id === id);
+      const machine = found?.name ?? "";
       return {
         id: tab, kind, code: project?.code ?? "", color: project?.color,
         label: t("log.tab", { machine }), title: t("log.tab_title", { machine }),
-        closeTitle: t("log.close_tab"),
+        closeTitle: t("log.close_tab"), locked: !!found && isLogClosed(found),
       };
     }
-    const status = statuses[tab];
+    if (kind === "keys") {
+      const project = projects.find((p) => p.machines.some((m) => m.id === id));
+      const machine = project?.machines.find((m) => m.id === id)?.name ?? "";
+      return {
+        id: tab, kind, code: project?.code ?? "", color: project?.color,
+        label: t("keys_closed.tab", { machine }), title: t("keys_closed.tab_title", { machine }),
+        closeTitle: t("keys_closed.close_tab"), locked: true,
+      };
+    }
     const known = liveTerminals.find((t) => t.id === tab);
+    // A terminal closed here (0.1.28) is its name and machine as the lists
+    // give them: not what its view said of it before (its folder, what ran,
+    // or the placeholder of a view that never attached).
+    const status = known && terminalClosed(known) ? undefined : statuses[tab];
     const full = status?.label ?? known?.label ?? t("app.tab.terminal");
     const machine = status?.machine || known?.machine || "";
     const dot = dotOf(status, known, !!state && !known && !status);
@@ -1143,9 +1249,10 @@ export function App() {
       id: tab, kind, code: slash > 0 ? full.slice(0, slash) : "", color: home?.color,
       label: slash > 0 ? full.slice(slash + 1) : full, dot,
       here: !!there?.here, cutOff: cutOff && !!there && !there.here,
-      machine, name: known?.name, canRename,
-      title: canRename ? `${said}\n${t("sidebar.double_click")}` : said,
-      closeTitle: t("app.tab.close_terminal"),
+      machine, name: known?.name, canRename: canRename && !terminalClosed(known),
+      title: terminalClosed(known) ? t("sidebar.closed_title")
+        : canRename ? `${said}\n${t("sidebar.double_click")}` : said,
+      closeTitle: t("app.tab.close_terminal"), locked: terminalClosed(known),
     };
   });
   const front = tabViews.find((t) => t.id === current);
@@ -1725,7 +1832,19 @@ export function App() {
       {/* Under the Settings window the page stays as it was, but Tab does
           not reach it: nothing typed there goes to a terminal under it. */}
       <div className="stage" inert={settingsOpen}>
-        {shownTabs.filter(isTerminalTab).map((id) => (
+        {shownTabs.filter(isTerminalTab).map((id) => {
+          const known = liveTerminals.find((x) => x.id === id);
+          if (known && terminalClosed(known)) {
+            // Closed on this device (0.1.28): its card, and nothing of it.
+            return (
+              <div key={id} className={id === current ? "terminal-view" : "terminal-view behind"}
+                inert={id !== current}>
+                <KeysClosed what={{ kind: "terminal", machine: known.machine,
+                  name: terminalName(known.name, t) }} />
+              </div>
+            );
+          }
+          return (
           <TerminalView key={id} terminalId={id} active={id === current}
             refocus={refocus}
             shownTheme={shownTheme} onStatus={onStatus} onCloseTab={closeTab}
@@ -1736,7 +1855,27 @@ export function App() {
             machineThere={(machineId) => machineIds.has(machineId)}
             paste={paste?.terminalId === id ? paste : null} me={state.me}
             here={hereIds.has(liveTerminals.find((x) => x.id === id)?.machineId ?? "")} />
-        ))}
+          );
+        })}
+        {shownTabs.filter((tab) => tabKind(tab) === "keys").map((tab) => {
+          const machine = byId.get(tabTarget(tab));
+          if (!machine) return null;
+          const opens = machine.kind === "computer" ? "mac" : machine.method === "key" ? "key" : "via";
+          return (
+            <div key={tab} className={tab === current ? "terminal-view" : "terminal-view behind"}
+              inert={tab !== current}>
+              {isClosed(machine) ? (
+                <KeysClosed what={{ kind: "new", machine: machine.name, opens,
+                  mac: machine.via?.name ?? undefined }} />
+              ) : (
+                <div className="terminal-note" role="status">
+                  <span className="spinner" aria-hidden="true" />
+                  {t("terminal_view.connecting", { machine: machine.name })}
+                </div>
+              )}
+            </div>
+          );
+        })}
         {shownTabs.filter((tab) => tabKind(tab) === "note").map((tab) => (
           <NoteView key={tab} noteId={tabTarget(tab)} active={tab === current}
             me={state.me} projects={projects}
@@ -1748,16 +1887,27 @@ export function App() {
             onDelete={(noteId, noteTitle) => askDeleteNote(noteId, noteTitle)}
             onCloseTab={(tab, gone) => closeTabs([tab], gone)} notify={notYet} />
         ))}
-        {shownTabs.filter((tab) => tabKind(tab) === "log").map((tab) => (
-          <LogView key={tab} machineId={tabTarget(tab)} active={tab === current}
-            me={state.me} projects={projects}
-            onCloseTab={() => closeTabs([tab], true)} notify={notYet} />
-        ))}
+        {shownTabs.filter((tab) => tabKind(tab) === "log").map((tab) => {
+          const machine = byId.get(tabTarget(tab));
+          if (machine && isLogClosed(machine)) {
+            return (
+              <div key={tab} className={tab === current ? "terminal-view" : "terminal-view behind"}
+                inert={tab !== current}>
+                <KeysClosed what={{ kind: "log", machine: machine.name }} />
+              </div>
+            );
+          }
+          return (
+            <LogView key={tab} machineId={tabTarget(tab)} active={tab === current}
+              me={state.me} projects={projects}
+              onCloseTab={() => closeTabs([tab], true)} notify={notYet} />
+          );
+        })}
         {frontKind === "project" && (
           <div className="page-scroll">
             {pageProject ? (
               <ProjectPage project={pageProject} me={state.me}
-                terminals={liveTerminals} dotFor={dotFor}
+                terminals={liveTerminals} dotFor={dotFor} closed={isClosed}
                 local={local}
                 onAddMachine={startAdding} onOpenTerminal={startTerminal}
                 onGoTo={goTo} onRemoveMachine={askRemove}
@@ -1806,6 +1956,7 @@ export function App() {
           <div className="page-scroll">
             {anyMachine || local ? (
               <Machines projects={projects} terminals={state.terminals} local={local}
+                closed={isClosed}
                 onAdd={(projectId) => startAdding(projectId)}
                 onOpenTerminal={startTerminal} onGoTo={goTo}
                 onRemove={askRemove} />
@@ -1853,6 +2004,8 @@ export function App() {
           current={current}
           terminals={state.terminals}
           dotFor={dotFor}
+          closed={isClosed}
+          logClosed={isLogClosed}
           onOpenProject={(projectId) => away(() => openTab(projectTab(projectId)))()}
           onAddMachine={(projectId) => startAdding(projectId)}
           onNewTerminal={(machine) => away(() => newTerminal(machine))()}
@@ -1985,6 +2138,7 @@ export function App() {
         return (
           <MoveDialog machine={moving}
             targets={projects.filter((p) => p.own && p.role === "owner" && p.id !== from?.id)}
+            closed={isClosed(moving)}
             onMove={(projectId) => moveTo(moving, projectId)}
             onCancel={() => setMoving(null)} />
         );
@@ -2009,8 +2163,11 @@ export function App() {
       )}
 
       {asking?.kind === "remove" && (
+        // A machine closed on this device (0.1.28): the window opens the
+        // keys first, then it is the usual one.
         <Confirm title={t("app.remove.title", { name: asking.machine.name })}
           confirm={t("app.remove.confirm", { name: asking.machine.name })}
+          blocked={isClosed(asking.machine)}
           onConfirm={() => remove(asking.machine)}
           onCancel={() => setAsking(null)}>
           <p>{t("app.remove.text")}</p>
@@ -2018,6 +2175,9 @@ export function App() {
             <p className="hint">{t("app.remove.computer")}</p>
           ) : (
             <p className="hint">{t("app.remove.server")}</p>
+          )}
+          {isClosed(asking.machine) && (
+            <KeysHere text={t("app.remove.closed", { name: asking.machine.name })} />
           )}
         </Confirm>
       )}

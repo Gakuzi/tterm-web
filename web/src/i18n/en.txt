@@ -127,6 +127,11 @@ sidebar.with_key = Opens with your key, from your vault
 # name, and its tip ({mac} is the Mac's name).
 sidebar.via_mac = via Mac
 sidebar.via_title = Through {mac}, while it is on
+sidebar.keys_closed_new = The keys are not open on this device. Open them and a new terminal on {name}
+sidebar.keys_closed = The keys are not open on this device. Open them
+sidebar.keys_closed_mac = A terminal on your Mac from a browser: only where the keys are open. Open them
+sidebar.closed_terminal = {label} on {machine}: closed on this device. Open the keys
+sidebar.closed_title = Closed on this device: open the keys
 
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
@@ -403,6 +408,7 @@ app.remove.confirm = Remove {name}
 app.remove.text = It disappears from tTerm Web, and its terminals end. The commands typed there stay in the history.
 app.remove.computer = Its agent hears that the computer is removed and stops. To connect the computer again: Add a machine, then Computer.
 app.remove.server = tTerm Web stops signing in to it and takes its access back on the server itself. If the server does not answer, the command for that comes next.
+app.remove.closed = {name} is closed on this device: it can be removed only where the keys are open. Open them here.
 app.end.title = End {label}?
 app.end.confirm = End the terminal
 app.end.text = Its shell ends, and whatever runs in it stops, as when a terminal window is closed. What it ran stays in its tab and in the history.
@@ -862,6 +868,7 @@ project_dialog.with_others = with others
 project_dialog.move_becomes = In {project} it becomes {code}/{name}. Its terminals keep running, and nothing changes on the machine itself.
 # The same, when its name is taken there: {machine} is its name now, {name} the one it gets (web-01-2).
 project_dialog.move_becomes_taken = In {project} it becomes {code}/{name}: the name {machine} is taken there. Its terminals keep running, and nothing changes on the machine itself.
+project_dialog.move_closed = {machine} is closed on this device: it can be moved only where the keys are open. Open them here.
 # The button: {project} is the project's name.
 project_dialog.move_to = Move to {project}
 # The button while there is nothing to pick (a verb).
@@ -942,6 +949,7 @@ projectpage.remove_machine = Remove machine
 # An item of a machine's menu.
 projectpage.move_machine = Move to another project
 projectpage.no_terminals = No terminals open
+projectpage.closed = closed on this device
 # Who changed a note last, and when: {ago} is just now, 5 min ago, yesterday, on 12 Oct (time.*).
 projectpage.edited_you = You, {ago}
 # The same, someone else: {name} is their first name.
@@ -1036,6 +1044,7 @@ machines.account = Account
 machines.offline_seen = offline, {seen}
 machines.offline = offline
 machines.online = online
+machines.closed = closed on this device
 machines.offline_note = The computer is asleep or offline, or its agent is not running. It comes back by itself when its agent can connect; this page notices within ten seconds.
 # On Open a terminal while the computer is offline.
 machines.offline_title = It is offline: asleep, or its agent is not running
@@ -1415,6 +1424,7 @@ log.today_count = {n} today
 # A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
 log.tab = {machine} log
 log.tab_title = Log of {machine}
+log.closed_here = The log of {machine}: closed on this device. Open the keys
 log.close_tab = Close the log
 # The ⋯ over the page, and its one item.
 log.menu = Log menu
@@ -1602,6 +1612,7 @@ classic.several_lines = This command has several lines, and the classic mode wou
 # ------------------------------------------------------------ tabs: the line of tabs on top (TabBar.tsx)
 # The tabs that are open, for screen readers.
 tabs.label = Open tabs
+tabs.closed_here = closed on this device
 # Naming a terminal in its tab, after a double click.
 tabs.rename_title = Name this terminal
 tabs.rename_hint = Enter saves, Esc cancels. The name shows in the sidebar, in tabs and on the project's page.
@@ -1850,6 +1861,7 @@ app_code.text_lost = This Mac's lock no longer opens your vault. Open it here on
 # A vault with a password (0.1.26): opened here once with it.
 app_code.text_password = This Mac has no lock on your vault yet. Open it here once with your vault password: then this Mac opens it with Touch ID.
 app_code.text_lost_password = This Mac's lock no longer opens your vault. Open it here once with your vault password: then this Mac gets a new lock, and Touch ID opens it again.
+app_code.text_prove = Your vault has no key yet, so tTerm Web needs the vault password to know that the keys are open on this Mac. Type it once: it is enough until the vault locks.
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1905,10 +1917,30 @@ vault_locked.no_ed25519 = This browser cannot sign with Ed25519 keys. Open {mach
 vault_locked.not_here = Your vault is open here, but {key} does not open in this browser. Add it again from its file in Settings › Keys.
 vault_locked.its_key = its key
 
+# ------------------------------------------------------------ keys_closed: a tab of a machine closed on this device (KeysClosed.tsx, 0.1.28)
+keys_closed.tab = {machine} · new terminal
+keys_closed.tab_title = A new terminal on {machine}, once the keys are open on this device
+keys_closed.close_tab = Close the tab: no new terminal
+keys_closed.new_key_title = {machine} opens with your key
+keys_closed.new_key_text = The keys are not open on this device yet. Open them right here, and a new terminal on {machine} opens at once.
+keys_closed.new_via_title = {machine} opens through {mac}
+keys_closed.new_via_text = Your Mac starts the terminal. From a browser it opens only where the keys are open: a second lock, so that nobody who got into your email gets in through the Mac.
+keys_closed.new_mac_title = A terminal on {mac}
+keys_closed.new_mac_text = From a browser, a terminal on your Mac opens only where the keys are open: a second lock, so that nobody who got into your email opens a terminal on your Mac.
+keys_closed.log_title = The log of {machine} is closed on this device
+keys_closed.log_text = The log has the same commands and the same output as the terminal, so it is closed the same way. Open the keys, and the log opens.
+keys_closed.terminal_title = This terminal is closed on this device
+keys_closed.terminal_text = “{name}” on {machine} is running, but it does not show here until the keys are open here. Open the keys, and the terminal shows from where it is now.
+keys_closed.open_new = Open the keys and the terminal
+keys_closed.proving = Opening the keys on this device…
+keys_closed.refused = {machine} is closed on this device: open the keys and try again.
+keys_closed.foot = Servers with your key, servers through your Mac, the Mac itself and their logs show where you opened the keys yourself: with the password, Touch ID or the approval on the Mac. Signing in with a code from email does not open them. In the app on the Mac itself, its own terminals open without the password.
+
 # ------------------------------------------------------------ vault_problem: what went wrong with the vault (vault/store.ts)
 vault_problem.no_vault = You have no vault yet.
 vault_problem.exists = You have a vault already: open it, then add the key.
 vault_problem.locked = Open your vault first.
+vault_problem.keys_closed = The vault changes only where its keys are open. Open them on this device, then try again.
 # The vault password: {n} tries left (shown when 3 or fewer), {time} a
 # time of day, as the page shows times ("14:05").
 vault_problem.password_wrong = That password does not open your vault. Check the keyboard layout and Caps Lock.

@@ -15,13 +15,15 @@
 // cloud says that it waits for it. From 0.1.15, in the app with a new
 // version ready, Restart to update before Search (Updates.tsx). From 0.1.20
 // a tab is a machine's log too: P/web-01 log, after a clock turning back.
+// From 0.1.28 a tab of a machine closed on this device starts with a lock,
+// and so does a new terminal asked for there (P/droplet · new terminal).
 
 import { useRef, type ReactNode } from "react";
 import type { ProjectColor } from "./api";
 import { colorClass } from "./colors";
 import { useT } from "./i18n";
 import {
-  Check, Close, CloudOff, Computer, Doc, History, ListCheck, Plus, Search,
+  Check, Close, CloudOff, Computer, Doc, History, ListCheck, Lock, Plus, Search,
 } from "./icons";
 import { NameInput } from "./NameInput";
 import { JUMP_KEYS, type TabKind } from "./tabs";
@@ -54,6 +56,8 @@ export interface TabView {
   here?: boolean;
   /** In the app without the connection: a terminal of the cloud, waiting. */
   cutOff?: boolean;
+  /** Its machine is closed on this device (0.1.28): a lock first. */
+  locked?: boolean;
 }
 
 /** How saving goes in the note in front. */
@@ -86,6 +90,14 @@ interface Props {
 }
 
 function Lead({ tab }: { tab: TabView }) {
+  const t = useT();
+  if (tab.locked) {
+    return (
+      <span className="tab-lock" role="img" aria-label={t("tabs.closed_here")}>
+        <Lock size={12} />
+      </span>
+    );
+  }
   if (tab.kind === "terminal") {
     return (
       <>

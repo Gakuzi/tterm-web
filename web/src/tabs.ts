@@ -6,24 +6,27 @@
 //
 // A terminal's tab is its id, as before 0.1.0, so that the tabs a browser
 // kept then are still there; a note's is n:<id>, a project's page p:<id>,
-// and from 0.1.20 a machine's log l:<id of the machine>.
+// from 0.1.20 a machine's log l:<id of the machine>, and from 0.1.28 a new
+// terminal asked for on a machine closed on this device, k:<id of the
+// machine>: its card opens the keys, then the terminal comes in its place.
 //
 // And the page's own shortcuts: Cmd on a Mac, Ctrl+Shift elsewhere. Plain
 // Ctrl stays the terminal's: Ctrl+C, Ctrl+R and Ctrl+K belong to the shell.
 
 const TABS_KEY = "tterm.tabs";
 const ID = /^[0-9a-f-]{36}$/;
-const TAB = /^(?:[npl]:)?[0-9a-f-]{36}$/;
+const TAB = /^(?:[nplk]:)?[0-9a-f-]{36}$/;
 /** Tabs at once, at most: each terminal is on the page's one connection,
  * which takes 64. */
 export const TABS_MAX = 32;
 
-export type TabKind = "terminal" | "note" | "project" | "log";
+export type TabKind = "terminal" | "note" | "project" | "log" | "keys";
 
 export function tabKind(tab: string): TabKind {
   if (tab.startsWith("n:")) return "note";
   if (tab.startsWith("p:")) return "project";
   if (tab.startsWith("l:")) return "log";
+  if (tab.startsWith("k:")) return "keys";
   return "terminal";
 }
 
@@ -35,16 +38,17 @@ export function tabTarget(tab: string): string {
 export const noteTab = (id: string) => `n:${id}`;
 export const projectTab = (id: string) => `p:${id}`;
 export const logTab = (machineId: string) => `l:${machineId}`;
+export const keysTab = (machineId: string) => `k:${machineId}`;
 
-/** The address of a tab: /t/<id>, /n/<id>, /p/<id>, /l/<id>. */
+/** The address of a tab: /t/<id>, /n/<id>, /p/<id>, /l/<id>, /k/<id>. */
 export function tabPath(tab: string): string {
   const kind = tabKind(tab);
   const id = tabTarget(tab);
   return kind === "note" ? `/n/${id}` : kind === "project" ? `/p/${id}`
-    : kind === "log" ? `/l/${id}` : `/t/${id}`;
+    : kind === "log" ? `/l/${id}` : kind === "keys" ? `/k/${id}` : `/t/${id}`;
 }
 
-const PATH = /^\/([tnpl])\/([0-9a-f-]{36})\/?$/;
+const PATH = /^\/([tnplk])\/([0-9a-f-]{36})\/?$/;
 
 /** The tab an address shows, if it shows one. */
 export function tabOfPath(path: string): string | null {

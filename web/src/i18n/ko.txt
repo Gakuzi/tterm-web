@@ -127,6 +127,11 @@ sidebar.with_key = 보관함에 있는 내 키로 열려요
 # name, and its tip ({mac} is the Mac's name).
 sidebar.via_mac = Mac 경유
 sidebar.via_title = {mac} 경유, 켜져 있는 동안 열려요
+sidebar.keys_closed_new = 이 기기에서는 키가 열려 있지 않아요. 키를 열고 {name}에서 새 터미널 열기
+sidebar.keys_closed = 이 기기에서는 키가 열려 있지 않아요. 열기
+sidebar.keys_closed_mac = 브라우저에서 내 Mac의 터미널은 키가 열린 곳에서만 열 수 있어요. 열기
+sidebar.closed_terminal = {machine}의 {label}: 이 기기에서는 닫혀 있어요. 키 열기
+sidebar.closed_title = 이 기기에서는 닫혀 있어요. 키를 여세요
 
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
@@ -403,6 +408,7 @@ app.remove.confirm = {name} 제거
 app.remove.text = tTerm Web에서 사라지고, 터미널이 모두 종료돼요. 그 머신에서 입력한 명령은 기록에 남아요.
 app.remove.computer = 에이전트는 컴퓨터가 제거됐다는 것을 알고 멈춰요. 컴퓨터를 다시 연결하려면 머신 추가에서 컴퓨터를 고르세요.
 app.remove.server = tTerm Web은 더 이상 이 서버에 로그인하지 않고, 서버에서 직접 접근 권한을 회수해요. 서버가 응답하지 않으면 직접 실행할 명령을 이어서 보여 드려요.
+app.remove.closed = {name} 머신은 이 기기에서 닫혀 있어요. 키가 열린 곳에서만 제거할 수 있어요. 여기에서 키를 여세요.
 app.end.title = {label} 터미널을 종료할까요?
 app.end.confirm = 터미널 종료
 app.end.text = 터미널 창을 닫을 때처럼 셸이 종료되고, 그 안에서 실행 중인 것도 멈춰요. 실행한 내용은 탭과 기록에 남아요.
@@ -862,6 +868,7 @@ project_dialog.with_others = 다른 사람과 함께
 project_dialog.move_becomes = {project} 프로젝트에서는 {code}/{name} 머신이 돼요. 터미널은 계속 실행되고, 머신 자체에는 아무 변화도 없어요.
 # The same, when its name is taken there: {machine} is its name now, {name} the one it gets (web-01-2).
 project_dialog.move_becomes_taken = {project} 프로젝트에는 이미 {machine} 이름이 있어서 {code}/{name} 머신이 돼요. 터미널은 계속 실행되고, 머신 자체에는 아무 변화도 없어요.
+project_dialog.move_closed = {machine} 머신은 이 기기에서 닫혀 있어요. 키가 열린 곳에서만 이동할 수 있어요. 여기에서 키를 여세요.
 # The button: {project} is the project's name.
 project_dialog.move_to = {project} 프로젝트로 이동
 # The button while there is nothing to pick (a verb).
@@ -942,6 +949,7 @@ projectpage.remove_machine = 머신 제거
 # An item of a machine's menu.
 projectpage.move_machine = 다른 프로젝트로 이동
 projectpage.no_terminals = 열린 터미널이 없어요
+projectpage.closed = 이 기기에서는 닫혀 있어요
 # Who changed a note last, and when: {ago} is just now, 5 min ago, yesterday, on 12 Oct (time.*).
 projectpage.edited_you = 나, {ago}
 # The same, someone else: {name} is their first name.
@@ -1036,6 +1044,7 @@ machines.account = 계정
 machines.offline_seen = 오프라인, {seen}
 machines.offline = 오프라인
 machines.online = 온라인
+machines.closed = 이 기기에서는 닫혀 있어요
 machines.offline_note = 컴퓨터가 절전 모드이거나 오프라인이거나, 에이전트가 실행 중이 아니에요. 에이전트가 연결되면 저절로 돌아오고, 이 페이지에는 10초 안에 반영돼요.
 # On Open a terminal while the computer is offline.
 machines.offline_title = 오프라인이에요. 절전 모드이거나 에이전트가 실행 중이 아니에요
@@ -1415,6 +1424,7 @@ log.today_count = 오늘 {n}개
 # A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
 log.tab = {machine} 로그
 log.tab_title = {machine} 머신의 로그
+log.closed_here = {machine} 머신의 로그: 이 기기에서는 닫혀 있어요. 키 열기
 log.close_tab = 로그 닫기
 # The ⋯ over the page, and its one item.
 log.menu = 로그 메뉴
@@ -1602,6 +1612,7 @@ classic.several_lines = 이 명령은 여러 줄이라 클래식 모드에서는
 # ------------------------------------------------------------ tabs: the line of tabs on top (TabBar.tsx)
 # The tabs that are open, for screen readers.
 tabs.label = 열린 탭
+tabs.closed_here = 이 기기에서는 닫혀 있음
 # Naming a terminal in its tab, after a double click.
 tabs.rename_title = 이 터미널에 이름 붙이기
 tabs.rename_hint = Enter로 저장, Esc로 취소. 이름은 사이드바, 탭, 프로젝트 페이지에 표시돼요.
@@ -1850,6 +1861,7 @@ app_code.text_lost = 이 Mac은 더 이상 보관함을 직접 열 수 없어요
 # A vault with a password (0.1.26): opened here once with it.
 app_code.text_password = 이 Mac은 아직 보관함을 직접 열 수 없어요. 여기서 보관함 비밀번호로 한 번만 열면, 그다음부터는 이 Mac에서 Touch ID로 열려요.
 app_code.text_lost_password = 이 Mac은 더 이상 보관함을 직접 열 수 없어요. 여기서 보관함 비밀번호로 한 번만 열면, 이 Mac에 새 잠금이 설정되어 다시 Touch ID로 열려요.
+app_code.text_prove = 보관함에 아직 키가 없어서, tTerm Web이 이 Mac에서 키가 열려 있는지 알려면 보관함 비밀번호가 필요해요. 한 번만 입력하면 보관함이 잠길 때까지 유지돼요.
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1905,10 +1917,30 @@ vault_locked.no_ed25519 = 이 브라우저는 Ed25519 키로 서명할 수 없�
 vault_locked.not_here = 여기서 보관함은 열려 있지만, {key} 키는 이 브라우저에서 열리지 않아요. 설정 > SSH 키에서 키 파일로 다시 추가하세요.
 vault_locked.its_key = 이 서버의
 
+# ------------------------------------------------------------ keys_closed: a tab of a machine closed on this device (KeysClosed.tsx, 0.1.28)
+keys_closed.tab = {machine} · 새 터미널
+keys_closed.tab_title = 이 기기에서 키가 열리면 {machine}에서 새 터미널이 열려요
+keys_closed.close_tab = 탭 닫기: 새 터미널은 열지 않아요
+keys_closed.new_key_title = {machine} 서버는 내 키로 열려요
+keys_closed.new_key_text = 이 기기에서는 아직 키가 열려 있지 않아요. 여기에서 바로 키를 열면 {machine}에서 새 터미널이 곧바로 열려요.
+keys_closed.new_via_title = {machine} 서버는 {mac} 경유로 열려요
+keys_closed.new_via_text = 터미널은 내 Mac이 실행해요. 브라우저에서는 키가 열린 곳에서만 열려요. 누군가 내 이메일에 들어가더라도 Mac을 거쳐 들어오지 못하게 하는 두 번째 잠금이에요.
+keys_closed.new_mac_title = {mac}의 터미널
+keys_closed.new_mac_text = 브라우저에서 내 Mac의 터미널은 키가 열린 곳에서만 열려요. 누군가 내 이메일에 들어가더라도 내 Mac에서 터미널을 열지 못하게 하는 두 번째 잠금이에요.
+keys_closed.log_title = {machine} 머신의 로그는 이 기기에서 닫혀 있어요
+keys_closed.log_text = 로그에는 터미널과 같은 명령과 같은 출력이 있어서 똑같이 닫혀 있어요. 키를 열면 로그가 열려요.
+keys_closed.terminal_title = 이 터미널은 이 기기에서 닫혀 있어요
+keys_closed.terminal_text = {machine}의 ‘{name}’ 터미널은 실행 중이지만, 여기에서 키가 열릴 때까지 여기에는 보이지 않아요. 키를 열면 터미널이 지금 상태 그대로 보여요.
+keys_closed.open_new = 키와 터미널 열기
+keys_closed.proving = 이 기기에서 키를 여는 중…
+keys_closed.refused = {machine} 머신은 이 기기에서 닫혀 있어요. 키를 연 다음 다시 시도하세요.
+keys_closed.foot = 내 키로 여는 서버, 내 Mac을 거치는 서버, Mac 자체와 그 로그는 내가 직접 키를 연 곳에서만 보여요. 비밀번호, Touch ID 또는 Mac에서의 승인으로 열 수 있어요. 이메일로 받은 코드로 로그인하면 열리지 않아요. Mac 자체의 앱에서는 그 Mac의 터미널이 비밀번호 없이 열려요.
+
 # ------------------------------------------------------------ vault_problem: what went wrong with the vault (vault/store.ts)
 vault_problem.no_vault = 아직 보관함이 없어요.
 vault_problem.exists = 이미 보관함이 있어요. 보관함을 연 다음 키를 추가하세요.
 vault_problem.locked = 먼저 보관함을 여세요.
+vault_problem.keys_closed = 보관함은 키가 열린 곳에서만 바뀌어요. 이 기기에서 키를 연 다음 다시 시도하세요.
 # The vault password: {n} tries left (shown when 3 or fewer), {time} a
 # time of day, as the page shows times ("14:05").
 vault_problem.password_wrong = 이 비밀번호로는 보관함을 열 수 없어요. 입력 언어(한/영)와 Caps Lock을 확인하세요.

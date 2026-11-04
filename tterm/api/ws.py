@@ -50,6 +50,21 @@ The core verifies the raw signature with the stored public key before a
 login uses it. The engine of tTerm for Mac sits on this socket and answers
 for its own keys itself, passing the rest through.
 
+From 0.1.28 (vault-design.md v3) a socket proves that the keys are open on
+its device before anything of a guarded machine (a server with the person's
+key, one through their Mac, a computer) reaches it, and only the sockets of
+the session that opened a key server's terminal are asked to sign its login:
+
+    core → page   {"op": "vault.challenge", "nonce": "<b64u of 32 bytes>"}
+    page → core   {"op": "vault.prove", "key": "SHA256:…", "alg": "…",
+                   "sig": "<b64u raw>"}   over vault.proof_blob(nonce)
+                  {"op": "vault.prove", "auth": "<b64u 32>"}   the password
+                  {"op": "vault.closed"}   the keys closed on the device
+    core → page   {"op": "vault.proven"}
+                  {"op": "vault.unproven", "error": "…", …}
+                  {"op": "locked", "ch": 1, "terminal": {"id", "name",
+                   "machine", "machineId"}}   instead of attaching one
+
 The socket belongs to a session (see core/auth.py) and shows only that
 person's terminals. When the session ends, the socket closes with the code
 SIGNED_OUT_CLOSE and the page asks to sign in: at once on Sign out, Forget
@@ -65,6 +80,7 @@ import itertools
 import json
 import logging
 import uuid
+from types import SimpleNamespace
 
 import asyncpg
 from starlette.websockets import WebSocket, WebSocketDisconnect
@@ -129,7 +145,7 @@ def page_json(text: str | bytes):
 class PageSocket:
     def __init__(self, websocket: WebSocket, terminals: Terminals,
                  session: auth.Session, pool: asyncpg.Pool, relay=None,
-                 label: str = "") -> None:
+                 label: str = "", ip: str = "") -> None:
         self.ws = websocket
         self.terminals = terminals
         self.session = session
@@ -149,6 +165,33 @@ class PageSocket:
         self._closing: set[asyncio.Task] = set()
         self._closed = False
         self._touched = 0.0
+        #: Keys open on this device (0.1.28, vault-design.md v3): the nonce
+        #: this socket's proof signs, and whether it proved. A guarded
+        #: machine's terminals reach only a socket that did; the proof lives
+        #: as long as the socket, or until the page says the keys closed.
+        self.nonce = vault.new_nonce()
+        self.keys_open = False
+        #: The address it came from, for the journal of a wrong password.
+        self.ip = ip
+        #: The app's computer (Session.computer_id), kept up to date by
+        #: POST /api/computers/this while the socket is open.
+        self.computer_id = session.computer_id
+
+    @property
+    def session_id(self) -> uuid.UUID:
+        """The session of this socket: the relay asks only the sockets of
+        the session that opened a terminal to sign its login."""
+        return self.session.id
+
+    async def closed_to(self, machine) -> bool:
+        """Whether this socket sees nothing of the machine: a guarded one
+        (a server with the person's key, one through their Mac, a computer),
+        the keys not proved open here, not the app's own computer, and the
+        person's keys guard something (vault.guarding)."""
+        if (self.keys_open or not vault.guarded(machine)
+                or vault.exempt(self.computer_id, machine)):
+            return False
+        return await vault.guarding(self.pool, self.user_id)
 
     # The vault relay treats this socket as a signing source (core/vault.py).
 
@@ -213,6 +256,9 @@ class PageSocket:
 
     async def run(self) -> None:
         await self.ws.accept()
+        # The nonce first, so that a device with its keys open proves it at
+        # once (0.1.28).
+        await self.json({"op": "vault.challenge", "nonce": self.nonce})
         if self.relay is not None:
             self.relay.join(self)
         checking = asyncio.create_task(self._keep_checking())
@@ -258,6 +304,12 @@ class PageSocket:
         if op in ("vault.can", "vault.signed", "vault.unable"):
             self._vault(op, msg)
             return
+        if op == "vault.prove":
+            await self._prove(msg)
+            return
+        if op == "vault.closed":
+            await self._keys_closed()
+            return
         watcher = self.watchers.get(ch)
         if op == "attach":
             await self._attach(ch, msg)
@@ -289,9 +341,19 @@ class PageSocket:
             return
         terminal = self.terminals.get(terminal_id, self.user_id)
         if terminal is None:
-            await self.json({"op": "gone", "ch": ch, "terminal":
-                             await self.terminals.ended(terminal_id,
-                                                        self.user_id)})
+            ended = await self.terminals.ended(terminal_id, self.user_id)
+            machine = (await self.terminals.machine_of(terminal_id, self.user_id)
+                       if ended is not None else None)
+            if machine is not None and await self.closed_to(machine):
+                # Ended, but not even where it ended up, here (0.1.28).
+                await self.json(_locked(ch, SimpleNamespace(
+                    id=terminal_id, name=ended["name"], machine=machine)))
+                return
+            await self.json({"op": "gone", "ch": ch, "terminal": ended})
+            return
+        if await self.closed_to(terminal.machine):
+            # Nothing of it: no watcher, no screen, not even its size.
+            await self.json(_locked(ch, terminal))
             return
         if len(self.watchers) >= MAX_CHANNELS:
             await self.json({"op": "error", "message": "Too many terminals."})
@@ -331,6 +393,61 @@ class PageSocket:
         if watcher is not None:
             await watcher.stop()
 
+    async def _prove(self, msg: dict) -> None:
+        """A proof that the keys are open on this device (0.1.28, v3): by a
+        key of the person's vault, signing the blob of this socket's nonce;
+        or, with no key to sign with, by the vault password's proof (`auth`),
+        which counts and pauses as password/open does, but forgives no wrong
+        try. A refused one leaves the socket as it was; so does one checked
+        while the socket was asked to prove again (prove_again)."""
+        nonce = self.nonce
+        try:
+            if "auth" in msg:
+                await vault.open_with_password(self.pool, self.user_id,
+                                               auth=msg.get("auth"),
+                                               device=self.label_text,
+                                               ip=self.ip, forgive=False)
+            else:
+                await vault.prove_by_key(self.pool, self.user_id,
+                                         nonce=nonce,
+                                         fingerprint=msg.get("key"),
+                                         alg=msg.get("alg"), sig=msg.get("sig"))
+        except vault.Refused as exc:
+            await self.json({"op": "vault.unproven", "error": str(exc),
+                             **exc.details})
+            return
+        except (OSError, asyncpg.PostgresError) as exc:
+            log.warning("could not check a proof of open keys: %s", exc)
+            await self.json({"op": "vault.unproven",
+                             "error": "Something went wrong. Try again."})
+            return
+        if self.nonce != nonce:
+            await self.json({"op": "vault.unproven",
+                             "error": "The vault changed meanwhile: prove "
+                                      "it again."})
+            return
+        self.keys_open = True
+        await self.json({"op": "vault.proven"})
+
+    async def prove_again(self) -> None:
+        """What proved the keys open here may be gone (0.1.28): a key taken
+        out of the vault, a new password. The proof goes, the guarded
+        terminals it watched turn locked, and a new nonce asks for it again:
+        a device with its keys open proves at once; whoever proved with what
+        is gone cannot."""
+        await self._keys_closed()
+        self.nonce = vault.new_nonce()
+        await self.json({"op": "vault.challenge", "nonce": self.nonce})
+
+    async def _keys_closed(self) -> None:
+        """The keys closed on this device (Lock, idle, signing out): the
+        proof goes, and every guarded terminal it watched turns locked."""
+        self.keys_open = False
+        for ch, watcher in list(self.watchers.items()):
+            if await self.closed_to(watcher.terminal.machine):
+                await self._detach(ch)
+                await self.json(_locked(ch, watcher.terminal))
+
     def _vault(self, op: str, msg: dict) -> None:
         """The vault signing ops (core/vault.py). vault.can announces which
         keys this socket can sign for; vault.signed/unable answer a request
@@ -359,6 +476,15 @@ class PageSocket:
             self.relay.answer(request_id, None)
             return
         self.relay.answer(request_id, raw)
+
+
+def _locked(ch: int, terminal) -> dict:
+    """What a socket without open keys hears of a guarded terminal: that it
+    is there and closed, with what the page needs for the card."""
+    return {"op": "locked", "ch": ch,
+            "terminal": {"id": str(terminal.id), "name": terminal.name,
+                         "machine": terminal.machine.name,
+                         "machineId": str(terminal.machine.id)}}
 
 
 def _resize(terminal, msg: dict) -> None:

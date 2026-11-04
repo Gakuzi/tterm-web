@@ -20,6 +20,11 @@
 // From 0.1.24 a terminal a release of tTerm Web ended says so, and why it
 // had to end, with What's new in that version and the machine's log, where
 // its commands are; and Open a new terminal starts where it was.
+//
+// From 0.1.28 a terminal of a machine closed on this device shows the card
+// of KeysClosed.tsx instead (App.tsx); and where the core says it is closed
+// although the page took it for open, the card comes over it, until the
+// keys are proved open here and the socket attaches it again.
 
 import { useEffect, useRef, useState } from "react";
 import { endTerminal, terminalInfo, type Me, type TerminalInfo,
@@ -30,6 +35,8 @@ import { FeedTerminal } from "./FeedTerminal";
 import { useFoundBlock, wentThere } from "./found";
 import { SshStrip } from "./SshStrip";
 import { VaultLocked } from "./VaultLocked";
+import { KeysClosed } from "./KeysClosed";
+import { terminalName } from "./colors";
 import { gap, useT } from "./i18n";
 import { ModeToggle } from "./InputLine";
 import { whatsNew } from "./links";
@@ -106,6 +113,8 @@ export function TerminalView(props: Props) {
   const [missing, setMissing] = useState(false);
   const [running, setRunning] = useState(false);
   const [ending, setEnding] = useState(false);
+  /** The core said its machine is closed on this device (0.1.28). */
+  const [lockedHere, setLockedHere] = useState(false);
   const [mode, setMode] = useState<Mode>(rememberedMode);
   const [, setTick] = useState(0);
   const changed = useRef(props.onChanged);
@@ -175,7 +184,9 @@ export function TerminalView(props: Props) {
       setInfo(terminal);
       setMissing(false);
       setRunning(!!terminal.running);
+      setLockedHere(false);
     },
+    locked: () => setLockedHere(true),
     marker: (event) => {
       setRunning(event.t === "C");
       if (event.t === "P") {
@@ -253,9 +264,13 @@ export function TerminalView(props: Props) {
             paste={props.paste} me={props.me}
             after={props.here ? (b, all) => <SshStrip block={b} blocks={all} /> : undefined} />
         )}
-        {state === "connecting" && !missing && info?.vault && (
+        {state === "connecting" && !missing && info?.vault && !lockedHere && (
           <VaultLocked machine={info.machine} fingerprint={info.vault.key}
             keyName={info.vault.keyName} />
+        )}
+        {lockedHere && (
+          <KeysClosed what={{ kind: "terminal", machine: info?.machine ?? "",
+            name: terminalName(info?.name ?? "", t) }} />
         )}
         {state === "connecting" && !missing && !info?.vault && (
           <div className="terminal-note" role="status">

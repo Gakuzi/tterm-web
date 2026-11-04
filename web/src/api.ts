@@ -75,6 +75,9 @@ export interface Machine {
    * Mac (`via`), while it is on. */
   method?: LoginMethod;
   via?: { id: string; name: string | null } | null;
+  /** The person's own (they added it, or nobody is recorded): its log
+   * follows their keys on a device (0.1.28); others read it by their role. */
+  mine?: boolean;
 }
 
 export type LoginMethod = "cert" | "key" | "mac";
@@ -244,6 +247,9 @@ export interface TerminalInfo {
    * or app that can sign with it is there: its login waits, and goes on by
    * itself once one is. */
   vault?: { key: string; keyName: string | null; since: string } | null;
+  /** Its machine is closed on this device (0.1.28): the core sends only
+   * its name and where it is, not what it does. */
+  locked?: boolean;
 }
 
 export interface RunningCommand {
@@ -340,6 +346,9 @@ export interface State {
   /** Signed in in the app, and tTerm cannot be reached now: the computer
    * works on, the rest waits for the connection (0.1.6). */
   offline?: boolean;
+  /** The core asks a device to prove its keys open before anything of a
+   * guarded machine reaches it (0.1.28, keys.ts). */
+  proofs?: boolean;
 }
 
 export interface Install {
@@ -408,6 +417,13 @@ async function check(response: Response): Promise<Response> {
     if (response.status === 401 && body.signedOut) {
       signedOutNow();
       throw new SignedOut(error || say("api.sign_in"), 401);
+    }
+    // Closed on this device (0.1.28): said in the page's language, whatever
+    // window shows it.
+    if (response.status === 423 && body.locked) {
+      const machine = typeof body.machine === "string" ? body.machine : "";
+      throw new CoreError(machine ? say("keys_closed.refused", { machine })
+        : say("vault_problem.keys_closed"), 423, body);
     }
     throw new CoreError(error || say("api.answered", { status: String(response.status) }),
       response.status, body);
@@ -1495,6 +1511,12 @@ export interface AppVault {
   /** The tTerm Web this app is signed in to ("app.tterm.net"), from 0.8.0;
    * null or missing when the engine does not say. */
   web?: string | null;
+  /** Whether the engine can prove the keys open to tTerm (0.8.1): with a
+   * key of the vault, or the vault password typed on this Mac since the
+   * vault opened. False for a vault with its password and no key yet,
+   * opened with Touch ID: the page asks for the password. Missing from an
+   * app before 0.8.1. */
+  proves?: boolean;
 }
 
 export async function loadAppVault(): Promise<AppVault> {

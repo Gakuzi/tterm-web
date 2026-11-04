@@ -339,13 +339,14 @@ async def projects_of(pool: asyncpg.Pool, user_id: uuid.UUID) -> list[dict]:
         SELECT m.id, m.project_id, m.kind, m.name, m.host, m.last_seen_at,
                m.passport - 'commands' AS passport,
                jsonb_array_length(COALESCE(m.passport->'commands', '[]')) AS commands,
-               m.login_method, m.via_machine_id, via.name AS via_name
+               m.login_method, m.via_machine_id, via.name AS via_name,
+               (m.created_by IS NULL OR m.created_by = $2) AS mine
         FROM machines m
         LEFT JOIN machines via ON via.id = m.via_machine_id
              AND via.removed_at IS NULL
         WHERE m.removed_at IS NULL AND m.project_id = ANY($1::uuid[])
         ORDER BY lower(m.name)
-        """, [r["id"] for r in rows])
+        """, [r["id"] for r in rows], user_id)
     by_project: dict[uuid.UUID, list[dict]] = {}
     for m in machines:
         pp = json.loads(m["passport"]) if m["passport"] else {}
@@ -361,7 +362,11 @@ async def projects_of(pool: asyncpg.Pool, user_id: uuid.UUID) -> list[dict]:
             # their Mac, named in `via`).
             "method": m["login_method"],
             "via": ({"id": str(m["via_machine_id"]), "name": m["via_name"]}
-                    if m["via_machine_id"] is not None else None)})
+                    if m["via_machine_id"] is not None else None),
+            # The person's own (they added it, or nobody is recorded): its
+            # log follows their keys on a device (0.1.28); other members
+            # read a log by their role.
+            "mine": bool(m["mine"])})
     return [{
         "id": str(r["id"]),
         "name": r["name"],

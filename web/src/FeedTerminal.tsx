@@ -661,6 +661,7 @@ export function FeedTerminal(props: Props) {
           stopTerminal();
           events.current.gone(info);
         },
+        locked: () => events.current.locked?.(),
         confirm: (question) => {
           clearPending();
           setAsk(question);

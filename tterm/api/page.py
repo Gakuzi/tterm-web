@@ -28,7 +28,8 @@ from .. import __version__
 from ..core import (accounts, auth, letters, logs, machines, notes,
                     photos, projects, reach, search, ssh, support, vault)
 from ..core.mail import Mailer
-from ..core.terminals import NotAllowed, NotOpen, Terminal, Terminals
+from ..core.terminals import (KeysClosed, NotAllowed, NotOpen, Terminal,
+                              Terminals)
 from .connect import client_ip
 from .security import PAGE_HEADERS, AddHeaders, PageGuard, page_csp
 from .ws import SIGNED_OUT_CLOSE, PageSocket, page_json
@@ -201,6 +202,10 @@ class TerminalPatch(BaseModel):
 #: A line the input line may ask Tab about, at most.
 MAX_LINE = 64 * 1024
 NOT_OPEN = "The terminal is not open."
+#: What the page gets of a terminal on a machine closed to its device
+#: (0.1.28): enough to list it, dimmed with a lock, and nothing it did.
+LOCKED_FIELDS = ("id", "machineId", "machine", "label", "name", "state",
+                 "away", "awaySince", "openedAt")
 #: A note's save, at most, in bytes: its blocks are kept to half that
 #: (notes.BODY_MAX), and JSON from the page escapes a little on the way.
 NOTE_SAVE_MAX = 1024 * 1024
@@ -336,6 +341,70 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     #: The page sockets open now: a session that ends closes its own at once.
     sockets: set[PageSocket] = set()
 
+    # Keys open on this device (0.1.28, vault-design.md v3). A request of a
+    # session counts as made with the keys open when one of that session's
+    # open sockets proved it; a guarded machine (a server with the person's
+    # key, one through their Mac, a computer) is closed to it otherwise,
+    # the app's own computer and the servers through it apart, and nothing
+    # is while the person's keys guard nothing (vault.guarding: no vault a
+    # device could prove open).
+
+    def keys_open(session: auth.Session) -> bool:
+        return any(s.keys_open for s in sockets if s.session.id == session.id)
+
+    async def guarding(session: auth.Session) -> bool:
+        async with pool.acquire() as conn:
+            return await vault.guarding(conn, session.person.id)
+
+    async def closed_to(session: auth.Session):
+        """For a machine: whether this session's device sees nothing of it."""
+        if keys_open(session) or not await guarding(session):
+            return lambda machine: False
+        return lambda machine: (vault.guarded(machine) and not
+                                vault.exempt(session.computer_id, machine))
+
+    async def log_closed_to(session: auth.Session, machine) -> bool:
+        """As closed_to, for a log: only the person's own machines, since
+        other members read a log by their role (the owner, 03.11)."""
+        return (machine.created_by in (None, session.person.id)
+                and (await closed_to(session))(machine))
+
+    async def hidden_for(session: auth.Session, *, own_only: bool) -> list:
+        """The machines this session's device sees nothing of, for the
+        lists: history, search, the logs of the day."""
+        if keys_open(session):
+            return []
+        async with pool.acquire() as conn:
+            return await vault.closed_machines(conn, session.person.id,
+                                               session.computer_id,
+                                               own_only=own_only)
+
+    def keys_closed(machine: str) -> Response:
+        """423: the page shows its card, to open the keys here."""
+        return _json({"error": "The keys are not open on this device: open "
+                               f"them to reach {machine}.",
+                      "locked": True, "machine": machine}, 423)
+
+    async def keys_needed(session: auth.Session) -> Response | None:
+        """423 for a change of the vault that only a device with the keys
+        open makes, once they guard something (0.1.28): a key or a password
+        put in from a device without them would prove them open there from
+        then on, and a key taken out could leave nothing to prove. None to
+        go on."""
+        if keys_open(session) or not await guarding(session):
+            return None
+        return _json({"error": "Open the keys on this device first: then "
+                               "change the vault.", "locked": True}, 423)
+
+    def shown(terminal: Terminal, closed) -> dict:
+        """A terminal as the page lists it. One on a machine closed to this
+        device (`closed`) only by its name, where it is, and that it is
+        locked: not its folder, branch or the command it runs."""
+        described = terminal.describe()
+        if not closed(terminal.machine):
+            return described
+        return {**{k: described[k] for k in LOCKED_FIELDS}, "locked": True}
+
     async def cut(ended) -> None:
         """Closes the sockets of sessions that ended, so that whatever was
         open there asks to sign in: `ended` tells them by their session."""
@@ -356,6 +425,18 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
 
     async def vault_changed(user_id: uuid.UUID) -> None:
         await vault_broadcast(user_id, {"op": "vault.changed"})
+
+    async def proofs_gone(user_id: uuid.UUID, keep: uuid.UUID) -> None:
+        """A key out of the vault, a new password or recovery code (0.1.28):
+        what proved the keys open on the person's other sessions may be
+        gone, so each of their sockets is asked to prove again. The session
+        that made the change keeps its proof: it has just shown it. So
+        whoever proved with a guessed password or a key of their own is out
+        once the person changes the password or takes the key out."""
+        targets = [s for s in sockets if s.user_id == user_id
+                   and s.session.id != keep]
+        await asyncio.gather(*(s.prove_again() for s in targets),
+                             return_exceptions=True)
 
     async def pairing_update(user_id: uuid.UUID, pairing_id: uuid.UUID,
                              state: str) -> None:
@@ -687,6 +768,19 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
                 os_name=os_name, app=app_name)
         except machines.ThisComputerRefused as exc:
             return _json({"error": str(exc)}, exc.status)
+        # The app's device runs on this computer (0.1.28, v3): the computer's
+        # own key shows it, which only that computer has. Its session needs
+        # no proof of open keys for this computer and the servers through it.
+        if session.device_id is not None:
+            computer_id = uuid.UUID(found["machine"]["id"])
+            done = await pool.execute(
+                "UPDATE devices SET computer_id = $1 WHERE id = $2 "
+                "AND user_id = $3 AND kind = 'app'",
+                computer_id, session.device_id, session.person.id)
+            if done != "UPDATE 0":
+                for open_socket in sockets:
+                    if open_socket.session.id == session.id:
+                        open_socket.computer_id = computer_id
         return _json({**found, "hub": machines.hub_url(connect_url)},
                      201 if found["created"] else 200)
 
@@ -702,6 +796,7 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         """Everything the page needs on start."""
         me = session.person
         listed = await accounts.projects_of(pool, me.id)
+        closed = await closed_to(session)
         # Each project's folders of notes, with the notes listed but not
         # their text: the sidebar and the project's page (0.1.0).
         folders = await notes.folders_of(
@@ -728,7 +823,11 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
                 "appSignedIn": await auth.app_signed_in(pool, me.id),
             },
             "projects": listed,
-            "terminals": ([t.describe() for t in terminals.live(me.id)]
+            # A device proves its keys open before anything of a guarded
+            # machine reaches it (0.1.28, vault-design.md v3).
+            "proofs": True,
+            # Those closed to this device only by name (0.1.28).
+            "terminals": ([shown(t, closed) for t in terminals.live(me.id)]
                           if terminals else []),
         })
 
@@ -839,8 +938,10 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
             machine = uuid.UUID(near) if near else None
         except ValueError:
             machine = None
-        found = await search.search(pool, session.person.id, q[:search.QUERY_MAX],
-                                    near=machine)
+        found = await search.search(
+            pool, session.person.id, q[:search.QUERY_MAX], near=machine,
+            hidden=await hidden_for(session, own_only=False),
+            hidden_logs=await hidden_for(session, own_only=True))
         return _json(found)
 
     @app.post("/api/installs")
@@ -870,6 +971,17 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
             return _json({"error": "no such install"}, 404)
         return _json(status)
 
+    async def closed_machine(machine_id: uuid.UUID,
+                             session: auth.Session) -> Response | None:
+        """423 for a machine closed to this device; None to go on (also for
+        no such machine: the route says)."""
+        async with pool.acquire() as conn:
+            machine = await vault.guard_of(conn, session.person.id,
+                                           machine_id=machine_id)
+        if machine is not None and (await closed_to(session))(machine):
+            return keys_closed(machine.name)
+        return None
+
     @app.get("/api/machines/{machine_id}")
     async def machine(machine_id: uuid.UUID,
                       session: auth.Session = Depends(signed_in)) -> Response:
@@ -885,7 +997,10 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         """Takes the machine out of tTerm Web. Its terminals end, a
         computer's agent hears it is removed and stops; the history stays.
         From a server tTerm Web takes its line out itself, if it answers;
-        if not, the answer carries the command that does it there."""
+        if not, the answer carries the command that does it there. A guarded
+        machine only from a device with the keys open (0.1.28)."""
+        if (closed := await closed_machine(machine_id, session)) is not None:
+            return closed
         try:
             removed = await machines.remove(pool, session.person.id, machine_id)
         except PermissionError as exc:
@@ -907,7 +1022,10 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     async def move_machine(machine_id: uuid.UUID, body: MoveBody,
                            session: auth.Session = Depends(signed_in)) -> Response:
         """To another project of the person's own (0.1.1). Its terminals go
-        on; nothing changes on the machine itself."""
+        on; nothing changes on the machine itself. A guarded machine only
+        from a device with the keys open (0.1.28)."""
+        if (closed := await closed_machine(machine_id, session)) is not None:
+            return closed
         try:
             moved = await projects.move_machine(pool, session.person.id,
                                                 machine_id, body.projectId)
@@ -952,16 +1070,30 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         try:
             terminal = await terminals.open(session.person, request.machineId,
                                             request.cols, request.rows,
-                                            request.cwd)
+                                            request.cwd, session_id=session.id,
+                                            closed=await closed_to(session))
         except NotAllowed as exc:
             return _json({"error": str(exc)}, 404)
+        except KeysClosed as exc:
+            return keys_closed(exc.machine)
         return _json(terminal.describe(), 201)
+
+    async def closed_terminal(terminal_id: uuid.UUID,
+                              session: auth.Session) -> Response | None:
+        """423 for a terminal on a machine closed to this device, running or
+        ended; None to go on (also for no such terminal: the route says)."""
+        machine = await terminals.machine_of(terminal_id, session.person.id)
+        if machine is not None and (await closed_to(session))(machine):
+            return keys_closed(machine.name)
+        return None
 
     @app.get("/api/terminals/{terminal_id}")
     async def terminal_info(terminal_id: uuid.UUID,
                             session: auth.Session = Depends(signed_in)) -> Response:
         if terminals is None:
             return _json({"error": "terminals are not running"}, 503)
+        if (closed := await closed_terminal(terminal_id, session)) is not None:
+            return closed
         terminal = terminals.get(terminal_id, session.person.id)
         if terminal is not None:
             return _json(terminal.describe())
@@ -976,6 +1108,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         """A name for the person's terminal, instead of its number (0.1.1)."""
         if terminals is None:
             return _json({"error": "terminals are not running"}, 503)
+        if (closed := await closed_terminal(terminal_id, session)) is not None:
+            return closed
         try:
             terminal = await terminals.rename(terminal_id, session.person.id,
                                               body.name)
@@ -995,6 +1129,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         shell there ends when the computer is back."""
         if terminals is None:
             return _json({"error": "terminals are not running"}, 503)
+        if (closed := await closed_terminal(terminal_id, session)) is not None:
+            return closed
         terminal = terminals.get(terminal_id, session.person.id)
         if terminal is None:
             return _json({"error": "no such terminal"}, 404)
@@ -1009,6 +1145,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         with the end of its output."""
         if terminals is None:
             return _json({"error": "terminals are not running"}, 503)
+        if (closed := await closed_terminal(terminal_id, session)) is not None:
+            return closed
         feed = await terminals.feed(terminal_id, session.person.id, before,
                                     limit)
         if feed is None:
@@ -1021,6 +1159,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         """Everything a block kept of its output, as the terminal printed it."""
         if terminals is None:
             return _json({"error": "terminals are not running"}, 503)
+        if (closed := await closed_terminal(terminal_id, session)) is not None:
+            return closed
         got = await terminals.block_output(terminal_id, session.person.id, seq)
         if got is None:
             return _json({"error": "no such block"}, 404)
@@ -1033,7 +1173,11 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
                                session: auth.Session = Depends(signed_in)) -> Response:
         if terminals is None:
             return _json({"error": "terminals are not running"}, 503)
-        commands = await terminals.history(terminal_id, session.person.id)
+        if (closed := await closed_terminal(terminal_id, session)) is not None:
+            return closed
+        commands = await terminals.history(
+            terminal_id, session.person.id,
+            hidden=await hidden_for(session, own_only=False))
         if commands is None:
             return _json({"error": "no such terminal"}, 404)
         return _json({"commands": commands})
@@ -1054,6 +1198,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         terminal = _open(terminal_id, session)
         if terminal is None:
             return _json({"error": NOT_OPEN}, 409)
+        if (await closed_to(session))(terminal.machine):
+            return keys_closed(terminal.machine.name)
         if len(request.line) > MAX_LINE:
             return _json({"error": "The line is too long."}, 422)
         try:
@@ -1067,6 +1213,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         terminal = _open(terminal_id, session)
         if terminal is None:
             return _json({"error": NOT_OPEN}, 409)
+        if (await closed_to(session))(terminal.machine):
+            return keys_closed(terminal.machine.name)
         try:
             return _json(await terminal.dirs())
         except NotOpen:
@@ -1078,6 +1226,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         terminal = _open(terminal_id, session)
         if terminal is None:
             return _json({"error": NOT_OPEN}, 409)
+        if (await closed_to(session))(terminal.machine):
+            return keys_closed(terminal.machine.name)
         try:
             return _json(await terminal.branches())
         except NotOpen:
@@ -1242,6 +1392,15 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     def log_refused(exc: logs.Refused) -> Response:
         return _json({"error": str(exc)}, exc.status)
 
+    async def closed_log(session: auth.Session, **where) -> Response | None:
+        """423 for the log of a machine closed to this device (the person's
+        own guarded machine, the keys not open here); None to go on."""
+        async with pool.acquire() as conn:
+            machine = await vault.guard_of(conn, session.person.id, **where)
+        if machine is not None and await log_closed_to(session, machine):
+            return keys_closed(machine.name)
+        return None
+
     @app.get("/api/logs/today")
     async def logs_today(since: int,
                          session: auth.Session = Depends(signed_in)) -> Response:
@@ -1251,8 +1410,12 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         midnight = _moment(since)
         if midnight is None:
             return _json({"error": "Say since when: the page's midnight."}, 422)
-        return _json({"counts": await logs.counts(pool, session.person.id,
-                                                  midnight)})
+        counts = await logs.counts(pool, session.person.id, midnight)
+        # A log closed to this device says nothing, not even how much it
+        # has (0.1.28): the sidebar shows its lock.
+        for machine_id in await hidden_for(session, own_only=True):
+            counts.pop(str(machine_id), None)
+        return _json({"counts": counts})
 
     @app.get("/api/machines/{machine_id}/log")
     async def machine_log(machine_id: uuid.UUID, start: int, end: int,
@@ -1263,6 +1426,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         if a is None or b is None:
             return _json({"error": "Say which day: from one midnight to the "
                                    "next."}, 422)
+        if (closed := await closed_log(session, machine_id=machine_id)) is not None:
+            return closed
         try:
             return _json(await logs.day(pool, session.person.id, machine_id,
                                         a, b))
@@ -1276,6 +1441,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         """Find in this log (0.1.21): the machine's commands, as far back as
         they are kept, with every word of `q` in the command or in the notes
         under it; the oldest first, or the newest."""
+        if (closed := await closed_log(session, machine_id=machine_id)) is not None:
+            return closed
         try:
             return _json(await logs.find(
                 pool, session.person.id, machine_id,
@@ -1287,6 +1454,13 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     async def log_note(body: LogNoteBody,
                        session: auth.Session = Depends(signed_in)) -> Response:
         """A note under a line: what stays in the log as written."""
+        if body.entry is not None:
+            closed = await closed_log(session, entry_id=body.entry)
+        else:
+            closed = (await closed_log(session, terminal_id=body.terminalId)
+                      if body.terminalId is not None else None)
+        if closed is not None:
+            return closed
         try:
             note = await logs.add_note(pool, session.person.id, body.text,
                                        entry_id=body.entry,
@@ -1304,9 +1478,14 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         who, when and why. A command's go from every line with the same
         words of the machines in that project, and the terminals of those
         that are running forget them too."""
+        if (closed := await closed_log(session, entry_id=entry_id)) is not None:
+            return closed
         try:
+            # Not on the lines of machines closed to this device (0.1.28):
+            # it would change their logs, and say where the words ran.
             done = await logs.redact(pool, session.person.id, entry_id,
-                                     body.reason)
+                                     body.reason,
+                                     hidden=await hidden_for(session, own_only=True))
         except logs.Refused as exc:
             return log_refused(exc)
         if terminals is not None and done["what"] == "command":
@@ -1384,7 +1563,10 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     async def set_vault_password(request: Request,
                                  session: auth.Session = Depends(signed_in)) -> Response:
         """Sets the vault password, or replaces it; the recovery code goes,
-        and the person's pages hear that the vault changed."""
+        and the person's pages hear that the vault changed. Once the keys
+        guard something, only from a device with them open (0.1.28)."""
+        if (locked := await keys_needed(session)) is not None:
+            return locked
         try:
             data = await vault_body(request)
             changed = await vault.set_password(
@@ -1395,6 +1577,7 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
             return _json({"error": str(exc)}, exc.status)
         except vault.Refused as exc:
             return vault_refused(exc)
+        await proofs_gone(session.person.id, session.id)
         await vault_changed(session.person.id)
         return _json({"vault": changed})
 
@@ -1411,7 +1594,10 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     async def set_vault_recovery(request: Request,
                                  session: auth.Session = Depends(signed_in)) -> Response:
         """Make a new recovery code: the one shown before stops working.
-        Refused (409) for a vault with a password."""
+        Refused (409) for a vault with a password. Once the keys guard
+        something, only from a device with them open (0.1.28)."""
+        if (locked := await keys_needed(session)) is not None:
+            return locked
         try:
             data = await vault_body(request)
             await vault.set_recovery(
@@ -1422,6 +1608,7 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
             return _json({"error": str(exc)}, exc.status)
         except vault.Refused as exc:
             return vault_refused(exc)
+        await proofs_gone(session.person.id, session.id)
         return Response(status_code=204, headers=NO_STORE)
 
     @app.post("/api/vault/locks")
@@ -1441,6 +1628,11 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     @app.delete("/api/vault/locks/{lock_id}")
     async def remove_vault_lock(lock_id: uuid.UUID,
                                 session: auth.Session = Depends(signed_in)) -> Response:
+        """Once the keys guard something, only from a device with them open
+        (0.1.28): otherwise whoever got in could take the Mac's own lock
+        off, and the Mac would forget its key to the vault."""
+        if (locked := await keys_needed(session)) is not None:
+            return locked
         try:
             await vault.remove_lock(pool, session.person.id, lock_id,
                                     session.device_id)
@@ -1460,7 +1652,11 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     async def add_vault_key(request: Request,
                             session: auth.Session = Depends(signed_in)) -> Response:
         """A key into the vault: the core checks the public key parses, its
-        type matches, and the fingerprint is its SHA256 one."""
+        type matches, and the fingerprint is its SHA256 one. Once the keys
+        guard something, only from a device with them open (0.1.28): a key
+        of its own would prove them open there."""
+        if (locked := await keys_needed(session)) is not None:
+            return locked
         try:
             data = await vault_body(request)
             created = await vault.add_key(
@@ -1480,11 +1676,16 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     @app.delete("/api/vault/keys/{key_id}")
     async def remove_vault_key(key_id: uuid.UUID,
                                session: auth.Session = Depends(signed_in)) -> Response:
+        """Only from a device with the keys open (0.1.28); the person's
+        other devices prove them open again, without it."""
+        if (locked := await keys_needed(session)) is not None:
+            return locked
         try:
             await vault.remove_key(pool, session.person.id, key_id,
                                    session.device_id)
         except vault.Refused as exc:
             return vault_refused(exc)
+        await proofs_gone(session.person.id, session.id)
         await vault_changed(session.person.id)
         return Response(status_code=204, headers=NO_STORE)
 
@@ -1614,6 +1815,17 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
             project_id = uuid.UUID(str(data.get("project")))
         except (TypeError, ValueError):
             return _json({"error": "Say which project the server is in."}, 422)
+        # A guarded server (0.1.28): with the person's key, or through their
+        # Mac, only from a device with the keys open, once they guard
+        # something; else whoever got in would add one aimed at a host of
+        # their own, named as a real one. Through the app's own computer, the
+        # app needs none, as it needs none to reach it.
+        method = data.get("method")
+        own_via = (method == "mac" and session.computer_id is not None
+                   and str(data.get("via")) == str(session.computer_id))
+        if method in ("key", "mac") and not own_via and (
+                locked := await keys_needed(session)) is not None:
+            return locked
         try:
             made = await machines.add_own(
                 pool, terminals.signer, relay, session.person.id,
@@ -1662,7 +1874,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
             return
         page_socket = PageSocket(
             websocket, terminals, session, pool, relay,
-            label=auth.socket_label(session, websocket.headers.get("user-agent", "")))
+            label=auth.socket_label(session, websocket.headers.get("user-agent", "")),
+            ip=client_ip(websocket))
         sockets.add(page_socket)
         try:
             await page_socket.run()

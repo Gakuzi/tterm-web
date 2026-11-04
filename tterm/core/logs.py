@@ -289,7 +289,7 @@ async def add_note(pool: asyncpg.Pool, user_id: uuid.UUID, text: object, *,
 
 
 async def redact(pool: asyncpg.Pool, user_id: uuid.UUID, entry_id: int,
-                 reason: object) -> dict:
+                 reason: object, hidden=None) -> dict:
     """Redacts the words of a line or a note: they go for good, and with a
     command's, its block's command and output (the feed and search). The
     log keeps who did it, when and why. By the owner and admins of the
@@ -303,7 +303,10 @@ async def redact(pool: asyncpg.Pool, user_id: uuid.UUID, entry_id: int,
 
     What came of it, for the page and for the terminals, if they are
     running, to forget the commands too: the kind, the terminal and the
-    block's numbers, and the same for the other lines (`also`)."""
+    block's numbers, and the same for the other lines (`also`).
+
+    Not the lines of the machines in `hidden` (0.1.28: closed to the device
+    that asks): it would change their logs, and say where the words ran."""
     reason = clean_reason(reason)
     if not _number(entry_id):
         raise NotFound("No such line in the log.")
@@ -338,10 +341,12 @@ async def redact(pool: asyncpg.Pool, user_id: uuid.UUID, entry_id: int,
             WHERE j.id = $1
                OR ($2 AND j.kind = 'command.ran' AND j.expires_at > now()
                    AND x.text = $4 AND j.machine_id IN (
-                       SELECT id FROM machines WHERE project_id = $3))
+                       SELECT id FROM machines WHERE project_id = $3)
+                   AND NOT (j.machine_id = ANY($5::uuid[])))
             ORDER BY x.id
             FOR UPDATE OF x
-            """, row["id"], what == "command", now["project_id"], words)
+            """, row["id"], what == "command", now["project_id"], words,
+            list(hidden or []))
         asked = next((x for x in lines if x["id"] == row["id"]), None)
         if asked is None or asked["redacted_at"] is not None:
             raise Taken("This is redacted already.")
@@ -628,13 +633,16 @@ def _where(row: asyncpg.Record) -> dict:
 
 
 async def found_in_logs(conn: asyncpg.Connection, user_id: uuid.UUID,
-                        words: list[str]) -> tuple[list[dict], bool]:
+                        words: list[str],
+                        hidden: list[uuid.UUID] | None = None) -> tuple[list[dict], bool]:
     """For search (0.1.21), in the logs the person reads, as far back as
     their projects keep them: the commands with every word in them, the
     latest run of each on each machine with how many runs there were, and
     the notes with every word in them; the latest first. Whether there was
     more than is sent."""
     likes = [_like(w) for w in words]
+    # None of the logs closed to the device asking (0.1.28, `hidden`).
+    out = f"AND NOT (m.id = ANY(${len(words) + 2}::uuid[]))"
     has = " ".join(f"AND x.text ILIKE ${i + 2}" for i in range(len(words)))
     lines = await conn.fetch(
         f"""
@@ -649,10 +657,10 @@ async def found_in_logs(conn: asyncpg.Connection, user_id: uuid.UUID,
         LEFT JOIN terminals t ON t.id = j.terminal_id
         WHERE j.kind = 'command.ran' AND j.expires_at > now()
           AND m.project_id IN {_IN}
-          AND m.removed_at IS NULL AND p.deleted_at IS NULL {has}
+          AND m.removed_at IS NULL AND p.deleted_at IS NULL {has} {out}
         ORDER BY j.at DESC, j.id DESC
         LIMIT {LOGS_SCAN}
-        """, user_id, *likes)
+        """, user_id, *likes, list(hidden or []))
     has = " ".join(f"AND nx.text ILIKE ${i + 2}" for i in range(len(words)))
     said = await conn.fetch(
         f"""
@@ -669,10 +677,10 @@ async def found_in_logs(conn: asyncpg.Connection, user_id: uuid.UUID,
         WHERE n.kind = 'log.note' AND n.expires_at > now()
           AND j.expires_at > now()
           AND m.project_id IN {_IN}
-          AND m.removed_at IS NULL AND p.deleted_at IS NULL {has}
+          AND m.removed_at IS NULL AND p.deleted_at IS NULL {has} {out}
         ORDER BY n.at DESC, n.id DESC
         LIMIT {LOGS_SCAN}
-        """, user_id, *likes)
+        """, user_id, *likes, list(hidden or []))
     runs: dict[tuple, dict] = {}
     for r in lines:
         key = (r["command"], r["machine_id"])

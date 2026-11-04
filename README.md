@@ -4,8 +4,17 @@ tTerm in the browser: a real terminal with command blocks, for people who work
 with servers and for their teams. Projects, roles, a journal of who ran what,
 and watching a colleague's terminal, always with them knowing.
 
-**Status:** early development. Version 0.1.27 makes Settings a window
-over the page, as Claude's own settings are: on the left a search and the
+**Status:** early development. Version 0.1.28 opens a server that signs
+in with your key, one through your Mac, and the Mac itself only on a device
+where you opened your keys yourself (the vault password, Touch ID where the
+browser keeps them, the Mac's approval): signing in with a code from your
+email is not enough for them. Elsewhere such a machine has a lock in place
+of +, its terminals and its log are dimmed with a lock, and a click opens
+the keys right there in a card, then the terminal; removing or moving it
+opens them first in its window; nothing of them reaches that device. A
+login is signed only by the device that opened its terminal: no other is
+asked, the Mac neither. Version 0.1.27 makes Settings a window over the
+page, as Claude's own settings are: on the left a search and the
 sections, Preferences (General, Account, Plan) and Security (Keys,
 Devices), and in tTerm for Mac its own, This computer and Updates; on the
 right the section chosen, in rows. Each section has its address,

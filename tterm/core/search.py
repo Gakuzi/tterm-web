@@ -199,15 +199,22 @@ async def _starts(db: asyncpg.Connection, ids: list[int]) -> dict[int, list[str]
             for r in rows}
 
 
+def _not_hidden(ws: list[str]) -> str:
+    """None of the machines closed to the device asking (0.1.28): the
+    parameter after the words."""
+    return f" AND NOT (m.id = ANY(${len(ws) + 2}::uuid[]))"
+
+
 async def _commands(db: asyncpg.Connection, user_id: uuid.UUID,
-                    ws: list[str]) -> tuple[list[dict], bool]:
+                    ws: list[str],
+                    hidden: list[uuid.UUID] | None = None) -> tuple[list[dict], bool]:
     """Commands with every word in them, the latest run of each on each
     machine, with how many runs there were and the start of its output."""
     where = " ".join(f"AND b.command ILIKE ${i + 2}" for i in range(len(ws)))
     rows = await db.fetch(
-        _BLOCKS.format(text="NULL") + where +
+        _BLOCKS.format(text="NULL") + where + _not_hidden(ws) +
         f" ORDER BY b.started_at DESC LIMIT {SCAN_MAX}",
-        user_id, *[_like(w) for w in ws])
+        user_id, *[_like(w) for w in ws], list(hidden or []))
     found: dict[tuple, dict] = {}
     ids: dict[tuple, int] = {}
     for row in rows:
@@ -225,14 +232,15 @@ async def _commands(db: asyncpg.Connection, user_id: uuid.UUID,
 
 
 async def _output(db: asyncpg.Connection, user_id: uuid.UUID,
-                  ws: list[str]) -> tuple[list[dict], bool]:
+                  ws: list[str],
+                  hidden: list[uuid.UUID] | None = None) -> tuple[list[dict], bool]:
     """Blocks whose output has every word, with the line where they are
     (or the first of them) and the lines around it."""
     where = " ".join(f"AND b.output_text ILIKE ${i + 2}" for i in range(len(ws)))
     rows = await db.fetch(
-        _BLOCKS.format(text="b.output_text") + where +
+        _BLOCKS.format(text="b.output_text") + where + _not_hidden(ws) +
         f" ORDER BY b.started_at DESC LIMIT {OUTPUT_SCAN_MAX}",
-        user_id, *[_like(w) for w in ws])
+        user_id, *[_like(w) for w in ws], list(hidden or []))
     found: dict[tuple, dict] = {}
     for row in rows:
         lines = _lines(row["text"])
@@ -339,22 +347,27 @@ async def recent(db: asyncpg.Connection, user_id: uuid.UUID,
 
 
 async def search(pool: asyncpg.Pool, user_id: uuid.UUID, query: str, *,
-                 near: uuid.UUID | None = None) -> dict:
+                 near: uuid.UUID | None = None,
+                 hidden: list[uuid.UUID] | None = None,
+                 hidden_logs: list[uuid.UUID] | None = None) -> dict:
     """Everything of the person's with all the words of `query` in it:
     commands, output, the machines' logs and notes, the latest first.
-    Nothing typed: the commands they run most on the machine `near`."""
+    Nothing typed: the commands they run most on the machine `near`.
+    Nothing of the machines closed to the device asking (0.1.28): `hidden`
+    for terminals, `hidden_logs` for the logs."""
     ws = words(query)
     async with pool.acquire() as db:
         if not ws:
             return {"words": [], "commands": [], "output": [], "notes": [],
                     "logs": [], "more": {},
-                    "recent": await recent(db, user_id, near)}
+                    "recent": ([] if near in (hidden or [])
+                               else await recent(db, user_id, near))}
         # One after another, on one connection: a person typing fast takes
         # one of the core's connections, not four.
-        commands, more_c = await _commands(db, user_id, ws)
-        output, more_o = await _output(db, user_id, ws)
+        commands, more_c = await _commands(db, user_id, ws, hidden)
+        output, more_o = await _output(db, user_id, ws, hidden)
         notes, more_n = await _notes(db, user_id, ws)
-        found, more_l = await logs.found_in_logs(db, user_id, ws)
+        found, more_l = await logs.found_in_logs(db, user_id, ws, hidden_logs)
     return {"words": ws, "commands": commands, "output": output,
             "notes": notes, "logs": found, "recent": [],
             "more": {"commands": more_c, "output": more_o, "notes": more_n,

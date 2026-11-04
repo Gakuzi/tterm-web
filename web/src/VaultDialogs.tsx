@@ -19,7 +19,9 @@
 //   forgot       Forgot your vault password?: where a new one can be set;
 //   app-password in the app, a vault this Mac has no lock of: opened here
 //                once with its password (app-code: with the recovery code,
-//                while the vault has no password);
+//                while the vault has no password); from 0.1.28 also a vault
+//                open here with no key yet, whose password then proves the
+//                keys open to tTerm (`prove`);
 //   mac-approve  in the app, a new browser wants to open the keys: the same
 //                six digits, Allow with Touch ID or It's not me.
 //
@@ -144,7 +146,7 @@ type Asked =
   | { kind: "passphrase"; keyName: string; signIn: string | null;
       done: (passphrase: string | null) => void }
   | { kind: "app-code"; lost: boolean; done: (opened: boolean) => void }
-  | { kind: "app-password"; lost: boolean; done: (opened: boolean) => void };
+  | { kind: "app-password"; lost: boolean; prove?: boolean; done: (opened: boolean) => void };
 
 class Windows {
   private asked: Asked | null = null;
@@ -207,9 +209,11 @@ class Windows {
     return new Promise((resolve) => this.show({ kind: "app-code", lost, done: resolve }));
   }
 
-  /** The same, for a vault with a password (0.1.26): the password, once. */
-  appPassword(lost = false): Promise<boolean> {
-    return new Promise((resolve) => this.show({ kind: "app-password", lost, done: resolve }));
+  /** The same, for a vault with a password (0.1.26): the password, once.
+   * `prove` (0.1.28): the vault is open here but has no key yet, and the
+   * password proves the keys open to tTerm. */
+  appPassword(lost = false, prove = false): Promise<boolean> {
+    return new Promise((resolve) => this.show({ kind: "app-password", lost, prove, done: resolve }));
   }
 
   close(): void {
@@ -235,6 +239,22 @@ class Windows {
 
 export const vaultUi = new Windows();
 
+/** A vault window is up over the page (0.1.28): one asked for here, the
+ * Keep question after the password, or the Mac's approval of a browser, as
+ * VaultDialogHost shows them. A window under it leaves Esc and the keys to
+ * it. */
+export function vaultWindowUp(): boolean {
+  const v = vaultStore.get();
+  return vaultUi.get() !== null || !!v.request || (v.offerPasskey && !v.app);
+}
+
+/** The same, for a window that waits for it to go. */
+export function useVaultWindowUp(): boolean {
+  const asked = useSyncExternalStore(vaultUi.subscribe, vaultUi.get, vaultUi.get);
+  const v = useVault();
+  return asked !== null || !!v.request || (v.offerPasskey && !v.app);
+}
+
 /** In tTerm for Mac: the vault opened on this Mac. With this Mac's own lock,
  * Touch ID or the Mac's password; a vault this Mac has no lock of opens
  * once with its password (with its recovery code while it has none; the
@@ -246,7 +266,17 @@ export const vaultUi = new Windows();
 export async function openOnMac(): Promise<boolean> {
   await vaultStore.refreshApp();
   let state = vaultStore.get();
-  if (state.appVault?.open) return true;
+  if (state.appVault?.open) {
+    // Open with nothing to prove it by to tTerm (0.1.28): a vault with its
+    // password and no key yet, opened with Touch ID. The password, once:
+    // tTerm takes a change of the vault, its first key say, only then.
+    if (!state.proofs || state.appVault.proves !== false) return true;
+    if (!state.vault) {
+      await vaultStore.reload();
+      state = vaultStore.get();
+    }
+    return state.vault?.password ? vaultUi.appPassword(false, true) : true;
+  }
   if (!state.vault) {
     await vaultStore.reload();
     state = vaultStore.get();
@@ -319,7 +349,7 @@ export function VaultDialogHost() {
         asked.done(opened);
       }} />;
     case "app-password":
-      return <AppPassword key="app-password" lost={asked.lost} onDone={(opened) => {
+      return <AppPassword key="app-password" lost={asked.lost} prove={asked.prove} onDone={(opened) => {
         vaultUi.close();
         asked.done(opened);
       }} />;
@@ -489,7 +519,7 @@ function PasswordWindow(props: { asked: Extract<Asked, { kind: "password" }> }) 
  * the keys, and what goes under it (`links`). In a browser the keys open
  * here for this session, and the Keep question follows; in the app the
  * engine opens the vault and gives this Mac its lock. */
-export function PasswordOpen(props: { links?: ReactNode; autoFocus?: boolean }) {
+export function PasswordOpen(props: { links?: ReactNode; autoFocus?: boolean; action?: string }) {
   const t = useT();
   const v = useVault();
   const id = useId();
@@ -535,7 +565,7 @@ export function PasswordOpen(props: { links?: ReactNode; autoFocus?: boolean }) 
       </div>
       <button type="submit" className="button-accent big vault-pass-go" disabled={busy || !value}>
         {busy ? <span className="spinner" aria-hidden="true" /> : <Unlock size={18} />}
-        {busy ? t("vault_password.opening") : t("vault_password.open")}
+        {busy ? t("vault_password.opening") : props.action ?? t("vault_password.open")}
       </button>
       {problem && <div className="error-box" role="alert">{problem}</div>}
       {props.links}
@@ -884,7 +914,7 @@ function AppCode(props: { lost: boolean; onDone: (opened: boolean) => void }) {
  * tTerm for the wrap, and gives this Mac its own lock; no Touch ID, the
  * person has just typed the password. A wrong one, or too many, is said in
  * the page's words, and the window stays to try again. */
-function AppPassword(props: { lost: boolean; onDone: (opened: boolean) => void }) {
+function AppPassword(props: { lost: boolean; prove?: boolean; onDone: (opened: boolean) => void }) {
   const t = useT();
   const id = useId();
   const [value, setValue] = useState("");
@@ -911,9 +941,12 @@ function AppPassword(props: { lost: boolean; onDone: (opened: boolean) => void }
       <section ref={box} className="dialog vault-dialog" role="dialog" aria-modal="true"
         aria-labelledby="ap-title" tabIndex={-1}>
         <Tile><Lock size={24} /></Tile>
-        <h2 id="ap-title" className="vault-dialog-title">{t("app_code.title")}</h2>
+        <h2 id="ap-title" className="vault-dialog-title">
+          {props.prove ? t("vault_password.open") : t("app_code.title")}
+        </h2>
         <p className="vault-dialog-text">
-          {props.lost ? t("app_code.text_lost_password") : t("app_code.text_password")}
+          {props.prove ? t("app_code.text_prove")
+            : props.lost ? t("app_code.text_lost_password") : t("app_code.text_password")}
         </p>
         <form className="vault-pass-form" onSubmit={(e) => {
           e.preventDefault();

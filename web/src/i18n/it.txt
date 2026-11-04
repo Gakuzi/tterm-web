@@ -127,6 +127,11 @@ sidebar.with_key = Si apre con la tua chiave, dalla tua cassaforte
 # name, and its tip ({mac} is the Mac's name).
 sidebar.via_mac = via Mac
 sidebar.via_title = Tramite {mac}, finché è acceso
+sidebar.keys_closed_new = Le chiavi non sono aperte su questo dispositivo. Aprile e apri un nuovo terminale su {name}
+sidebar.keys_closed = Le chiavi non sono aperte su questo dispositivo. Aprile
+sidebar.keys_closed_mac = Un terminale sul tuo Mac da un browser: solo dove le chiavi sono aperte. Aprile
+sidebar.closed_terminal = {label} su {machine}: chiuso su questo dispositivo. Apri le chiavi
+sidebar.closed_title = Chiuso su questo dispositivo: apri le chiavi
 
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
@@ -403,6 +408,7 @@ app.remove.confirm = Rimuovi {name}
 app.remove.text = Scompare da tTerm Web e i suoi terminali vengono terminati. I comandi digitati lì restano nella cronologia.
 app.remove.computer = Il suo agente viene avvisato della rimozione e si ferma. Per collegare di nuovo il computer: Aggiungi una macchina, poi Computer.
 app.remove.server = tTerm Web smette di accedervi e revoca il proprio accesso sul server stesso. Se il server non risponde, subito dopo ti mostra il comando per farlo.
+app.remove.closed = {name} è chiuso su questo dispositivo: si può rimuovere solo dove le chiavi sono aperte. Aprile qui.
 app.end.title = Terminare {label}?
 app.end.confirm = Termina il terminale
 app.end.text = La sua shell si chiude e tutto ciò che vi gira si ferma, come quando chiudi una finestra di terminale. Quello che ha eseguito resta nella sua scheda e nella cronologia.
@@ -862,6 +868,7 @@ project_dialog.with_others = con altri
 project_dialog.move_becomes = In {project} diventa {code}/{name}. I suoi terminali restano in esecuzione e sulla macchina stessa non cambia nulla.
 # The same, when its name is taken there: {machine} is its name now, {name} the one it gets (web-01-2).
 project_dialog.move_becomes_taken = In {project} diventa {code}/{name}: lì il nome {machine} è già in uso. I suoi terminali restano in esecuzione e sulla macchina stessa non cambia nulla.
+project_dialog.move_closed = {machine} è chiuso su questo dispositivo: si può spostare solo dove le chiavi sono aperte. Aprile qui.
 # The button: {project} is the project's name.
 project_dialog.move_to = Sposta in {project}
 # The button while there is nothing to pick (a verb).
@@ -942,6 +949,7 @@ projectpage.remove_machine = Rimuovi macchina
 # An item of a machine's menu.
 projectpage.move_machine = Sposta in un altro progetto
 projectpage.no_terminals = Nessun terminale aperto
+projectpage.closed = chiuso su questo dispositivo
 # Who changed a note last, and when: {ago} is just now, 5 min ago, yesterday, on 12 Oct (time.*).
 projectpage.edited_you = Tu, {ago}
 # The same, someone else: {name} is their first name.
@@ -1036,6 +1044,7 @@ machines.account = Utente
 machines.offline_seen = offline, {seen}
 machines.offline = offline
 machines.online = online
+machines.closed = chiuso su questo dispositivo
 machines.offline_note = Il computer è in sospensione o offline, oppure il suo agente non è in esecuzione. Torna da solo quando il suo agente riesce a collegarsi; questa pagina se ne accorge entro dieci secondi.
 # On Open a terminal while the computer is offline.
 machines.offline_title = È offline: in sospensione, o il suo agente non è in esecuzione
@@ -1415,6 +1424,7 @@ log.today_count = {n} oggi
 # A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
 log.tab = {machine}: log
 log.tab_title = Log di {machine}
+log.closed_here = Log di {machine}: chiuso su questo dispositivo. Apri le chiavi
 log.close_tab = Chiudi il log
 # The ⋯ over the page, and its one item.
 log.menu = Menu del log
@@ -1602,6 +1612,7 @@ classic.several_lines = Questo comando ha più righe, e la modalità classica le
 # ------------------------------------------------------------ tabs: the line of tabs on top (TabBar.tsx)
 # The tabs that are open, for screen readers.
 tabs.label = Schede aperte
+tabs.closed_here = chiuso su questo dispositivo
 # Naming a terminal in its tab, after a double click.
 tabs.rename_title = Dai un nome a questo terminale
 tabs.rename_hint = Enter salva, Esc annulla. Il nome compare nella barra laterale, nelle schede e nella pagina del progetto.
@@ -1850,6 +1861,7 @@ app_code.text_lost = Questo Mac non può più aprire la tua cassaforte da solo. 
 # A vault with a password (0.1.26): opened here once with it.
 app_code.text_password = Questo Mac non può ancora aprire la tua cassaforte da solo. Aprila qui una volta con la password della cassaforte: poi questo Mac la aprirà con Touch ID.
 app_code.text_lost_password = Questo Mac non può più aprire la tua cassaforte da solo. Aprila qui una volta con la password della cassaforte: poi questo Mac tornerà ad aprirla con Touch ID.
+app_code.text_prove = La tua cassaforte non contiene ancora nessuna chiave, quindi tTerm Web ha bisogno della password della cassaforte per sapere che le chiavi sono aperte su questo Mac. Inseriscila una volta: basta finché la cassaforte non si chiude.
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1905,10 +1917,30 @@ vault_locked.no_ed25519 = Questo browser non può firmare con chiavi Ed25519. Ap
 vault_locked.not_here = La tua cassaforte è aperta qui, ma {key} non si apre in questo browser. Aggiungila di nuovo dal suo file in Impostazioni › Chiavi.
 vault_locked.its_key = la chiave del server
 
+# ------------------------------------------------------------ keys_closed: a tab of a machine closed on this device (KeysClosed.tsx, 0.1.28)
+keys_closed.tab = {machine} · nuovo terminale
+keys_closed.tab_title = Un nuovo terminale su {machine}, appena le chiavi sono aperte su questo dispositivo
+keys_closed.close_tab = Chiudi la scheda: nessun nuovo terminale
+keys_closed.new_key_title = {machine} si apre con la tua chiave
+keys_closed.new_key_text = Le chiavi non sono ancora aperte su questo dispositivo. Aprile qui e si apre subito un nuovo terminale su {machine}.
+keys_closed.new_via_title = {machine} si apre tramite {mac}
+keys_closed.new_via_text = È il tuo Mac ad avviare il terminale. Da un browser si apre solo dove le chiavi sono aperte: una seconda serratura, perché nessuno che sia entrato nella tua email possa entrare tramite il Mac.
+keys_closed.new_mac_title = Un terminale su {mac}
+keys_closed.new_mac_text = Da un browser, un terminale sul tuo Mac si apre solo dove le chiavi sono aperte: una seconda serratura, perché nessuno che sia entrato nella tua email possa aprire un terminale sul tuo Mac.
+keys_closed.log_title = Il log di {machine} è chiuso su questo dispositivo
+keys_closed.log_text = Nel log ci sono gli stessi comandi e lo stesso output del terminale, quindi è chiuso allo stesso modo. Apri le chiavi e il log si apre.
+keys_closed.terminal_title = Questo terminale è chiuso su questo dispositivo
+keys_closed.terminal_text = “{name}” su {machine} è in esecuzione, ma qui non si vede finché qui le chiavi non sono aperte. Apri le chiavi e il terminale compare da dove si trova adesso.
+keys_closed.open_new = Apri le chiavi e il terminale
+keys_closed.proving = Apertura delle chiavi su questo dispositivo…
+keys_closed.refused = {machine} è chiuso su questo dispositivo: apri le chiavi e riprova.
+keys_closed.foot = I server con la tua chiave, i server tramite il tuo Mac, il Mac stesso e i loro log si vedono dove hai aperto le chiavi tu stesso: con la password, con Touch ID o con l'approvazione sul Mac. L'accesso con un codice dall'email non li apre. Nell'app sul Mac stesso, i suoi terminali si aprono senza password.
+
 # ------------------------------------------------------------ vault_problem: what went wrong with the vault (vault/store.ts)
 vault_problem.no_vault = Non hai ancora una cassaforte.
 vault_problem.exists = Hai già una cassaforte: aprila, poi aggiungi la chiave.
 vault_problem.locked = Prima apri la tua cassaforte.
+vault_problem.keys_closed = La cassaforte cambia solo dove le sue chiavi sono aperte. Aprile su questo dispositivo e riprova.
 # The vault password: {n} tries left (shown when 3 or fewer), {time} a
 # time of day, as the page shows times ("14:05").
 vault_problem.password_wrong = Questa password non apre la tua cassaforte. Controlla il layout della tastiera e il Caps Lock.

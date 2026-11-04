@@ -127,6 +127,11 @@ sidebar.with_key = 保管庫にあるあなたの鍵で開きます
 # name, and its tip ({mac} is the Mac's name).
 sidebar.via_mac = Mac 経由
 sidebar.via_title = {mac} 経由で開きます（オンラインのあいだ）
+sidebar.keys_closed_new = このデバイスでは鍵が開いていません。鍵を開いて {name} で新規ターミナルを開く
+sidebar.keys_closed = このデバイスでは鍵が開いていません。開く
+sidebar.keys_closed_mac = ブラウザーから Mac のターミナルを開けるのは、鍵が開いている場所だけです。開く
+sidebar.closed_terminal = {machine} の {label}: このデバイスでは閉じています。鍵を開く
+sidebar.closed_title = このデバイスでは閉じています: 鍵を開いてください
 
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
@@ -403,6 +408,7 @@ app.remove.confirm = {name} を削除
 app.remove.text = tTerm Web から消え、ターミナルも終了します。そこで入力したコマンドは履歴に残ります。
 app.remove.computer = エージェントは削除の通知を受けて停止します。コンピューターをもう一度接続するには、「マシンを追加」で「コンピューター」を選びます。
 app.remove.server = tTerm Web はこのサーバーへのログインをやめ、サーバー上のアクセス権も取り消します。サーバーが応答しない場合は、次にそのためのコマンドが表示されます。
+app.remove.closed = {name} はこのデバイスでは閉じています。削除できるのは、鍵が開いている場所だけです。ここで鍵を開いてください。
 app.end.title = {label} を終了しますか？
 app.end.confirm = ターミナルを終了
 app.end.text = シェルが終了し、その中で動いているものも停止します。ターミナルのウィンドウを閉じたときと同じです。実行した内容はタブと履歴に残ります。
@@ -862,6 +868,7 @@ project_dialog.with_others = ほかのメンバーと共有
 project_dialog.move_becomes = {project} では {code}/{name} になります。ターミナルは動き続け、マシン自体には何も変更が加わりません。
 # The same, when its name is taken there: {machine} is its name now, {name} the one it gets (web-01-2).
 project_dialog.move_becomes_taken = {project} では {code}/{name} になります（{machine} という名前はすでに使われています）。ターミナルは動き続け、マシン自体には何も変更が加わりません。
+project_dialog.move_closed = {machine} はこのデバイスでは閉じています。移動できるのは、鍵が開いている場所だけです。ここで鍵を開いてください。
 # The button: {project} is the project's name.
 project_dialog.move_to = {project} に移動
 # The button while there is nothing to pick (a verb).
@@ -942,6 +949,7 @@ projectpage.remove_machine = マシンを削除
 # An item of a machine's menu.
 projectpage.move_machine = 別のプロジェクトに移動
 projectpage.no_terminals = 開いているターミナルはありません
+projectpage.closed = このデバイスでは閉じています
 # Who changed a note last, and when: {ago} is just now, 5 min ago, yesterday, on 12 Oct (time.*).
 projectpage.edited_you = あなた、{ago}
 # The same, someone else: {name} is their first name.
@@ -1036,6 +1044,7 @@ machines.account = ユーザー
 machines.offline_seen = オフライン（{seen}）
 machines.offline = オフライン
 machines.online = オンライン
+machines.closed = このデバイスでは閉じています
 machines.offline_note = コンピューターがスリープ中かオフラインであるか、エージェントが動いていません。エージェントが接続できるようになると自動で戻り、このページには 10 秒以内に反映されます。
 # On Open a terminal while the computer is offline.
 machines.offline_title = オフラインです。スリープ中か、エージェントが動いていません
@@ -1415,6 +1424,7 @@ log.today_count = 今日 {n} 件
 # A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
 log.tab = {machine} のログ
 log.tab_title = {machine} のログ
+log.closed_here = {machine} のログ: このデバイスでは閉じています。鍵を開く
 log.close_tab = ログを閉じる
 # The ⋯ over the page, and its one item.
 log.menu = ログのメニュー
@@ -1602,6 +1612,7 @@ classic.several_lines = このコマンドは複数行あり、クラシック�
 # ------------------------------------------------------------ tabs: the line of tabs on top (TabBar.tsx)
 # The tabs that are open, for screen readers.
 tabs.label = 開いているタブ
+tabs.closed_here = このデバイスでは閉じています
 # Naming a terminal in its tab, after a double click.
 tabs.rename_title = このターミナルに名前を付ける
 tabs.rename_hint = Enter で保存、Esc でキャンセル。名前はサイドバー、タブ、プロジェクトのページに表示されます。
@@ -1850,6 +1861,7 @@ app_code.text_lost = この Mac で保管庫を開くための設定が無効に
 # A vault with a password (0.1.26): opened here once with it.
 app_code.text_password = この Mac は、まだ保管庫を開けるように設定されていません。ここで一度保管庫のパスワードを使って開くと、以降はこの Mac で Touch ID を使って開けます。
 app_code.text_lost_password = この Mac で保管庫を開くための設定が無効になりました。ここで一度保管庫のパスワードを使って開くと、設定し直され、再び Touch ID を使って開けるようになります。
+app_code.text_prove = 保管庫にはまだ鍵がないため、この Mac で鍵が開いていることを tTerm Web が確かめるには保管庫のパスワードが必要です。一度入力してください。保管庫がロックされるまで有効です。
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1905,10 +1917,30 @@ vault_locked.no_ed25519 = このブラウザーは Ed25519 鍵で署名できま
 vault_locked.not_here = 保管庫はここで開いていますが、{key} はこのブラウザーでは開けません。「設定」の「SSH 鍵」で、ファイルからもう一度追加してください。
 vault_locked.its_key = このサーバーの鍵
 
+# ------------------------------------------------------------ keys_closed: a tab of a machine closed on this device (KeysClosed.tsx, 0.1.28)
+keys_closed.tab = {machine} · 新規ターミナル
+keys_closed.tab_title = このデバイスで鍵が開いたら、{machine} で新規ターミナルが開きます
+keys_closed.close_tab = タブを閉じる: 新規ターミナルは開きません
+keys_closed.new_key_title = {machine} はあなたの鍵で開きます
+keys_closed.new_key_text = このデバイスでは、まだ鍵が開いていません。ここで鍵を開くと、すぐに {machine} で新規ターミナルが開きます。
+keys_closed.new_via_title = {machine} は {mac} 経由で開きます
+keys_closed.new_via_text = ターミナルを起動するのはあなたの Mac です。ブラウザーからは、鍵が開いている場所でしか開きません。メールに入られても Mac 経由で入られないための、2 つ目のロックです。
+keys_closed.new_mac_title = {mac} のターミナル
+keys_closed.new_mac_text = ブラウザーから Mac のターミナルが開くのは、鍵が開いている場所だけです。メールに入られても Mac のターミナルを開かれないための、2 つ目のロックです。
+keys_closed.log_title = {machine} のログは、このデバイスでは閉じています
+keys_closed.log_text = ログにはターミナルと同じコマンドと出力があるため、同じように閉じています。鍵を開くと、ログが開きます。
+keys_closed.terminal_title = このターミナルは、このデバイスでは閉じています
+keys_closed.terminal_text = {machine} の「{name}」は動いていますが、ここで鍵が開くまで、ここには表示されません。鍵を開くと、ターミナルは今の状態から表示されます。
+keys_closed.open_new = 鍵を開いてターミナルを開く
+keys_closed.proving = このデバイスで鍵を開いています…
+keys_closed.refused = {machine} はこのデバイスでは閉じています。鍵を開いてから、もう一度お試しください。
+keys_closed.foot = あなたの鍵で開くサーバー、Mac 経由のサーバー、Mac 自体、そしてそれらのログが表示されるのは、あなた自身が鍵を開いた場所だけです。パスワード、Touch ID、または Mac での承認で開きます。メールのコードでのサインインでは開きません。Mac 上のアプリでは、その Mac 自身のターミナルはパスワードなしで開きます。
+
 # ------------------------------------------------------------ vault_problem: what went wrong with the vault (vault/store.ts)
 vault_problem.no_vault = 保管庫はまだありません。
 vault_problem.exists = 保管庫はすでにあります。保管庫を開いてから、鍵を追加してください。
 vault_problem.locked = 先に保管庫を開いてください。
+vault_problem.keys_closed = 保管庫を変更できるのは、鍵が開いている場所だけです。このデバイスで鍵を開いてから、もう一度お試しください。
 # The vault password: {n} tries left (shown when 3 or fewer), {time} a
 # time of day, as the page shows times ("14:05").
 vault_problem.password_wrong = このパスワードでは保管庫を開けません。キーボード配列と Caps Lock を確認してください。

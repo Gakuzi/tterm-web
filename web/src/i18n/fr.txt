@@ -127,6 +127,11 @@ sidebar.with_key = S’ouvre avec votre clé, depuis votre coffre
 # name, and its tip ({mac} is the Mac's name).
 sidebar.via_mac = via Mac
 sidebar.via_title = Via {mac}, tant qu’il est allumé
+sidebar.keys_closed_new = Les clés ne sont pas ouvertes sur cet appareil. Les ouvrir, avec un nouveau terminal sur {name}
+sidebar.keys_closed = Les clés ne sont pas ouvertes sur cet appareil. Les ouvrir
+sidebar.keys_closed_mac = Un terminal sur votre Mac depuis un navigateur : seulement là où les clés sont ouvertes. Les ouvrir
+sidebar.closed_terminal = {label} sur {machine} : fermé sur cet appareil. Ouvrir les clés
+sidebar.closed_title = Fermé sur cet appareil : ouvrez les clés
 
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
@@ -403,6 +408,7 @@ app.remove.confirm = Retirer {name}
 app.remove.text = La machine disparaîtra de tTerm Web et ses terminaux prendront fin. Les commandes qui y ont été tapées resteront dans l’historique.
 app.remove.computer = Son agent apprendra que l’ordinateur a été retiré et s’arrêtera. Pour reconnecter l’ordinateur : Ajouter une machine, puis Ordinateur.
 app.remove.server = tTerm Web cessera de s’y connecter et retirera son accès sur le serveur lui-même. Si le serveur ne répond pas, la commande à lancer pour cela s’affichera ensuite.
+app.remove.closed = {name} est fermé sur cet appareil : on ne peut le retirer que là où les clés sont ouvertes. Ouvrez-les ici.
 app.end.title = Mettre fin à {label} ?
 app.end.confirm = Mettre fin au terminal
 app.end.text = Son shell prendra fin et tout ce qui s’y exécute s’arrêtera, comme quand on ferme une fenêtre de terminal. Ce qu’il a exécuté restera dans son onglet et dans l’historique.
@@ -862,6 +868,7 @@ project_dialog.with_others = avec d’autres personnes
 project_dialog.move_becomes = Dans {project}, la machine deviendra {code}/{name}. Ses terminaux continueront de tourner, et rien ne changera sur la machine elle-même.
 # The same, when its name is taken there: {machine} is its name now, {name} the one it gets (web-01-2).
 project_dialog.move_becomes_taken = Dans {project}, la machine deviendra {code}/{name} : le nom {machine} y est déjà pris. Ses terminaux continueront de tourner, et rien ne changera sur la machine elle-même.
+project_dialog.move_closed = {machine} est fermé sur cet appareil : on ne peut le déplacer que là où les clés sont ouvertes. Ouvrez-les ici.
 # The button: {project} is the project's name.
 project_dialog.move_to = Déplacer vers {project}
 # The button while there is nothing to pick (a verb).
@@ -942,6 +949,7 @@ projectpage.remove_machine = Retirer la machine
 # An item of a machine's menu.
 projectpage.move_machine = Déplacer vers un autre projet
 projectpage.no_terminals = Aucun terminal ouvert
+projectpage.closed = fermé sur cet appareil
 # Who changed a note last, and when: {ago} is just now, 5 min ago, yesterday, on 12 Oct (time.*).
 projectpage.edited_you = Vous, {ago}
 # The same, someone else: {name} is their first name.
@@ -1036,6 +1044,7 @@ machines.account = Compte
 machines.offline_seen = hors ligne, {seen}
 machines.offline = hors ligne
 machines.online = en ligne
+machines.closed = fermé sur cet appareil
 machines.offline_note = L’ordinateur est en veille ou hors ligne, ou son agent n’est pas lancé. Il réapparaîtra de lui-même dès que son agent pourra se connecter ; cette page s’en aperçoit en moins de dix secondes.
 # On Open a terminal while the computer is offline.
 machines.offline_title = Hors ligne : en veille, ou son agent n’est pas lancé
@@ -1415,6 +1424,7 @@ log.today_count = {n} aujourd’hui
 # A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
 log.tab = {machine} : journal
 log.tab_title = Journal de la machine {machine}
+log.closed_here = Journal de la machine {machine} : fermé sur cet appareil. Ouvrir les clés
 log.close_tab = Fermer le journal
 # The ⋯ over the page, and its one item.
 log.menu = Menu du journal
@@ -1602,6 +1612,7 @@ classic.several_lines = Cette commande fait plusieurs lignes, et le mode classiq
 # ------------------------------------------------------------ tabs: the line of tabs on top (TabBar.tsx)
 # The tabs that are open, for screen readers.
 tabs.label = Onglets ouverts
+tabs.closed_here = fermé sur cet appareil
 # Naming a terminal in its tab, after a double click.
 tabs.rename_title = Nommer ce terminal
 tabs.rename_hint = Enter pour enregistrer, Esc pour annuler. Le nom apparaît dans la barre latérale, dans les onglets et sur la page du projet.
@@ -1850,6 +1861,7 @@ app_code.text_lost = Ce Mac ne peut plus ouvrir votre coffre par lui-même. Ouvr
 # A vault with a password (0.1.26): opened here once with it.
 app_code.text_password = Ce Mac ne peut pas encore ouvrir votre coffre par lui-même. Ouvrez-le ici une première fois avec le mot de passe du coffre : ce Mac l’ouvrira ensuite avec Touch ID.
 app_code.text_lost_password = Ce Mac ne peut plus ouvrir votre coffre par lui-même. Ouvrez-le ici une fois avec le mot de passe du coffre : ce Mac pourra de nouveau l’ouvrir avec Touch ID.
+app_code.text_prove = Votre coffre ne contient encore aucune clé : tTerm Web a donc besoin du mot de passe du coffre pour savoir que les clés sont ouvertes sur ce Mac. Saisissez-le une fois : cela suffit jusqu’à ce que le coffre se verrouille.
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1905,10 +1917,30 @@ vault_locked.no_ed25519 = Ce navigateur ne peut pas signer avec des clés Ed2551
 vault_locked.not_here = Votre coffre est ouvert ici, mais {key} ne s’ouvre pas dans ce navigateur. Ajoutez-la de nouveau depuis son fichier, dans Paramètres › Clés.
 vault_locked.its_key = sa clé
 
+# ------------------------------------------------------------ keys_closed: a tab of a machine closed on this device (KeysClosed.tsx, 0.1.28)
+keys_closed.tab = {machine} · nouveau terminal
+keys_closed.tab_title = Un nouveau terminal sur {machine}, une fois les clés ouvertes sur cet appareil
+keys_closed.close_tab = Fermer l’onglet : pas de nouveau terminal
+keys_closed.new_key_title = {machine} s’ouvre avec votre clé
+keys_closed.new_key_text = Les clés ne sont pas encore ouvertes sur cet appareil. Ouvrez-les ici même, et un nouveau terminal sur {machine} s’ouvre aussitôt.
+keys_closed.new_via_title = {machine} s’ouvre via {mac}
+keys_closed.new_via_text = C’est votre Mac qui lance le terminal. Depuis un navigateur, il ne s’ouvre que là où les clés sont ouvertes : un second verrou, pour que personne ayant accédé à vos e-mails n’entre par le Mac.
+keys_closed.new_mac_title = Un terminal sur {mac}
+keys_closed.new_mac_text = Depuis un navigateur, un terminal sur votre Mac ne s’ouvre que là où les clés sont ouvertes : un second verrou, pour que personne ayant accédé à vos e-mails n’ouvre un terminal sur votre Mac.
+keys_closed.log_title = Le journal de la machine {machine} est fermé sur cet appareil
+keys_closed.log_text = Le journal contient les mêmes commandes et la même sortie que le terminal : il est donc fermé de la même façon. Ouvrez les clés, et le journal s’ouvre.
+keys_closed.terminal_title = Ce terminal est fermé sur cet appareil
+keys_closed.terminal_text = « {name} » sur {machine} tourne, mais il n’apparaît pas ici tant que les clés n’y sont pas ouvertes. Ouvrez les clés, et le terminal apparaît là où il en est.
+keys_closed.open_new = Ouvrir les clés et le terminal
+keys_closed.proving = Ouverture des clés sur cet appareil…
+keys_closed.refused = {machine} est fermé sur cet appareil : ouvrez les clés, puis réessayez.
+keys_closed.foot = Les serveurs avec votre clé, les serveurs via votre Mac, le Mac lui-même et leurs journaux s’affichent là où vous avez ouvert les clés vous-même : avec le mot de passe, Touch ID ou l’approbation sur le Mac. Une connexion avec un code reçu par e-mail ne les ouvre pas. Dans l’application sur le Mac lui-même, ses propres terminaux s’ouvrent sans mot de passe.
+
 # ------------------------------------------------------------ vault_problem: what went wrong with the vault (vault/store.ts)
 vault_problem.no_vault = Vous n’avez pas encore de coffre.
 vault_problem.exists = Vous avez déjà un coffre : ouvrez-le, puis ajoutez la clé.
 vault_problem.locked = Ouvrez d’abord votre coffre.
+vault_problem.keys_closed = Le coffre ne se modifie que là où ses clés sont ouvertes. Ouvrez-les sur cet appareil, puis réessayez.
 # The vault password: {n} tries left (shown when 3 or fewer), {time} a
 # time of day, as the page shows times ("14:05").
 vault_problem.password_wrong = Ce mot de passe n’ouvre pas votre coffre. Vérifiez la disposition du clavier et la touche Caps Lock.

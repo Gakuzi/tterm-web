@@ -881,13 +881,18 @@ async def test_a_release_says_so_of_the_terminals_it_ended(h):
 # ------------------------------------------------------------ the socket
 
 async def _frames(ws, until, timeout: float = 15) -> list:
+    """What the socket sends until `until` says so, but its first word, the
+    vault's challenge (0.1.28): no terminal's."""
     got = []
     end = time.monotonic() + timeout
     while not until(got):
         left = end - time.monotonic()
         assert left > 0, f"timed out; got {got[-5:]!r}"
         msg = await asyncio.wait_for(ws.recv(), left)
-        got.append(json.loads(msg) if isinstance(msg, str) else msg)
+        frame = json.loads(msg) if isinstance(msg, str) else msg
+        if isinstance(frame, dict) and frame.get("op") == "vault.challenge":
+            continue
+        got.append(frame)
     return got
 
 

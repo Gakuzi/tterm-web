@@ -48,6 +48,7 @@ import uuid
 import zlib
 from collections import deque
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 from typing import Awaitable, Callable
 
 import asyncpg
@@ -281,10 +282,14 @@ class Terminal:
     def __init__(self, *, pool: asyncpg.Pool, signer: SignerClient,
                  owner: Person, machine: Machine, name: str,
                  cols: int, rows: int, agents=None, relay=None,
-                 start_in: str = "") -> None:
+                 start_in: str = "",
+                 session_id: uuid.UUID | None = None) -> None:
         self.id = uuid.uuid4()
         self.pool = pool
         self.signer = signer
+        #: The session that opened it (0.1.28, v3): a key server's login is
+        #: signed only by that session's sockets.
+        self.session_id = session_id
         #: The connected agents, for a terminal on a computer.
         self.agents = agents
         #: The vault signing relay (vault.VaultRelay), for a 'key' server.
@@ -535,7 +540,7 @@ class Terminal:
                     user_id=self.owner.id, fingerprint=m.vault_fingerprint,
                     key_name=m.vault_key_name or "", machine=m.name,
                     machine_id=m.id, project_id=m.project_id,
-                    waiting=self._set_vault_wait)
+                    waiting=self._set_vault_wait, session_id=self.session_id)
 
                 async def key_factory():
                     return vault.RelayKeyPair(pub, sign)
@@ -556,7 +561,8 @@ class Terminal:
             # A device that can sign first, however long the person takes to
             # open their vault; then the dial, with its own timeout (0.1.19).
             await self.relay.wait_capable(self.owner.id, m.vault_fingerprint,
-                                          self._set_vault_wait)
+                                          self._set_vault_wait,
+                                          session_id=self.session_id)
         return await ssh.connect_own(
             host=m.host, port=m.port or 22, login=m.login or trust.LOGIN,
             host_keys=m.host_keys, client_key=client_key(), who=who,
@@ -1038,6 +1044,16 @@ class NotAllowed(Exception):
     """No such machine, or not one this person may open terminals on."""
 
 
+class KeysClosed(Exception):
+    """The machine is reached only with the keys open on the device asking,
+    and they are not (0.1.28, vault-design.md v3): its name, for the page."""
+
+    def __init__(self, machine: str) -> None:
+        super().__init__(f"The keys are not open on this device: open them "
+                         f"to reach {machine}.")
+        self.machine = machine
+
+
 def _ms(when: dt.datetime | None) -> int | None:
     return int(when.timestamp() * 1000) if when else None
 
@@ -1166,13 +1182,21 @@ class Terminals:
             log.exception("could not make the text of earlier blocks for search")
 
     async def open(self, person: Person, machine_id: uuid.UUID, cols: int,
-                   rows: int, cwd: str = "") -> Terminal:
+                   rows: int, cwd: str = "", *,
+                   session_id: uuid.UUID | None = None,
+                   closed=None) -> Terminal:
         """A new terminal on the machine. `cwd` (0.1.24): the folder to start
         in, the one the terminal it replaces was in; where the login shell
-        cannot be told, or the folder is gone, it starts at home."""
+        cannot be told, or the folder is gone, it starts at home.
+        `session_id` (0.1.28): the session asking, whose sockets alone sign
+        a key server's login; `closed(machine)`, whether the keys are closed
+        on that device for this machine: KeysClosed then, and nothing is
+        opened."""
         lock = self._opening.setdefault(person.id, asyncio.Lock())
         async with lock:
             machine = await self._machine(machine_id, person.id)
+            if closed is not None and closed(machine):
+                raise KeysClosed(machine.name)
             plan, most = await accounts.limit(self.pool, person.id, "terminals")
             count = len(self.live(person.id))
             if most is not None and count >= most:
@@ -1186,7 +1210,8 @@ class Terminals:
             terminal = Terminal(pool=self.pool, signer=self.signer,
                                 owner=person, machine=machine, name=name,
                                 cols=cols, rows=rows, agents=self.agents,
-                                relay=self.relay, start_in=cwd)
+                                relay=self.relay, start_in=cwd,
+                                session_id=session_id)
             await self.pool.execute(
                 "INSERT INTO terminals (id, machine_id, owner_id, name, kind) "
                 "VALUES ($1, $2, $3, $4, 'term')",
@@ -1261,6 +1286,16 @@ class Terminals:
             jump_host_keys=list(row["jump_host_keys"] or []),
             via_machine_id=row["via_machine_id"], via_name=row["via_name"],
             ssh_target=row["ssh_target"], own_server=row["own_server"])
+
+    async def machine_of(self, terminal_id: uuid.UUID,
+                         user_id: uuid.UUID) -> SimpleNamespace | None:
+        """The machine of the person's terminal, running or ended: what the
+        check of open keys needs (0.1.28), or None for no such terminal."""
+        row = await self.pool.fetchrow(
+            "SELECT m.id, m.name, m.kind, m.login_method, m.via_machine_id "
+            "FROM terminals t JOIN machines m ON m.id = t.machine_id "
+            "WHERE t.id = $1 AND t.owner_id = $2", terminal_id, user_id)
+        return SimpleNamespace(**dict(row)) if row is not None else None
 
     def get(self, terminal_id: uuid.UUID, user_id: uuid.UUID) -> Terminal | None:
         """The person's terminal: someone else's is as if it were not."""
@@ -1358,11 +1393,12 @@ class Terminals:
         output = await asyncio.to_thread(zlib.decompress, data) if data else b""
         return output, row["output_cut"]
 
-    async def history(self, terminal_id: uuid.UUID,
-                      user_id: uuid.UUID) -> list[dict] | None:
+    async def history(self, terminal_id: uuid.UUID, user_id: uuid.UUID,
+                      hidden: list[uuid.UUID] | None = None) -> list[dict] | None:
         """The commands for the input line's history, newest first: those
         run on this terminal's machine, then the rest of its project's;
-        only the person's own."""
+        only the person's own. None of the `hidden` machines' (0.1.28: the
+        ones closed to the device asking)."""
         owned = await self._owned(terminal_id, user_id)
         if owned is None:
             return None
@@ -1375,11 +1411,12 @@ class Terminals:
             WHERE t.owner_id = $1 AND m.project_id = $3
               AND b.command IS NOT NULL AND b.command <> ''
               AND b.expires_at > now()
+              AND NOT (m.id = ANY($5::uuid[]))
             GROUP BY b.command
             ORDER BY bool_or(t.machine_id = $2) DESC, max(b.started_at) DESC
             LIMIT $4
             """, user_id, owned["machine_id"], owned["project_id"],
-            HISTORY_MAX)
+            HISTORY_MAX, list(hidden or []))
         return [{"command": r["command"], "here": r["here"]} for r in rows]
 
     async def rename(self, terminal_id: uuid.UUID, user_id: uuid.UUID,

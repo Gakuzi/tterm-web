@@ -884,6 +884,9 @@ async def test_each_person_sees_only_their_own(h):
             assert core.terminals.live(anna_id) == []
             assert await core.terminals.ended(ended, anna_id) is None
             async with page_socket(core.page_port, cookie=anna) as ws:
+                # A socket's first word is the vault's challenge (0.1.28).
+                first = json.loads(await asyncio.wait_for(ws.recv(), 5))
+                assert first["op"] == "vault.challenge", first
                 for terminal in (mine.id, ended):
                     await ws.send(json.dumps({"op": "attach", "ch": 1,
                                               "id": str(terminal)}))

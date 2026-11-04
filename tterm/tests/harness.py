@@ -423,6 +423,17 @@ def page_socket(port: int, *, cookie: str | None = None, **options):
         additional_headers={"cookie": cookie} if cookie else None, **options)
 
 
+async def session_id_of(core, cookie: str | None = None):
+    """The session a cookie carries (the owner's, unless given), as its
+    requests and sockets go: a terminal opened the way the page opens it
+    names it, since only that session's sockets sign its login (0.1.28)."""
+    cookie = SESSIONS[core.page_port] if cookie is None else cookie
+    token = cookie.split("=", 1)[1]
+    found = await auth.session(core.pool, token, touch=False)
+    assert found is not None, "no such session"
+    return found.id
+
+
 async def sign_in_as(core, email: str, name: str | None = None) -> str:
     """A session for the account of `email`, made as signing up would make
     it: the cookie that carries it. The name, unless given, from the

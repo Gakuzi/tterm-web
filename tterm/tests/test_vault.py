@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import datetime as dt
 import hashlib
 import json
@@ -29,7 +30,8 @@ from asyncssh.packet import SSHPacket
 
 from ..core import db, reach, ssh, vault
 from ..core.machines import remember_cas
-from .harness import page_socket, request, shell_server, sign_in_as, ssh_server
+from .harness import (page_socket, request, session_id_of, shell_server,
+                      sign_in_as, ssh_server)
 from .test_auth import CHROME_MAC, Browser, sign_in
 from .test_terminals import _ca_public, _home, _login_shell, _until
 
@@ -255,11 +257,18 @@ async def test_keys_are_checked_against_their_public_half(h):
     async with h.core() as core:
         await request(core.page_port, "POST", "/api/vault", headers=CHANGE,
                       body=json.dumps(_create_body()).encode())
-        body, _ = _key_body()
+        body, priv = _key_body()
         r = await request(core.page_port, "POST", "/api/vault/keys",
                           headers=CHANGE, body=json.dumps(body).encode())
         assert r.status == 201, r.text
         assert len(r.json()["vault"]["keys"]) == 1
+        # With a key in it, the vault changes only where the keys are open
+        # (0.1.28): proved by that key.
+        r = await request(core.page_port, "POST", "/api/vault/keys",
+                          headers=CHANGE,
+                          body=json.dumps(_key_body()[0]).encode())
+        assert r.status == 423 and r.json()["locked"] is True, r.text
+        proving = await _proving(core, priv=priv)
         # The same key again: refused.
         again = dict(body, id=str(uuid.uuid4()))
         r = await request(core.page_port, "POST", "/api/vault/keys",
@@ -288,6 +297,7 @@ async def test_keys_are_checked_against_their_public_half(h):
         assert r.status == 204, r.text
         assert (await request(core.page_port, "GET", "/api/vault")).json()[
             "vault"]["keys"] == []
+        await proving.close()
 
 
 async def test_recovery_can_be_made_anew(h):
@@ -556,6 +566,82 @@ def _raw_sign(priv: asyncssh.SSHKey, alg: str, data: bytes) -> str:
     return b64u(packet.get_string())    # the raw signature
 
 
+def _fingerprint(priv: asyncssh.SSHKey) -> str:
+    return asyncssh.import_public_key(
+        priv.export_public_key().decode()).get_fingerprint()
+
+
+async def _heard_one(ws, ops: tuple[str, ...], wait: float = 5.0) -> dict | None:
+    """The first message of any of `ops` the socket gets within `wait`."""
+    try:
+        async with asyncio.timeout(wait):
+            while True:
+                frame = await ws.recv()
+                if isinstance(frame, str) and json.loads(frame).get("op") in ops:
+                    return json.loads(frame)
+    except TimeoutError:
+        return None
+
+
+async def _challenge(ws) -> str:
+    """The nonce a page socket gets first of all (0.1.28)."""
+    msg = await _heard(ws, "vault.challenge")
+    assert msg is not None, "no vault.challenge"
+    return msg["nonce"]
+
+
+def _proof(priv: asyncssh.SSHKey, nonce: str, alg: str = "ssh-ed25519") -> dict:
+    """vault.prove by a key, as a device sends it: the raw signature over
+    the proof blob of its socket's nonce."""
+    return {"op": "vault.prove", "key": _fingerprint(priv), "alg": alg,
+            "sig": _raw_sign(priv, alg, vault.proof_blob(nonce))}
+
+
+async def _prove(ws, *, priv: asyncssh.SSHKey | None = None,
+                 auth: str | None = None) -> dict | None:
+    """Proves the keys open on this socket, by a key or by the password's
+    proof: the core's answer (vault.proven or vault.unproven). A key signs
+    the socket's nonce, so its challenge must not have been read yet; the
+    password needs none."""
+    if priv is not None:
+        msg = _proof(priv, await _challenge(ws))
+    else:
+        msg = {"op": "vault.prove", "auth": auth}
+    await ws.send(json.dumps(msg))
+    return await _heard_one(ws, ("vault.proven", "vault.unproven"))
+
+
+async def _proving(core, *, priv: asyncssh.SSHKey | None = None,
+                   auth: str | None = None, cookie: str | None = None):
+    """A page socket of the owner's (or of `cookie`) that proved the keys
+    open, by `priv` or the password's `auth`: while it is open, the
+    session's requests count as made with them open. Close it when done."""
+    ws = await page_socket(core.page_port, cookie=cookie)
+    answer = await _prove(ws, priv=priv, auth=auth)
+    assert answer == {"op": "vault.proven"}, answer
+    return ws
+
+
+@contextlib.asynccontextmanager
+async def _proven(core, **how):
+    ws = await _proving(core, **how)
+    try:
+        yield ws
+    finally:
+        await ws.close()
+
+
+async def _key_into(core, user_id, priv: asyncssh.SSHKey) -> uuid.UUID:
+    """`priv`'s public half as a key of the person's vault, made already."""
+    public = priv.export_public_key().decode().strip()
+    return await core.pool.fetchval(
+        "INSERT INTO vault_keys (id, vault_id, name, type, public_key, "
+        "fingerprint, sealed, source) SELECT $1, v.id, 'id_ed25519', "
+        "'ssh-ed25519', $3, $4, $5, 'mac' FROM vaults v WHERE v.user_id = $2 "
+        "RETURNING id", uuid.uuid4(), user_id, public, _fingerprint(priv),
+        b"sealed")
+
+
 class FakePage:
     """A page socket of the owner's that answers vault.sign by signing with a
     private key (standing in for the device). `policy`: 'sign', 'unable', or
@@ -617,7 +703,9 @@ async def test_a_key_server_signs_in_over_the_relay(h):
                 page = FakePage(ws, priv)
                 await page.can([fp])
                 await asyncio.sleep(0.1)
-                t = await core.terminals.open(core.owner, machine_id, 80, 24)
+                t = await core.terminals.open(
+                    core.owner, machine_id, 80, 24,
+                    session_id=await session_id_of(core))
                 await _until(lambda: t.state in ("open", "ended"),
                              what="the key login")
                 assert t.state == "open", t.reason
@@ -661,7 +749,9 @@ async def test_a_key_server_waits_for_a_socket(h):
             # than a dial may take (0.1.19: the wait ran into the SSH
             # connection's timeout, and the terminal ended).
             ssh.CONNECT_TIMEOUT = 1
-            t = await core.terminals.open(core.owner, machine_id, 80, 24)
+            t = await core.terminals.open(
+                core.owner, machine_id, 80, 24,
+                session_id=await session_id_of(core))
             await _until(lambda: t.vault_wait is not None, what="the wait")
             assert t.vault_wait["key"] == fp and t.state == "connecting"
             assert t.describe()["vault"]["keyName"] == "id_ed25519"
@@ -706,7 +796,9 @@ async def test_unable_is_passed_over_and_a_wrong_signature_is_refused(h):
                 await unable.can([fp])
                 await signer.can([fp])
                 await asyncio.sleep(0.1)
-                t = await core.terminals.open(core.owner, machine_id, 80, 24)
+                t = await core.terminals.open(
+                    core.owner, machine_id, 80, 24,
+                    session_id=await session_id_of(core))
                 await _until(lambda: t.state in ("open", "ended"),
                              what="the login past unable")
                 assert t.state == "open", t.reason
@@ -717,7 +809,9 @@ async def test_unable_is_passed_over_and_a_wrong_signature_is_refused(h):
                 wrong = FakePage(c, priv, policy="wrong")
                 await wrong.can([fp])
                 await asyncio.sleep(0.1)
-                t = await core.terminals.open(core.owner, machine_id, 80, 24)
+                t = await core.terminals.open(
+                    core.owner, machine_id, 80, 24,
+                    session_id=await session_id_of(core))
                 await _until(lambda: t.state == "ended", what="the refusal")
                 assert "did not accept" in (t.reason or "") \
                     or "certificate" in (t.reason or "") \
@@ -784,7 +878,9 @@ async def test_a_key_server_opens_behind_a_bastion(h):
                 page = FakePage(ws, priv)
                 await page.can([fp])
                 await asyncio.sleep(0.1)
-                t = await core.terminals.open(core.owner, machine_id, 80, 24)
+                t = await core.terminals.open(
+                    core.owner, machine_id, 80, 24,
+                    session_id=await session_id_of(core))
                 await _until(lambda: t.state in ("open", "ended"),
                              what="the login through the bastion")
                 assert t.state == "open", t.reason
@@ -865,13 +961,16 @@ async def test_add_an_own_key_server(h):
         state = (await request(core.page_port, "GET", "/api/state")).json()
         project = state["projects"][0]["id"]
         host_key = asyncssh.generate_private_key("ssh-ed25519")
-        r = await request(core.page_port, "POST", "/api/machines/own",
-                          headers=CHANGE, body=json.dumps({
-                              "project": project, "name": "box", "method": "key",
-                              "keyId": key_id, "host": "server.example.com",
-                              "port": 22, "login": "deploy", "hostKeys": [
-                                  host_key.export_public_key().decode().strip()]
-                          }).encode())
+        # The vault holds a key now: from a device with it open (0.1.28).
+        async with _proven(core, priv=priv):
+            r = await request(core.page_port, "POST", "/api/machines/own",
+                              headers=CHANGE, body=json.dumps({
+                                  "project": project, "name": "box",
+                                  "method": "key", "keyId": key_id,
+                                  "host": "server.example.com", "port": 22,
+                                  "login": "deploy", "hostKeys": [
+                                      host_key.export_public_key().decode()
+                                      .strip()]}).encode())
         assert r.status == 201, r.text
         assert r.json()["machine"]["method"] == "key"
         row = await core.pool.fetchrow(
@@ -1150,8 +1249,9 @@ async def test_what_is_removed_from_the_vault_is_wiped(h):
             "own_server) VALUES ($1, 'server', 'box', '203.0.113.9', 22, 'root', "
             "'{}', $2, 'key', $3, true, true) RETURNING id",
             uuid.UUID(project), core.owner.id, uuid.UUID(key_id))
-        r = await request(core.page_port, "DELETE", f"/api/vault/keys/{key_id}",
-                          headers=CHANGE)
+        async with _proven(core, priv=_priv):
+            r = await request(core.page_port, "DELETE",
+                              f"/api/vault/keys/{key_id}", headers=CHANGE)
         assert r.status == 204, r.text
         row = await core.pool.fetchrow(
             "SELECT sealed, removed_at, fingerprint FROM vault_keys WHERE id = $1",
@@ -1529,11 +1629,13 @@ async def test_a_password_is_checked_before_it_is_kept(h):
                                            "password": _pw(kdf=edges)}).encode())
         assert r.status == 201, r.text
         assert r.json()["vault"]["password"]["kdf"] == edges
-        # Setting one is checked the same way.
-        for password in bad:
-            r = await request(core.page_port, "PUT", "/api/vault/password",
-                              headers=CHANGE, body=json.dumps(password).encode())
-            assert r.status == 422 and r.json()["error"], (password, r.text)
+        # Setting one is checked the same way (where the keys are open).
+        async with _proven(core, auth=_pw()["auth"]):
+            for password in bad:
+                r = await request(core.page_port, "PUT", "/api/vault/password",
+                                  headers=CHANGE,
+                                  body=json.dumps(password).encode())
+                assert r.status == 422 and r.json()["error"], (password, r.text)
         v = (await request(core.page_port, "GET", "/api/vault")).json()["vault"]
         assert v["password"]["kdf"] == edges, v["password"]
         assert await _details(core, "vault.password.changed") == []
@@ -1683,8 +1785,17 @@ async def test_thirty_wrong_passwords_a_day_and_a_right_one_does_not_clear_them(
                                 "WHERE user_id = $1", owner)
         assert (await _open(core, v["auth"])).status == 429
         new = _pw_made_up()
-        r = await request(core.page_port, "PUT", "/api/vault/password",
-                          headers=CHANGE, body=json.dumps(new).encode())
+        # Paused, the password proves nothing; a key does (0.1.28), as on a
+        # Mac with Touch ID.
+        ws = await page_socket(core.page_port)
+        answer = await _prove(ws, auth=v["auth"])
+        assert answer["op"] == "vault.unproven" and answer["retryAt"], answer
+        await ws.close()
+        priv = asyncssh.generate_private_key("ssh-ed25519")
+        await _key_into(core, owner, priv)
+        async with _proven(core, priv=priv):
+            r = await request(core.page_port, "PUT", "/api/vault/password",
+                              headers=CHANGE, body=json.dumps(new).encode())
         assert r.status == 200, r.text
         counts = await core.pool.fetchrow(
             "SELECT password_wrong, password_wrong_at, password_wrong_day, "
@@ -1845,6 +1956,11 @@ async def test_a_password_replaces_the_recovery_code(h):
         assert bytes(row["password_check"]) == b64u_dec(v["check"])
         assert await _details(core, "vault.password.set") == [
             {"recovery": True, "device": "Chrome on macOS"}]
+        # From now on it changes only where the keys are open (0.1.28).
+        r = await request(core.page_port, "PUT", "/api/vault/password",
+                          headers=CHANGE, body=json.dumps(_pw_made_up()).encode())
+        assert r.status == 423 and r.json()["locked"] is True, r.text
+        proving = await _proving(core, auth=v["auth"])
         # No new recovery code for it now.
         r = await request(core.page_port, "PUT", "/api/vault/recovery",
                           headers=CHANGE, body=json.dumps(
@@ -1874,16 +1990,19 @@ async def test_a_password_replaces_the_recovery_code(h):
         assert r.status == 403 and r.json()["left"] == 9, r.text
         r = await _open(core, new["auth"])
         assert r.status == 200 and r.json() == {"wrap": new["wrap"]}, r.text
+        await proving.close()
 
 
 async def test_the_last_lock_stays_with_a_password_too(h):
     """Change 6 stands in 0.1.26: the vault's last lock is never taken off,
     with a password or without; with another lock beside it, either one
-    may go, and then the other stays."""
+    may go, and then the other stays. A lock goes only from a device with
+    the keys open, once they guard something (0.1.28)."""
     async with h.core() as core:
         r = await request(core.page_port, "POST", "/api/vault", headers=CHANGE,
                           body=json.dumps(_pw_body(_lock())).encode())
         assert r.status == 201, r.text
+        proving = await _proving(core, auth=_pw()["auth"])
         last = r.json()["vault"]["locks"][0]["id"]
         r = await request(core.page_port, "DELETE", f"/api/vault/locks/{last}",
                           headers=CHANGE)
@@ -1916,15 +2035,18 @@ async def test_the_last_lock_stays_with_a_password_too(h):
         r = await request(core.page_port, "DELETE", f"/api/vault/locks/{hers}",
                           headers=as_anna)
         assert r.status == 422 and r.json() == {"error": LAST_LOCK}, r.text
+        password = _pw_made_up()
         r = await request(core.page_port, "PUT", "/api/vault/password",
-                          headers=as_anna, body=json.dumps(_pw_made_up()).encode())
+                          headers=as_anna, body=json.dumps(password).encode())
         assert r.status == 200, r.text
-        r = await request(core.page_port, "DELETE", f"/api/vault/locks/{hers}",
-                          headers=as_anna)
+        async with _proven(core, auth=password["auth"], cookie=anna):
+            r = await request(core.page_port, "DELETE",
+                              f"/api/vault/locks/{hers}", headers=as_anna)
         assert r.status == 422 and r.json() == {"error": LAST_LOCK}, r.text
         v = (await request(core.page_port, "GET", "/api/vault",
                            headers={"cookie": anna})).json()["vault"]
         assert [lk["id"] for lk in v["locks"]] == [hers], v["locks"]
+        await proving.close()
 
 
 async def test_two_locks_taken_off_at_once_leave_the_last(h):
@@ -1936,6 +2058,7 @@ async def test_two_locks_taken_off_at_once_leave_the_last(h):
         r = await request(core.page_port, "POST", "/api/vault", headers=CHANGE,
                           body=json.dumps(_pw_body(_lock())).encode())
         assert r.status == 201, r.text
+        proving = await _proving(core, auth=_pw()["auth"])
         r = await request(core.page_port, "POST", "/api/vault/locks",
                           headers=CHANGE, body=json.dumps(_lock("passkey")).encode())
         assert r.status == 201, r.text
@@ -1957,6 +2080,7 @@ async def test_two_locks_taken_off_at_once_leave_the_last(h):
             [a.text for a in answers]
         v = (await request(core.page_port, "GET", "/api/vault")).json()["vault"]
         assert len(v["locks"]) == 1, v["locks"]
+        await proving.close()
 
 
 async def test_nobody_else_opens_sets_or_reads_a_vault_password(h):
@@ -1988,14 +2112,22 @@ async def test_nobody_else_opens_sets_or_reads_a_vault_password(h):
         assert r.status == 404, r.text
         # Her own vault, with her own password: the owner's proof is a wrong
         # one there, counted on hers.
+        hers = _pw_made_up()
         r = await request(core.page_port, "POST", "/api/vault", headers=as_anna,
                           body=json.dumps({"id": str(uuid.uuid4()),
-                                           "password": _pw_made_up()}).encode())
+                                           "password": hers}).encode())
         assert r.status == 201, r.text
         r = await _open(core, v["auth"], cookie=anna)
         assert r.status == 403 and r.json()["left"] == 9, r.text
-        r = await request(core.page_port, "PUT", "/api/vault/password",
-                          headers=as_anna, body=json.dumps(_pw_made_up()).encode())
+        # The owner's password proves nothing on her socket either.
+        ws = await page_socket(core.page_port, cookie=anna)
+        answer = await _prove(ws, auth=v["auth"])
+        assert answer["op"] == "vault.unproven" and answer["left"] == 8, answer
+        await ws.close()
+        async with _proven(core, auth=hers["auth"], cookie=anna):
+            r = await request(core.page_port, "PUT", "/api/vault/password",
+                              headers=as_anna,
+                              body=json.dumps(_pw_made_up()).encode())
         assert r.status == 200, r.text
         # The owner's is as it was.
         assert await _wrong_count(core, core.owner.id) == 0
@@ -2025,7 +2157,11 @@ async def test_the_persons_pages_hear_that_the_password_changed(h):
             assert r.status == 200, r.text
             assert await _heard(mine, "vault.changed") == {"op": "vault.changed"}
             assert await _heard(hers, "vault.changed", wait=0.5) is None
-            # A change again; and opening it is no change.
+            # A change again, where the keys are open (0.1.28); and opening
+            # it is no change.
+            await mine.send(json.dumps({"op": "vault.prove",
+                                        "auth": _pw()["auth"]}))
+            assert await _heard(mine, "vault.proven") == {"op": "vault.proven"}
             r = await request(core.page_port, "PUT", "/api/vault/password",
                               headers=CHANGE,
                               body=json.dumps(_pw_made_up()).encode())
@@ -2064,7 +2200,7 @@ async def test_the_password_migration_keeps_a_vault_of_before(h):
             "recovery_wrap) VALUES ($1, $2, $3, $4, $5) RETURNING id",
             uuid.uuid4(), uid, b"p" * 32, b"s" * 16, b"r" * 60)
         applied = await db.migrate(pool)
-        assert applied == ["020_vault_password"], applied
+        assert applied == ["020_vault_password", "021_keys_here"], applied
         row = await pool.fetchrow("SELECT * FROM vaults WHERE id = $1", vid)
         assert bytes(row["recovery_wrap"]) == b"r" * 60 and row["recovery_at"]
         assert row["password_salt"] is None and row["password_wrong"] == 0

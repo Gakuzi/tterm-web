@@ -34,6 +34,8 @@ export interface ViewEvents {
   marker: (event: MarkerEvent) => void;
   state: (terminal: TerminalInfo) => void;
   gone: (terminal: TerminalInfo | null) => void;
+  /** The core said its machine is closed on this device (0.1.28). */
+  locked?: () => void;
 }
 
 interface Props {
@@ -178,6 +180,7 @@ export function ClassicTerminal(props: Props) {
           stop();
           events.current.gone(terminal);
         },
+        locked: () => events.current.locked?.(),
         // A command of it redacted in the log (0.1.20): the screen is drawn
         // again from what the core kept, which no longer has it. A redaction
         // in a replay from a clean screen is old news, that screen has it

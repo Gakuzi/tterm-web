@@ -18,7 +18,8 @@ import {
 } from "../src/vault/crypto.ts";
 import { passwordRule } from "../src/vault/password.ts";
 import { fingerprint, publicLine, shortFingerprint } from "../src/vault/ssh.ts";
-import { signerOf } from "../src/vault/sign.ts";
+import { PROOF_ALG, proofBlob } from "../src/vault/proof.ts";
+import { isUserauth, signerOf } from "../src/vault/sign.ts";
 
 const V = JSON.parse(readFileSync(new URL("./vault-vectors.json", import.meta.url), "utf8"));
 const vk = fromB64u(V.vk);
@@ -141,6 +142,22 @@ test("signing: the raw Ed25519 signature of the vector", async () => {
   const sig = await signer.sign("ssh-ed25519", u(S.data));
   assert.equal(b64u(sig), S.raw_sig);
   assert.equal(fromUtf8(u(S.data)), "session-id-and-userauth-request");
+});
+
+test("the proof of open keys: the vector's SSHSIG blob and its signature (0.1.28)", async () => {
+  const P = V.proof;
+  const blob = await proofBlob(P.nonce);
+  assert.equal(b64u(blob), P.blob);
+  assert.equal(fromUtf8(blob.subarray(0, 6)), "SSHSIG");
+  const plain = JSON.parse(V.key.plaintext);
+  assert.equal(PROOF_ALG[plain.type as keyof typeof PROOF_ALG], P.alg);
+  const signer = await signerOf(plain);
+  assert.equal(b64u(await signer.sign(P.alg, blob)), P.raw_sig);
+  assert.equal(await fingerprint(plain.type, plain.jwk), P.key);
+  // Another nonce, another blob: a proof is for its own socket.
+  assert.notEqual(b64u(await proofBlob(P.nonce.slice(1))), P.blob);
+  // A login's data is not the proof's, nor the other way round.
+  assert.equal(isUserauth(blob, "ssh-ed25519", signer.blob), false);
 });
 
 test("base64url is strict, as the core reads it", () => {

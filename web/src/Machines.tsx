@@ -4,17 +4,22 @@
 // running on it. A computer is online only while its agent runs. The owner
 // and admins can remove a machine here (from 0.0.8). In the app before
 // signing in (0.1.4) there is only the computer it runs on: nothing to
-// remove, and Add a machine says what signing in brings (0.1.5).
+// remove, and Add a machine says what signing in brings (0.1.5). From
+// 0.1.28 (the canvas, version 109) a machine closed on this device says so,
+// its button has the lock (the keys first, then the terminal) and its
+// terminals are dimmed, each with a lock, as in the sidebar.
 
 import type { Machine, Passport, Project, Role, TerminalInfo } from "./api";
 import { colorClass } from "./colors";
 import { useT, type Translate } from "./i18n";
-import { Computer, Plus, Server, TerminalIcon, Trash } from "./icons";
+import { Computer, Lock, Plus, Server, TerminalIcon, Trash } from "./icons";
 import { lastSeen } from "./time";
 
 interface Props {
   projects: Project[];
   terminals: TerminalInfo[];
+  /** A machine closed on this device (0.1.28, keysHere.ts). */
+  closed: (machine: Machine) => boolean;
   onAdd: (projectId: string) => void;
   onOpenTerminal: (machineId: string) => void;
   onGoTo: (terminalId: string) => void;
@@ -71,12 +76,14 @@ function facts(p: Passport, t: Translate): [string, string][] {
   return rows.filter((row): row is [string, string] => row[1] !== null);
 }
 
-function MachineCard({ machine, code, terminals, manage, onOpenTerminal, onGoTo,
+function MachineCard({ machine, code, terminals, manage, shut, onOpenTerminal, onGoTo,
   onRemove }: {
   machine: Machine;
   code: string;
   terminals: TerminalInfo[];
   manage: boolean;
+  /** Closed on this device (0.1.28). */
+  shut: boolean;
   onOpenTerminal: (machineId: string) => void;
   onGoTo: (terminalId: string) => void;
   onRemove: (machine: Machine) => void;
@@ -85,6 +92,8 @@ function MachineCard({ machine, code, terminals, manage, onOpenTerminal, onGoTo,
   const passport = machine.passport ?? {};
   const computer = machine.kind === "computer";
   const offline = computer && !machine.online;
+  const lockTitle = computer ? t("sidebar.keys_closed_mac")
+    : t("sidebar.keys_closed_new", { name: machine.name });
   return (
     <article className="machine-card" aria-label={machine.name}>
       <div className="machine-top">
@@ -101,6 +110,12 @@ function MachineCard({ machine, code, terminals, manage, onOpenTerminal, onGoTo,
                 {offline ? (machine.lastSeen
                   ? t("machines.offline_seen", { seen: lastSeen(machine.lastSeen, t) })
                   : t("machines.offline")) : t("machines.online")}
+              </span>
+            )}
+            {shut && (
+              <span className="machine-closed">
+                <Lock size={12} />
+                {t("machines.closed")}
               </span>
             )}
             {[machine.os, machine.host].filter(Boolean).join(" · ")}
@@ -123,18 +138,28 @@ function MachineCard({ machine, code, terminals, manage, onOpenTerminal, onGoTo,
       </dl>
       <div className="button-row">
         <button type="button" className="button-accent" disabled={offline}
-          title={offline ? t("machines.offline_title") : undefined}
+          title={offline ? t("machines.offline_title") : shut ? lockTitle : undefined}
           onClick={() => onOpenTerminal(machine.id)}>
+          {shut && <Lock size={14} />}
           {t("machines.open_terminal")}
         </button>
-        {terminals.map((term) => (
+        {terminals.map((term) => (shut ? (
+          // Its card in its tab: the keys, then the terminal from where it is.
+          <button key={term.id} type="button" className="button-plain running closed"
+            title={t("sidebar.closed_title")}
+            aria-label={t("sidebar.closed_terminal", { label: term.label, machine: machine.name })}
+            onClick={() => onGoTo(term.id)}>
+            <Lock size={14} className="closed-lock" />
+            <span className="running-name">{term.label}</span>
+          </button>
+        ) : (
           <button key={term.id} type="button" className="button-plain running"
             title={t("machines.back_to", { label: term.label })}
             onClick={() => onGoTo(term.id)}>
             <TerminalIcon size={14} />
             {term.label}
           </button>
-        ))}
+        )))}
         {manage && (
           <button type="button" className="button-plain quiet push-right"
             title={t("machines.remove_title", { machine: machine.name })}
@@ -149,7 +174,7 @@ function MachineCard({ machine, code, terminals, manage, onOpenTerminal, onGoTo,
 }
 
 export function Machines(props: Props) {
-  const { projects, terminals, onAdd, onOpenTerminal, onGoTo, onRemove, local } = props;
+  const { projects, terminals, closed, onAdd, onOpenTerminal, onGoTo, onRemove, local } = props;
   const t = useT();
   const withMachines = projects.filter((p) => p.machines.length > 0);
   const first = projects.find((p) => p.role === "owner") ?? projects[0];
@@ -179,7 +204,7 @@ export function Machines(props: Props) {
             {project.machines.map((machine) => (
               <MachineCard key={machine.id} machine={machine}
                 code={project.code} onOpenTerminal={onOpenTerminal}
-                onGoTo={onGoTo} onRemove={onRemove}
+                onGoTo={onGoTo} onRemove={onRemove} shut={closed(machine)}
                 manage={canManage(project.role) && !local}
                 terminals={terminals.filter((term) => term.machineId === machine.id)} />
             ))}

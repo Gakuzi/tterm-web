@@ -127,6 +127,11 @@ sidebar.with_key = Kasandaki anahtarınla açılır
 # name, and its tip ({mac} is the Mac's name).
 sidebar.via_mac = Mac üzerinden
 sidebar.via_title = {mac} üzerinden, açık olduğu sürece
+sidebar.keys_closed_new = Anahtarlar bu cihazda açık değil. Onları aç ve {name} üzerinde yeni bir terminal aç
+sidebar.keys_closed = Anahtarlar bu cihazda açık değil. Aç
+sidebar.keys_closed_mac = Tarayıcıdan Mac'inde terminal: yalnızca anahtarların açık olduğu yerde. Aç
+sidebar.closed_terminal = {machine} üzerinde {label}: bu cihazda kapalı. Anahtarları aç
+sidebar.closed_title = Bu cihazda kapalı: anahtarları aç
 
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
@@ -403,6 +408,7 @@ app.remove.confirm = {name} makinesini kaldır
 app.remove.text = tTerm Web'den kaybolur ve terminalleri sonlanır. Orada yazılan komutlar geçmişte kalır.
 app.remove.computer = Bilgisayardaki ajan, makinenin kaldırıldığını öğrenir ve durur. Bilgisayarı yeniden bağlamak için: Makine ekle, ardından Bilgisayar.
 app.remove.server = tTerm Web ona giriş yapmayı bırakır ve erişimini sunucunun kendisinde geri alır. Sunucu yanıt vermezse bunun için gereken komut ardından gösterilir.
+app.remove.closed = {name} bu cihazda kapalı: yalnızca anahtarların açık olduğu yerde kaldırılabilir. Anahtarları burada aç.
 app.end.title = {label} terminali sonlandırılsın mı?
 app.end.confirm = Terminali sonlandır
 app.end.text = Kabuğu sonlanır ve içinde çalışan her şey durur, tıpkı bir terminal penceresi kapatıldığında olduğu gibi. Çalıştırdığı komutlar sekmesinde ve geçmişte kalır.
@@ -862,6 +868,7 @@ project_dialog.with_others = başkalarıyla
 project_dialog.move_becomes = {project} projesinde {code}/{name} olur. Terminalleri çalışmaya devam eder, makinenin kendisinde hiçbir şey değişmez.
 # The same, when its name is taken there: {machine} is its name now, {name} the one it gets (web-01-2).
 project_dialog.move_becomes_taken = {project} projesinde {code}/{name} olur: {machine} adı orada kullanılıyor. Terminalleri çalışmaya devam eder, makinenin kendisinde hiçbir şey değişmez.
+project_dialog.move_closed = {machine} bu cihazda kapalı: yalnızca anahtarların açık olduğu yerde taşınabilir. Anahtarları burada aç.
 # The button: {project} is the project's name.
 project_dialog.move_to = {project} projesine taşı
 # The button while there is nothing to pick (a verb).
@@ -942,6 +949,7 @@ projectpage.remove_machine = Makineyi kaldır
 # An item of a machine's menu.
 projectpage.move_machine = Başka bir projeye taşı
 projectpage.no_terminals = Açık terminal yok
+projectpage.closed = bu cihazda kapalı
 # Who changed a note last, and when: {ago} is just now, 5 min ago, yesterday, on 12 Oct (time.*).
 projectpage.edited_you = Sen, {ago}
 # The same, someone else: {name} is their first name.
@@ -1036,6 +1044,7 @@ machines.account = Kullanıcı
 machines.offline_seen = çevrimdışı, {seen}
 machines.offline = çevrimdışı
 machines.online = çevrimiçi
+machines.closed = bu cihazda kapalı
 machines.offline_note = Bilgisayar uykuda ya da çevrimdışı, ya da ajanı çalışmıyor. Ajanı bağlanabildiğinde kendiliğinden geri gelir; bu sayfa bunu on saniye içinde fark eder.
 # On Open a terminal while the computer is offline.
 machines.offline_title = Çevrimdışı: uykuda ya da ajanı çalışmıyor
@@ -1415,6 +1424,7 @@ log.today_count = bugün {n}
 # A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
 log.tab = {machine} logu
 log.tab_title = {machine} makinesinin logu
+log.closed_here = {machine} makinesinin logu: bu cihazda kapalı. Anahtarları aç
 log.close_tab = Logu kapat
 # The ⋯ over the page, and its one item.
 log.menu = Log menüsü
@@ -1602,6 +1612,7 @@ classic.several_lines = Bu komut birkaç satırdan oluşuyor ve klasik mod her s
 # ------------------------------------------------------------ tabs: the line of tabs on top (TabBar.tsx)
 # The tabs that are open, for screen readers.
 tabs.label = Açık sekmeler
+tabs.closed_here = bu cihazda kapalı
 # Naming a terminal in its tab, after a double click.
 tabs.rename_title = Bu terminale ad ver
 tabs.rename_hint = Enter kaydeder, Esc iptal eder. Ad kenar çubuğunda, sekmelerde ve proje sayfasında görünür.
@@ -1850,6 +1861,7 @@ app_code.text_lost = Bu Mac artık kasanı kendi başına açamıyor. Onu burada
 # A vault with a password (0.1.26): opened here once with it.
 app_code.text_password = Bu Mac henüz kasanı kendi başına açamıyor. Onu burada bir kez kasa parolanla aç: sonra bu Mac onu Touch ID ile açar.
 app_code.text_lost_password = Bu Mac artık kasanı kendi başına açamıyor. Onu burada bir kez kasa parolanla aç: sonra bu Mac onu yeniden Touch ID ile açar.
+app_code.text_prove = Kasanda henüz hiç anahtar yok, bu yüzden tTerm Web'in anahtarların bu Mac'te açık olduğunu bilmesi için kasa parolasına ihtiyacı var. Bir kez yaz: kasa kilitlenene kadar bu yeter.
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1905,10 +1917,30 @@ vault_locked.no_ed25519 = Bu tarayıcı Ed25519 anahtarlarıyla imza atamaz. {ma
 vault_locked.not_here = Kasan burada açık, ama {key} bu tarayıcıda açılmıyor. Onu Ayarlar › Anahtarlar bölümünde dosyasından yeniden ekle.
 vault_locked.its_key = sunucunun anahtarı
 
+# ------------------------------------------------------------ keys_closed: a tab of a machine closed on this device (KeysClosed.tsx, 0.1.28)
+keys_closed.tab = {machine} · yeni terminal
+keys_closed.tab_title = Anahtarlar bu cihazda açılınca {machine} üzerinde yeni bir terminal
+keys_closed.close_tab = Sekmeyi kapat: yeni terminal açılmaz
+keys_closed.new_key_title = {machine} anahtarınla açılır
+keys_closed.new_key_text = Anahtarlar bu cihazda henüz açık değil. Onları tam burada aç; {machine} üzerinde yeni bir terminal hemen açılır.
+keys_closed.new_via_title = {machine}, {mac} üzerinden açılır
+keys_closed.new_via_text = Terminali Mac'in başlatır. Tarayıcıdan yalnızca anahtarların açık olduğu yerde açılır: e-postana giren biri Mac üzerinden içeri giremesin diye ikinci bir kilit.
+keys_closed.new_mac_title = {mac} üzerinde terminal
+keys_closed.new_mac_text = Tarayıcıdan Mac'indeki bir terminal yalnızca anahtarların açık olduğu yerde açılır: e-postana giren biri Mac'inde terminal açamasın diye ikinci bir kilit.
+keys_closed.log_title = {machine} makinesinin logu bu cihazda kapalı
+keys_closed.log_text = Logda terminaldekiyle aynı komutlar ve aynı çıktı var, bu yüzden o da aynı şekilde kapalı. Anahtarları aç, log açılsın.
+keys_closed.terminal_title = Bu terminal bu cihazda kapalı
+keys_closed.terminal_text = {machine} üzerindeki “{name}” çalışıyor, ama anahtarlar burada açılana kadar burada görünmez. Anahtarları aç, terminal şu an olduğu yerden görünür.
+keys_closed.open_new = Anahtarları ve terminali aç
+keys_closed.proving = Anahtarlar bu cihazda açılıyor…
+keys_closed.refused = {machine} bu cihazda kapalı: anahtarları aç ve yeniden dene.
+keys_closed.foot = Anahtarınla açılan sunucular, Mac'in üzerinden açılan sunucular, Mac'in kendisi ve bunların logları yalnızca anahtarları kendin açtığın yerde görünür: parolayla, Touch ID ile ya da Mac'te onayla. E-postadaki kodla giriş yapmak onları açmaz. Mac'in kendisindeki uygulamada onun terminalleri parolasız açılır.
+
 # ------------------------------------------------------------ vault_problem: what went wrong with the vault (vault/store.ts)
 vault_problem.no_vault = Henüz bir kasan yok.
 vault_problem.exists = Zaten bir kasan var: önce onu aç, sonra anahtarı ekle.
 vault_problem.locked = Önce kasanı aç.
+vault_problem.keys_closed = Kasa yalnızca anahtarlarının açık olduğu yerde değişir. Onları bu cihazda aç ve yeniden dene.
 # The vault password: {n} tries left (shown when 3 or fewer), {time} a
 # time of day, as the page shows times ("14:05").
 vault_problem.password_wrong = Bu parola kasanı açmıyor. Klavye düzenini ve Caps Lock tuşunu kontrol et.

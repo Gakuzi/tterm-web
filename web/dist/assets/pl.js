@@ -127,6 +127,11 @@ sidebar.with_key = Otwiera się twoim kluczem z sejfu
 # name, and its tip ({mac} is the Mac's name).
 sidebar.via_mac = przez Maca
 sidebar.via_title = Przez tTerm na {mac}, gdy jest włączony
+sidebar.keys_closed_new = Klucze nie są otwarte na tym urządzeniu. Otwórz je i nowy terminal na {name}
+sidebar.keys_closed = Klucze nie są otwarte na tym urządzeniu. Otwórz
+sidebar.keys_closed_mac = Terminal na twoim Macu z przeglądarki: tylko tam, gdzie klucze są otwarte. Otwórz
+sidebar.closed_terminal = {label} na {machine}: zamknięty na tym urządzeniu. Otwórz klucze
+sidebar.closed_title = Zamknięte na tym urządzeniu: otwórz klucze
 
 # ------------------------------------------------------------ account_menu: the account at the bottom of the sidebar and its menu
 # "Free" is the plan's name: it stays as it is.
@@ -403,6 +408,7 @@ app.remove.confirm = Usuń {name}
 app.remove.text = Maszyna zniknie z tTerm Web, a jej terminale zostaną zakończone. Wpisane w nich polecenia pozostaną w historii.
 app.remove.computer = Agent na komputerze dowie się o usunięciu i się zatrzyma. Aby ponownie podłączyć komputer, wybierz Dodaj maszynę, a potem Komputer.
 app.remove.server = tTerm Web przestanie się na nim logować i odbierze swój dostęp na samym serwerze. Jeśli serwer nie odpowie, w następnym kroku pojawi się polecenie, które to zrobi.
+app.remove.closed = Maszyna {name} jest zamknięta na tym urządzeniu: usunąć ją można tylko tam, gdzie klucze są otwarte. Otwórz je tutaj.
 app.end.title = Zakończyć {label}?
 app.end.confirm = Zakończ terminal
 app.end.text = Powłoka terminala zostanie zamknięta, a wszystko, co w niej działa, zostanie przerwane, jak po zamknięciu okna terminala. To, co w nim uruchomiono, pozostanie na karcie i w historii.
@@ -862,6 +868,7 @@ project_dialog.with_others = z innymi osobami
 project_dialog.move_becomes = W projekcie {project} będzie to {code}/{name}. Terminale działają dalej, a na samej maszynie nic się nie zmienia.
 # The same, when its name is taken there: {machine} is its name now, {name} the one it gets (web-01-2).
 project_dialog.move_becomes_taken = W projekcie {project} będzie to {code}/{name}, bo nazwa {machine} jest tam zajęta. Terminale działają dalej, a na samej maszynie nic się nie zmienia.
+project_dialog.move_closed = Maszyna {machine} jest zamknięta na tym urządzeniu: przenieść ją można tylko tam, gdzie klucze są otwarte. Otwórz je tutaj.
 # The button: {project} is the project's name.
 project_dialog.move_to = Przenieś do projektu {project}
 # The button while there is nothing to pick (a verb).
@@ -942,6 +949,7 @@ projectpage.remove_machine = Usuń maszynę
 # An item of a machine's menu.
 projectpage.move_machine = Przenieś do innego projektu
 projectpage.no_terminals = Brak otwartych terminali
+projectpage.closed = zamknięty na tym urządzeniu
 # Who changed a note last, and when: {ago} is just now, 5 min ago, yesterday, on 12 Oct (time.*).
 projectpage.edited_you = Ty, {ago}
 # The same, someone else: {name} is their first name.
@@ -1036,6 +1044,7 @@ machines.account = Konto
 machines.offline_seen = offline, {seen}
 machines.offline = offline
 machines.online = online
+machines.closed = zamknięta na tym urządzeniu
 machines.offline_note = Komputer śpi, jest offline albo jego agent nie działa. Wróci sam, gdy agent będzie mógł się połączyć; ta strona zauważy to w ciągu dziesięciu sekund.
 # On Open a terminal while the computer is offline.
 machines.offline_title = Jest offline: śpi albo agent nie działa
@@ -1415,6 +1424,7 @@ log.today_count = {n} dzisiaj
 # A log's tab, after the project's code: P/web-01 log. {machine} is the machine's name.
 log.tab = {machine}: log
 log.tab_title = Log maszyny {machine}
+log.closed_here = Log maszyny {machine}: zamknięty na tym urządzeniu. Otwórz klucze
 log.close_tab = Zamknij log
 # The ⋯ over the page, and its one item.
 log.menu = Menu logu
@@ -1602,6 +1612,7 @@ classic.several_lines = To polecenie ma kilka wierszy, a tryb klasyczny wykonywa
 # ------------------------------------------------------------ tabs: the line of tabs on top (TabBar.tsx)
 # The tabs that are open, for screen readers.
 tabs.label = Otwarte karty
+tabs.closed_here = zamknięte na tym urządzeniu
 # Naming a terminal in its tab, after a double click.
 tabs.rename_title = Nazwij ten terminal
 tabs.rename_hint = Enter zapisuje, Esc anuluje. Nazwa jest widoczna w panelu bocznym, na kartach i na stronie projektu.
@@ -1850,6 +1861,7 @@ app_code.text_lost = Ten Mac stracił dostęp do twojego sejfu. Otwórz go tu ra
 # A vault with a password (0.1.26): opened here once with it.
 app_code.text_password = Ten Mac nie ma jeszcze dostępu do twojego sejfu. Otwórz go tu raz hasłem do sejfu: potem ten Mac będzie go otwierać za pomocą Touch ID.
 app_code.text_lost_password = Ten Mac stracił dostęp do twojego sejfu. Otwórz go tu raz hasłem do sejfu: potem ten Mac odzyska dostęp, a Touch ID znów będzie go otwierać.
+app_code.text_prove = W twoim sejfie nie ma jeszcze żadnego klucza, więc tTerm Web potrzebuje hasła do sejfu, żeby wiedzieć, że klucze są otwarte na tym Macu. Wpisz je raz: wystarczy, dopóki sejf się nie zamknie.
 
 # ------------------------------------------------------------ passphrase: a key's passphrase, in tTerm for Mac (VaultDialogs.tsx)
 # {key} is the key's name: id_ed25519.
@@ -1905,10 +1917,30 @@ vault_locked.no_ed25519 = Ta przeglądarka nie może podpisywać kluczami Ed2551
 vault_locked.not_here = Twój sejf jest tu otwarty, ale {key} nie otwiera się w tej przeglądarce. Dodaj go ponownie z jego pliku w Ustawieniach › Klucze.
 vault_locked.its_key = jego klucz
 
+# ------------------------------------------------------------ keys_closed: a tab of a machine closed on this device (KeysClosed.tsx, 0.1.28)
+keys_closed.tab = {machine} · nowy terminal
+keys_closed.tab_title = Nowy terminal na {machine}, gdy klucze zostaną otwarte na tym urządzeniu
+keys_closed.close_tab = Zamknij kartę: bez nowego terminala
+keys_closed.new_key_title = {machine} otwiera się twoim kluczem
+keys_closed.new_key_text = Na tym urządzeniu klucze nie są jeszcze otwarte. Otwórz je tutaj, a od razu otworzy się nowy terminal na {machine}.
+keys_closed.new_via_title = {machine} otwiera się przez {mac}
+keys_closed.new_via_text = Terminal uruchamia twój Mac. Z przeglądarki otwiera się tylko tam, gdzie klucze są otwarte: to drugi zamek, żeby nikt, kto dostał się do twojej poczty, nie wszedł przez Maca.
+keys_closed.new_mac_title = Terminal na {mac}
+keys_closed.new_mac_text = Z przeglądarki terminal na twoim Macu otwiera się tylko tam, gdzie klucze są otwarte: to drugi zamek, żeby nikt, kto dostał się do twojej poczty, nie otworzył terminala na twoim Macu.
+keys_closed.log_title = Log maszyny {machine} jest zamknięty na tym urządzeniu
+keys_closed.log_text = W logu są te same polecenia i te same wyniki co w terminalu, więc jest zamknięty tak samo. Otwórz klucze, a log się otworzy.
+keys_closed.terminal_title = Ten terminal jest zamknięty na tym urządzeniu
+keys_closed.terminal_text = „{name}” na {machine} działa, ale nie widać go tutaj, dopóki klucze nie są tu otwarte. Otwórz klucze, a terminal pokaże się od miejsca, w którym jest teraz.
+keys_closed.open_new = Otwórz klucze i terminal
+keys_closed.proving = Otwieranie kluczy na tym urządzeniu…
+keys_closed.refused = Maszyna {machine} jest zamknięta na tym urządzeniu: otwórz klucze i spróbuj ponownie.
+keys_closed.foot = Serwery z twoim kluczem, serwery przez twojego Maca, sam Mac i ich logi widać tylko tam, gdzie otwarto klucze: hasłem, Touch ID albo zatwierdzeniem na Macu. Logowanie kodem z e-maila ich nie otwiera. W aplikacji na samym Macu jego własne terminale otwierają się bez hasła.
+
 # ------------------------------------------------------------ vault_problem: what went wrong with the vault (vault/store.ts)
 vault_problem.no_vault = Nie masz jeszcze sejfu.
 vault_problem.exists = Masz już sejf: otwórz go, a potem dodaj klucz.
 vault_problem.locked = Najpierw otwórz swój sejf.
+vault_problem.keys_closed = Sejf zmienia się tylko tam, gdzie jego klucze są otwarte. Otwórz je na tym urządzeniu i spróbuj ponownie.
 # The vault password: {n} tries left (shown when 3 or fewer), {time} a
 # time of day, as the page shows times ("14:05").
 vault_problem.password_wrong = To hasło nie otwiera twojego sejfu. Sprawdź układ klawiatury i Caps Lock.
