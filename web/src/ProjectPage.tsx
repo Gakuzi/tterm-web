@@ -29,6 +29,8 @@ import {
 import { FolderMenuItems, MenuButton, NoteMenuItems } from "./Menus";
 import { NameInput } from "./NameInput";
 import { titled } from "./noteText";
+import { ClientInstallerBanner } from "./ClientInstallerBanner";
+import { ProjectCollaboration } from "./ProjectCollaboration";
 import {
   deletesFolder, deletesNote, manages, writes,
 } from "./rights";
@@ -398,6 +400,8 @@ export function ProjectPage(props: Props) {
         <p>{line}</p>
       </div>
 
+      <ClientInstallerBanner />
+
       <section className="pp-section" aria-labelledby="pp-machines">
         <div className="pp-section-head">
           <div className="pp-section-title">
@@ -554,6 +558,8 @@ export function ProjectPage(props: Props) {
           </div>
         )}
       </section>
+
+      <ProjectCollaboration project={project} terminals={running} me={me} />
 
       {project.own && !project.personal && (
         <section className="pp-section" aria-labelledby="pp-delete">

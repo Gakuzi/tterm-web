@@ -146,24 +146,76 @@
 
 ---
 
+### 6. Управление проектами и коллективная работа (`ProjectCollaboration.tsx`)
+
+В архитектуре tTerm заложена концепция совместных рабочих пространств (`projects`). Мы реализовали полноценный хаб совместной работы прямо на странице проекта:
+* **Приглашение в команду:** генерация защищенных ссылок приглашения в проект с указанием срока действия.
+* **Матрица ролей и доступ ИИ:** список участников и подключенных ИИ-ассистентов с ролевой моделью (`Project Admin`, `Node Admin`, `Container Developer`, `Service Operator`).
+* **Точечный доступ к терминалам (Scoped Terminal Access):** возможность указать конкретный список разрешенных терминалов для каждого человека или ИИ-агента, исключая случайный или несанкционированный доступ к соседним процессам.
+* **Экстренный отзыв:** кнопка мгновенного отзыва всех прав у всех ИИ-ассистентов в 1 клик.
+* **Git интеграция:** привязка URL репозитория (GitHub, Gitea, GitLab), отображение текущей ветки разработки и статуса синхронизации.
+
+---
+
+### 7. Иерархическая контейнерная оркестрация и изоляция (`tterm/orchestration`)
+
+Для безопасной работы ИИ-агентов и сторонних разработчиков разработан движок 4-уровневой контейнерной оркестрации:
+* **Уровень 1: Проект (Workspace)**
+* **Уровень 2: Нода (Физический сервер / VPS)**
+* **Уровень 3: Контейнер (Изолированное Docker-окружение с OpenSSH)**
+* **Уровень 4: Сервис (Процесс / API порт внутри контейнера)**
+
+#### Ключевые меры изоляции и безопасности:
+1. **Защита от побега (Anti-Escape):** жесткий запрет проброса сокета `/var/run/docker.sock` на уровне БД (`CHECK (mount_docker_socket = FALSE)`) и валидатора воркера.
+2. **Безопасность ядра:** флаг `no-new-privileges: true`, сброс capabilities (`cap_drop: ALL`).
+3. **Ресурсные ограничения:** лимиты cgroups по CPU (`nano_cpus`), оперативной памяти (`mem_limit`, `memswap_limit = mem_limit`) и защита от fork-бомб (`pids_limit: 256`).
+4. **Сетевая изоляция:** каждый проект/команда запускается в отдельном Docker bridge network.
+5. **Генерация параметров подключения:** экспорт профиля для Termius (1-click JSON), конфигурации `~/.ssh/config` и однострочника CLI.
+6. **Автоматические тесты:** модуль `test_orchestration.py` (7 тестов) проверяет изоляцию границ, рекурсивные права Project Admin и блокировку shell-доступа для операторов сервисов.
+
+---
+
+### 8. Автоопределение ОС клиента и загрузка Windows-дистрибутива (`ClientInstallerBanner.tsx`)
+
+* Автоматически определяет операционную систему браузера клиента (`windows`, `mac`, `linux`) через `detectClientOS()`.
+* На странице проекта отображает компактный интерактивный баннер:
+  * Для Windows: кнопка прямой загрузки `install_windows.bat` и готовая однострочная команда PowerShell.
+  * Для Linux / macOS: bash-однострочник для мгновенного развертывания.
+  * Возможность ручного переключения ОС в 1 клик.
+
+---
+
 ## 🗂 Сводка затронутых файлов
 
 ```text
-Backend:
+Backend & Orchestration:
   tterm/core/machines.py               — логика rename, ps1/bat инсталляторы
   tterm/core/passport.py               — сбор паспорта Windows через PowerShell
   tterm/core/agents.py                 — поддержка Windows-агента
   tterm/api/connect.py                 — эндпоинты /c/{token}.ps1 и /c/{token}.bat
   tterm/api/page.py                    — PATCH /api/machines/{id}, windowsCommand
   tterm/templates/install_computer.ps1 — нативный PowerShell-агент для Windows
+  tterm/orchestration/models.py        — гибридные SQLAlchemy/Pydantic/Dataclass модели
+  tterm/orchestration/rbac.py          — движок проверки прав (user, entity, action)
+  tterm/orchestration/worker.py        — воркер создания контейнеров, cgroups, Termius
+  tterm/orchestration/schema.sql       — PostgreSQL DDL схема с ограничениями
+  tterm/orchestration/api.py           — FastAPI эндпоинты оркестрации
   mcp_server.py                        — JSON-RPC MCP шлюз для ИИ-ассистентов
-  test_mcp.py                          — 6 автоматических тестов функционала
+  tterm_cli.py                         — консольный клиент tterm-cli
+  test_mcp.py                          — 6 тестов функционала MCP
+  test_orchestration.py                — 7 тестов иерархического RBAC и контейнеров
 
 Frontend:
+  web/src/ProjectPage.tsx              — интеграция баннера и хаба совместной работы
+  web/src/ProjectCollaboration.tsx     — хаб команды, ИИ-доступа, Git и контейнеров
+  web/src/ClientInstallerBanner.tsx    — автоопределение ОС и загрузка Windows агента
+  web/src/TerminalHeader.tsx           — верхняя панель терминала с кнопкой ИИ
+  web/src/TerminalAccessDialog.tsx     — диалог настройки прав терминала и Guard Mode
+  web/src/platform.ts                  — детекция Windows / Linux / macOS браузеров
   web/src/AddMachine.tsx               — табы macOS/Linux/Windows, кнопка .bat
   web/src/InputLine.tsx                — панель Git (статус, коммит, push, pull)
-  web/src/BlockView.tsx                — кнопка «Помощь ИИ» и автоисправление
-  web/src/FeedTerminal.tsx             — проброс запуска исправлений onRunFix
+  web/src/BlockView.tsx                — цветные подписи авторов и кнопка помощи ИИ
+  web/src/FeedTerminal.tsx             — авторство команд и проброс onRunFix
   web/src/AiSection.tsx                — раздел настроек MCP, безопасность, RBAC
   web/src/Sidebar.tsx                  — inline-редактирование имени машин
   web/src/styles/app.css               — стили Git-бара, popover, ИИ-карточек
