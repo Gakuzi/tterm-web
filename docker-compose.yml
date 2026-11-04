@@ -25,6 +25,8 @@ services:
       - db
     environment:
       TTERM_DATABASE_URL: postgresql://tterm_web:tterm_pi_secure_password@db:5432/tterm_web
+      TTERM_PAGE_HOST: "0.0.0.0"
+      TTERM_CONNECT_HOST: "0.0.0.0"
       TTERM_PAGE_PORT: 8290
       TTERM_CONNECT_PORT: 8291
       TTERM_PAGE_URL: http://192.168.0.6:8290
