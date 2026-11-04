@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tterm_web
+      POSTGRES_USER: tterm_web
+      POSTGRES_PASSWORD: tterm_pi_secure_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 80M
+    command: >
+      postgres
+      -c shared_buffers=16MB
+      -c work_mem=2MB
+      -c max_connections=20
+
+  tterm:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      TTERM_DATABASE_URL: postgresql://tterm_web:tterm_pi_secure_password@db:5432/tterm_web
+      TTERM_PAGE_PORT: 8290
+      TTERM_CONNECT_PORT: 8291
+      TTERM_PAGE_URL: http://192.168.0.6:8290
+      TTERM_CONNECT_URL: http://192.168.0.6:8291
+      TTERM_OWNER_EMAIL: eklimov84@gmail.com
+      TTERM_OWNER_NAME: Евгений
+      TTERM_WEB_DIST: web/dist
+    ports:
+      # Safe ports: does not conflict with TorrServer (8090), qBittorrent (8080), or HomeAssistant (8123)
+      - "8290:8290"
+      - "8291:8291"
+    volumes:
+      - signerdata:/app/data/signer
+    deploy:
+      resources:
+        limits:
+          memory: 140M
+
+volumes:
+  pgdata:
+  signerdata:
