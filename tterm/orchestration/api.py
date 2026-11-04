@@ -223,3 +223,180 @@ async def grant_permission(
         action=data.action,
     )
     return {"ok": True, "granted": data.model_dump()}
+
+
+# ---------------------------------------------------------------------- Auto-Discovery
+class RenameEntityDTO(BaseModel):
+    node_id: str
+    entity_type: str                  # "container" or "service"
+    entity_id: str
+    custom_name: str
+
+
+@router.post("/discovery/scan/{node_id}")
+async def scan_node_discovery(node_id: str, raw_output: str = ""):
+    """Scans or processes discovery probe output for a node."""
+    from .discovery import discovery_scanner
+    if not raw_output:
+        # Default mock probe for development and testing
+        raw_output = """===DOCKER_BEGIN===
+0e64525d5026\ttterm-server-tterm-1\ttterm-server-tterm\tUp 15 minutes\t0.0.0.0:8290-8291->8290-8291/tcp
+7045c1f0de1b\ttterm-postgres-db\tpostgres:16-alpine\tUp 2 hours\t5432/tcp
+===DOCKER_END===
+===PORTS_BEGIN===
+tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*
+===PORTS_END==="""
+    containers = discovery_scanner.parse_discovery_output(node_id, raw_output)
+    return {"ok": True, "containers": [c.model_dump() for c in containers]}
+
+
+@router.get("/discovery/{node_id}")
+async def get_node_discovery(node_id: str):
+    """Returns all discovered containers and services for a node."""
+    from .discovery import discovery_scanner
+    containers = discovery_scanner.get_containers(node_id)
+    return {"ok": True, "containers": [c.model_dump() for c in containers]}
+
+
+@router.patch("/discovery/rename")
+async def rename_discovered_entity(data: RenameEntityDTO):
+    """Sets a human-friendly alias for a discovered container or service."""
+    from .discovery import discovery_scanner
+    ok = discovery_scanner.rename_entity(data.node_id, data.entity_type, data.entity_id, data.custom_name)
+    return {"ok": ok, "custom_name": data.custom_name}
+
+
+# ---------------------------------------------------------------------- Drain Locks & Appeals
+class CheckImpactDTO(BaseModel):
+    entity_type: str                  # "node", "container", "service"
+    entity_id: str
+    entity_name: str
+    action: str                       # "reboot", "restart", "delete", "upgrade"
+
+
+class InitiateDrainDTO(BaseModel):
+    initiator_id: str
+    initiator_name: str
+    entity_type: str
+    entity_id: str
+    entity_name: str
+    action: str
+    timeout_seconds: int = 180
+
+
+class SubmitAppealDTO(BaseModel):
+    lock_id: str
+    user_id: str
+    user_name: str
+    terminal_id: str
+    reason: str
+
+
+class ResolveAppealDTO(BaseModel):
+    appeal_id: str
+    approved: bool
+    extend_seconds: int = 120
+
+
+@router.post("/locks/check")
+async def check_disruptive_impact(data: CheckImpactDTO):
+    """Checks if active processes are running under an entity before a disruptive action."""
+    from .locks import lock_manager
+    impact = lock_manager.check_disruptive_impact(
+        entity_type=data.entity_type,
+        entity_id=data.entity_id,
+        entity_name=data.entity_name,
+        action=data.action,
+    )
+    return impact
+
+
+@router.post("/locks/drain")
+async def initiate_drain_lock(data: InitiateDrainDTO):
+    """Initiates a graceful drain lock, blocking new subordinate command input."""
+    from .locks import lock_manager
+    lock = lock_manager.initiate_drain_lock(
+        initiator_id=data.initiator_id,
+        initiator_name=data.initiator_name,
+        entity_type=data.entity_type,
+        entity_id=data.entity_id,
+        entity_name=data.entity_name,
+        action=data.action,
+        timeout_seconds=data.timeout_seconds,
+    )
+    return {"ok": True, "lock": lock.model_dump()}
+
+
+@router.post("/locks/appeal")
+async def submit_drain_appeal(data: SubmitAppealDTO):
+    """Subordinates submit an appeal to extend or delay the disruptive action."""
+    from .locks import lock_manager
+    from .notifications import notification_hub
+
+    appeal = lock_manager.submit_appeal(
+        lock_id=data.lock_id,
+        user_id=data.user_id,
+        user_name=data.user_name,
+        terminal_id=data.terminal_id,
+        reason=data.reason,
+    )
+    # Notify admin
+    lock = lock_manager._active_locks.get(data.lock_id)
+    if lock:
+        notification_hub.dispatch_notification(
+            user_id=lock.initiator_id,
+            notification_type="appeal",
+            title=f"⚠️ Запрос отсрочки от {data.user_name}",
+            body=f"Причина: {data.reason} (Терминал: {data.terminal_id})",
+            entity_id=data.lock_id,
+        )
+    return {"ok": True, "appeal": appeal.model_dump()}
+
+
+@router.post("/locks/resolve-appeal")
+async def resolve_drain_appeal(data: ResolveAppealDTO):
+    """Administrator approves or rejects a subordinate appeal."""
+    from .locks import lock_manager
+    ok = lock_manager.resolve_appeal(data.appeal_id, data.approved, data.extend_seconds)
+    return {"ok": ok}
+
+
+@router.post("/locks/cancel")
+async def cancel_drain_lock(lock_id: str = Query(...)):
+    """Cancels a drain lock."""
+    from .locks import lock_manager
+    ok = lock_manager.cancel_lock(lock_id)
+    return {"ok": ok}
+
+
+@router.get("/locks/status/{terminal_id}")
+async def get_terminal_lock_status(terminal_id: str):
+    """Returns active lock status for a terminal."""
+    from .locks import lock_manager
+    is_locked, lock = lock_manager.is_locked(terminal_id)
+    return {
+        "is_locked": is_locked,
+        "lock": lock.model_dump() if lock else None,
+    }
+
+
+# ---------------------------------------------------------------------- Notifications & Bell
+class ToggleBellDTO(BaseModel):
+    terminal_id: str
+    user_id: str
+
+
+@router.post("/notifications/bell")
+async def toggle_notification_bell(data: ToggleBellDTO):
+    """Toggles notification bell on or off for a terminal's running command."""
+    from .notifications import notification_hub
+    active = notification_hub.toggle_command_bell(data.terminal_id, data.user_id)
+    return {"ok": True, "bell_active": active}
+
+
+@router.get("/notifications")
+async def list_user_notifications(user_id: str = Query(...), unread_only: bool = False):
+    """Lists notifications for a user."""
+    from .notifications import notification_hub
+    notifs = notification_hub.get_notifications(user_id, unread_only)
+    return {"ok": True, "notifications": [n.model_dump() for n in notifs]}

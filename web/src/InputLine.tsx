@@ -20,6 +20,7 @@ import { ArrowUp, Branch, Check, Close, CloudUp, Download, Folder, ListCheck, Sp
 import { typeInto, type Home } from "./keys";
 import { LocalOnly } from "./local";
 import { Picker, type PickerItem } from "./Picker";
+import { HierarchicalLockBanner, type ActiveDrainLock } from "./HierarchicalLockBanner";
 
 export type Phase = "start" | "prompt" | "running" | "input" | "full";
 
@@ -98,6 +99,53 @@ export function InputLine(props: Props) {
   const t = useT();
   const { phase, prompt, history, terminalId } = props;
   const [text, setText] = useState("");
+  const [drainLock, setDrainLock] = useState<ActiveDrainLock | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    const checkLock = async () => {
+      try {
+        const res = await fetch(`/api/orchestration/locks/status/${props.terminalId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (live) {
+            setDrainLock(data.is_locked ? data.lock : null);
+          }
+        }
+      } catch {
+        // Ignore
+      }
+    };
+    checkLock();
+    const interval = setInterval(checkLock, 4000);
+    return () => {
+      live = false;
+      clearInterval(interval);
+    };
+  }, [props.terminalId]);
+
+  const handleAppealSubmit = async (lockId: string, reason: string): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/orchestration/locks/appeal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lock_id: lockId,
+          user_id: "current-user",
+          user_name: "Пользователь", // i18n-ignore
+          terminal_id: props.terminalId,
+          reason,
+        }),
+      });
+      if (res.ok) {
+        props.notify("Запрос отсрочки передан руководителю"); // i18n-ignore
+        return true;
+      }
+    } catch {
+      // Ignore
+    }
+    return false;
+  };
   const [atEnd, setAtEnd] = useState(true);
   const [listing, setListing] = useState<Listing | null>(null);
   const [open, setOpen] = useState<Open>(null);
@@ -136,7 +184,7 @@ export function InputLine(props: Props) {
     setCommitMsg(next);
   };
 
-  const ready = phase === "prompt";
+  const ready = phase === "prompt" && !drainLock;
   /** The line takes typing while a command runs too: the next command can
    * be typed ahead, and runs once the prompt is back. */
   const usable = phase !== "start";
@@ -563,6 +611,13 @@ export function InputLine(props: Props) {
             </div>
           </div>
         </div>
+      )}
+      {drainLock && (
+        <HierarchicalLockBanner
+          lock={drainLock}
+          terminalId={props.terminalId}
+          onAppealSubmit={handleAppealSubmit}
+        />
       )}
       <div className="input-row">
         {open && (

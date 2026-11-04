@@ -185,6 +185,59 @@
 
 ---
 
+### 9. Иерархическая защита от срыва вложенных процессов (Graceful Drain & Conflict Locks)
+
+В многопользовательской среде частая проблема — срыв длительных операций: подчиненный разработчик или ИИ-агент запускает в терминале контейнера миграцию базы данных или долгую сборку (build), а администратор верхнего уровня в этот же момент перезагружает физическую ноду или пересоздает контейнер.
+
+#### Что добавлено:
+* **Движок детекции и блокировок ([`tterm/orchestration/locks.py`](file:///Users/evgeniy/Documents/antigravity/tterm-web/tterm/orchestration/locks.py)):**
+  * Отслеживание жизненного цикла активных процессов в терминалах (`register_command_start`, `register_command_end`).
+  * Метод `check_disruptive_impact(entity_type, entity_id, action)`: мгновенно сканирует всю иерархическую ветку вглубь на наличие активных терминалов и запущенных команд.
+  * Три стратегии разрешения конфликтов:
+    1. **Graceful Drain (Мягкое завершение):** блокирует ввод новых команд в дочерних терминалах (`state = DRAINING`), дает текущим процессам завершиться в течение настраиваемого тайм-аута (по умолчанию 30-60 сек), после чего выполняет действие.
+    2. **Force Kill (Принудительное выполнение):** аварийное прерывание процессов и немедленное исполнение.
+    3. **Cancel:** отмена действия администратором.
+* **Диалог оценки воздействия ([`web/src/DisruptiveActionModal.tsx`](file:///Users/evgeniy/Documents/antigravity/tterm-web/web/src/DisruptiveActionModal.tsx)):**
+  * Перед перезагрузкой или остановкой администратор видит сводку влияния: сколько процессов запущено, какие именно команды выполняются, кем и сколько секунд они уже длятся.
+  * Возможность выбора между Graceful Drain и Force Kill с отображением таймера.
+* **Информирование исполнителей и система апелляций ([`web/src/HierarchicalLockBanner.tsx`](file:///Users/evgeniy/Documents/antigravity/tterm-web/web/src/HierarchicalLockBanner.tsx), [`web/src/InputLine.tsx`](file:///Users/evgeniy/Documents/antigravity/tterm-web/web/src/InputLine.tsx)):**
+  * В затронутых терминалах строка ввода блокируется (`disabled`), а сверху появляется предупреждающий янтарный баннер: *«Внимание: Администратор [Имя] инициировал действие [Перезагрузка ноды]. Ввод команд приостановлен до завершения текущей задачи»*.
+  * Кнопка **«Запросить отсрочку» (Appeal)**: разработчик может в 1 клик отправить запрос администратору с объяснением причины (например: *«Идет фиксация миграции, нужно еще 3 минуты»*).
+  * Администратор получает пуш-уведомление с кнопками продления тайм-аута (`+60с`, `+180с`) или отклонения.
+
+---
+
+### 10. Пуш-уведомления и Web Audio колокольчик для долгих команд
+
+При выполнении долгих задач разработчики часто переключаются на другие вкладки браузера или приложения.
+
+#### Что добавлено:
+* **Колокольчик уведомления в блоке команды ([`web/src/BlockView.tsx`](file:///Users/evgeniy/Documents/antigravity/tterm-web/web/src/BlockView.tsx)):**
+  * Во время выполнения любой команды рядом с вращающимся спиннером появляется кнопка с иконкой колокольчика (🔔) **«Уведомить об окончании»**.
+  * Поддерживается как ручное включение в 1 клик, так и автоматический триггер для команд длиннее 15 секунд.
+* **Синтезатор звукового колокольчика ([`web/src/notifications.ts`](file:///Users/evgeniy/Documents/antigravity/tterm-web/web/src/notifications.ts)):**
+  * Реализован нативный Web Audio API генератор звука (`AudioContext.createOscillator()`), воспроизводящий чистый двухтоновый колокольчик (A5 880 Гц $\to$ E6 1318 Гц) с мягким экспоненциальным затуханием. Не требует загрузки внешних аудиофайлов.
+* **Web Push API интеграция:**
+  * Браузерные пуш-уведомления через `Notification API`: оповещают об успешном или ошибочном завершении команды, запросах апелляций и начале сервисных блокировок даже если вкладка с tTerm свернута.
+
+---
+
+### 11. Автоматическое обнаружение (Discovery) Docker-контейнеров и открытых портов
+
+При подключении новой машины (или по кнопке «Сканировать») система автоматически производит инвентаризацию доступных Docker-окружений и сервисов.
+
+#### Что добавлено:
+* **Сканер ноды ([`tterm/orchestration/discovery.py`](file:///Users/evgeniy/Documents/antigravity/tterm-web/tterm/orchestration/discovery.py)):**
+  * Опрашивает Docker CLI / сокет (`docker ps -a --format "{{json .}}"`) и карту сетевых портов.
+  * Автоматически встраивает найденные контейнеры в 4-уровневую иерархию проекта.
+* **Управление и кастомное переименование ([`web/src/ProjectCollaboration.tsx`](file:///Users/evgeniy/Documents/antigravity/tterm-web/web/src/ProjectCollaboration.tsx)):**
+  * Кнопка **«🔍 Сканировать окружение»** в карточке ноды.
+  * Список живых контейнеров с бейджами статуса (`running`, `exited`), портами и возможностью дать человекочитаемое имя (например, заменить `sharp_curie` на `Production Postgres`).
+  * Кнопка **«Деструктивное действие»** с автоматической проверкой активных процессов через Graceful Drain.
+  * Возможность точечно назначить права разработчику или ИИ-агенту прямо на конкретный контейнер из списка.
+
+---
+
 ## 🗂 Сводка затронутых файлов
 
 ```text
@@ -198,26 +251,33 @@ Backend & Orchestration:
   tterm/orchestration/models.py        — гибридные SQLAlchemy/Pydantic/Dataclass модели
   tterm/orchestration/rbac.py          — движок проверки прав (user, entity, action)
   tterm/orchestration/worker.py        — воркер создания контейнеров, cgroups, Termius
+  tterm/orchestration/discovery.py     — сканирование Docker-контейнеров и портов
+  tterm/orchestration/locks.py         — иерархические блокировки (Drain Locks) и апелляции
+  tterm/orchestration/notifications.py — диспетчер пуш-уведомлений и колокольчика
   tterm/orchestration/schema.sql       — PostgreSQL DDL схема с ограничениями
-  tterm/orchestration/api.py           — FastAPI эндпоинты оркестрации
+  tterm/orchestration/api.py           — FastAPI эндпоинты оркестрации и блокировок
   mcp_server.py                        — JSON-RPC MCP шлюз для ИИ-ассистентов
   tterm_cli.py                         — консольный клиент tterm-cli
   test_mcp.py                          — 6 тестов функционала MCP
-  test_orchestration.py                — 7 тестов иерархического RBAC и контейнеров
+  test_orchestration.py                — 10 тестов иерархического RBAC, контейнеров и Drain Locks
 
 Frontend:
   web/src/ProjectPage.tsx              — интеграция баннера и хаба совместной работы
-  web/src/ProjectCollaboration.tsx     — хаб команды, ИИ-доступа, Git и контейнеров
+  web/src/ProjectCollaboration.tsx     — хаб команды, ИИ-доступа, Git, контейнеров и Discovery
+  web/src/DisruptiveActionModal.tsx    — модальное окно Impact Assessment и Graceful Drain
+  web/src/HierarchicalLockBanner.tsx   — баннер блокировки ввода и подачи апелляций
+  web/src/notifications.ts             — Web Push API и Web Audio синтезатор звука
   web/src/ClientInstallerBanner.tsx    — автоопределение ОС и загрузка Windows агента
   web/src/TerminalHeader.tsx           — верхняя панель терминала с кнопкой ИИ
   web/src/TerminalAccessDialog.tsx     — диалог настройки прав терминала и Guard Mode
   web/src/platform.ts                  — детекция Windows / Linux / macOS браузеров
   web/src/AddMachine.tsx               — табы macOS/Linux/Windows, кнопка .bat
-  web/src/InputLine.tsx                — панель Git (статус, коммит, push, pull)
-  web/src/BlockView.tsx                — цветные подписи авторов и кнопка помощи ИИ
+  web/src/InputLine.tsx                — панель Git, блокировка ввода при Drain Lock
+  web/src/BlockView.tsx                — цветные подписи авторов, помощь ИИ и колокольчик (🔔)
   web/src/FeedTerminal.tsx             — авторство команд и проброс onRunFix
   web/src/AiSection.tsx                — раздел настроек MCP, безопасность, RBAC
   web/src/Sidebar.tsx                  — inline-редактирование имени машин
+  web/src/icons.tsx                    — иконки терминала (Bell, Docker, Sparkle)
   web/src/styles/app.css               — стили Git-бара, popover, ИИ-карточек
 ```
 

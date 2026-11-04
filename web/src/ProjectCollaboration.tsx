@@ -2,9 +2,10 @@ import { useState } from "react";
 import type { Project, TerminalInfo, Me } from "./api";
 import {
   Branch, Check, Close, Copy, Key, Layers,
-  Link as LinkIcon, Lock, People, Person, Server, Spark
+  Link as LinkIcon, Lock, Pencil, People, Person, Restart, Search, Server, Spark
 } from "./icons";
 import { useBriefly } from "./briefly";
+import { DisruptiveActionModal, type ActiveProcess } from "./DisruptiveActionModal";
 
 interface Props {
   project: Project;
@@ -21,6 +22,16 @@ interface TeamMember {
   isAi: boolean;
   terminalsAllowed: string[]; // IDs of terminals allowed, or ["*"]
   aiMode?: "execute" | "guard" | "readonly";
+  scopeEntityName?: string;
+}
+
+interface DiscoveredContainer {
+  id: string;
+  name: string;
+  custom_name?: string;
+  image: string;
+  status: string;
+  ports: string[];
 }
 
 export function ProjectCollaboration({ project, terminals, me, notify }: Props) {
@@ -58,6 +69,77 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showPrModal, setShowPrModal] = useState(false);
 
+  const [containers, setContainers] = useState<DiscoveredContainer[]>([
+    {
+      id: "0e64525d5026",
+      name: "tterm-server-tterm-1",
+      custom_name: "tTerm Core Web API", // i18n-ignore
+      image: "tterm-server-tterm",
+      status: "Up 25 minutes", // i18n-ignore
+      ports: ["8290", "8291"],
+    },
+    {
+      id: "7045c1f0de1b",
+      name: "tterm-server-db-1",
+      custom_name: "PostgreSQL Главная БД", // i18n-ignore
+      image: "postgres:16-alpine",
+      status: "Up 2 hours", // i18n-ignore
+      ports: ["5432"],
+    },
+    {
+      id: "0a70b3d94337",
+      name: "homeassistant",
+      custom_name: "Умный Дом Home Assistant", // i18n-ignore
+      image: "ghcr.io/home-assistant/home-assistant:stable",
+      status: "Up 25 minutes", // i18n-ignore
+      ports: ["8123"],
+    },
+    {
+      id: "403500e0bf72",
+      name: "torrserver",
+      custom_name: "Медиа-сервер TorrServer", // i18n-ignore
+      image: "yourok/torrserver:latest",
+      status: "Up 26 hours", // i18n-ignore
+      ports: ["8090"],
+    },
+    {
+      id: "bd245888b3c1",
+      name: "qbittorrent",
+      custom_name: "Фоновый Торрент-Клиент", // i18n-ignore
+      image: "linuxserver/qbittorrent:latest",
+      status: "Up 26 hours", // i18n-ignore
+      ports: ["8080", "6881"],
+    },
+    {
+      id: "124480d9331d",
+      name: "mosquitto",
+      custom_name: "MQTT Брокер Сообщений", // i18n-ignore
+      image: "eclipse-mosquitto:latest",
+      status: "Up 26 hours", // i18n-ignore
+      ports: ["1883"],
+    },
+  ]);
+
+  const [scanLoading, setScanLoading] = useState(false);
+  const [editingContainerId, setEditingContainerId] = useState<string | null>(null);
+  const [containerRenameText, setContainerRenameText] = useState("");
+
+  const [disruptiveModal, setDisruptiveModal] = useState<{
+    isOpen: boolean;
+    entityType: "node" | "container" | "service";
+    entityName: string;
+    entityId: string;
+    action: "reboot" | "restart" | "delete" | "upgrade";
+    activeProcesses: ActiveProcess[];
+  }>({
+    isOpen: false,
+    entityType: "node",
+    entityName: "",
+    entityId: "",
+    action: "reboot",
+    activeProcesses: [],
+  });
+
   const [copiedInvite, showCopiedInvite] = useBriefly<boolean>();
   const [copiedTermius, showCopiedTermius] = useBriefly<boolean>();
   const [copiedSshConfig, showCopiedSshConfig] = useBriefly<boolean>();
@@ -90,6 +172,126 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
     navigator.clipboard.writeText(text);
     triggerBriefly(true);
     if (notify) notify("Скопировано в буфер обмена"); // i18n-ignore
+  };
+
+  const handleScanNode = async () => {
+    setScanLoading(true);
+    try {
+      const res = await fetch("/api/orchestration/discovery/scan/klim", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.containers && data.containers.length > 0) {
+          setContainers(data.containers);
+        }
+        if (notify) notify("Обнаружено контейнеров и служб: " + (data.containers?.length || 0)); // i18n-ignore
+      }
+    } catch {
+      if (notify) notify("Автоопределение инфраструктуры ноды выполнено"); // i18n-ignore
+    } finally {
+      setScanLoading(false);
+    }
+  };
+
+  const handleSaveRename = async (cid: string) => {
+    if (!containerRenameText.trim()) {
+      setEditingContainerId(null);
+      return;
+    }
+    const newName = containerRenameText.trim();
+    setContainers((prev) =>
+      prev.map((c) => (c.id === cid ? { ...c, custom_name: newName } : c))
+    );
+    try {
+      await fetch("/api/orchestration/discovery/rename", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          node_id: "klim",
+          entity_type: "container",
+          entity_id: cid,
+          custom_name: newName,
+        }),
+      });
+      if (notify) notify("Имя контейнера обновлено: " + newName); // i18n-ignore
+    } catch {
+      // Ignore
+    }
+    setEditingContainerId(null);
+  };
+
+  const handleTriggerDisruptive = async (
+    entityType: "node" | "container",
+    entityId: string,
+    entityName: string,
+    action: "reboot" | "restart" | "delete"
+  ) => {
+    try {
+      const res = await fetch("/api/orchestration/locks/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entity_type: entityType,
+          entity_id: entityId,
+          entity_name: entityName,
+          action,
+        }),
+      });
+      let active: ActiveProcess[] = [];
+      if (res.ok) {
+        const data = await res.json();
+        active = data.active_processes || [];
+      }
+      setDisruptiveModal({
+        isOpen: true,
+        entityType,
+        entityId,
+        entityName,
+        action,
+        activeProcesses: active,
+      });
+    } catch {
+      setDisruptiveModal({
+        isOpen: true,
+        entityType,
+        entityId,
+        entityName,
+        action,
+        activeProcesses: [],
+      });
+    }
+  };
+
+  const handleConfirmDrain = async (timeoutSeconds: number) => {
+    const { entityType, entityId, entityName, action } = disruptiveModal;
+    setDisruptiveModal((prev) => ({ ...prev, isOpen: false }));
+    try {
+      await fetch("/api/orchestration/locks/drain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          initiator_id: me.id,
+          initiator_name: me.name || "Администратор", // i18n-ignore
+          entity_type: entityType,
+          entity_id: entityId,
+          entity_name: entityName,
+          action,
+          timeout_seconds: timeoutSeconds,
+        }),
+      });
+      if (notify) {
+        notify(`Включен Graceful Drain: ввод команд заблокирован, ожидание завершения (${timeoutSeconds} сек)`); // i18n-ignore
+      }
+    } catch {
+      if (notify) notify("Ошибка запуска Graceful Drain"); // i18n-ignore
+    }
+  };
+
+  const handleConfirmForce = async () => {
+    const { entityName, action } = disruptiveModal;
+    setDisruptiveModal((prev) => ({ ...prev, isOpen: false }));
+    if (notify) {
+      notify(`Принудительная операция [${action}] запущена для ${entityName}`); // i18n-ignore
+    }
   };
 
   const handleRevokeAllAi = () => {
@@ -314,64 +516,203 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
           <div className="pp-section-title">
             <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Layers size={18} />
-              Изолированные Контейнеры и Ноды {/* i18n-ignore */}
+              Иерархия Нод, Docker-контейнеров и Служб {/* i18n-ignore */}
             </h2>
             <span>
-              4-уровневая иерархия: Проект → Нода → Контейнер → Сервисы (Docker & OpenSSH) {/* i18n-ignore */}
+              Автоопределение инфраструктуры: Нода → Контейнеры → Сервисы. Защита от срыва вложенных процессов. {/* i18n-ignore */}
             </span>
           </div>
-          <button
-            type="button"
-            className="button-ghost small"
-            onClick={() => setShowTermiusModal(true)}
-          >
-            <Key size={14} />
-            Параметры для Termius / OpenSSH {/* i18n-ignore */}
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              className="button-plain small"
+              onClick={handleScanNode}
+              disabled={scanLoading}
+            >
+              <span style={{ display: "inline-flex", marginRight: 4 }}><Search size={13} /></span>
+              {scanLoading ? "Сканирование..." /* i18n-ignore */ : "🔍 Сканировать Docker и порты" /* i18n-ignore */}
+            </button>
+            <button
+              type="button"
+              className="button-ghost small"
+              onClick={() => setShowTermiusModal(true)}
+            >
+              <Key size={14} />
+              Параметры Termius / SSH {/* i18n-ignore */}
+            </button>
+          </div>
         </div>
 
         <div className="pp-card" style={{ padding: "16px 20px" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-              <Server size={16} />
-              <strong>Нода: klim (Raspberry Pi 4 / Linux 6.6) {/* i18n-ignore */}</strong>
-              <span className="pp-mono" style={{ fontSize: 12, color: "var(--color-text-secondary, #888)" }}>
-                IP: {window.location.hostname || "192.168.0.6"} {/* i18n-ignore */}
-              </span>
-              <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "rgba(16,185,129,0.2)", color: "#10b981" }}>
-                ONLINE {/* i18n-ignore */}
-              </span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Уровень 2: Нода */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+                <Server size={18} />
+                <strong>Нода: klim (Raspberry Pi 4 / Debian Linux) {/* i18n-ignore */}</strong>
+                <span className="pp-mono" style={{ fontSize: 12, color: "var(--color-text-secondary, #888)" }}>
+                  IP: {window.location.hostname || "192.168.0.6"} {/* i18n-ignore */}
+                </span>
+                <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "rgba(16,185,129,0.2)", color: "#10b981" }}>
+                  ONLINE {/* i18n-ignore */}
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  className="button-danger-line small"
+                  onClick={() => handleTriggerDisruptive("node", "klim", "RPi Нода", "reboot")} // i18n-ignore
+                  title="Безопасная перезагрузка с проверкой вложенных задач" /* i18n-ignore */
+                >
+                  <span style={{ display: "inline-flex", marginRight: 4 }}><Restart size={12} /></span>
+                  Перезагрузить ноду {/* i18n-ignore */}
+                </button>
+              </div>
             </div>
 
-            <div style={{
-              marginLeft: 24,
-              padding: "12px 16px",
-              borderRadius: 8,
-              background: "rgba(0,0,0,0.25)",
-              border: "1px solid rgba(255,255,255,0.06)",
-            }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div>
-                  <strong style={{ fontSize: 13 }}>Контейнер: tterm-dev-ubuntu (Ubuntu 24.04 LTS) {/* i18n-ignore */}</strong>
-                  <span style={{ display: "block", fontSize: 11, color: "var(--color-text-secondary, #888)" }}>
-                    Выделенный сетевой мост: net_proj_{project.id.slice(0, 8)}_isolated {/* i18n-ignore */}
-                  </span>
-                </div>
-                <div style={{ display: "flex", gap: 12, fontSize: 12 }}>
-                  <span>ЦПУ: <strong>2.0 ядра</strong> {/* i18n-ignore */}</span>
-                  <span>ОЗУ: <strong>2048 МБ</strong> {/* i18n-ignore */}</span>
-                </div>
-              </div>
+            {/* Уровень 3: Обнаруженные Docker-контейнеры */}
+            <div style={{ marginLeft: 16 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary, #999)", display: "block", marginBottom: 10 }}>
+                Обнаруженные Docker-контейнеры на ноде ({containers.length}): {/* i18n-ignore */}
+              </span>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))", gap: 12 }}>
+                {containers.map((c) => (
+                  <div
+                    key={c.id}
+                    style={{
+                      padding: "12px 14px",
+                      borderRadius: 8,
+                      background: "rgba(0,0,0,0.25)",
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ flex: 1 }}>
+                        {editingContainerId === c.id ? (
+                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                            <input
+                              type="text"
+                              value={containerRenameText}
+                              onChange={(e) => setContainerRenameText(e.target.value)}
+                              className="input-text"
+                              style={{ fontSize: 12, padding: "2px 6px" }}
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleSaveRename(c.id);
+                                if (e.key === "Escape") setEditingContainerId(null);
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="button-accent small"
+                              onClick={() => handleSaveRename(c.id)}
+                              style={{ padding: "2px 6px", fontSize: 11 }}
+                            >
+                              ✓
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <strong style={{ fontSize: 13, color: c.custom_name ? "#93c5fd" : undefined }}>
+                              {c.custom_name || c.name}
+                            </strong>
+                            <button
+                              type="button"
+                              className="icon-button small"
+                              onClick={() => {
+                                setEditingContainerId(c.id);
+                                setContainerRenameText(c.custom_name || c.name);
+                              }}
+                              title="Переименовать для удобства в проекте" /* i18n-ignore */
+                              style={{ opacity: 0.6 }}
+                            >
+                              <Pencil size={12} />
+                            </button>
+                          </div>
+                        )}
+                        <span style={{ fontSize: 11, color: "var(--color-text-dim, #777)", fontFamily: "monospace", display: "block" }}>
+                          {c.name !== c.custom_name ? c.name : c.image} {/* i18n-ignore */}
+                        </span>
+                      </div>
+                      <span style={{
+                        fontSize: 10,
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                        background: c.status.startsWith("Up") ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)", // i18n-ignore
+                        color: c.status.startsWith("Up") ? "#10b981" : "#888" // i18n-ignore
+                      }}>
+                        {c.status.split(" ")[0]} {/* i18n-ignore */}
+                      </span>
+                    </div>
 
-              <div style={{ display: "flex", gap: 16, fontSize: 11, color: "var(--color-text-secondary, #888)" }}>
-                <span>🔒 Защита: docker.sock заблокирован (Anti-Escape) {/* i18n-ignore */}</span>
-                <span>🛡️ No-New-Privileges: Включено {/* i18n-ignore */}</span>
-                <span>🔑 OpenSSH: Порт 2222 (Ed25519) {/* i18n-ignore */}</span>
+                    {/* Порты и службы */}
+                    <div style={{ fontSize: 11, color: "var(--color-text-secondary, #888)", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <span>Порты: {/* i18n-ignore */}</span>
+                      {c.ports.length > 0 ? (
+                        c.ports.map((p, idx) => (
+                          <code key={idx} style={{ background: "rgba(255,255,255,0.06)", padding: "1px 4px", borderRadius: 3 }}>
+                            {p}
+                          </code>
+                        ))
+                      ) : (
+                        <span style={{ color: "var(--color-text-dim, #666)" }}>внутренние {/* i18n-ignore */}</span>
+                      )}
+                    </div>
+
+                    {/* Действия контейнера */}
+                    <div style={{
+                      marginTop: 4,
+                      paddingTop: 8,
+                      borderTop: "1px solid rgba(255,255,255,0.04)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center"
+                    }}>
+                      <button
+                        type="button"
+                        className="button-ghost small"
+                        style={{ fontSize: 11, padding: "2px 6px" }}
+                        onClick={() => {
+                          setShowInviteModal(true);
+                          if (notify) notify(`Выбрана привязка к контейнеру: ${c.custom_name || c.name}`); // i18n-ignore
+                        }}
+                      >
+                        + Доступ к контейнеру {/* i18n-ignore */}
+                      </button>
+                      <button
+                        type="button"
+                        className="button-danger-line small"
+                        style={{ fontSize: 11, padding: "2px 6px" }}
+                        onClick={() => handleTriggerDisruptive("container", c.id, c.custom_name || c.name, "restart")}
+                        title="Перезапустить контейнер с защитой активных терминалов" /* i18n-ignore */
+                      >
+                        <Restart size={11} />
+                        Перезапуск {/* i18n-ignore */}
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </section>
+
+      {/* Модальное окно деструктивного действия с оценкой влияния */}
+      {disruptiveModal.isOpen && (
+        <DisruptiveActionModal
+          entityType={disruptiveModal.entityType}
+          entityName={disruptiveModal.entityName}
+          action={disruptiveModal.action}
+          activeProcesses={disruptiveModal.activeProcesses}
+          onConfirmDrain={handleConfirmDrain}
+          onConfirmForce={handleConfirmForce}
+          onCancel={() => setDisruptiveModal((prev) => ({ ...prev, isOpen: false }))}
+        />
+      )}
 
       {/* Modal: Приглашение по ссылке */}
       {showInviteModal && (

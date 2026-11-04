@@ -368,3 +368,78 @@ class ConnectionInfoDTO(BaseModel):
     ssh_config_snippet: str
     ssh_command: str
     security_isolation_summary: dict[str, Any]
+
+
+# ---------------------------------------------------------------------- Discovery & Lock DTOs
+class DiscoveredServiceDTO(BaseModel):
+    id: str
+    name: str
+    custom_name: Optional[str] = None
+    port: int
+    protocol: str = "tcp"
+    container_id: Optional[str] = None
+    is_active: bool = True
+
+
+class DiscoveredContainerDTO(BaseModel):
+    id: str
+    name: str
+    custom_name: Optional[str] = None
+    image: str
+    status: str
+    ports: List[str] = Field(default_factory=list)
+    created: str = ""
+    services: List[DiscoveredServiceDTO] = Field(default_factory=list)
+
+
+class ActiveProcessDTO(BaseModel):
+    terminal_id: str
+    terminal_name: str
+    user_id: str
+    user_name: str
+    command: str
+    running_since: str
+    duration_seconds: int = 0
+
+
+class DrainLockStateEnum(str, enum.Enum):
+    DRAINING = "draining"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class DrainLockDTO(BaseModel):
+    id: str
+    entity_type: str                  # "node", "container", "service"
+    entity_id: str
+    entity_name: str
+    initiator_id: str
+    initiator_name: str
+    action: str                       # "reboot", "restart", "delete", "upgrade", "maintenance"
+    state: DrainLockStateEnum = DrainLockStateEnum.DRAINING
+    created_at: str = ""
+    timeout_seconds: int = 180
+    active_processes: List[ActiveProcessDTO] = Field(default_factory=list)
+
+
+class AppealDTO(BaseModel):
+    id: str
+    lock_id: str
+    user_id: str
+    user_name: str
+    terminal_id: str
+    reason: str
+    created_at: str = ""
+    status: str = "pending"           # "pending", "approved", "rejected"
+
+
+class NotificationDTO(BaseModel):
+    id: str
+    user_id: str
+    type: str                         # "command_finished", "drain_lock", "appeal", "comment"
+    title: str
+    body: str
+    entity_id: Optional[str] = None
+    read: bool = False
+    created_at: str = ""

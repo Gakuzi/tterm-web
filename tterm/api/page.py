@@ -33,6 +33,7 @@ from ..core.terminals import (KeysClosed, NotAllowed, NotOpen, Terminal,
 from .connect import client_ip
 from .security import PAGE_HEADERS, AddHeaders, PageGuard, page_csp
 from .ws import SIGNED_OUT_CLOSE, PageSocket, page_json
+from ..orchestration.api import router as orchestration_router
 
 NO_STORE = {"cache-control": "no-store"}
 #: Stage 1 builds the page with stable file names, so the browser must ask
@@ -460,6 +461,7 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         return machine
     app = FastAPI(title="tTerm Web", version=__version__, docs_url=None,
                   redoc_url=None, openapi_url=None)
+    app.include_router(orchestration_router)
     dist = dist.resolve()
 
     @app.exception_handler(SignedOut)

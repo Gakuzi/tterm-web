@@ -11,12 +11,13 @@ import type { LogNote, Me, Redaction } from "./api";
 import { useBriefly } from "./briefly";
 import { useT } from "./i18n";
 import {
-  Branch, Check, Close, Collapse, Copy, CopyText, Cross, Expand, Link, NoteAdd, Person, Rerun,
+  Bell, Branch, Check, Close, Collapse, Copy, CopyText, Cross, Expand, Link, NoteAdd, Person, Rerun,
   Spark, Stop,
 } from "./icons";
 import { plainly } from "./logday";
 import { RedactedMark, Thread } from "./LogNotes";
 import { markIn, marked } from "./marks";
+import { requestNotificationPermission, showPushNotification } from "./notifications";
 import type { Rendered } from "./render";
 
 /** Lines of a long output shown before "Show all". */
@@ -200,6 +201,28 @@ export function BlockView(props: Props) {
   const failed = block.state === "done" && block.exitCode !== null &&
     block.exitCode !== 0;
   const [aiHelpOpen, setAiHelpOpen] = useState(false);
+  const [bellActive, setBellActive] = useState(false);
+  const wasRunning = useRef(running);
+
+  useEffect(() => {
+    if (wasRunning.current && !running && bellActive) {
+      const exitText = block.exitCode === 0 ? "успешно" : `с ошибкой (код ${block.exitCode})`; // i18n-ignore
+      showPushNotification(
+        "Команда завершена", // i18n-ignore
+        `${block.command || "Команда"} завершена ${exitText}`, // i18n-ignore
+        block.key,
+      );
+    }
+    wasRunning.current = running;
+  }, [running, bellActive, block.command, block.exitCode, block.key]);
+
+  const toggleBell = async () => {
+    if (!bellActive) {
+      await requestNotificationPermission();
+    }
+    setBellActive(!bellActive);
+  };
+
   const lines = block.rendered?.lines ?? [];
   const shown = block.expanded ? lines : lines.slice(-SHOW_LINES);
   const hidden = lines.length - shown.length;
@@ -330,13 +353,33 @@ export function BlockView(props: Props) {
           {!running && <span>{clock(block.startedAt)}</span>}
         </span>
         {running ? (
-          <button type="button" className="block-stop" onClick={props.onStop}
-            title={t("block.stop_title")}>
-            <Stop size={11} />
-            {t("block.stop")}
-            {/* i18n-ignore */}
-            <kbd>⌃C</kbd>
-          </button>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <button
+              type="button"
+              className={`button-ghost small ${bellActive ? "pressed" : ""}`}
+              onClick={toggleBell}
+              title={bellActive ? "Уведомление при завершении активно" /* i18n-ignore */ : "Уведомить push при завершении" /* i18n-ignore */}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                color: bellActive ? "#a855f7" : undefined,
+                background: bellActive ? "rgba(168, 85, 247, 0.15)" : undefined,
+                padding: "2px 8px",
+                fontSize: 11,
+              }}
+            >
+              <Bell size={12} />
+              {bellActive ? "Уведомлю 🔔" /* i18n-ignore */ : "🔔" /* i18n-ignore */}
+            </button>
+            <button type="button" className="block-stop" onClick={props.onStop}
+              title={t("block.stop_title")}>
+              <Stop size={11} />
+              {t("block.stop")}
+              {/* i18n-ignore */}
+              <kbd>⌃C</kbd>
+            </button>
+          </div>
         ) : redacted ? (
           <div role="group" aria-label={t("block.actions")}
             className={"block-actions" + (copied ? " acted" : "")}>
