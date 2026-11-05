@@ -109,6 +109,21 @@ func main() {
 		return
 	}
 
+	// In daemon mode, ensure single running instance
+	lockPath := filepath.Join(appDir, "daemon.pid")
+	if prevData, err := os.ReadFile(lockPath); err == nil {
+		var prevPID int
+		if _, sErr := fmt.Sscanf(string(prevData), "%d", &prevPID); sErr == nil && prevPID > 0 && prevPID != os.Getpid() {
+			chk := exec.Command("powershell.exe", "-NoProfile", "-Command", fmt.Sprintf("Get-Process -Id %d -ErrorAction SilentlyContinue", prevPID))
+			if chk.Run() == nil {
+				// Another daemon is already running happily
+				return
+			}
+		}
+	}
+	_ = os.WriteFile(lockPath, []byte(fmt.Sprintf("%d\n", os.Getpid())), 0644)
+	defer os.Remove(lockPath)
+
 	log.Printf("[tTerm Windows Agent v%s] Starting session...", appVersion)
 	log.Printf("[Config] Hub: %s | Computer: %s | Key: %s...", cfg.Hub, cfg.Name, safePrefix(cfg.Key, 8))
 
@@ -199,10 +214,13 @@ func installAndLaunchDaemon(cfg *Config, appDir string) {
 
 	targetExe := filepath.Join(installDir, "tterm-agent.exe")
 
-	// Stop any previously running instance if updating binary
+	// Stop any previously running instance without killing current installer
+	myPID := os.Getpid()
+	psKillOthers := fmt.Sprintf(`Get-Process -Name "tterm-agent" -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne %d } | Stop-Process -Force -ErrorAction SilentlyContinue`, myPID)
+	_ = exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psKillOthers).Run()
+
 	currentExe, err := os.Executable()
 	if err == nil && filepath.Clean(currentExe) != filepath.Clean(targetExe) {
-		_ = exec.Command("taskkill", "/F", "/IM", "tterm-agent.exe").Run()
 		time.Sleep(300 * time.Millisecond)
 		_ = copyFile(currentExe, targetExe)
 	}
@@ -221,17 +239,13 @@ func installAndLaunchDaemon(cfg *Config, appDir string) {
 		_ = exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psScript).Run()
 	}
 
-	// Launch completely detached background daemon via PowerShell Start-Process (independent desktop session process)
+	// Clean up any legacy start_agent.vbs
+	vbsLegacy := filepath.Join(appDir, "start_agent.vbs")
+	_ = os.Remove(vbsLegacy)
+
+	// Launch single detached background daemon via PowerShell Start-Process (independent desktop session process)
 	psSpawn := fmt.Sprintf(`Start-Process -FilePath '%s' -ArgumentList '--daemon' -WindowStyle Hidden`, targetExe)
 	_ = exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psSpawn).Run()
-
-	// Also launch directly with Win32 DETACHED_PROCESS and CREATE_NEW_PROCESS_GROUP flags as robust fallback
-	bgCmd := exec.Command(targetExe, "--daemon")
-	bgCmd.SysProcAttr = &syscall.SysProcAttr{
-		CreationFlags: 0x08000000 | 0x00000200 | 0x00000008, // CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS
-		HideWindow:    true,
-	}
-	_ = bgCmd.Start()
 
 	msg := fmt.Sprintf("tTerm Windows Agent успешно установлен и подключен!\n\n"+
 		"• Сервер: %s\n"+

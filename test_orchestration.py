@@ -1369,6 +1369,45 @@ class TestEncryptedVaultAndTelegram(unittest.TestCase):
         self.assertFalse(agents.struck_out("127.0.0.1"))
         self.assertFalse(agents.struck_out("10.0.1.15"))
 
+    def test_machine_bound_to_multiple_projects(self):
+        """Verifies that a single machine can be bound to multiple projects concurrently."""
+        from tterm.orchestration.machines_projects import MachineProjectManager
+        mgr = MachineProjectManager()
+        mgr.bind_machine_to_project("win-laptop", "proj-frontend", "Frontend App")
+        mgr.bind_machine_to_project("win-laptop", "proj-backend", "Backend API")
+
+        projects = mgr.get_projects_for_machine("win-laptop")
+        project_ids = {p["project_id"] for p in projects}
+        self.assertIn("proj-frontend", project_ids)
+        self.assertIn("proj-backend", project_ids)
+
+        fe_machines = mgr.get_machines_for_project("proj-frontend")
+        be_machines = mgr.get_machines_for_project("proj-backend")
+        self.assertIn("win-laptop", fe_machines)
+        self.assertIn("win-laptop", be_machines)
+
+    def test_terminal_scoped_to_project_isolation(self):
+        """Verifies that terminals on the same machine are strictly isolated per project."""
+        from tterm.orchestration.machines_projects import MachineProjectManager
+        mgr = MachineProjectManager()
+        mgr.bind_machine_to_project("server-node", "proj-alpha", "Alpha")
+        mgr.bind_machine_to_project("server-node", "proj-beta", "Beta")
+
+        mgr.set_terminal_project("term-1", "proj-alpha", "server-node")
+        mgr.set_terminal_project("term-2", "proj-beta", "server-node")
+
+        ctx1 = mgr.get_terminal_project_context("term-1")
+        ctx2 = mgr.get_terminal_project_context("term-2")
+        self.assertEqual(ctx1["project_id"], "proj-alpha")
+        self.assertEqual(ctx2["project_id"], "proj-beta")
+
+        alpha_terms = [t["terminal_id"] for t in mgr.list_terminals_by_project("proj-alpha")]
+        beta_terms = [t["terminal_id"] for t in mgr.list_terminals_by_project("proj-beta")]
+        self.assertIn("term-1", alpha_terms)
+        self.assertNotIn("term-2", alpha_terms)
+        self.assertIn("term-2", beta_terms)
+        self.assertNotIn("term-1", beta_terms)
+
 
 if __name__ == "__main__":
     unittest.main()

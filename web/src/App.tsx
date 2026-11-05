@@ -701,7 +701,8 @@ export function App() {
    * (0.1.28) the keys are asked for first; `failed`, when it could not be
    * made. */
   const startTerminal = useCallback((machineId: string, instead?: string,
-    then?: (terminalId: string) => void, cwd?: string, failed?: () => void) => {
+    then?: (terminalId: string) => void, cwd?: string, failed?: () => void,
+    projectId?: string) => {
     const machine = byIdRef.current.get(machineId);
     const asked = !!instead && tabKind(instead) === "keys";
     if (machine && !asked && closedRef.current(machine)) {
@@ -709,10 +710,11 @@ export function App() {
       return;
     }
     const { cols, rows } = guessSize();
-    const project = stateNow.current?.projects.find((p) =>
-      p.machines.some((m) => m.id === machineId));
+    const project = projectId
+      ? stateNow.current?.projects.find((p) => p.id === projectId)
+      : stateNow.current?.projects.find((p) => p.machines.some((m) => m.id === machineId));
     if (project) unfold(`p:${project.id}`, `m:${machineId}`);
-    openTerminal(machineId, cols, rows, cwd)
+    openTerminal(machineId, cols, rows, cwd, projectId)
       .then((terminal) => {
         setStatuses((all) => {
           const next = { ...all, [terminal.id]: {
@@ -741,14 +743,14 @@ export function App() {
   }, [navigate, refresh, notYet, unfold, askKeys]);
 
   /** A new terminal from a machine's "+": an offline computer says so. */
-  const newTerminal = useCallback((machine: Machine) => {
+  const newTerminal = useCallback((machine: Machine, projectId?: string) => {
     if (machine.kind === "computer" && !machine.online) {
       const seen = lastSeen(machine.lastSeen, say);
       notYet(seen ? say("app.offline_seen", { name: machine.name, seen })
         : say("app.offline", { name: machine.name }));
       return;
     }
-    startTerminal(machine.id);
+    startTerminal(machine.id, undefined, undefined, undefined, undefined, projectId);
   }, [notYet, startTerminal]);
 
   // Removing a machine and ending a terminal ask first (Confirm).
@@ -1948,10 +1950,12 @@ export function App() {
         {frontKind === "project" && (
           <div className="page-scroll">
             {pageProject ? (
-              <ProjectPage project={pageProject} me={state.me}
+              <ProjectPage project={pageProject} allProjects={projects} me={state.me}
                 terminals={liveTerminals} dotFor={dotFor} closed={isClosed}
-                local={local}
-                onAddMachine={startAdding} onOpenTerminal={startTerminal}
+                local={local} onRefresh={refresh}
+                onAddMachine={startAdding}
+                onOpenTerminal={(machineId, projectId) =>
+                  startTerminal(machineId, undefined, undefined, undefined, undefined, projectId)}
                 onGoTo={goTo} onRemoveMachine={askRemove}
                 onMoveMachine={pageProject.own && projects.some((p) => p.own &&
                   p.role === "owner" && p.id !== pageProject.id)
@@ -2000,7 +2004,9 @@ export function App() {
               <Machines projects={projects} terminals={state.terminals} local={local}
                 closed={isClosed}
                 onAdd={(projectId) => startAdding(projectId)}
-                onOpenTerminal={startTerminal} onGoTo={goTo}
+                onOpenTerminal={(machineId, projectId) =>
+                  startTerminal(machineId, undefined, undefined, undefined, undefined, projectId)}
+                onGoTo={goTo}
                 onRemove={askRemove} />
             ) : (
               <Welcome me={state.me} personal={personal}

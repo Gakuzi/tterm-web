@@ -739,6 +739,12 @@ class Agents:
         return len(self._waiting)
 
     def may_wait(self, address: str) -> bool:
+        try:
+            net = ipaddress.ip_network(address, strict=False)
+            if net.is_private or net.is_loopback:
+                return True
+        except ValueError:
+            pass
         if sum(1 for a, _ in self._waiting.values()
                if a == address) >= PENDING_PER_ADDRESS:
             return False
@@ -768,8 +774,8 @@ class Agents:
     def struck_out(self, address: str) -> bool:
         """Whether this address failed too often lately to be looked at."""
         try:
-            ip = ipaddress.ip_address(address)
-            if ip.is_private or ip.is_loopback:
+            net = ipaddress.ip_network(address, strict=False)
+            if net.is_private or net.is_loopback:
                 return False
         except ValueError:
             pass
@@ -784,8 +790,8 @@ class Agents:
 
     def strike(self, address: str) -> None:
         try:
-            ip = ipaddress.ip_address(address)
-            if ip.is_private or ip.is_loopback:
+            net = ipaddress.ip_network(address, strict=False)
+            if net.is_private or net.is_loopback:
                 return
         except ValueError:
             pass

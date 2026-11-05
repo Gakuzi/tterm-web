@@ -21,7 +21,7 @@ interface Props {
   /** A machine closed on this device (0.1.28, keysHere.ts). */
   closed: (machine: Machine) => boolean;
   onAdd: (projectId: string) => void;
-  onOpenTerminal: (machineId: string) => void;
+  onOpenTerminal: (machineId: string, projectId?: string) => void;
   onGoTo: (terminalId: string) => void;
   onRemove: (machine: Machine) => void;
   /** The app before signing in: this computer only. */
@@ -76,15 +76,16 @@ function facts(p: Passport, t: Translate): [string, string][] {
   return rows.filter((row): row is [string, string] => row[1] !== null);
 }
 
-function MachineCard({ machine, code, terminals, manage, shut, onOpenTerminal, onGoTo,
+function MachineCard({ machine, code, projectId, terminals, manage, shut, onOpenTerminal, onGoTo,
   onRemove }: {
   machine: Machine;
   code: string;
+  projectId?: string;
   terminals: TerminalInfo[];
   manage: boolean;
   /** Closed on this device (0.1.28). */
   shut: boolean;
-  onOpenTerminal: (machineId: string) => void;
+  onOpenTerminal: (machineId: string, projectId?: string) => void;
   onGoTo: (terminalId: string) => void;
   onRemove: (machine: Machine) => void;
 }) {
@@ -101,7 +102,14 @@ function MachineCard({ machine, code, terminals, manage, shut, onOpenTerminal, o
           {computer ? <Computer size={20} /> : <Server size={20} />}
         </span>
         <div className="machine-names">
-          <strong>{machine.name}</strong>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <strong>{machine.name}</strong>
+            {machine.shared && (
+              <span style={{ fontSize: 11, background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", padding: "1px 6px", borderRadius: 4 }}>
+                Общая {/* i18n-ignore */}
+              </span>
+            )}
+          </div>
           <span>
             {computer && (
               <span className="machine-state">
@@ -139,7 +147,7 @@ function MachineCard({ machine, code, terminals, manage, shut, onOpenTerminal, o
       <div className="button-row">
         <button type="button" className="button-accent" disabled={offline}
           title={offline ? t("machines.offline_title") : shut ? lockTitle : undefined}
-          onClick={() => onOpenTerminal(machine.id)}>
+          onClick={() => onOpenTerminal(machine.id, projectId)}>
           {shut && <Lock size={14} />}
           {t("machines.open_terminal")}
         </button>
@@ -203,10 +211,10 @@ export function Machines(props: Props) {
           <div className="machine-list">
             {project.machines.map((machine) => (
               <MachineCard key={machine.id} machine={machine}
-                code={project.code} onOpenTerminal={onOpenTerminal}
+                code={project.code} projectId={project.id} onOpenTerminal={onOpenTerminal}
                 onGoTo={onGoTo} onRemove={onRemove} shut={closed(machine)}
                 manage={canManage(project.role) && !local}
-                terminals={terminals.filter((term) => term.machineId === machine.id)} />
+                terminals={terminals.filter((term) => term.machineId === machine.id && (!term.projectId || term.projectId === project.id))} />
             ))}
           </div>
         </section>

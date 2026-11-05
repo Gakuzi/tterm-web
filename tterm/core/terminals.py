@@ -284,13 +284,16 @@ class Terminal:
                  owner: Person, machine: Machine, name: str,
                  cols: int, rows: int, agents=None, relay=None,
                  start_in: str = "",
-                 session_id: uuid.UUID | None = None) -> None:
+                 session_id: uuid.UUID | None = None,
+                 project_id: uuid.UUID | None = None) -> None:
         self.id = uuid.uuid4()
         self.pool = pool
         self.signer = signer
         #: The session that opened it (0.1.28, v3): a key server's login is
         #: signed only by that session's sockets.
         self.session_id = session_id
+        #: Project this terminal is explicitly scoped to (or machine's default project)
+        self.project_id = project_id or machine.project_id
         #: The connected agents, for a terminal on a computer.
         self.agents = agents
         #: The vault signing relay (vault.VaultRelay), for a 'key' server.
@@ -381,6 +384,7 @@ class Terminal:
             "id": str(self.id),
             "machineId": str(self.machine.id),
             "machine": self.machine.name,
+            "projectId": str(self.project_id),
             "label": self.label,
             "name": self.name,
             "state": self.state,
@@ -1209,14 +1213,15 @@ class Terminals:
     async def open(self, person: Person, machine_id: uuid.UUID, cols: int,
                    rows: int, cwd: str = "", *,
                    session_id: uuid.UUID | None = None,
-                   closed=None) -> Terminal:
+                   closed=None,
+                   project_id: uuid.UUID | None = None) -> Terminal:
         """A new terminal on the machine. `cwd` (0.1.24): the folder to start
         in, the one the terminal it replaces was in; where the login shell
         cannot be told, or the folder is gone, it starts at home.
         `session_id` (0.1.28): the session asking, whose sockets alone sign
         a key server's login; `closed(machine)`, whether the keys are closed
         on that device for this machine: KeysClosed then, and nothing is
-        opened."""
+        opened. `project_id`: explicitly scopes terminal to a project."""
         lock = self._opening.setdefault(person.id, asyncio.Lock())
         async with lock:
             machine = await self._machine(machine_id, person.id)
@@ -1236,7 +1241,8 @@ class Terminals:
                                 owner=person, machine=machine, name=name,
                                 cols=cols, rows=rows, agents=self.agents,
                                 relay=self.relay, start_in=cwd,
-                                session_id=session_id)
+                                session_id=session_id,
+                                project_id=project_id)
             await self.pool.execute(
                 "INSERT INTO terminals (id, machine_id, owner_id, name, kind) "
                 "VALUES ($1, $2, $3, $4, 'term')",
@@ -1244,6 +1250,15 @@ class Terminals:
             self._live[terminal.id] = terminal
             self._peak = max(self._peak, self.open_count())
             self._peak_one = max(self._peak_one, len(self.live(person.id)))
+            try:
+                from ..orchestration.machines_projects import machine_project_manager
+                machine_project_manager.set_terminal_project(
+                    terminal_id=str(terminal.id),
+                    project_id=str(terminal.project_id),
+                    machine_id=str(machine.id),
+                )
+            except Exception as exc:
+                log.debug("machine_project_manager.set_terminal_project failed: %s", exc)
         terminal.start()
         return terminal
 

@@ -78,6 +78,9 @@ export interface Machine {
   /** The person's own (they added it, or nobody is recorded): its log
    * follows their keys on a device (0.1.28); others read it by their role. */
   mine?: boolean;
+  /** Whether the machine is shared across multiple projects. */
+  shared?: boolean;
+  projectId?: string;
 }
 
 export type LoginMethod = "cert" | "key" | "mac";
@@ -221,6 +224,7 @@ export interface TerminalInfo {
   id: string;
   machineId: string;
   machine: string;
+  projectId?: string;
   /** As tabs show it: P/web-01, or P/web-01 · 2 for the second one. */
   label: string;
   name: string;
@@ -1041,10 +1045,47 @@ export async function sendSupport(message: {
 /** `cwd` (0.1.24): the folder to start in, the one an ended terminal was
  * in; the core starts there if it can, and at home otherwise. */
 export async function openTerminal(machineId: string, cols: number,
-  rows: number, cwd?: string): Promise<TerminalInfo> {
-  const response = await fetch("/api/terminals",
-    change("POST", cwd ? { machineId, cols, rows, cwd } : { machineId, cols, rows }));
+  rows: number, cwd?: string, projectId?: string): Promise<TerminalInfo> {
+  const payload: Record<string, any> = { machineId, cols, rows };
+  if (cwd) payload.cwd = cwd;
+  if (projectId) payload.projectId = projectId;
+  const response = await fetch("/api/terminals", change("POST", payload));
   return (await check(response)).json();
+}
+
+export async function getMachineProjects(machineId: string): Promise<Array<{ project_id: string; project_name: string; bound_at?: string }>> {
+  try {
+    const response = await fetch(`/api/orchestration/machines/${machineId}/projects`);
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.projects || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function bindMachineToProject(machineId: string, projectId: string, projectName: string = ""): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/orchestration/machines/${machineId}/projects`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId, project_name: projectName }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function unbindMachineFromProject(machineId: string, projectId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/orchestration/machines/${machineId}/projects/${projectId}`, {
+      method: "DELETE",
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function terminalInfo(id: string): Promise<TerminalInfo | null> {

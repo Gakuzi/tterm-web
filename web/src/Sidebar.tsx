@@ -88,7 +88,7 @@ interface Props {
   logClosed: (machine: Machine) => boolean;
   onOpenProject: (projectId: string) => void;
   onAddMachine: (projectId: string) => void;
-  onNewTerminal: (machine: Machine) => void;
+  onNewTerminal: (machine: Machine, projectId?: string) => void;
   onGoTo: (terminalId: string) => void;
   onEndTerminal: (terminal: TerminalInfo) => void;
   /** The machine being named here, if one is. */
@@ -184,10 +184,10 @@ export function Sidebar(props: Props) {
   const themeLabel = shownTheme === "light" ? t("sidebar.theme_dark")
     : t("sidebar.theme_light");
 
-  const machineRows = (m: Machine) => {
+  const machineRows = (m: Machine, project?: Project) => {
     const key = `m:${m.id}`;
     const open = !folded.has(key);
-    const mine = terminals.filter((x) => x.machineId === m.id);
+    const mine = terminals.filter((x) => x.machineId === m.id && (!x.projectId || !project || x.projectId === project.id));
     const computer = m.kind === "computer";
     const here = !!m.here;
     // In the app without the connection the cloud's machines wait for it;
@@ -258,6 +258,11 @@ export function Sidebar(props: Props) {
                 <Computer size={11} />{t("sidebar.via_mac")}
               </span>
             )}
+            {m.shared && (
+              <span className="sb-tag" style={{ marginLeft: 4, fontSize: 10, padding: "1px 5px", borderRadius: 4, background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8" }}>
+                Общая {/* i18n-ignore */}
+              </span>
+            )}
             {here && <span className="here-pill">{hereWord(t)}</span>}
             {!open && mine.length > 0 && <span className="sb-count">{mine.length}</span>}
             {computer && (
@@ -272,14 +277,14 @@ export function Sidebar(props: Props) {
             <button type="button" className="sb-plus sb-lock"
               aria-label={t("sidebar.keys_closed_new", { name: m.name })}
               title={computer ? t("sidebar.keys_closed_mac") : t("sidebar.keys_closed")}
-              onClick={() => props.onNewTerminal(m)}>
+              onClick={() => props.onNewTerminal(m, project?.id)}>
               <Lock size={13} />
             </button>
           ) : (
             <button type="button" className="sb-plus"
               aria-label={t("sidebar.new_terminal_on", { name: m.name })}
               title={t("sidebar.new_terminal")}
-              onClick={() => props.onNewTerminal(m)}>
+              onClick={() => props.onNewTerminal(m, project?.id)}>
               <Plus size={13} />
             </button>
           )}
@@ -496,7 +501,7 @@ export function Sidebar(props: Props) {
                   {project.machines.length === 0 && (
                     <div className="sb-none">{t("sidebar.no_machines")}</div>
                   )}
-                  {project.machines.map(machineRows)}
+                  {project.machines.map((m) => machineRows(m, project))}
                   <Label text={t("sidebar.notes")} plus={writes(project) ? {
                     title: t("sidebar.new_folder"),
                     onClick: () => props.onNewFolder(project),

@@ -145,6 +145,7 @@ class TerminalRequest(BaseModel):
     #: ended starts where it was. One the shell cannot be told is ignored
     #: (shell.start_in); the limit is only one for the size of the request.
     cwd: str = Field("", max_length=65536)
+    projectId: uuid.UUID | None = None
 
 
 class SupportBody(BaseModel):
@@ -1152,7 +1153,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
             terminal = await terminals.open(session.person, request.machineId,
                                             request.cols, request.rows,
                                             request.cwd, session_id=session.id,
-                                            closed=await closed_to(session))
+                                            closed=await closed_to(session),
+                                            project_id=request.projectId)
         except NotAllowed as exc:
             return _json({"error": str(exc)}, 404)
         except KeysClosed as exc:
