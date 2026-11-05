@@ -274,5 +274,49 @@ class TestProjectMembersAndDiscovery(unittest.TestCase):
         self.assertEqual(ha.custom_name, "Home Assistant Pro")
 
 
+class TestGitSyncAndTerminalBranches(unittest.TestCase):
+    def setUp(self):
+        from tterm.orchestration.git_sync import GitSyncManager, ProjectGitConfigDTO
+        self.mgr = GitSyncManager()
+
+    def test_project_git_binding(self):
+        from tterm.orchestration.git_sync import ProjectGitConfigDTO
+        cfg = ProjectGitConfigDTO(
+            project_id="proj-42",
+            repo_url="https://github.com/myorg/custom-repo.git",
+            provider="github",
+            default_branch="main",
+            auto_branch_per_terminal=True,
+            auto_commit_actions=True,
+        )
+        saved = self.mgr.set_config(cfg)
+        self.assertEqual(saved.repo_url, "https://github.com/myorg/custom-repo.git")
+        self.assertTrue(saved.auto_branch_per_terminal)
+
+    def test_terminal_branch_generation_and_auto_commit(self):
+        branch_dto = self.mgr.get_or_create_terminal_branch(
+            project_id="proj-42",
+            terminal_id="term-xyz-123",
+            terminal_label="BuildWorker",
+            user_name="Evgeny",
+        )
+        self.assertEqual(branch_dto.branch_name, "term/buildworker-evgeny")
+        self.assertTrue(branch_dto.auto_commit)
+
+        # Check setup script
+        setup_cmd = self.mgr.build_branch_setup_script(branch_dto.branch_name, "main")
+        self.assertIn("term/buildworker-evgeny", setup_cmd)
+        self.assertIn("git switch", setup_cmd)
+
+        # Check commit script
+        commit_cmd = self.mgr.build_action_commit_command("npm install", "Evgeny", exit_code=0)
+        self.assertIn("npm install", commit_cmd)
+        self.assertIn("git commit -m", commit_cmd)
+
+        # Record commit
+        updated = self.mgr.record_commit("term-xyz-123", "npm install")
+        self.assertEqual(updated.commits_count, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

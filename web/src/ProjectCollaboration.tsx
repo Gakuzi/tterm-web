@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Project, TerminalInfo, Me } from "./api";
 import {
   Branch, Check, Close, Copy, Key, Layers,
@@ -23,6 +23,24 @@ interface TeamMember {
   terminalsAllowed: string[]; // IDs of terminals allowed, or ["*"]
   aiMode?: "execute" | "guard" | "readonly";
   scopeEntityName?: string;
+}
+
+function normalizeMember(m: any): TeamMember {
+  const allowed = Array.isArray(m.terminalsAllowed)
+    ? m.terminalsAllowed
+    : Array.isArray(m.terminals_allowed)
+      ? m.terminals_allowed
+      : ["*"];
+  return {
+    id: m.id,
+    name: m.name,
+    email: m.email,
+    role: m.role || "container_developer",
+    isAi: Boolean(m.is_ai ?? m.isAi),
+    terminalsAllowed: allowed,
+    aiMode: m.ai_mode || m.aiMode || "guard",
+    scopeEntityName: m.scopeEntityName || m.scope_entity_name,
+  };
 }
 
 interface DiscoveredContainer {
@@ -64,7 +82,12 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
   ]);
 
   const [gitRepo, setGitRepo] = useState("https://github.com/DLGerasimenko/tterm-web.git");
-  const [gitBranch] = useState("feature/mcp-ai-integration");
+  const [gitBranch, setGitBranch] = useState("main");
+  const [autoBranchPerTerminal, setAutoBranchPerTerminal] = useState(true);
+  const [autoCommitActions, setAutoCommitActions] = useState(true);
+  const [isSavingGit, setIsSavingGit] = useState(false);
+  const [terminalBranches, setTerminalBranches] = useState<Record<string, { branch_name: string; auto_commit: boolean; commits_count: number }>>({});
+  const [copiedBranchScript, showCopiedBranchScript] = useBriefly<string>();
   const [showTermiusModal, setShowTermiusModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showPrModal, setShowPrModal] = useState(false);
@@ -146,13 +169,14 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
   const [copiedSshCmd, showCopiedSshCmd] = useBriefly<boolean>();
 
   // Auto-fetch discovered containers and members on mount
-  useState(() => {
+  useEffect(() => {
+    let live = true;
     fetch("/api/orchestration/discovery/klim", {
       headers: { "x-tterm": "1" },
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data?.containers?.length) {
+        if (live && data?.containers?.length) {
           setContainers(data.containers);
         }
       })
@@ -163,12 +187,52 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data?.members?.length) {
-          setMembers(data.members);
+        if (live && data?.members?.length) {
+          setMembers(data.members.map(normalizeMember));
         }
       })
       .catch(() => {});
-  });
+
+    // Fetch Git repository config
+    fetch(`/api/orchestration/projects/${project.id}/git-config`, {
+      headers: { "x-tterm": "1" },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (live && data?.config) {
+          if (data.config.repo_url) setGitRepo(data.config.repo_url);
+          if (data.config.default_branch) setGitBranch(data.config.default_branch);
+          if (typeof data.config.auto_branch_per_terminal === "boolean") {
+            setAutoBranchPerTerminal(data.config.auto_branch_per_terminal);
+          }
+          if (typeof data.config.auto_commit_actions === "boolean") {
+            setAutoCommitActions(data.config.auto_commit_actions);
+          }
+        }
+      })
+      .catch(() => {});
+
+    // Fetch terminal branch mapping for open terminals
+    terminals.forEach((t) => {
+      fetch(`/api/orchestration/terminals/${t.id}/git-branch?project_id=${project.id}&label=${encodeURIComponent(t.name || "")}&user=${encodeURIComponent(me.name || "user")}`, {
+        headers: { "x-tterm": "1" },
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (live && data?.branch) {
+            setTerminalBranches((prev) => ({
+              ...prev,
+              [t.id]: data.branch,
+            }));
+          }
+        })
+        .catch(() => {});
+    });
+
+    return () => {
+      live = false;
+    };
+  }, [project.id]);
 
   const inviteLink = `${window.location.origin}/#invite=${project.id}&token=tt_inv_${project.id.slice(0, 8)}`;
 
@@ -197,6 +261,33 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
     navigator.clipboard.writeText(text);
     triggerBriefly(true);
     if (notify) notify("Скопировано в буфер обмена"); // i18n-ignore
+  };
+
+  const handleSaveGitConfig = async () => {
+    setIsSavingGit(true);
+    try {
+      const res = await fetch(`/api/orchestration/projects/${project.id}/git-config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify({
+          project_id: project.id,
+          repo_url: gitRepo,
+          provider: gitRepo.includes("gitea") ? "gitea" : gitRepo.includes("gitlab") ? "gitlab" : "github",
+          default_branch: gitBranch,
+          auto_branch_per_terminal: autoBranchPerTerminal,
+          auto_commit_actions: autoCommitActions,
+        }),
+      });
+      if (res.ok) {
+        if (notify) notify("Конфигурация репозитория и веток терминалов успешно сохранена!"); // i18n-ignore
+      } else {
+        if (notify) notify("Ошибка при сохранении конфигурации Git"); // i18n-ignore
+      }
+    } catch {
+      if (notify) notify("Сетевая ошибка при сохранении Git-конфигурации"); // i18n-ignore
+    } finally {
+      setIsSavingGit(false);
+    }
   };
 
   const handleScanNode = async () => {
@@ -334,14 +425,18 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
     setMembers((prev) =>
       prev.map((m) => {
         if (m.id !== memberId) return m;
-        const current = m.terminalsAllowed;
+        const current = Array.isArray(m.terminalsAllowed)
+          ? m.terminalsAllowed
+          : Array.isArray((m as any).terminals_allowed)
+            ? (m as any).terminals_allowed
+            : ["*"];
         if (current.includes("*")) {
           // Switch to explicit list without this terminal
           const allOtherIds = terminals.map((t) => t.id).filter((id) => id !== terminalId);
           return { ...m, terminalsAllowed: allOtherIds };
         }
         if (current.includes(terminalId)) {
-          return { ...m, terminalsAllowed: current.filter((id) => id !== terminalId) };
+          return { ...m, terminalsAllowed: current.filter((id: string) => id !== terminalId) };
         }
         return { ...m, terminalsAllowed: [...current, terminalId] };
       })
@@ -434,7 +529,12 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     {terminals.map((t) => {
-                      const allowed = member.terminalsAllowed.includes("*") || member.terminalsAllowed.includes(t.id);
+                      const allowedList = Array.isArray(member.terminalsAllowed)
+                        ? member.terminalsAllowed
+                        : Array.isArray((member as any).terminals_allowed)
+                          ? (member as any).terminals_allowed
+                          : ["*"];
+                      const allowed = allowedList.includes("*") || allowedList.includes(t.id);
                       return (
                         <label
                           key={t.id}
@@ -476,64 +576,207 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
           <div className="pp-section-title">
             <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Branch size={18} />
-              Git Репозиторий и Слияние {/* i18n-ignore */}
+              Git Репозиторий и Ветки Терминалов {/* i18n-ignore */}
             </h2>
             <span>
-              Связь проекта с GitHub / Gitea для синхронизации и слияния изменений {/* i18n-ignore */}
+              Каждый проект привязывается к Git-репозиторию. Терминалы — изолированные ветки с автокоммитом действий. {/* i18n-ignore */}
             </span>
           </div>
-          <button
-            type="button"
-            className="button-accent small"
-            onClick={() => setShowPrModal(true)}
-          >
-            Предложение для автора (PR) {/* i18n-ignore */}
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              className="button-accent small"
+              onClick={handleSaveGitConfig}
+              disabled={isSavingGit}
+            >
+              {isSavingGit ? "Сохранение..." : "💾 Сохранить привязку Git"} {/* i18n-ignore */}
+            </button>
+            <button
+              type="button"
+              className="button-ghost small"
+              onClick={() => setShowPrModal(true)}
+            >
+              Предложение автору (PR) {/* i18n-ignore */}
+            </button>
+          </div>
         </div>
 
         <div className="pp-card" style={{ padding: "16px 20px" }}>
-          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
-            <div style={{ flex: 1, minWidth: 260 }}>
+          {/* Main repo configuration */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 16 }}>
+            <div>
               <span style={{ fontSize: 11, color: "var(--color-text-secondary, #888)", display: "block", marginBottom: 4 }}>
-                URL удаленного репозитория (GitHub / Gitea): {/* i18n-ignore */}
+                URL удаленного репозитория (GitHub / Gitea / GitLab): {/* i18n-ignore */}
               </span>
               <input
                 type="text"
                 className="input-text"
                 value={gitRepo}
+                placeholder="https://github.com/DLGerasimenko/tterm-web.git"
                 onChange={(e) => setGitRepo(e.target.value)}
                 style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }}
               />
             </div>
-            <div style={{ minWidth: 160 }}>
+            <div>
               <span style={{ fontSize: 11, color: "var(--color-text-secondary, #888)", display: "block", marginBottom: 4 }}>
-                Ветка разработки: {/* i18n-ignore */}
+                Базовая ветка (Base Trunk Branch): {/* i18n-ignore */}
               </span>
-              <div style={{
-                padding: "8px 12px",
-                borderRadius: 6,
-                background: "rgba(0,0,0,0.3)",
-                fontFamily: "monospace",
-                fontSize: 13,
-                border: "1px solid rgba(255,255,255,0.08)"
-              }}>
-                {gitBranch} {/* i18n-ignore */}
-              </div>
+              <input
+                type="text"
+                className="input-text"
+                value={gitBranch}
+                placeholder="main"
+                onChange={(e) => setGitBranch(e.target.value)}
+                style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }}
+              />
             </div>
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 12, color: "var(--color-text-secondary, #888)" }}>
+
+          {/* Options Toggles */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 14px", background: "rgba(255,255,255,0.02)", borderRadius: 8, border: "1px solid rgba(255,255,255,0.06)", marginBottom: 16 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
+              <input
+                type="checkbox"
+                checked={autoBranchPerTerminal}
+                onChange={(e) => setAutoBranchPerTerminal(e.target.checked)}
+              />
+              <strong>Изолировать каждый терминал в отдельную ветку Git {/* i18n-ignore */}</strong>
+              <span style={{ color: "var(--color-text-secondary, #888)", fontSize: 12 }}>
+                (ветка <code>term/название-автор</code> создается автоматически) {/* i18n-ignore */}
+              </span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
+              <input
+                type="checkbox"
+                checked={autoCommitActions}
+                onChange={(e) => setAutoCommitActions(e.target.checked)}
+              />
+              <strong>Автоматически фиксировать действия каждого терминала как Git-коммиты {/* i18n-ignore */}</strong>
+              <span style={{ color: "var(--color-text-secondary, #888)", fontSize: 12 }}>
+                (команды логируются в формате <code>[term] команда (by автор)</code>) {/* i18n-ignore */}
+              </span>
+            </label>
+          </div>
+
+          {/* Terminal Branches List */}
+          <div style={{ marginTop: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <h4 style={{ margin: 0, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+                <Branch size={14} />
+                Ветки активных терминалов проекта ({terminals.length}) {/* i18n-ignore */}
+              </h4>
+              <span style={{ fontSize: 11, color: "var(--color-text-secondary, #888)" }}>
+                Каждое окно терминала изолировано в своей ветке {/* i18n-ignore */}
+              </span>
+            </div>
+
+            {terminals.length === 0 ? (
+              <div style={{ padding: "12px 16px", borderRadius: 8, background: "rgba(0,0,0,0.2)", fontSize: 12, color: "var(--color-text-secondary, #888)" }}>
+                В проекте нет открытых терминалов. Откройте терминал, чтобы активировать персональную ветку. {/* i18n-ignore */}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {terminals.map((t) => {
+                  const cleanUser = (me.name || "user").replace(/[^a-zA-Z0-9]/g, "").toLowerCase() || "user";
+                  const cleanLabel = (t.name || t.machine || `term${t.id.slice(0, 4)}`).replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+                  const fallbackBranch = `term/${cleanLabel}-${cleanUser}`;
+                  const branchInfo = terminalBranches[t.id];
+                  const branchName = branchInfo?.branch_name || fallbackBranch;
+                  const commitsCount = branchInfo?.commits_count ?? 0;
+
+                  return (
+                    <div
+                      key={t.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "10px 14px",
+                        borderRadius: 8,
+                        background: "rgba(0,0,0,0.25)",
+                        border: "1px solid rgba(255,255,255,0.05)",
+                        flexWrap: "wrap",
+                        gap: 8,
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 200 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>{t.name || `Терминал #${t.id.slice(0, 6)}` /* i18n-ignore */}</span>
+                        <span style={{
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          background: "rgba(59, 130, 246, 0.15)",
+                          border: "1px solid rgba(59, 130, 246, 0.3)",
+                          color: "#60a5fa",
+                          fontFamily: "monospace",
+                          fontSize: 12,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}>
+                          <Branch size={12} />
+                          {branchName}
+                        </span>
+                        {autoCommitActions && (
+                          <span style={{
+                            padding: "2px 6px",
+                            borderRadius: 4,
+                            background: "rgba(16, 185, 129, 0.15)",
+                            color: "#10b981",
+                            fontSize: 11,
+                          }}>
+                            {/* i18n-ignore */}
+                            💾 {commitsCount} коммитов
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <button
+                          type="button"
+                          className="button-ghost small"
+                          title="Скопировать команду перехода в ветку терминала" // i18n-ignore
+                          onClick={() => {
+                            const cmd = `git switch -c ${branchName} 2>/dev/null || git switch ${branchName}`;
+                            copyText(cmd, (v) => showCopiedBranchScript(v ? t.id : ""));
+                            if (notify) notify(`Команда switch для ветки ${branchName} скопирована`); // i18n-ignore
+                          }}
+                        >
+                          <Copy size={13} />
+                          <span>{copiedBranchScript === t.id ? "Скопировано!" : "Команда switch" /* i18n-ignore */}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="button-plain small"
+                          title="Скопировать команду отправки ветки в репозиторий" // i18n-ignore
+                          onClick={() => {
+                            const cmd = `git push -u origin ${branchName}`;
+                            copyText(cmd, () => {});
+                            if (notify) notify(`Команда push скопирована: git push -u origin ${branchName}`); // i18n-ignore
+                          }}
+                        >
+                          <span>🚀 Push в Git {/* i18n-ignore */}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 12, color: "var(--color-text-secondary, #888)", marginTop: 14 }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
               <span style={{ color: "#10b981", display: "inline-flex" }}><Check size={14} /></span>
-              Синхронизировано с локальным рабочим пространством {/* i18n-ignore */}
+              Привязано к локальному и удаленному репозиторию {/* i18n-ignore */}
             </span>
             <span>·</span>
             <a
-              href="https://github.com/DLGerasimenko/tterm-web"
+              href={gitRepo.replace(/\.git$/, "")}
               target="_blank"
               rel="noreferrer"
               style={{ color: "var(--color-accent, #3b82f6)", textDecoration: "none" }}
             >
-              Открыть upstream на GitHub ↗ {/* i18n-ignore */}
+              Открыть {gitRepo.includes("github.com") ? "GitHub" : "Репозиторий"} ↗ {/* i18n-ignore */}
             </a>
           </div>
         </div>

@@ -290,7 +290,11 @@ export function ProjectAccessDialog(props: Props) {
     setMembers((prev) =>
       prev.map((m) => {
         if (m.id !== userId) return m;
-        const currentAllowed = m.terminals_allowed || [];
+        const currentAllowed = Array.isArray(m.terminals_allowed)
+          ? m.terminals_allowed
+          : Array.isArray((m as any).terminalsAllowed)
+            ? (m as any).terminalsAllowed
+            : ["*"];
         const isAll = currentAllowed.includes("*");
         const next = isAll ? [terminalId] : ["*"];
         return { ...m, terminals_allowed: next };
@@ -539,7 +543,12 @@ export function ProjectAccessDialog(props: Props) {
             <div className="members-list">
               {members.map((m) => {
                 const roleMeta = ROLE_LABELS[m.role] || ROLE_LABELS.container_developer;
-                const isOnlyCurrentTerm = !m.terminals_allowed.includes("*");
+                const allowedList = Array.isArray(m.terminals_allowed)
+                  ? m.terminals_allowed
+                  : Array.isArray((m as any).terminalsAllowed)
+                    ? (m as any).terminalsAllowed
+                    : ["*"];
+                const isOnlyCurrentTerm = !allowedList.includes("*");
 
                 return (
                   <div key={m.id} className="member-row-card">

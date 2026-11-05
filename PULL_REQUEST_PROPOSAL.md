@@ -238,6 +238,27 @@
 
 ---
 
+### 12. Привязка проектов к Git-репозиториям, терминалы как ветки и автокоммит действий
+
+Каждый проект в tTerm теперь можно связать с отдельным удаленным Git-репозиторием (GitHub, Gitea, GitLab), а рабочие окна терминалов организованы по модели «Терминал как ветка».
+
+#### Что добавлено:
+* **Менеджер синхронизации с Git ([`tterm/orchestration/git_sync.py`](file:///Users/evgeniy/Documents/antigravity/tterm-web/tterm/orchestration/git_sync.py)):**
+  * Эндпоинты `/api/orchestration/projects/{project_id}/git-config` и `/api/orchestration/terminals/{terminal_id}/git-branch`.
+  * Индивидуальная привязка Git-репозитория к каждому проекту с настройкой базовой ветки trunk (`main`, `master`, `dev`).
+* **Модель «Терминал как ветка репозитория»:**
+  * Каждому открытому окну терминала автоматически сопоставляется изолированная Git-ветка проекта вида `term/{название_окна}-{автор}` (например, `term/buildworker-evgeny`).
+  * Скрипт переключения рабочего дерева генерируется и доступен по 1 клику (`git switch -c ...`).
+* **Автоматическая фиксация действий терминала (Auto-Commit):**
+  * Каждая команда, выполняемая в терминале, фиксируется в виде коммита в его персональной ветке (`[term] <команда> (by <автор>)`), обеспечивая прозрачную и неизменяемую историю сессий.
+  * Интерактивный тумблер в строке ввода `[💾 Автокоммит: ВКЛ / ВЫКЛ]`, позволяющий разработчику в любой момент отключить или включить автоматическое логирование.
+  * Кнопка быстрой отправки ветки в удаленный репозиторий `[🚀 Push в Git]`.
+* **Устранение ошибок и мобильная адаптивность:**
+  * Устранено падение JavaScript `TypeError: Cannot read properties of undefined (reading 'includes')` путем добавления строгой нормализации списков разрешенных терминалов `terminals_allowed` / `terminalsAllowed`.
+  * Кнопки управления терминалом и доступом команды консолидированы в адаптивное меню шестеренки `⚙️` с 3-уровневой приоритетной группировкой: 1) Проект и команда $\to$ 2) Docker и нода $\to$ 3) Терминал и ИИ.
+
+---
+
 ## 🗂 Сводка затронутых файлов
 
 ```text
@@ -254,12 +275,13 @@ Backend & Orchestration:
   tterm/orchestration/discovery.py     — сканирование Docker-контейнеров и портов с автокэшированием
   tterm/orchestration/locks.py         — иерархические блокировки (Drain Locks) и апелляции
   tterm/orchestration/notifications.py — диспетчер пуш-уведомлений и колокольчика
+  tterm/orchestration/git_sync.py      — привязка Git-репозиториев, ветки терминалов и автокоммит
   tterm/orchestration/schema.sql       — PostgreSQL DDL схема с ограничениями
-  tterm/orchestration/api.py           — FastAPI эндпоинты оркестрации, блокировок и CRUD участников
+  tterm/orchestration/api.py           — FastAPI эндпоинты оркестрации, блокировок, Git и CRUD участников
   mcp_server.py                        — JSON-RPC MCP шлюз для ИИ-ассистентов
   tterm_cli.py                         — консольный клиент tterm-cli
-  test_mcp.py                          — 6 тестов функционала MCP
-  test_orchestration.py                — 12 тестов иерархического RBAC, контейнеров и Drain Locks
+  test_mcp.py                          — 6 тестов функционала MCP (100% OK)
+  test_orchestration.py                — 14 тестов RBAC, контейнеров, Drain Locks и Git Sync (100% OK)
 
 Frontend:
   web/src/ProjectPage.tsx              — интеграция баннера и хаба совместной работы
@@ -274,13 +296,13 @@ Frontend:
   web/src/settingsSearch.ts            — индексация секции projects
   web/src/platform.ts                  — детекция Windows / Linux / macOS браузеров
   web/src/AddMachine.tsx               — табы macOS/Linux/Windows, кнопка .bat
-  web/src/InputLine.tsx                — панель Git, блокировка ввода при Drain Lock
+  web/src/InputLine.tsx                — Git-бар с кнопкой автокоммита и авто-переключением ветки
   web/src/BlockView.tsx                — цветные подписи авторов, помощь ИИ и колокольчик (🔔)
   web/src/FeedTerminal.tsx             — авторство команд и проброс onRunFix
   web/src/AiSection.tsx                — раздел настроек MCP, безопасность, RBAC
   web/src/Sidebar.tsx                  — inline-редактирование имени машин
   web/src/icons.tsx                    — иконки терминала (Bell, Docker, Sparkle)
-  web/src/styles/app.css               — стили Git-бара, popover, ИИ-карточек и мобильная верстка
+  web/src/styles/app.css               — стили Git-бара, автокоммита, popover, ИИ-карточек и мобильная верстка
 ```
 
 ---
@@ -290,7 +312,7 @@ Frontend:
 1. **Без прав Root:** Все новые агенты и скрипты запускаются от непривилегированного пользователя.
 2. **Интернационализация:** Все строки интерфейса соответствуют правилам `scripts/strings.mjs` и не нарушают сборку 12 языковых локалей.
 3. **Чистота TypeScript:** `tsc --noEmit` и `vite build` отрабатывают с 0 предупреждений и ошибок.
-4. **Тесты:** В репозитории добавлен файл тестов `test_mcp.py`, покрывающий ключевые сценарии.
+4. **Тесты:** В репозитории добавлены файлы тестов `test_mcp.py` и `test_orchestration.py`, суммарно 20 тестов, все проходят успешно.
 
 ---
 

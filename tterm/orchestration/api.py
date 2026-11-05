@@ -88,6 +88,59 @@ async def bind_git_repository(
     return {"ok": True, "project_id": str(project_id), "git": data.model_dump()}
 
 
+# ---------------------------------------------------------------------- Git Sync & Terminal Branches
+from .git_sync import git_sync_manager, ProjectGitConfigDTO
+
+
+@router.get("/projects/{project_id}/git-config")
+async def get_project_git_config(project_id: str):
+    """Returns the Git repository binding and terminal branch settings for a project."""
+    cfg = git_sync_manager.get_config(project_id)
+    return {"ok": True, "config": cfg.model_dump()}
+
+
+@router.post("/projects/{project_id}/git-config")
+async def update_project_git_config(project_id: str, data: ProjectGitConfigDTO):
+    """Binds a Git repository to the project and configures terminal branching."""
+    saved = git_sync_manager.set_config(data)
+    return {"ok": True, "config": saved.model_dump()}
+
+
+@router.get("/terminals/{terminal_id}/git-branch")
+async def get_terminal_git_branch(
+    terminal_id: str,
+    project_id: str = "default",
+    label: str = "",
+    user: str = "",
+):
+    """Gets or generates the unique Git branch for this terminal and its setup commands."""
+    dto = git_sync_manager.get_or_create_terminal_branch(project_id, terminal_id, label, user)
+    setup_script = git_sync_manager.build_branch_setup_script(dto.branch_name, dto.base_branch)
+    return {
+        "ok": True,
+        "branch": dto.model_dump(),
+        "setup_script": setup_script,
+    }
+
+
+class RecordCommitDTO(BaseModel):
+    command: str
+    author: str = "user"
+    exit_code: int = 0
+
+
+@router.post("/terminals/{terminal_id}/record-commit")
+async def record_terminal_action_commit(terminal_id: str, data: RecordCommitDTO):
+    """Records that a terminal action was committed to its dedicated git branch."""
+    updated = git_sync_manager.record_commit(terminal_id, data.command)
+    commit_cmd = git_sync_manager.build_action_commit_command(data.command, data.author, data.exit_code)
+    return {
+        "ok": True,
+        "branch": updated.model_dump() if updated else None,
+        "commit_cmd": commit_cmd,
+    }
+
+
 # ---------------------------------------------------------------------- Nodes
 @router.post("/projects/{project_id}/nodes")
 async def register_node(

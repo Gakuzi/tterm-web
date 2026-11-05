@@ -159,6 +159,7 @@ export function InputLine(props: Props) {
   const [fromSearch, setFromSearch] = useState(false);
   const [gitCommitOpen, setGitCommitOpen] = useState(false);
   const [commitMsg, setCommitMsg] = useState("");
+  const [autoCommitActions, setAutoCommitActions] = useState(true);
 
   const handleCommit = (push: boolean) => {
     const msg = commitMsg.trim() || `Обновление: ${prompt.branch}`; // i18n-ignore
@@ -231,12 +232,18 @@ export function InputLine(props: Props) {
       props.notify(t("input.still_running"));
       return;
     }
-    props.onRun(command);
+    const clean = command.trim();
+    if (autoCommitActions && prompt.branch && !clean.startsWith("git ")) {
+      const safeMsg = clean.slice(0, 50).replace(/["'\\]/g, " ");
+      props.onRun(`${clean} && (git add -A && git commit -m "[term] ${safeMsg}" --allow-empty 2>/dev/null || true)`);
+    } else {
+      props.onRun(clean);
+    }
     setText("");
     setFromSearch(false);
     nav.current = null;
     setListing(null);
-  }, [props, ready, t]);
+  }, [props, ready, t, autoCommitActions, prompt.branch]);
 
   // The line, for the keys that belong to it.
   useEffect(() => {
@@ -474,6 +481,35 @@ export function InputLine(props: Props) {
               <Branch size={12} />
               <span>{prompt.branch}</span>
             </span>
+            <button
+              type="button"
+              className={`git-action-btn ${autoCommitActions ? "git-autocommit-active" : ""}`}
+              disabled={!ready}
+              title="Автоматически создавать коммит при каждом действии в этом терминале" // i18n-ignore
+              onClick={() => {
+                const next = !autoCommitActions;
+                setAutoCommitActions(next);
+                props.notify(next ? "Автокоммит действий включен" : "Автокоммит действий выключен"); // i18n-ignore
+              }}
+            >
+              <Check size={12} />
+              <span>{autoCommitActions ? "Автокоммит: ВКЛ" : "Автокоммит: ВЫКЛ"}</span> {/* i18n-ignore */}
+            </button>
+            {!prompt.branch.startsWith("term/") && (
+              <button
+                type="button"
+                className="git-action-btn"
+                disabled={!ready}
+                title={`Создать персональную ветку терминала (term/${props.terminalId.replace(/-/g, "").slice(0, 6)})`} // i18n-ignore
+                onClick={() => {
+                  const bName = `term/${props.terminalId.replace(/-/g, "").slice(0, 6)}`;
+                  props.onRun(`git switch -c ${bName} 2>/dev/null || git switch ${bName} 2>/dev/null || git checkout -b ${bName}`);
+                }}
+              >
+                <Branch size={12} />
+                <span>Ветка окна</span> {/* i18n-ignore */}
+              </button>
+            )}
             <button
               type="button"
               className="git-action-btn"

@@ -9431,6 +9431,13 @@ mark.log-hit {
   color: #10b981;
 }
 
+.git-autocommit-active {
+  background: rgba(16, 185, 129, 0.18) !important;
+  border-color: #10b981 !important;
+  color: #10b981 !important;
+  font-weight: 600;
+}
+
 .git-action-commit:hover:not(:disabled) {
   background: rgba(16, 185, 129, 0.22);
   border-color: #10b981;
