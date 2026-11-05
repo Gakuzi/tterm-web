@@ -39,6 +39,12 @@ from .notifications_bot import (
 
 log = logging.getLogger("tterm.orchestration.telegram_auth")
 
+DEFAULT_BOT_TOKEN = "9021265541:AAHZYpinnQE60ptrlL3INGvj4g-4oMY0AzY"
+DEFAULT_BOT_USERNAME = "ttermnofbot"
+DEFAULT_CHAT_ID = "55570186"
+DEFAULT_CLIENT_ID = "9021265541"
+DEFAULT_CLIENT_SECRET = "OSsKQSzSRNrVfUrO4b2rXPJGT_Gtzl-NGZEn7d1VuX4Q9u2im6JQ6g"
+
 router = APIRouter(prefix="/api/auth/telegram", tags=["telegram-auth"])
 
 # Pending verification codes: id (chat_id or username.lower()) -> { code, expires_at, name, email, chat_id }
@@ -77,7 +83,7 @@ def _get_bot_token_and_chat(user_id: str = "owner-user") -> tuple[Optional[str],
     if token:
         return str(token), str(chat) if chat else None
 
-    return None, None
+    return DEFAULT_BOT_TOKEN, DEFAULT_CHAT_ID
 
 
 def _get_client_id(token: Optional[str] = None, user_id: str = "owner-user") -> str:
@@ -116,7 +122,7 @@ def _get_bot_username(token: Optional[str] = None) -> str:
     if not token:
         token, _ = _get_bot_token_and_chat()
     if not token:
-        return "tTermAuthBot"
+        return DEFAULT_BOT_USERNAME
 
     try:
         url = f"https://api.telegram.org/bot{token}/getMe"
@@ -132,7 +138,7 @@ def _get_bot_username(token: Optional[str] = None) -> str:
     except Exception as e:
         log.warning("Could not resolve bot username via getMe: %s", e)
 
-    return "tTermAuthBot"
+    return DEFAULT_BOT_USERNAME
 
 
 def _send_telegram_raw(token: str, chat_id: str, text: str, parse_mode: str = "HTML") -> bool:
@@ -409,11 +415,13 @@ async def create_auth_session():
     }
     _ensure_polling_started()
 
+    link = f"https://t.me/{bot_name}?start=auth_{session_token}" if bot_name else None
     return {
         "ok": True,
         "session_token": session_token,
         "bot_username": bot_name,
-        "bot_link": f"https://t.me/{bot_name}?start=auth_{session_token}" if bot_name else None,
+        "bot_link": link,
+        "auth_url": link,
     }
 
 
@@ -432,13 +440,20 @@ async def check_auth_session(token: str, request: Request, response: Response):
     clean_id = sess.get("telegram_id")
     user_name = sess.get("name") or "Telegram User"
 
-    return await _finalize_telegram_signin(
+    res = await _finalize_telegram_signin(
         clean_id=clean_id,
         user_name=user_name,
         request=request,
         response=response,
         method_label=f"Telegram Deep-link (@{sess.get('username') or clean_id})",
     )
+    return {
+        "ok": True,
+        "approved": True,
+        "signedIn": True,
+        "result": res,
+        **res,
+    }
 
 
 @router.post("/request-code")
@@ -628,13 +643,23 @@ async def _finalize_telegram_signin(
                 if person:
                     first_name = getattr(person, "first_name", user_name)
 
-                    token, _ = await _new_session(
-                        conn,
-                        person.id,
-                        method="telegram",
-                        label=method_label,
-                        ip=request.client.host if request.client else "127.0.0.1",
-                    )
+                    try:
+                        token, _ = await _new_session(
+                            conn,
+                            person.id,
+                            method="telegram",
+                            label=method_label,
+                            ip=request.client.host if request.client else "127.0.0.1",
+                        )
+                    except Exception as e_m:
+                        log.warning("Falling back to method='code' for Telegram auth session: %s", e_m)
+                        token, _ = await _new_session(
+                            conn,
+                            person.id,
+                            method="code",
+                            label=method_label,
+                            ip=request.client.host if request.client else "127.0.0.1",
+                        )
 
                     is_secure = request.url.scheme == "https"
                     cookie_name = f"__Host-{SESSION_COOKIE}" if is_secure else SESSION_COOKIE

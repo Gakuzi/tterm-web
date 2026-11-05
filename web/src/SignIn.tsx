@@ -331,6 +331,7 @@ function EmailStep(props: {
   const [setupToken, setSetupToken] = useState("");
   const [showSetup, setShowSetup] = useState(false);
   const [waitingOneClick, setWaitingOneClick] = useState(false);
+  const [tgLink, setTgLink] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -350,18 +351,20 @@ function EmailStep(props: {
     setWaitingOneClick(true);
     try {
       const session = await createTelegramAuthSession();
-      if (session.auth_url) {
-        window.open(session.auth_url, "_blank");
+      const openLink = session.auth_url || session.bot_link;
+      if (openLink) {
+        setTgLink(openLink);
+        window.open(openLink, "_blank");
       }
       // Poll session status
       const pollTimer = window.setInterval(async () => {
         try {
           const check = await checkTelegramAuthSession(session.session_token);
-          if (check.approved && check.result) {
+          if (check.approved && (check.result || (check as any).signedIn)) {
             window.clearInterval(pollTimer);
             setWaitingOneClick(false);
             setBusy(false);
-            props.onIn(check.result);
+            props.onIn(((check.result || check) as SignedInNow));
           }
         } catch {
           // Keep polling until verified or cancelled
@@ -499,10 +502,23 @@ function EmailStep(props: {
                   {waitingOneClick ? "⏳ Ожидание нажатия Start в Telegram..." : `✈️ Войти в 1 клик через @${tgStatus.bot_username || "бота"}`}
                 </button>
                 {waitingOneClick && (
-                  <p className="signin-small" style={{ color: "var(--accent)", marginTop: 8, textAlign: "center" }}>
-                    {/* i18n-ignore */}
-                    <span>Откройте бота в Telegram и нажмите кнопку <strong>«Запустить» (/start)</strong> для автоматического входа.</span>
-                  </p>
+                  <div style={{ marginTop: 8, textAlign: "center" }}>
+                    <p className="signin-small" style={{ color: "var(--accent)", marginBottom: 6 }}>
+                      {/* i18n-ignore */}
+                      <span>Откройте бота в Telegram и нажмите кнопку <strong>«Запустить» (/start)</strong> для автоматического входа.</span>
+                    </p>
+                    {tgLink && (
+                      <a
+                        href={tgLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ fontSize: 13, fontWeight: 600, color: "#229ED9", textDecoration: "underline", display: "inline-block", margin: "4px 0" }}
+                      >
+                        {/* i18n-ignore */}
+                        👉 Нажмите сюда, если Telegram не открылся автоматически
+                      </a>
+                    )}
+                  </div>
                 )}
               </div>
 

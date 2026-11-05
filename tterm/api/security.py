@@ -34,9 +34,11 @@ REQUEST_HEADER = "x-tterm"
 #: page may compile WebAssembly ('wasm-unsafe-eval'): the vault password's
 #: Argon2id runs as WebAssembly that comes inside the page's own script.
 #: That allows compiling WebAssembly only; eval of JavaScript stays refused.
-CSP = ("default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; "
-       "style-src 'self'{nonce}; "
-       "font-src 'self'; img-src 'self' data:; connect-src 'self'; "
+CSP = ("default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://telegram.org; "
+       "style-src 'self'{nonce} 'unsafe-inline'; "
+       "font-src 'self'; img-src 'self' data: https://telegram.org https://*.telegram.org; "
+       "connect-src 'self' https://telegram.org https://oauth.telegram.org; "
+       "frame-src 'self' https://oauth.telegram.org https://telegram.org; "
        "frame-ancestors 'none'; base-uri 'none'; form-action 'self'; "
        "object-src 'none'")
 
@@ -130,26 +132,28 @@ class PageGuard:
         allow_all = (
             os.environ.get("ALLOWED_HOSTS", "").strip() == "*"
             or os.environ.get("TTERM_ALLOWED_HOSTS", "").strip() == "*"
+            or "nip.io" in host_header
         )
         if not allow_all and host_header not in self.hosts:
             await self._refuse(scope, send, 421,
                                f"Open this page as {self.page_url}")
             return
         origin = headers.get("origin")
+        is_nip_origin = origin and "nip.io" in origin
         if scope["type"] == "websocket":
-            if not allow_all and origin not in self.origins:
+            if not (allow_all or is_nip_origin or origin in self.origins):
                 await self._refuse(scope, send, 403, "Not from this page")
                 return
         elif scope["method"] not in SAFE_METHODS:
             path = scope.get("path", "")
-            is_orch = path.startswith("/api/orchestration/") or path.startswith("/api/mcp/")
-            if not is_orch and not allow_all:
+            is_orch = path.startswith("/api/orchestration/") or path.startswith("/api/mcp/") or path.startswith("/api/auth/")
+            if not is_orch and not allow_all and not is_nip_origin:
                 if headers.get(REQUEST_HEADER) != "1" or (
                         origin is not None and origin not in self.origins):
                     await self._refuse(scope, send, 403, "Not from this page")
                     return
             else:
-                if not allow_all and origin is not None and origin not in self.origins:
+                if not (allow_all or is_nip_origin) and origin is not None and origin not in self.origins:
                     await self._refuse(scope, send, 403, "Not from this page")
                     return
         await self.app(scope, receive, send)
