@@ -204,7 +204,7 @@ def read_terminal(terminal_id: str) -> str:
 
 async def _run_command_ws(terminal_id: str, command: str, timeout: float = 30.0, author: dict[str, Any] | None = None) -> dict[str, Any]:
     allowed_term = _get_allowed_terminal()
-    if allowed_term and terminal_id != allowed_term:
+    if allowed_term and allowed_term != "*" and terminal_id != allowed_term:
         raise PermissionError(f"Access denied: AI Agent is restricted to terminal {allowed_term}")
 
     _ping_session(terminal_id, command)
