@@ -542,8 +542,8 @@ export function Settings(props: Props) {
                 gap: 12,
                 padding: "12px 18px",
                 borderRadius: 10,
-                background: "var(--color-bg-secondary, #1e1e24)",
-                border: "1px solid var(--color-border, #33333d)",
+                background: "var(--raised)",
+                border: "1px solid var(--line)",
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <People size={18} />

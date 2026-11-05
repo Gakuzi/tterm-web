@@ -32,29 +32,47 @@ export function DisruptiveActionModal(props: Props) {
   const title = actionTitles[action] || action;
 
   return (
-    <div className="dialog-overlay" onClick={onCancel}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 580 }}>
-        <div className="dialog-head">
-          <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ color: "#ef4444", display: "inline-flex" }}><Alert size={18} /></span>
-            {title}: {entityName} {/* i18n-ignore */}
-          </h3>
-          <button type="button" className="button-ghost small" onClick={onCancel}>
-            <Close size={15} />
+    <div className="scrim" onClick={onCancel}>
+      <section
+        className="dialog"
+        role="alertdialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "580px",
+          maxWidth: "100%",
+          padding: "24px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "16px",
+        }}
+      >
+        <div className="dialog-head" style={{ marginBottom: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ color: "var(--red)", display: "inline-flex" }}>
+              <Alert size={20} />
+            </span>
+            <div className="dialog-title">
+              <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: "var(--ink)" }}>
+                {title}: {entityName} {/* i18n-ignore */}
+              </h2>
+            </div>
+          </div>
+          <button type="button" className="icon-button small" onClick={onCancel} aria-label="Закрыть" /* i18n-ignore */>
+            <Close size={16} />
           </button>
         </div>
 
-        <div className="dialog-body" style={{ padding: "16px 20px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {activeProcesses.length > 0 ? (
             <>
               <div style={{
                 padding: "10px 14px",
                 borderRadius: "8px",
-                background: "rgba(245, 158, 11, 0.12)",
-                border: "1px solid rgba(245, 158, 11, 0.3)",
-                color: "#fbbf24",
+                background: "var(--amber-tint)",
+                border: "1px solid var(--amber-ring)",
+                color: "var(--amber-ink)",
                 fontSize: 13,
-                marginBottom: 14
               }}>
                 <strong>Обнаружены активные вложенные процессы! {/* i18n-ignore */}</strong>
                 <p style={{ margin: "4px 0 0 0", fontSize: 12 }}>
@@ -62,23 +80,23 @@ export function DisruptiveActionModal(props: Props) {
                 </p>
               </div>
 
-              <div style={{ marginBottom: 16 }}>
-                <span style={{ fontSize: 12, color: "var(--color-text-secondary, #888)", display: "block", marginBottom: 6 }}>
+              <div>
+                <span style={{ fontSize: 12, color: "var(--dim)", display: "block", marginBottom: 6 }}>
                   Список запущенных процессов: {/* i18n-ignore */}
                 </span>
                 <div style={{
                   maxHeight: 180,
                   overflowY: "auto",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  border: "1px solid var(--line)",
                   borderRadius: 6,
-                  background: "rgba(0,0,0,0.3)"
+                  background: "var(--raised)",
                 }}>
                   {activeProcesses.map((p, idx) => (
                     <div
                       key={idx}
                       style={{
                         padding: "8px 12px",
-                        borderBottom: idx < activeProcesses.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
+                        borderBottom: idx < activeProcesses.length - 1 ? "1px solid var(--line)" : "none",
                         fontSize: 12,
                         display: "flex",
                         justifyContent: "space-between",
@@ -86,15 +104,15 @@ export function DisruptiveActionModal(props: Props) {
                       }}
                     >
                       <div>
-                        <strong>{p.terminal_name}</strong>
-                        <span style={{ color: "var(--color-text-secondary, #888)", marginLeft: 6 }}>
+                        <strong style={{ color: "var(--ink)" }}>{p.terminal_name}</strong>
+                        <span style={{ color: "var(--dim)", marginLeft: 6 }}>
                           ({p.user_name}) {/* i18n-ignore */}
                         </span>
-                        <code style={{ display: "block", marginTop: 2, color: "#93c5fd" }}>
+                        <code style={{ display: "block", marginTop: 2, color: "var(--blue)" }}>
                           {p.command} {/* i18n-ignore */}
                         </code>
                       </div>
-                      <span style={{ fontSize: 11, color: "var(--color-text-dim, #777)" }}>
+                      <span style={{ fontSize: 11, color: "var(--faint)" }}>
                         {p.running_since.slice(11, 19)} {/* i18n-ignore */}
                       </span>
                     </div>
@@ -102,7 +120,7 @@ export function DisruptiveActionModal(props: Props) {
                 </div>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
                 <button
                   type="button"
                   className="button-accent"
@@ -121,7 +139,7 @@ export function DisruptiveActionModal(props: Props) {
                   >
                     ⚡ Принудительно (Force Kill) {/* i18n-ignore */}
                   </button>
-                  <button type="button" className="button-ghost small" onClick={onCancel}>
+                  <button type="button" className="button-plain small" onClick={onCancel}>
                     Отмена {/* i18n-ignore */}
                   </button>
                 </div>
@@ -129,21 +147,21 @@ export function DisruptiveActionModal(props: Props) {
             </>
           ) : (
             <>
-              <p style={{ fontSize: 13, marginBottom: 16 }}>
+              <p style={{ fontSize: 13, margin: "4px 0 16px 0", color: "var(--ink)" }}>
                 Активных запущенных процессов не обнаружено. Операция <strong>{title} {/* i18n-ignore */}</strong> для <strong>{entityName} {/* i18n-ignore */}</strong> безопасна для выполнения. {/* i18n-ignore */}
               </p>
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                <button type="button" className="button-ghost" onClick={onCancel}>
+                <button type="button" className="button-plain small" onClick={onCancel}>
                   Отмена {/* i18n-ignore */}
                 </button>
-                <button type="button" className="button-accent" onClick={onConfirmForce}>
+                <button type="button" className="button-accent small" onClick={onConfirmForce}>
                   Подтвердить {/* i18n-ignore */}
                 </button>
               </div>
             </>
           )}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

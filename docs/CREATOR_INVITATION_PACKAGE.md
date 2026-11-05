@@ -86,7 +86,7 @@ graph TD
 
 ---
 
-### Столп 6: Защищенный сейф профиля (GitHub OAuth & Aeza Cloud VPS)
+### Столп 6: Защищенный сейф профиля и интеграция с GitHub
 * **Интеграция с GitHub:** В персональных настройках пользователя (`Account.tsx`) реализована привязка GitHub Personal Access Token (PAT) и GitHub OAuth Web App. Позволяет просматривать репозитории, ветки и создавать Pull Request прямо из tTerm.
 * **Синхронизация заметок и документации с GitHub:** подгрузка всех `.md` файлов из привязанного к проекту репозитория в качестве заметок с возможностью редактирования прямо из веб-интерфейса сервиса.
 
@@ -157,14 +157,12 @@ This PR introduces the **tTerm Distributed AI Orchestration Suite**, turning tTe
    - Colored author badges in terminal feed (`🤖 Antigravity`, `👤 Owner`, `👥 Teammate`).
 
 6. **Personal Security Vault & Telegram Alerts (`Account.tsx`, `encrypted_vault.py`):**
-   - Encrypted in-profile credentials vault for GitHub OAuth and Personal Access Tokens.
-   - 1-click hourly cloud VPS deployment via Aeza Cloud API (starting at 1.40 RUB/hr) with auto-enrollment.
+   - Encrypted in-profile credentials vault for GitHub OAuth and Personal Access Tokens with AES-256-GCM.
+   - Cross-device Telegram Bot notifications and Web Audio chimes for long-running terminal tasks.
 
-7. **Native Windows Agent (`install_computer.ps1`):**
-   - Zero-dependency PowerShell installer using .NET WebSockets, running without requiring Python on Windows.
-
-8. **One-Click Automated VPS Migration (`cloud_deploy.py`):**
-   - Automated deployment and migration of containers and databases to cloud servers with email verification.
+7. **Native Windows Go Agent (`agent/windows/main.go`, `install_computer.ps1`):**
+   - Native lightweight agent with automatic service recovery and Registry/Startup persistence.
+   - Fixed macOS Darwin kernel shell dispatch preventing exit 127.
 
 #### Quality & Compatibility Verification:
 - ✅ **Frontend TypeScript:** `npx tsc --noEmit` passed with 0 errors.

@@ -124,6 +124,7 @@ export function ProjectAccessDialog(props: Props) {
   // Copy helper
   const [copiedInvite, showCopiedInvite] = useBriefly<boolean>();
   const [copiedSnippet, showCopiedSnippet] = useBriefly<boolean>();
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   // Disruptive modal
   const [disruptiveModal, setDisruptiveModal] = useState<{
@@ -451,14 +452,25 @@ export function ProjectAccessDialog(props: Props) {
                   Добавляйте коллег и ИИ-ассистентов, управляйте ролями RBAC и точечными правами к терминалам
                 </p>
               </div>
-              <button
-                type="button"
-                className="btn-accent-sm"
-                onClick={() => setShowAddForm(!showAddForm)}
-              >
-                <Plus size={14} />
-                <span>{showAddForm ? "Скрыть форму" : "Добавить участника"}</span> {/* i18n-ignore */}
-              </button>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="btn-accent-sm"
+                  onClick={() => setShowInviteModal(true)}
+                  style={{ display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <span>🔗 Пригласить по ссылке</span> {/* i18n-ignore */}
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary-sm"
+                  onClick={() => setShowAddForm(!showAddForm)}
+                  style={{ display: "flex", alignItems: "center", gap: 6 }}
+                >
+                  <Plus size={14} />
+                  <span>{showAddForm ? "Скрыть форму" : "Добавить"}</span> {/* i18n-ignore */}
+                </button>
+              </div>
             </div>
 
             {/* Add Member Form */}
@@ -604,33 +616,6 @@ export function ProjectAccessDialog(props: Props) {
                   </div>
                 );
               })}
-            </div>
-
-            {/* Invite Link Card */}
-            <div className="invite-share-card">
-              <div className="invite-text-col">
-                <strong>{/* i18n-ignore */}🔗 Пригласить в команду по ссылке</strong>
-                <span>{/* i18n-ignore */}Ссылка дает права входа в данный проект с ролью Разработчик</span>
-              </div>
-              <div className="invite-input-row">
-                <input type="text" readOnly value={inviteLink} className="code-input" />
-                <button
-                  type="button"
-                  className="btn-secondary-sm copy-btn"
-                  onClick={async () => {
-                    const ok = await copyToClipboard(inviteLink);
-                    if (ok) {
-                      showCopiedInvite(true);
-                      notify("Ссылка скопирована в буфер обмена"); // i18n-ignore
-                    } else {
-                      notify("Не удалось скопировать ссылку"); // i18n-ignore
-                    }
-                  }}
-                >
-                  {copiedInvite ? <Check size={14} /> : <Copy size={14} />}
-                  <span>{copiedInvite ? "Скопировано!" : "Копировать"}</span> {/* i18n-ignore */}
-                </button>
-              </div>
             </div>
           </div>
         )}
@@ -931,6 +916,92 @@ export function ProjectAccessDialog(props: Props) {
           }}
           onCancel={() => setDisruptiveModal((prev) => ({ ...prev, isOpen: false }))}
         />
+      )}
+
+      {/* Invite Link Modal */}
+      {showInviteModal && (
+        <div className="scrim" onClick={() => setShowInviteModal(false)}>
+          <section
+            className="dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pad-invite-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "520px",
+              maxWidth: "100%",
+              padding: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
+            <div className="dialog-head" style={{ marginBottom: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ color: "var(--blue)", display: "flex" }}>
+                  <People size={20} />
+                </span>
+                <div className="dialog-title">
+                  <h2 id="pad-invite-title" style={{ fontSize: 16, fontWeight: 600, margin: 0, color: "var(--ink)" }}>
+                    Приглашение в проект {projectName} {/* i18n-ignore */}
+                  </h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="icon-button small"
+                onClick={() => setShowInviteModal(false)}
+                aria-label="Закрыть" // i18n-ignore
+              >
+                <Close size={16} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: 13, color: "var(--dim)", margin: 0, lineHeight: 1.4 }}>
+              По этой ссылке пользователь или ИИ-агент может присоединиться к проекту {projectName} и получить доступ к назначенным терминалам. {/* i18n-ignore */}
+            </p>
+
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="text"
+                readOnly
+                value={inviteLink}
+                className="text-input"
+                style={{ flex: 1, fontFamily: "monospace", fontSize: 12, padding: "8px 12px" }}
+              />
+              <button
+                type="button"
+                className="button-accent"
+                onClick={async () => {
+                  const ok = await copyToClipboard(inviteLink);
+                  if (ok) {
+                    showCopiedInvite(true);
+                    notify("Ссылка скопирована в буфер обмена"); // i18n-ignore
+                  } else {
+                    notify("Не удалось скопировать ссылку"); // i18n-ignore
+                  }
+                }}
+              >
+                {copiedInvite ? <Check size={14} /> : <Copy size={14} />}
+                <span>{copiedInvite ? "Скопировано!" : "Копировать"}</span> {/* i18n-ignore */}
+              </button>
+            </div>
+
+            <div style={{ fontSize: 12, color: "var(--faint)" }}>
+              Срок действия ссылки: 24 часа. Назначить роль и права можно сразу после подключения. {/* i18n-ignore */}
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+              <button
+                type="button"
+                className="button-plain small"
+                onClick={() => setShowInviteModal(false)}
+              >
+                Закрыть {/* i18n-ignore */}
+              </button>
+            </div>
+          </section>
+        </div>
       )}
     </div>
   );

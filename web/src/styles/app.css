@@ -11422,34 +11422,6 @@ input:checked + .slider:before {
   flex-shrink: 0;
 }
 
-/* Fixed Centered Modal Overlays */
-.dialog-overlay {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 10000 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  background: rgba(0, 0, 0, 0.72) !important;
-  backdrop-filter: blur(6px) !important;
-  -webkit-backdrop-filter: blur(6px) !important;
-  padding: 16px !important;
-  overflow-y: auto !important;
-}
-
-.dialog-overlay .dialog {
-  position: relative !important;
-  background: var(--surface, #18181b) !important;
-  border: 1px solid var(--sep, #3f3f46) !important;
-  border-radius: 12px !important;
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.65) !important;
-  width: 100% !important;
-  max-width: 540px !important;
-  max-height: 90vh !important;
-  overflow-y: auto !important;
-  margin: auto !important;
-}
-
 
 
 

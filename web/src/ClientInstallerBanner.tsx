@@ -27,29 +27,29 @@ export function ClientInstallerBanner() {
       margin: "0 0 20px 0",
       padding: "16px 20px",
       borderRadius: "12px",
-      background: "var(--color-bg-secondary, #1e1e24)",
-      border: "1px solid var(--color-border, #33333d)",
-      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+      background: "var(--raised)",
+      border: "1px solid var(--line)",
+      boxShadow: "var(--shadow)",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Computer size={18} />
-          <strong>Подключение локальной машины к tTerm {/* i18n-ignore */}</strong>
+          <strong style={{ color: "var(--ink)" }}>Подключение локальной машины к tTerm {/* i18n-ignore */}</strong>
           {detectedOs === selectedOs && (
             <span style={{
               fontSize: 11,
               padding: "2px 8px",
               borderRadius: 6,
-              background: "rgba(16, 185, 129, 0.15)",
-              color: "#10b981",
-              border: "1px solid rgba(16, 185, 129, 0.3)"
+              background: "var(--green-tint)",
+              color: "var(--green-ink)",
+              border: "1px solid var(--green)"
             }}>
               Определена ОС: {selectedOs} {/* i18n-ignore */}
             </span>
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ display: "flex", background: "rgba(255,255,255,0.06)", borderRadius: 6, padding: 2 }}>
+          <div style={{ display: "flex", background: "var(--surface)", borderRadius: 6, padding: 2, border: "1px solid var(--line)" }}>
             <button
               type="button"
               className={`button-ghost small ${selectedOs === "windows" ? "pressed" : ""}`}
@@ -89,7 +89,7 @@ export function ClientInstallerBanner() {
 
       {selectedOs === "windows" && (
         <div>
-          <p style={{ margin: "0 0 10px 0", fontSize: 13, color: "var(--color-text-secondary, #999)" }}>
+          <p style={{ margin: "0 0 10px 0", fontSize: 13, color: "var(--dim)" }}>
             Нативная программа tTerm Agent для Windows автоматически подключает PowerShell к веб-интерфейсу, настраивает автозапуск при старте системы и работает тихо в фоновом режиме. {/* i18n-ignore */}
           </p>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
@@ -111,17 +111,18 @@ export function ClientInstallerBanner() {
               <Computer size={14} />
               Скрипт (.bat) {/* i18n-ignore */}
             </a>
-            <span style={{ fontSize: 12, color: "var(--color-text-secondary, #888)" }}>или запустить в PowerShell: {/* i18n-ignore */}</span>
+            <span style={{ fontSize: 12, color: "var(--dim)" }}>или запустить в PowerShell: {/* i18n-ignore */}</span>
           </div>
           <div style={{
             display: "flex",
             alignItems: "center",
-            background: "rgba(0,0,0,0.35)",
+            background: "var(--surface)",
             padding: "8px 12px",
             borderRadius: 6,
             fontFamily: "monospace",
             fontSize: 12,
-            border: "1px solid rgba(255,255,255,0.08)"
+            border: "1px solid var(--line)",
+            color: "var(--ink)",
           }}>
             <code style={{ flex: 1, overflowX: "auto", whiteSpace: "nowrap" }}>
               {windowsPsCmd}
@@ -141,18 +142,19 @@ export function ClientInstallerBanner() {
 
       {selectedOs === "linux" && (
         <div>
-          <p style={{ margin: "0 0 10px 0", fontSize: 13, color: "var(--color-text-secondary, #999)" }}>
+          <p style={{ margin: "0 0 10px 0", fontSize: 13, color: "var(--dim)" }}>
             Установка агента tTerm на Linux (Debian, Ubuntu, Arch, Fedora, Alpine): {/* i18n-ignore */}
           </p>
           <div style={{
             display: "flex",
             alignItems: "center",
-            background: "rgba(0,0,0,0.35)",
+            background: "var(--surface)",
             padding: "8px 12px",
             borderRadius: 6,
             fontFamily: "monospace",
             fontSize: 12,
-            border: "1px solid rgba(255,255,255,0.08)"
+            border: "1px solid var(--line)",
+            color: "var(--ink)",
           }}>
             <code style={{ flex: 1, overflowX: "auto", whiteSpace: "nowrap" }}>
               {linuxCmd}
@@ -172,18 +174,19 @@ export function ClientInstallerBanner() {
 
       {selectedOs === "mac" && (
         <div>
-          <p style={{ margin: "0 0 10px 0", fontSize: 13, color: "var(--color-text-secondary, #999)" }}>
+          <p style={{ margin: "0 0 10px 0", fontSize: 13, color: "var(--dim)" }}>
             Для macOS доступно нативное приложение tTerm for Mac и фоновый агент. {/* i18n-ignore */}
           </p>
           <div style={{
             display: "flex",
             alignItems: "center",
-            background: "rgba(0,0,0,0.35)",
+            background: "var(--surface)",
             padding: "8px 12px",
             borderRadius: 6,
             fontFamily: "monospace",
             fontSize: 12,
-            border: "1px solid rgba(255,255,255,0.08)"
+            border: "1px solid var(--line)",
+            color: "var(--ink)",
           }}>
             <code style={{ flex: 1, overflowX: "auto", whiteSpace: "nowrap" }}>
               {linuxCmd}

@@ -130,15 +130,15 @@ export function NotificationHttpNoticeModal(props: NotificationHttpNoticeModalPr
 
           <div
             style={{
-              background: "rgba(16, 185, 129, 0.08)",
-              border: "1px solid rgba(16, 185, 129, 0.25)",
+              background: "var(--green-tint)",
+              border: "1px solid var(--green)",
               borderRadius: 8,
               padding: "12px 14px",
               fontSize: 13,
               lineHeight: 1.5,
             }}
           >
-            <div style={{ fontWeight: 600, color: "#10b981", marginBottom: 6 }}>
+            <div style={{ fontWeight: 600, color: "var(--green-ink)", marginBottom: 6 }}>
               {/* i18n-ignore */}
               ✅ tTerm автоматически активировал для вас:
             </div>
@@ -154,15 +154,17 @@ export function NotificationHttpNoticeModal(props: NotificationHttpNoticeModalPr
 
           <div
             style={{
-              background: "rgba(59, 130, 246, 0.08)",
-              border: "1px solid rgba(59, 130, 246, 0.3)",
+              background: "var(--blue-tint)",
+              border: "1px solid var(--blue)",
               borderRadius: 8,
               padding: "12px 14px",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-              <Plane size={16} className="text-accent" />
-              <strong style={{ fontSize: 13, color: "#60a5fa" }}>
+              <span style={{ color: "var(--blue)", display: "flex" }}>
+                <Plane size={16} />
+              </span>
+              <strong style={{ fontSize: 13, color: "var(--blue)" }}>
                 {/* i18n-ignore */}
                 📱 100% надёжная доставка: Telegram Бот
               </strong>
@@ -184,7 +186,7 @@ export function NotificationHttpNoticeModal(props: NotificationHttpNoticeModalPr
 
           <div
             style={{
-              background: "rgba(255, 255, 255, 0.03)",
+              background: "var(--raised)",
               border: "1px solid var(--line)",
               borderRadius: 8,
               padding: "10px 14px",

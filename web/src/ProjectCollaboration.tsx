@@ -2223,43 +2223,81 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
       )}
 
       {/* Modal: Приглашение по ссылке */}
-      {showInviteModal && createPortal(
-        <div className="dialog-overlay" onClick={() => setShowInviteModal(false)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
-            <div className="dialog-head">
-              <h3>Приглашение в проект {project.name} {/* i18n-ignore */}</h3>
-              <button type="button" className="button-ghost small" onClick={() => setShowInviteModal(false)}>
+      {showInviteModal && (
+        <div className="scrim" onClick={() => setShowInviteModal(false)}>
+          <section
+            className="dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pc-invite-title"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "520px",
+              maxWidth: "100%",
+              padding: "24px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
+            <div className="dialog-head" style={{ marginBottom: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ color: "var(--blue)", display: "flex" }}>
+                  <LinkIcon size={20} />
+                </span>
+                <div className="dialog-title">
+                  <h2 id="pc-invite-title" style={{ fontSize: 16, fontWeight: 600, margin: 0, color: "var(--ink)" }}>
+                    Приглашение в проект {project.name} {/* i18n-ignore */}
+                  </h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="icon-button small"
+                onClick={() => setShowInviteModal(false)}
+                aria-label="Закрыть" // i18n-ignore
+              >
                 <Close size={16} />
               </button>
             </div>
-            <div className="dialog-body" style={{ padding: "16px 20px" }}>
-              <p style={{ fontSize: 13, color: "var(--color-text-secondary, #999)", marginBottom: 14 }}>
-                По этой ссылке пользователь или ИИ-агент может присоединиться к проекту и получить доступ к назначенным терминалам и контейнерам. {/* i18n-ignore */}
-              </p>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
-                <input
-                  type="text"
-                  readOnly
-                  value={inviteLink}
-                  className="input-text"
-                  style={{ flex: 1, fontFamily: "monospace", fontSize: 12 }}
-                />
-                <button
-                  type="button"
-                  className="button-accent"
-                  onClick={() => copyText(inviteLink, showCopiedInvite)}
-                >
-                  {copiedInvite ? <Check size={14} /> : <Copy size={14} />}
-                  {copiedInvite ? "Скопировано" /* i18n-ignore */ : "Копировать" /* i18n-ignore */}
-                </button>
-              </div>
-              <div style={{ fontSize: 12, color: "var(--color-text-secondary, #888)" }}>
-                Срок действия ссылки: 24 часа. Назначить роль можно сразу после подключения. {/* i18n-ignore */}
-              </div>
+
+            <p style={{ fontSize: 13, color: "var(--dim)", margin: 0, lineHeight: 1.4 }}>
+              По этой ссылке пользователь или ИИ-агент может присоединиться к проекту и получить доступ к назначенным терминалам и контейнерам. {/* i18n-ignore */}
+            </p>
+
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                type="text"
+                readOnly
+                value={inviteLink}
+                className="text-input"
+                style={{ flex: 1, fontFamily: "monospace", fontSize: 12, padding: "8px 12px" }}
+              />
+              <button
+                type="button"
+                className="button-accent"
+                onClick={() => copyText(inviteLink, showCopiedInvite)}
+              >
+                {copiedInvite ? <Check size={14} /> : <Copy size={14} />}
+                {copiedInvite ? "Скопировано" /* i18n-ignore */ : "Копировать" /* i18n-ignore */}
+              </button>
             </div>
-          </div>
-        </div>,
-        document.body
+
+            <div style={{ fontSize: 12, color: "var(--faint)" }}>
+              Срок действия ссылки: 24 часа. Назначить роль можно сразу после подключения. {/* i18n-ignore */}
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+              <button
+                type="button"
+                className="button-plain small"
+                onClick={() => setShowInviteModal(false)}
+              >
+                Закрыть {/* i18n-ignore */}
+              </button>
+            </div>
+          </section>
+        </div>
       )}
 
       {/* Slide-Over Side Drawer: Termius & OpenSSH */}

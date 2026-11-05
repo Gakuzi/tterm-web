@@ -223,33 +223,45 @@ function AttachExistingMachineModal(props: {
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose} style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, backdropFilter: "blur(2px)"
-    }}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
-        background: "var(--color-bg-primary, #18181b)", border: "1px solid var(--color-border, #333)",
-        borderRadius: "12px", padding: "20px 24px", width: "440px", maxWidth: "90vw", boxShadow: "0 10px 25px rgba(0,0,0,0.4)"
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Server size={18} />
-            <strong style={{ fontSize: 16 }}>
-              {/* i18n-ignore */}
-              Подключить существующую машину
-            </strong>
+    <div className="scrim" onClick={onClose}>
+      <section
+        className="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="aem-title"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "480px",
+          maxWidth: "100%",
+          padding: "24px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "16px",
+        }}
+      >
+        <div className="dialog-head" style={{ marginBottom: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ color: "var(--blue)", display: "flex" }}>
+              <Server size={20} />
+            </span>
+            <div className="dialog-title">
+              <h2 id="aem-title" style={{ fontSize: 16, fontWeight: 600, margin: 0, color: "var(--ink)" }}>
+                {/* i18n-ignore */}
+                Подключить существующую машину
+              </h2>
+            </div>
           </div>
-          <button type="button" className="button-ghost small" onClick={onClose} style={{ padding: "4px 8px" }}>
+          <button type="button" className="icon-button small" onClick={onClose} aria-label="Закрыть" /* i18n-ignore */>
             <Close size={16} />
           </button>
         </div>
-        <p style={{ fontSize: 13, color: "var(--color-text-secondary, #999)", marginBottom: 14, lineHeight: 1.4 }}>
+        <p style={{ fontSize: 13, color: "var(--dim)", margin: 0, lineHeight: 1.4 }}>
           {/* i18n-ignore */}
           Подключите машину к проекту «{project.name}». Машина появится в списке, а её терминалы в этом проекте будут изолированы.
         </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "240px", overflowY: "auto", marginBottom: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "240px", overflowY: "auto" }}>
           {availableMachines.length === 0 ? (
-            <div style={{ padding: "16px", textAlign: "center", color: "var(--color-text-secondary, #888)", fontSize: 13 }}>
+            <div style={{ padding: "16px", textAlign: "center", color: "var(--dim)", fontSize: 13, background: "var(--raised)", borderRadius: 8 }}>
               {/* i18n-ignore */}
               Все доступные машины уже добавлены в этот проект.
             </div>
@@ -257,13 +269,15 @@ function AttachExistingMachineModal(props: {
             availableMachines.map((m) => (
               <div key={m.id} style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px",
-                borderRadius: "8px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.08)"
+                borderRadius: "8px", background: "var(--raised)", border: "1px solid var(--line)"
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {m.kind === "computer" ? <Computer size={16} /> : <Server size={16} />}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ color: "var(--dim)", display: "flex" }}>
+                    {m.kind === "computer" ? <Computer size={18} /> : <Server size={18} />}
+                  </span>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</div>
-                    <div style={{ fontSize: 11, color: "var(--color-text-secondary, #888)" }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "var(--ink)" }}>{m.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--dim)" }}>
                       {[m.os, m.host].filter(Boolean).join(" · ")}
                     </div>
                   </div>
@@ -281,12 +295,12 @@ function AttachExistingMachineModal(props: {
             ))
           )}
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button type="button" className="button-ghost small" onClick={onClose}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+          <button type="button" className="button-plain small" onClick={onClose}>
             Отмена {/* i18n-ignore */}
           </button>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

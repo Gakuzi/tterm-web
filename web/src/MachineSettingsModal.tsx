@@ -143,49 +143,34 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
   };
 
   return (
-    <div
-      className="modal-backdrop"
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0, 0, 0, 0.72)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 9999,
-        backdropFilter: "blur(4px)",
-        padding: "16px",
-      }}
-    >
-      <div
-        className="modal-content"
+    <div className="scrim" onClick={onClose}>
+      <section
+        className="dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="msm-title"
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: "var(--color-bg-primary, #18181b)",
-          border: "1px solid var(--color-border, #333)",
-          borderRadius: "14px",
-          padding: "24px",
           width: "560px",
           maxWidth: "100%",
           maxHeight: "90vh",
           overflowY: "auto",
-          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.6)",
           display: "flex",
           flexDirection: "column",
           gap: "16px",
+          padding: "24px",
         }}
       >
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div className="dialog-head" style={{ marginBottom: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span
               style={{
                 width: 40,
                 height: 40,
                 borderRadius: 10,
-                background: "rgba(56, 189, 248, 0.12)",
-                color: "#38bdf8",
+                background: "var(--blue-tint)",
+                color: "var(--blue)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -193,15 +178,16 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
             >
               {computer ? <Computer size={22} /> : <Server size={22} />}
             </span>
-            <div>
-              <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="dialog-title">
+              <h2 id="msm-title" style={{ fontSize: 18, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 8, color: "var(--ink)" }}>
                 {machine.name}
                 {machine.shared && (
                   <span
                     style={{
                       fontSize: 11,
-                      background: "rgba(56, 189, 248, 0.18)",
-                      color: "#38bdf8",
+                      background: "var(--blue-tint)",
+                      color: "var(--blue)",
+                      border: "1px solid var(--blue)",
                       padding: "2px 7px",
                       borderRadius: 4,
                       fontWeight: 500,
@@ -212,7 +198,7 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
                   </span>
                 )}
               </h2>
-              <div style={{ fontSize: 12, color: "var(--color-text-secondary, #999)", marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: "var(--dim)", marginTop: 2 }}>
                 {/* i18n-ignore */}
                 {[machine.os, machine.host].filter(Boolean).join(" · ") || (computer ? "Компьютер" : "Сервер")}
               </div>
@@ -220,46 +206,46 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
           </div>
           <button
             type="button"
-            className="button-ghost small"
+            className="icon-button small"
             onClick={onClose}
-            style={{ padding: "6px 8px", borderRadius: 8 }}
             // i18n-ignore
             aria-label="Закрыть"
           >
-            <Close size={18} />
+            <Close size={16} />
           </button>
         </div>
 
         {/* Machine Stats Summary */}
         <div
           style={{
-            background: "rgba(255, 255, 255, 0.03)",
-            border: "1px solid rgba(255, 255, 255, 0.07)",
+            background: "var(--raised)",
+            border: "1px solid var(--line)",
             borderRadius: 10,
             padding: "12px 14px",
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
             gap: "10px",
             fontSize: 12,
+            color: "var(--ink)",
           }}
         >
           <div>
             {/* i18n-ignore */}
-            <div style={{ color: "var(--color-text-secondary, #888)", fontSize: 11 }}>Состояние</div>
+            <div style={{ color: "var(--dim)", fontSize: 11 }}>Состояние</div>
             <div style={{ fontWeight: 500, display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
               <span
                 style={{
                   width: 8,
                   height: 8,
                   borderRadius: "50%",
-                  background: offline ? "#ef4444" : "#22c55e",
+                  background: offline ? "var(--red)" : "var(--green)",
                   display: "inline-block",
                 }}
               />
               {/* i18n-ignore */}
               {computer
                 ? offline
-                  ? machine.lastSeen
+                ? machine.lastSeen
                     // i18n-ignore
                     ? `Был ${lastSeen(machine.lastSeen, t)}`
                     // i18n-ignore
@@ -273,21 +259,21 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
           {passport.arch && (
             <div>
               {/* i18n-ignore */}
-              <div style={{ color: "var(--color-text-secondary, #888)", fontSize: 11 }}>Архитектура</div>
+              <div style={{ color: "var(--dim)", fontSize: 11 }}>Архитектура</div>
               <div style={{ fontWeight: 500, marginTop: 2 }}>{passport.arch}</div>
             </div>
           )}
           {passport.shell && (
             <div>
               {/* i18n-ignore */}
-              <div style={{ color: "var(--color-text-secondary, #888)", fontSize: 11 }}>Оболочка (Shell)</div>
+              <div style={{ color: "var(--dim)", fontSize: 11 }}>Оболочка (Shell)</div>
               <div style={{ fontWeight: 500, marginTop: 2 }}>{passport.shell}</div>
             </div>
           )}
           {passport.user && (
             <div>
               {/* i18n-ignore */}
-              <div style={{ color: "var(--color-text-secondary, #888)", fontSize: 11 }}>Пользователь</div>
+              <div style={{ color: "var(--dim)", fontSize: 11 }}>Пользователь</div>
               <div style={{ fontWeight: 500, marginTop: 2 }}>{passport.user}</div>
             </div>
           )}
@@ -302,9 +288,9 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
               gap: 10,
               padding: "10px 14px",
               borderRadius: 8,
-              background: "rgba(234, 179, 8, 0.12)",
-              border: "1px solid rgba(234, 179, 8, 0.3)",
-              color: "#fbbf24",
+              background: "var(--amber-tint)",
+              border: "1px solid var(--amber-ring)",
+              color: "var(--amber-ink)",
               fontSize: 12,
               lineHeight: 1.4,
             }}
@@ -323,17 +309,17 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
         {/* Project Multi-Binding Section */}
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <span style={{ color: "#38bdf8", display: "flex" }}>
+            <span style={{ color: "var(--blue)", display: "flex" }}>
               <Layers size={16} />
             </span>
             {/* i18n-ignore */}
-            <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: "var(--ink)" }}>
               {/* i18n-ignore */}
               Привязка к проектам (Many-to-Many)
             </h3>
           </div>
           {/* i18n-ignore */}
-          <p style={{ fontSize: 12, color: "var(--color-text-secondary, #999)", margin: "0 0 12px 0", lineHeight: 1.4 }}>
+          <p style={{ fontSize: 12, color: "var(--dim)", margin: "0 0 12px 0", lineHeight: 1.4 }}>
             {/* i18n-ignore */}
             Машина может работать сразу в нескольких проектах. Терминалы и ветки разработки изолированы и принадлежат только проекту, в котором они были запущены.
           </p>
@@ -359,8 +345,8 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
                     justifyContent: "space-between",
                     padding: "10px 14px",
                     borderRadius: 10,
-                    background: isBound ? "rgba(56, 189, 248, 0.08)" : "rgba(255, 255, 255, 0.02)",
-                    border: isBound ? "1px solid rgba(56, 189, 248, 0.35)" : "1px solid rgba(255, 255, 255, 0.07)",
+                    background: isBound ? "var(--blue-tint)" : "var(--surface)",
+                    border: isBound ? "1px solid var(--blue)" : "1px solid var(--line)",
                     cursor: isDisabled ? "not-allowed" : "pointer",
                     opacity: isDisabled && !isBound ? 0.6 : 1,
                     transition: "all 0.15s ease",
@@ -374,7 +360,7 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
                       onChange={() => {}} // handled by parent div onClick
                       style={{
                         cursor: isDisabled ? "not-allowed" : "pointer",
-                        accentColor: "#38bdf8",
+                        accentColor: "var(--blue)",
                         width: 16,
                         height: 16,
                       }}
@@ -383,13 +369,13 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
                       {p.code}
                     </span>
                     <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                      <span style={{ fontWeight: isBound ? 600 : 400, fontSize: 13, textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                      <span style={{ fontWeight: isBound ? 600 : 400, fontSize: 13, color: "var(--ink)", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
                         {p.name}
                       </span>
                       {/* i18n-ignore */}
-                      <span style={{ fontSize: 11, color: "var(--color-text-secondary, #888)" }}>
+                      <span style={{ fontSize: 11, color: "var(--dim)" }}>
                         {/* i18n-ignore */}
-                        Ваша роль: <span style={{ color: isProjectAdmin ? "#38bdf8" : "#aaa", fontWeight: 500 }}>{ROLE_LABELS[userRole]}</span>
+                        Ваша роль: <span style={{ color: isProjectAdmin ? "var(--blue)" : "var(--faint)", fontWeight: 500 }}>{ROLE_LABELS[userRole]}</span>
                         {/* i18n-ignore */}
                         {!isProjectAdmin && " (недостаточно прав для привязки)"}
                       </span>
@@ -399,13 +385,14 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     {isBusy ? (
                       // i18n-ignore
-                      <span style={{ fontSize: 11, color: "#38bdf8" }}>Сохранение...</span>
+                      <span style={{ fontSize: 11, color: "var(--blue)" }}>Сохранение...</span>
                     ) : isBound ? (
                       <span
                         style={{
                           fontSize: 11,
-                          color: "#38bdf8",
-                          background: "rgba(56, 189, 248, 0.12)",
+                          color: "var(--blue)",
+                          background: "var(--blue-wash)",
+                          border: "1px solid var(--blue)",
                           padding: "2px 8px",
                           borderRadius: 6,
                           fontWeight: 500,
@@ -416,7 +403,7 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
                       </span>
                     ) : isProjectAdmin ? (
                       // i18n-ignore
-                      <span style={{ fontSize: 11, color: "var(--color-text-secondary, #777)" }}>
+                      <span style={{ fontSize: 11, color: "var(--dim)" }}>
                         {/* i18n-ignore */}
                         Доступно
                       </span>
@@ -426,8 +413,9 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
                         title="Требуются права администратора или владельца"
                         style={{
                           fontSize: 11,
-                          color: "#ef4444",
-                          background: "rgba(239, 68, 68, 0.1)",
+                          color: "var(--red-ink)",
+                          background: "var(--red-tint)",
+                          border: "1px solid var(--red-line)",
                           padding: "2px 6px",
                           borderRadius: 4,
                         }}
@@ -449,9 +437,9 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
             style={{
               padding: "8px 12px",
               borderRadius: 8,
-              background: "rgba(239, 68, 68, 0.12)",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              color: "#f87171",
+              background: "var(--red-tint)",
+              border: "1px solid var(--red-line)",
+              color: "var(--red-ink)",
               fontSize: 12,
               display: "flex",
               alignItems: "center",
@@ -468,9 +456,9 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
             style={{
               padding: "8px 12px",
               borderRadius: 8,
-              background: "rgba(34, 197, 94, 0.12)",
-              border: "1px solid rgba(34, 197, 94, 0.3)",
-              color: "#4ade80",
+              background: "var(--green-tint)",
+              border: "1px solid var(--green)",
+              color: "var(--green-ink)",
               fontSize: 12,
               display: "flex",
               alignItems: "center",
@@ -485,12 +473,12 @@ export function MachineSettingsModal(props: MachineSettingsModalProps) {
         {/* Footer */}
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
           {/* i18n-ignore */}
-          <button type="button" className="button-plain small" onClick={onClose}>
+          <button type="button" className="button-accent small" onClick={onClose}>
             {/* i18n-ignore */}
             Готово
           </button>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
