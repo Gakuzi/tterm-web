@@ -667,6 +667,94 @@ class TestMultiNodeAndApprovals(unittest.TestCase):
             # Aeza API live endpoint may be rate-limited or blip over SSL
             self.assertIn("Aeza", str(e))
 
+    def test_aeza_user_vault_isolation_and_api(self):
+        """Verifies that Aeza credentials are strictly isolated per user and APIs behave safely."""
+        from tterm.orchestration.aeza_cloud import (
+            AezaKeyStore,
+            get_user_key,
+            save_user_key,
+            delete_user_key,
+            get_aeza_client,
+            mask_api_key,
+        )
+        from tterm.orchestration.api import (
+            get_aeza_config,
+            save_aeza_config,
+            delete_aeza_config,
+            get_aeza_account,
+            get_aeza_vps_plans,
+            order_aeza_test_vps,
+            list_aeza_services,
+            AezaConfigDTO,
+            AezaOrderDTO,
+        )
+
+        user_alice = "alice-vault-1"
+        user_bob = "bob-vault-2"
+
+        # Clean any preexisting keys
+        delete_user_key(user_alice)
+        delete_user_key(user_bob)
+
+        # 1. Initially Alice has no key
+        self.assertIsNone(get_user_key(user_alice))
+        client_alice = get_aeza_client(user_id=user_alice)
+        self.assertFalse(client_alice.is_configured)
+        with self.assertRaises(RuntimeError) as ctx:
+            client_alice.get_account_info()
+        self.assertIn("Aeza API key is not configured", str(ctx.exception))
+
+        # 2. Save Alice's key
+        save_user_key(user_alice, "1404_mock_alice_key_secret_12345")
+        self.assertEqual(get_user_key(user_alice), "1404_mock_alice_key_secret_12345")
+        self.assertEqual(mask_api_key("1404_mock_alice_key_secret_12345"), "1404_m...2345")
+
+        # 3. Bob STILL has no key (Strict user isolation!)
+        self.assertIsNone(get_user_key(user_bob))
+        client_bob = get_aeza_client(user_id=user_bob)
+        self.assertFalse(client_bob.is_configured)
+
+        # 4. Delete Alice's key
+        deleted = delete_user_key(user_alice)
+        self.assertTrue(deleted)
+        self.assertIsNone(get_user_key(user_alice))
+
+        # 5. Test Router Endpoints
+        import asyncio
+        async def _test_endpoints():
+            # GET config when not configured
+            cfg_res = await get_aeza_config(user_id=user_bob)
+            self.assertTrue(cfg_res["ok"])
+            self.assertFalse(cfg_res["configured"])
+            self.assertIsNone(cfg_res["masked_key"])
+
+            # Account request without key returns error without 500
+            acc_res = await get_aeza_account(user_id=user_bob)
+            self.assertFalse(acc_res["ok"])
+            self.assertFalse(acc_res["configured"])
+            self.assertIn("API-ключ", acc_res["error"])
+
+            # Plans request without key returns empty list and error
+            plans_res = await get_aeza_vps_plans(user_id=user_bob)
+            self.assertFalse(plans_res["ok"])
+            self.assertEqual(plans_res["plans"], [])
+
+            # Services request without key returns empty list
+            srv_res = await list_aeza_services(user_id=user_bob)
+            self.assertFalse(srv_res["ok"])
+            self.assertEqual(srv_res["services"], [])
+
+            # Order request without key fails gracefully
+            order_res = await order_aeza_test_vps(AezaOrderDTO(user_id=user_bob))
+            self.assertFalse(order_res["ok"])
+            self.assertIn("API-ключ", order_res["error"])
+
+            # DELETE config
+            del_res = await delete_aeza_config(user_id=user_bob)
+            self.assertTrue(del_res["ok"])
+
+        asyncio.run(_test_endpoints())
+
     def test_github_app_auth_and_management(self):
         from tterm.orchestration.github_app import github_manager
         # Initially not authenticated
@@ -1064,6 +1152,143 @@ class TestMachineProjectsAndTerminalEnvironments(unittest.TestCase):
             del_res = await unbind_machine_from_project_endpoint("klim", "project-alpha")
             self.assertTrue(del_res["ok"])
             self.assertTrue(del_res["removed"])
+
+        asyncio.run(_run())
+
+
+class TestCloudDeploy(unittest.TestCase):
+    """Unit and Integration Tests for One-Click VPS Deploy & Migration Engine."""
+
+    def test_vps_deploy_engine_simulation_pipeline(self):
+        """Verifies full 7-step deployment lifecycle in simulation/dry-run mode."""
+        import asyncio
+        from tterm.orchestration.cloud_deploy import VpsDeployEngine
+
+        engine = VpsDeployEngine(
+            host="192.168.10.50",
+            port=22,
+            user="root",
+            admin_email="superadmin@tterm.cloud",
+            branch="feature/mcp-ai-orchestration-v1",
+            simulation_mode=True,
+        )
+
+        self.assertEqual(engine.status, "pending")
+        self.assertEqual(engine.progress_pct, 0)
+        self.assertEqual(engine.current_step, 1)
+
+        # Run pipeline
+        res = asyncio.run(engine.run_pipeline())
+
+        self.assertEqual(res["status"], "completed")
+        self.assertEqual(res["progress_pct"], 100)
+        self.assertEqual(res["current_step"], 7)
+        self.assertEqual(res["result_url"], "http://192.168.10.50:8290")
+        self.assertIsNotNone(res["verification_code"])
+        self.assertEqual(len(res["verification_code"]), 6)
+        self.assertTrue(res["verification_code"].isdigit())
+        self.assertGreaterEqual(len(res["logs"]), 10)
+
+        # Check all 7 steps completed
+        steps = res["steps_summary"]
+        self.assertEqual(len(steps), 7)
+        for s in range(1, 8):
+            self.assertIn(s, steps)
+            self.assertEqual(steps[s]["status"], "completed", f"Step {s} should be completed")
+            self.assertTrue(bool(steps[s]["details"]))
+
+    def test_vps_deploy_engine_failure_handling(self):
+        """Verifies graceful error capture and status update on unreachable host."""
+        import asyncio
+        from tterm.orchestration.cloud_deploy import VpsDeployEngine
+
+        engine = VpsDeployEngine(
+            host="192.0.2.1",  # Non-routable TEST-NET-1 IP
+            port=2222,
+            user="root",
+            simulation_mode=False,
+        )
+
+        res = asyncio.run(engine.run_pipeline())
+        self.assertEqual(res["status"], "failed")
+        self.assertIsNotNone(res["error"])
+        self.assertEqual(res["steps_summary"][1]["status"], "failed")
+        self.assertTrue(any("❌ ОШИБКА" in log for log in res["logs"]))
+
+    def test_cloud_deploy_manager_and_email(self):
+        """Verifies CloudDeployManager tracking and test email generation."""
+        import asyncio
+        from tterm.orchestration.cloud_deploy import cloud_deploy_manager
+
+        engine = cloud_deploy_manager.create_deployment(
+            host="10.20.30.40",
+            admin_email="devops@corp.local",
+            simulation_mode=True,
+        )
+        task_id = engine.task_id
+
+        # Verify task registration
+        retrieved = cloud_deploy_manager.get_task(task_id)
+        self.assertIsNotNone(retrieved)
+        self.assertEqual(retrieved.host, "10.20.30.40")
+
+        all_tasks = cloud_deploy_manager.list_tasks()
+        self.assertTrue(any(t["task_id"] == task_id for t in all_tasks))
+
+        # Test verification email dispatch
+        email_res = asyncio.run(cloud_deploy_manager.test_email("admin@test.ru", host="10.20.30.40"))
+        self.assertTrue(email_res["ok"])
+        self.assertEqual(email_res["email"], "admin@test.ru")
+        self.assertEqual(len(email_res["code"]), 6)
+        self.assertTrue(email_res["code"].isdigit())
+
+    def test_cloud_deploy_api_routes(self):
+        """Verifies FastAPI endpoints for cloud deploy orchestration."""
+        import asyncio
+        from tterm.orchestration.api import (
+            start_cloud_deploy,
+            get_cloud_deploy_status,
+            list_cloud_deploy_tasks,
+            test_cloud_deploy_email,
+            CloudDeployStartDTO,
+            CloudDeployTestEmailDTO,
+        )
+
+        async def _run():
+            # 1. Start Deploy
+            payload = CloudDeployStartDTO(
+                host="172.16.0.99",
+                admin_email="api-test@tterm.local",
+                branch="main",
+                simulation_mode=True,
+            )
+            start_res = await start_cloud_deploy(payload)
+            self.assertTrue(start_res["ok"])
+            task_id = start_res["task_id"]
+            self.assertTrue(bool(task_id))
+
+            # Allow simulation pipeline to progress
+            await asyncio.sleep(0.5)
+
+            # 2. Get Status
+            status_res = await get_cloud_deploy_status(task_id)
+            self.assertTrue(status_res["ok"])
+            task = status_res["task"]
+            self.assertEqual(task["task_id"], task_id)
+            self.assertEqual(task["host"], "172.16.0.99")
+            self.assertIn(task["status"], ["running", "completed"])
+
+            # 3. List Tasks
+            list_res = await list_cloud_deploy_tasks()
+            self.assertTrue(list_res["ok"])
+            self.assertTrue(any(t["task_id"] == task_id for t in list_res["tasks"]))
+
+            # 4. Test Email Endpoint
+            email_payload = CloudDeployTestEmailDTO(email="security@cloud.net", host="172.16.0.99")
+            email_res = await test_cloud_deploy_email(email_payload)
+            self.assertTrue(email_res["ok"])
+            self.assertEqual(email_res["email"], "security@cloud.net")
+            self.assertEqual(len(email_res["code"]), 6)
 
         asyncio.run(_run())
 

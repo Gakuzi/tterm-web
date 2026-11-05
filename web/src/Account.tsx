@@ -16,6 +16,7 @@ import { Close } from "./icons";
 import { PhotoDialog } from "./PhotoDialog";
 import { Group, Row } from "./SettingsRows";
 import { GitHubSection } from "./GitHubSection";
+import { AezaSection } from "./AezaSection";
 
 /** What a photo may be when chosen: the page makes the 256-pixel JPEG of it
  * itself. */
@@ -281,6 +282,9 @@ export function AccountPane(props: {
 
       {/* GitHub Integration for User Account */}
       <GitHubSection notify={props.notify} />
+
+      {/* Cloud Hosting & VPS Integration for User Account */}
+      <AezaSection notify={props.notify} />
 
       <Group title={t("account.delete_title")}>
         <Row label={t("account.delete")} note={t("account.delete_note", { email: support })}>

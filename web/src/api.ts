@@ -1866,4 +1866,188 @@ export async function getGitHubTerminalSetup(): Promise<{
   return (await check(response)).json();
 }
 
+// ------------------------------------------------------------- Cloud Deploy & Migration
+export interface CloudDeployParams {
+  host: string;
+  port?: number;
+  user?: string;
+  password?: string;
+  private_key?: string;
+  repo_url?: string;
+  branch?: string;
+  admin_email: string;
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_user?: string;
+  smtp_password?: string;
+  simulation_mode?: boolean;
+}
+
+export interface CloudDeployStepInfo {
+  step: number;
+  name: string;
+  status: "pending" | "running" | "completed" | "failed";
+  details: string;
+  updated_at: string;
+}
+
+export interface CloudDeployTask {
+  task_id: string;
+  host: string;
+  port: number;
+  user: string;
+  repo_url: string;
+  branch: string;
+  admin_email: string;
+  simulation_mode: boolean;
+  status: "pending" | "running" | "completed" | "failed";
+  current_step: number;
+  steps_summary: Record<number, CloudDeployStepInfo>;
+  progress_pct: number;
+  logs: string[];
+  result_url: string;
+  error?: string | null;
+  verification_code?: string | null;
+  generated_secrets?: {
+    app_secret?: string | null;
+    admin_email: string;
+  };
+  created_at: string;
+  finished_at?: string | null;
+}
+
+export async function startCloudDeploy(params: CloudDeployParams): Promise<{ ok: boolean; task_id: string }> {
+  const response = await fetch("/api/orchestration/cloud-deploy/start", change("POST", params));
+  return (await check(response)).json();
+}
+
+export async function getCloudDeployStatus(taskId: string): Promise<{ ok: boolean; task: CloudDeployTask }> {
+  const response = await fetch(`/api/orchestration/cloud-deploy/status/${taskId}`, { cache: "no-store" });
+  return (await check(response)).json();
+}
+
+export async function testCloudDeployEmail(params: { email: string; host?: string; code?: string }): Promise<any> {
+  const response = await fetch("/api/orchestration/cloud-deploy/test-email", change("POST", params));
+  return (await check(response)).json();
+}
+
+// ------------------------------------------------------------- Aeza Cloud VPS API Orchestration
+export interface AezaConfigStatus {
+  ok: boolean;
+  configured: boolean;
+  masked_key: string | null;
+  user_id?: string;
+}
+
+export interface AezaAccountInfo {
+  id?: number;
+  email?: string;
+  status?: string;
+  balance_rub: number;
+  balance_raw?: number;
+  currency: string;
+}
+
+export interface AezaPlan {
+  id: number;
+  name: string;
+  group: string;
+  cpu: number;
+  ram_gb: number;
+  disk_gb: number;
+  network_mbps: number;
+  hour_price_rub: number | null;
+  month_price_rub: number | null;
+  is_available: boolean;
+}
+
+export interface AezaServiceItem {
+  id: number;
+  name?: string;
+  status?: string;
+  ip?: string;
+  ips?: Array<{ ip: string; type?: string }>;
+  parameters?: {
+    ip?: string;
+    cpu?: number;
+    ram?: number;
+    rom?: number;
+  };
+  product?: {
+    name?: string;
+    rawPrices?: { hour?: number };
+  };
+  created_at?: string;
+  autoProlong?: boolean;
+}
+
+export async function getAezaConfig(): Promise<AezaConfigStatus> {
+  const response = await fetch("/api/orchestration/aeza/config", { cache: "no-store", headers: { "x-tterm": "1" } });
+  return (await check(response)).json();
+}
+
+export async function saveAezaConfig(apiKey: string): Promise<{
+  ok: boolean;
+  configured: boolean;
+  masked_key?: string;
+  balance?: number;
+  email?: string;
+  account?: any;
+  error?: string;
+}> {
+  const response = await fetch("/api/orchestration/aeza/config", change("POST", { api_key: apiKey }));
+  return response.json();
+}
+
+export async function deleteAezaConfig(): Promise<{ ok: boolean; configured: boolean }> {
+  const response = await fetch("/api/orchestration/aeza/config", change("DELETE", {}));
+  return response.json();
+}
+
+export async function getAezaAccount(): Promise<{
+  ok: boolean;
+  configured?: boolean;
+  account?: AezaAccountInfo;
+  ssh_keys?: any[];
+  error?: string;
+}> {
+  const response = await fetch("/api/orchestration/aeza/account", { cache: "no-store", headers: { "x-tterm": "1" } });
+  return response.json();
+}
+
+export async function getAezaPlans(hourlyOnly = true): Promise<{
+  ok: boolean;
+  configured?: boolean;
+  plans: AezaPlan[];
+  error?: string;
+}> {
+  const response = await fetch(`/api/orchestration/aeza/plans?hourly_only=${hourlyOnly}`, { cache: "no-store", headers: { "x-tterm": "1" } });
+  return response.json();
+}
+
+export async function orderAezaVps(params: {
+  name: string;
+  product_id: number;
+  hours: number;
+  os_id?: number;
+}): Promise<{ ok: boolean; order?: any; error?: string }> {
+  const response = await fetch("/api/orchestration/aeza/order", change("POST", {
+    os_id: 1,
+    ...params,
+  }));
+  return response.json();
+}
+
+export async function listAezaServices(): Promise<{
+  ok: boolean;
+  configured?: boolean;
+  services: any[];
+  error?: string;
+}> {
+  const response = await fetch("/api/orchestration/aeza/services", { cache: "no-store", headers: { "x-tterm": "1" } });
+  return response.json();
+}
+
+
+
 

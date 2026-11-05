@@ -30,7 +30,7 @@ import { AccountPane, planLine, PlanPane, SUPPORT } from "./Account";
 import { DevicesSection } from "./Devices";
 import { LANGUAGES, useT, type Lang } from "./i18n";
 import {
-  Bell, Card, ChevronDown, ChevronLeft, ChevronRight, Close, Computer, Devices, Download, Gear,
+  Bell, Card, ChevronDown, ChevronLeft, ChevronRight, Close, Cloud, Computer, Devices, Download, Gear,
   GitHub, Key, Monitor, Moon, People, Person, Search, Spark, Sun,
 } from "./icons";
 import {
@@ -40,6 +40,8 @@ import {
 import { KeysSection } from "./Keys.tsx";
 import { AiSection } from "./AiSection";
 import { GitHubSection } from "./GitHubSection";
+import { AezaSection } from "./AezaSection";
+import { CloudDeployModal } from "./CloudDeployModal";
 import { ProjectCollaboration } from "./ProjectCollaboration";
 import { InApp } from "./local";
 import { Group, Row, SearchWords } from "./SettingsRows";
@@ -295,6 +297,9 @@ export function Settings(props: Props) {
   const [info, setInfo] = useState<AccountInfo | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [showDeployModal, setShowDeployModal] = useState(false);
+  const [deployTargetIp, setDeployTargetIp] = useState("");
+
   const editing = useRef(false);
   const scrim = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLElement>(null);
@@ -360,6 +365,8 @@ export function Settings(props: Props) {
         items: [
           item("github", <GitHub size={18} />, "GitHub", [ // i18n-ignore
             "github", "гитхаб", "oauth", "репозиторий", "токен", "pat", "коммиты", "ветки", "pr"]), // i18n-ignore
+          item("hosting", <Cloud size={18} />, "Хостинг и VPS", [ // i18n-ignore
+            "hosting", "хостинг", "aeza", "аэза", "vps", "сервер", "облако", "деплой", "ключ", "баланс", "купить"]), // i18n-ignore
         ],
       });
     }
@@ -506,6 +513,17 @@ export function Settings(props: Props) {
         return <AiSection notify={props.notify} />;
       case "github":
         return <GitHubSection notify={props.notify} />;
+      case "hosting":
+        return (
+          <AezaSection
+            notify={props.notify}
+            onOpenDeployModal={(ip) => {
+              setDeployTargetIp(ip || "");
+              setShowDeployModal(true);
+            }}
+          />
+        );
+
     }
   };
 
@@ -584,6 +602,16 @@ export function Settings(props: Props) {
           )}
         </div>
       </section>
+
+      {showDeployModal && (
+        <CloudDeployModal
+          isOpen={showDeployModal}
+          onClose={() => setShowDeployModal(false)}
+          defaultHost={deployTargetIp}
+          defaultEmail={props.me?.email || "admin@example.com"}
+        />
+      )}
     </div>
+
   );
 }

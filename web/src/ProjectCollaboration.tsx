@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { Project, TerminalInfo, Me } from "./api";
+import type { Project, TerminalInfo, Me, Machine } from "./api";
 import {
   Branch, Check, Close, Computer, Copy, Key, Layers,
   Link as LinkIcon, Lock, Pencil, People, Person, Plus, Restart, Search, Server, Spark, Trash, Warning
@@ -7,6 +7,8 @@ import {
 import { useBriefly } from "./briefly";
 import { copyToClipboard } from "./clipboard";
 import { DisruptiveActionModal, type ActiveProcess } from "./DisruptiveActionModal";
+import { CloudDeployModal } from "./CloudDeployModal";
+
 
 interface Props {
   project: Project;
@@ -74,6 +76,89 @@ interface DiscoveredNode {
   ports: DiscoveredPort[];
   allowed_members: string[];
   last_scanned: string;
+}
+
+function mapMachinesToNodes(
+  machines: Machine[] | undefined,
+  currentNodes: DiscoveredNode[]
+): DiscoveredNode[] {
+  if (!machines || machines.length === 0) return currentNodes;
+
+  const nodeMap = new Map<string, DiscoveredNode>();
+  for (const n of currentNodes) {
+    nodeMap.set(n.id, n);
+  }
+
+  for (const m of machines) {
+    const existing = nodeMap.get(m.id);
+    const osName = m.os || (m.passport as any)?.os || (m.kind === "computer" ? "macOS / Windows Workstation" : "Linux Server"); // i18n-ignore
+    const ipAddr = m.host || (m.agent ? "WebSocket Agent" : "192.168.0.x"); // i18n-ignore
+    const status = m.online !== false ? "ONLINE" : (m.lastSeen ? "OFFLINE" : "ONLINE");
+
+    // parse containers from passport if present
+    const passportContainers: DiscoveredContainer[] = [];
+    const pp = m.passport as any;
+    if (pp?.docker_containers && Array.isArray(pp.docker_containers)) {
+      for (const dc of pp.docker_containers) {
+        passportContainers.push({
+          id: dc.id || Math.random().toString(),
+          name: dc.name || "container",
+          custom_name: dc.name,
+          image: dc.image || "unknown",
+          status: dc.status || "Up", // i18n-ignore
+          ports: Array.isArray(dc.ports) ? dc.ports : (dc.ports ? [dc.ports] : []),
+        });
+      }
+    }
+
+    const passportPorts: DiscoveredPort[] = [];
+    if (pp?.listening_ports && Array.isArray(pp.listening_ports)) {
+      for (const lp of pp.listening_ports) {
+        const line = String(lp);
+        const mPort = line.match(/:(\d+)\s+/);
+        if (mPort) {
+          const pNum = parseInt(mPort[1], 10);
+          passportPorts.push({
+            port: pNum,
+            protocol: line.toLowerCase().includes("udp") ? "udp" : "tcp",
+            process: "service",
+            listen_address: "0.0.0.0",
+            service_hint: `Служба порта ${pNum}`, // i18n-ignore
+          });
+        }
+      }
+    }
+
+    if (existing) {
+      nodeMap.set(m.id, {
+        ...existing,
+        name: m.name || existing.name,
+        kind: m.kind || existing.kind,
+        os_name: osName || existing.os_name,
+        ip_address: ipAddr || existing.ip_address,
+        status: status,
+        containers: existing.containers.length > 0 ? existing.containers : passportContainers,
+        ports: existing.ports.length > 0 ? existing.ports : passportPorts,
+      });
+    } else {
+      nodeMap.set(m.id, {
+        id: m.id,
+        name: m.name || `Машина ${m.id.slice(0, 8)}`, // i18n-ignore
+        kind: m.kind || "server",
+        os_name: osName,
+        ip_address: ipAddr,
+        status: status,
+        containers: passportContainers,
+        ports: passportPorts.length > 0 ? passportPorts : [
+          { port: 22, protocol: "tcp", process: "sshd", listen_address: "0.0.0.0", service_hint: "OpenSSH Сервер" } // i18n-ignore
+        ],
+        allowed_members: ["all"],
+        last_scanned: new Date().toISOString(),
+      });
+    }
+  }
+
+  return Array.from(nodeMap.values());
 }
 
 interface ApprovalRequest {
@@ -165,53 +250,61 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
   const [userGithubRepos, setUserGithubRepos] = useState<Array<{ name: string; full_name: string; html_url: string; private: boolean }>>([]);
 
   // Multi-Node Topology & Ports state
-  const [nodes, setNodes] = useState<DiscoveredNode[]>([
-    {
-      id: "klim",
-      name: "klim (Raspberry Pi 4)", // i18n-ignore
-      kind: "server",
-      os_name: "Raspberry Pi 4 / Debian Linux 12", // i18n-ignore
-      ip_address: "192.168.0.6",
-      status: "ONLINE",
-      allowed_members: ["all"],
-      last_scanned: new Date().toISOString(),
-      ports: [
-        { port: 8290, protocol: "tcp", process: "python", listen_address: "0.0.0.0", service_hint: "tTerm Core Web UI" }, // i18n-ignore
-        { port: 8291, protocol: "tcp", process: "python", listen_address: "0.0.0.0", service_hint: "tTerm Connect Gateway" }, // i18n-ignore
-        { port: 8123, protocol: "tcp", process: "homeassistant", listen_address: "0.0.0.0", service_hint: "Home Assistant IoT" }, // i18n-ignore
-        { port: 5432, protocol: "tcp", process: "postgres", listen_address: "0.0.0.0", service_hint: "PostgreSQL Главная БД" }, // i18n-ignore
-        { port: 8080, protocol: "tcp", process: "qbittorrent", listen_address: "0.0.0.0", service_hint: "qBittorrent Web UI" }, // i18n-ignore
-        { port: 8090, protocol: "tcp", process: "torrserver", listen_address: "0.0.0.0", service_hint: "TorrServer Web UI" }, // i18n-ignore
-        { port: 1883, protocol: "tcp", process: "mosquitto", listen_address: "0.0.0.0", service_hint: "MQTT Брокер Сообщений" }, // i18n-ignore
-        { port: 22, protocol: "tcp", process: "sshd", listen_address: "0.0.0.0", service_hint: "OpenSSH Сервер" }, // i18n-ignore
-      ],
-      containers: [
-        { id: "0e64525d5026", name: "tterm-server-tterm-1", custom_name: "tTerm Core Web API", image: "tterm-server-tterm", status: "Up 25 minutes", ports: ["8290", "8291"] }, // i18n-ignore
-        { id: "7045c1f0de1b", name: "tterm-server-db-1", custom_name: "PostgreSQL Главная БД", image: "postgres:16-alpine", status: "Up 2 hours", ports: ["5432"] }, // i18n-ignore
-        { id: "0a70b3d94337", name: "homeassistant", custom_name: "Умный Дом Home Assistant", image: "ghcr.io/home-assistant/home-assistant:stable", status: "Up 25 minutes", ports: ["8123"] }, // i18n-ignore
-        { id: "403500e0bf72", name: "torrserver", custom_name: "Медиа-сервер TorrServer", image: "yourok/torrserver:latest", status: "Up 26 hours", ports: ["8090"] }, // i18n-ignore
-        { id: "bd245888b3c1", name: "qbittorrent", custom_name: "Фоновый Торрент-Клиент", image: "linuxserver/qbittorrent:latest", status: "Up 26 hours", ports: ["8080", "6881"] }, // i18n-ignore
-        { id: "124480d9331d", name: "mosquitto", custom_name: "MQTT Брокер Сообщений", image: "eclipse-mosquitto:latest", status: "Up 26 hours", ports: ["1883"] }, // i18n-ignore
-      ],
-    },
-    {
-      id: "macbook-air",
-      name: "MacBook Air (Рабочая станция)", // i18n-ignore
-      kind: "computer",
-      os_name: "macOS Sonoma (Darwin arm64)", // i18n-ignore
-      ip_address: "192.168.0.7",
-      status: "ONLINE",
-      allowed_members: ["all"],
-      last_scanned: new Date().toISOString(),
-      ports: [
-        { port: 22, protocol: "tcp", process: "sshd", listen_address: "0.0.0.0", service_hint: "OpenSSH Сервер" }, // i18n-ignore
-        { port: 5173, protocol: "tcp", process: "node (vite)", listen_address: "127.0.0.1", service_hint: "Vite Dev Server" }, // i18n-ignore
-        { port: 3000, protocol: "tcp", process: "node", listen_address: "127.0.0.1", service_hint: "React / Node Server" }, // i18n-ignore
-      ],
-      containers: [],
-    },
-  ]);
-  const [selectedNodeId, setSelectedNodeId] = useState("klim");
+  const [nodes, setNodes] = useState<DiscoveredNode[]>(() => {
+    const defaultNodes: DiscoveredNode[] = [
+      {
+        id: "klim",
+        name: "klim (Raspberry Pi 4)", // i18n-ignore
+        kind: "server",
+        os_name: "Raspberry Pi 4 / Debian Linux 12", // i18n-ignore
+        ip_address: "192.168.0.6",
+        status: "ONLINE",
+        allowed_members: ["all"],
+        last_scanned: new Date().toISOString(),
+        ports: [
+          { port: 8290, protocol: "tcp", process: "python", listen_address: "0.0.0.0", service_hint: "tTerm Core Web UI" }, // i18n-ignore
+          { port: 8291, protocol: "tcp", process: "python", listen_address: "0.0.0.0", service_hint: "tTerm Connect Gateway" }, // i18n-ignore
+          { port: 8123, protocol: "tcp", process: "homeassistant", listen_address: "0.0.0.0", service_hint: "Home Assistant IoT" }, // i18n-ignore
+          { port: 5432, protocol: "tcp", process: "postgres", listen_address: "0.0.0.0", service_hint: "PostgreSQL Главная БД" }, // i18n-ignore
+          { port: 8080, protocol: "tcp", process: "qbittorrent", listen_address: "0.0.0.0", service_hint: "qBittorrent Web UI" }, // i18n-ignore
+          { port: 8090, protocol: "tcp", process: "torrserver", listen_address: "0.0.0.0", service_hint: "TorrServer Web UI" }, // i18n-ignore
+          { port: 1883, protocol: "tcp", process: "mosquitto", listen_address: "0.0.0.0", service_hint: "MQTT Брокер Сообщений" }, // i18n-ignore
+          { port: 22, protocol: "tcp", process: "sshd", listen_address: "0.0.0.0", service_hint: "OpenSSH Сервер" }, // i18n-ignore
+        ],
+        containers: [
+          { id: "0e64525d5026", name: "tterm-server-tterm-1", custom_name: "tTerm Core Web API", image: "tterm-server-tterm", status: "Up 25 minutes", ports: ["8290", "8291"] }, // i18n-ignore
+          { id: "7045c1f0de1b", name: "tterm-server-db-1", custom_name: "PostgreSQL Главная БД", image: "postgres:16-alpine", status: "Up 2 hours", ports: ["5432"] }, // i18n-ignore
+          { id: "0a70b3d94337", name: "homeassistant", custom_name: "Умный Дом Home Assistant", image: "ghcr.io/home-assistant/home-assistant:stable", status: "Up 25 minutes", ports: ["8123"] }, // i18n-ignore
+          { id: "403500e0bf72", name: "torrserver", custom_name: "Медиа-сервер TorrServer", image: "yourok/torrserver:latest", status: "Up 26 hours", ports: ["8090"] }, // i18n-ignore
+          { id: "bd245888b3c1", name: "qbittorrent", custom_name: "Фоновый Торрент-Клиент", image: "linuxserver/qbittorrent:latest", status: "Up 26 hours", ports: ["8080", "6881"] }, // i18n-ignore
+          { id: "124480d9331d", name: "mosquitto", custom_name: "MQTT Брокер Сообщений", image: "eclipse-mosquitto:latest", status: "Up 26 hours", ports: ["1883"] }, // i18n-ignore
+        ],
+      },
+      {
+        id: "macbook-air",
+        name: "MacBook Air (Рабочая станция)", // i18n-ignore
+        kind: "computer",
+        os_name: "macOS Sonoma (Darwin arm64)", // i18n-ignore
+        ip_address: "192.168.0.7",
+        status: "ONLINE",
+        allowed_members: ["all"],
+        last_scanned: new Date().toISOString(),
+        ports: [
+          { port: 22, protocol: "tcp", process: "sshd", listen_address: "0.0.0.0", service_hint: "OpenSSH Сервер" }, // i18n-ignore
+          { port: 5173, protocol: "tcp", process: "node (vite)", listen_address: "127.0.0.1", service_hint: "Vite Dev Server" }, // i18n-ignore
+          { port: 3000, protocol: "tcp", process: "node", listen_address: "127.0.0.1", service_hint: "React / Node Server" }, // i18n-ignore
+        ],
+        containers: [],
+      },
+    ];
+    return mapMachinesToNodes(project.machines, defaultNodes);
+  });
+  const [selectedNodeId, setSelectedNodeId] = useState<string>(() => {
+    if (project.machines && project.machines.length > 0) {
+      return project.machines[0].id;
+    }
+    return "klim";
+  });
   const [scanLoading, setScanLoading] = useState(false);
 
   // Dangerous Command Approvals state
@@ -250,12 +343,9 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
   } | null>(null);
   const [isGeneratingAiKey, setIsGeneratingAiKey] = useState(false);
 
-  // Aeza Cloud VPS state
-  const [showAezaDrawer, setShowAezaDrawer] = useState(false);
-  const [aezaAccount, setAezaAccount] = useState<any>(null);
-  const [aezaPlans, setAezaPlans] = useState<any[]>([]);
-  const [isOrderingAeza, setIsOrderingAeza] = useState(false);
-  const [aezaOrderResult, setAezaOrderResult] = useState<any>(null);
+  // One-Click VPS Deploy & Migration Modal state
+  const [showCloudDeployModal, setShowCloudDeployModal] = useState(false);
+
 
   // Scoped Entity Permission Modal state
   const [permissionModal, setPermissionModal] = useState<{
@@ -302,13 +392,14 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
     let live = true;
 
     // 1. Fetch Multi-Node Topology & Ports
-    fetch("/api/orchestration/nodes", {
+    fetch(`/api/orchestration/nodes?project_id=${project.id}`, {
       headers: { "x-tterm": "1" },
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (live && data?.nodes?.length) {
-          setNodes(data.nodes);
+          const merged = mapMachinesToNodes(project.machines, data.nodes);
+          setNodes(merged);
         }
       })
       .catch(() => {});
@@ -337,28 +428,6 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
       })
       .catch(() => {});
 
-    // 4. Fetch Aeza Cloud Status
-    fetch("/api/orchestration/aeza/account", {
-      headers: { "x-tterm": "1" },
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (live && data?.account) {
-          setAezaAccount(data.account);
-        }
-      })
-      .catch(() => {});
-
-    fetch("/api/orchestration/aeza/plans", {
-      headers: { "x-tterm": "1" },
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (live && data?.plans) {
-          setAezaPlans(data.plans);
-        }
-      })
-      .catch(() => {});
 
     fetch(`/api/orchestration/projects/${project.id}/members`, {
       headers: { "x-tterm": "1" },
@@ -428,6 +497,13 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
       clearInterval(aiTimer);
     };
   }, [project.id]);
+
+  // Synchronize project machines into nodes whenever project.machines changes
+  useEffect(() => {
+    if (project?.machines && project.machines.length > 0) {
+      setNodes((prev) => mapMachinesToNodes(project.machines, prev));
+    }
+  }, [project?.machines]);
 
   const inviteLink = `${window.location.origin}/#invite=${project.id}&token=tt_inv_${project.id.slice(0, 8)}`;
 
@@ -578,13 +654,16 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
   const handleScanAllNodes = async () => {
     setScanLoading(true);
     try {
-      const res = await fetch("/api/orchestration/nodes/scan-all", {
+      const res = await fetch(`/api/orchestration/nodes/scan-all?project_id=${project.id}`, {
         method: "POST",
         headers: { "x-tterm": "1" },
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.nodes) setNodes(data.nodes);
+        if (data.nodes) {
+          const merged = mapMachinesToNodes(project.machines, data.nodes);
+          setNodes(merged);
+        }
         if (notify) notify(`Автосканирование выполнено: проверено ${data.scanned_count || data.nodes?.length} подключенных машин и открытых портов`); // i18n-ignore
       }
     } catch {
@@ -594,7 +673,7 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
     }
   };
 
-  const handleScanNode = async (nodeId: string = "klim") => {
+  const handleScanNode = async (nodeId: string = selectedNodeId) => {
     setScanLoading(true);
     try {
       const res = await fetch(`/api/orchestration/discovery/scan/${nodeId}`, {
@@ -605,9 +684,27 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
       if (res.ok) {
         const data = await res.json();
         setNodes((prev) =>
-          prev.map((n) => (n.id === nodeId ? { ...n, containers: data.containers || n.containers } : n))
+          prev.map((n) =>
+            n.id === nodeId
+              ? {
+                  ...n,
+                  containers: data.containers ?? n.containers,
+                  ports: data.ports && data.ports.length > 0 ? data.ports : n.ports,
+                  status: data.node?.status ?? n.status,
+                  os_name: data.node?.os_name ?? n.os_name,
+                  ip_address: data.node?.ip_address ?? n.ip_address,
+                  last_scanned: new Date().toISOString(),
+                }
+              : n
+          )
         );
-        if (notify) notify(`Нода ${nodeId}: обнаружено контейнеров: ${data.containers?.length || 0}`); // i18n-ignore
+        const nodeObj = nodes.find((n) => n.id === nodeId);
+        const nodeTitle = nodeObj?.name || nodeId;
+        if (data.containers && data.containers.length > 0) {
+          if (notify) notify(`Нода ${nodeTitle}: обнаружено ${data.containers.length} Docker-контейнеров и ${data.ports?.length || 0} открытых портов`); // i18n-ignore
+        } else {
+          if (notify) notify(`Нода ${nodeTitle}: Docker не запущен / не установлен на ноде. Обнаружено открытых портов: ${data.ports?.length || 0}`); // i18n-ignore
+        }
       }
     } catch {
       if (notify) notify(`Сканирование ноды ${nodeId} выполнено`); // i18n-ignore
@@ -720,33 +817,6 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
     }
   };
 
-  const handleOrderAezaVps = async () => {
-    setIsOrderingAeza(true);
-    try {
-      const res = await fetch("/api/orchestration/aeza/order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-tterm": "1" },
-        body: JSON.stringify({
-          name: `tterm-${project.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
-          product_id: 52, // MSKs-1 (1.40 RUB/hr)
-          hours: 5,
-          os_id: 1, // Ubuntu 24.04
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setAezaOrderResult(data.order);
-        if (notify) notify("VPS на Aeza успешно заказан! Инициализация окружения..."); // i18n-ignore
-      } else {
-        const err = await res.json();
-        if (notify) notify(`Ошибка заказа VPS: ${err.error || "Недостаточно средств"}`); // i18n-ignore
-      }
-    } catch {
-      if (notify) notify("Ошибка соединения с Aeza API"); // i18n-ignore
-    } finally {
-      setIsOrderingAeza(false);
-    }
-  };
 
   const handleSavePermissions = async () => {
     const { type, nodeId, containerId, allowedMembers } = permissionModal;
@@ -1761,19 +1831,21 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
             <button
               type="button"
               className="button-ghost small"
-              onClick={() => setShowAezaDrawer(true)}
-            >
-              ☁️ Aeza Cloud VPS {/* i18n-ignore */}
-            </button>
-            <button
-              type="button"
-              className="button-ghost small"
               onClick={() => setShowTermiusDrawer(true)}
             >
               <Key size={14} />
               Параметры Termius / SSH {/* i18n-ignore */}
             </button>
+            <button
+              type="button"
+              className="button-primary small"
+              style={{ background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", color: "#fff", fontWeight: 600 }}
+              onClick={() => setShowCloudDeployModal(true)}
+            >
+              🚀 Развернуть сервис в 1 клик {/* i18n-ignore */}
+            </button>
           </div>
+
         </div>
 
         {/* Multi-Node Selector Bar */}
@@ -2003,8 +2075,21 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
                       ))}
                     </div>
                   ) : (
-                    <div style={{ padding: "12px 14px", borderRadius: 8, background: "rgba(0,0,0,0.2)", color: "var(--color-text-secondary, #888)", fontSize: 12 }}>
-                      На данной рабочей станции нет активных Docker-контейнеров. Доступ предоставляется к локальным процессам и службам. {/* i18n-ignore */}
+                    <div style={{
+                      padding: "14px 16px",
+                      borderRadius: 8,
+                      background: "rgba(0,0,0,0.25)",
+                      border: "1px dashed rgba(255,255,255,0.12)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#93c5fd", fontWeight: 600, fontSize: 13 }}>
+                        <span>🐳 Docker не запущен / не установлен на ноде</span> {/* i18n-ignore */}
+                      </div>
+                      <span style={{ fontSize: 12, color: "var(--color-text-secondary, #888)" }}>
+                        На данном узле ({activeNode.name}) контейнеры Docker не обнаружены. Доступ и сетевой мониторинг предоставляются напрямую к локальным службам и открытым сетевым портам рабочей станции ниже. {/* i18n-ignore */}
+                      </span>
                     </div>
                   )}
 
@@ -2298,128 +2383,7 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
         </div>
       )}
 
-      {/* Slide-Over Side Drawer: Aeza Cloud VPS */}
-      {showAezaDrawer && (
-        <>
-          <div className="side-drawer-backdrop" onClick={() => setShowAezaDrawer(false)} />
-          <aside className="side-drawer-panel" role="complementary">
-            <div className="side-drawer-head">
-              <div className="side-drawer-title">
-                <span>☁️ Aeza Cloud VPS (Почасовой хостинг) {/* i18n-ignore */}</span>
-              </div>
-              <button
-                type="button"
-                className="icon-button small"
-                onClick={() => setShowAezaDrawer(false)}
-                aria-label="Закрыть" // i18n-ignore
-              >
-                <Close size={16} />
-              </button>
-            </div>
 
-            <div className="side-drawer-body">
-              {/* Account Balance Card */}
-              <div style={{ padding: "14px", borderRadius: 8, background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.25)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <span style={{ fontSize: 11, color: "var(--color-text-secondary, #888)", display: "block" }}>
-                      Баланс аккаунта Aeza: {/* i18n-ignore */}
-                    </span>
-                    <strong style={{ fontSize: 18, color: "#10b981" }}>
-                      {aezaAccount?.balance_rub !== undefined ? `${aezaAccount.balance_rub.toFixed(2)} ₽` : "50.00 ₽"} {/* i18n-ignore */}
-                    </strong>
-                  </div>
-                  <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "rgba(16,185,129,0.2)", color: "#10b981" }}>
-                    Активен {/* i18n-ignore */}
-                  </span>
-                </div>
-                <div style={{ fontSize: 11, color: "var(--color-text-dim, #777)", marginTop: 6 }}>
-                  {"Email: "} {aezaAccount?.email || "eklimov84@xmail.ru"} {/* i18n-ignore */}
-                </div>
-              </div>
-
-              {/* Linked MacBook SSH Keys */}
-              <div>
-                <strong style={{ fontSize: 13, display: "block", marginBottom: 6 }}>
-                  Привязанные SSH-ключи MacBook {/* i18n-ignore */}
-                </strong>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <div style={{ padding: "8px 10px", borderRadius: 6, background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12, display: "flex", justifyContent: "space-between" }}>
-                    <span>🔑 MacBook-Air-Evgenij (ed25519) {/* i18n-ignore */}</span>
-                    <span style={{ color: "#10b981" }}>autoAssign: true {/* i18n-ignore */}</span>
-                  </div>
-                  <div style={{ padding: "8px 10px", borderRadius: 6, background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12, display: "flex", justifyContent: "space-between" }}>
-                    <span>🔑 MacBook-Air-Evgenij (rsa) {/* i18n-ignore */}</span>
-                    <span style={{ color: "#10b981" }}>autoAssign: true {/* i18n-ignore */}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Recommended Hourly VPS Plan */}
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <strong style={{ fontSize: 13 }}>
-                    Рекомендуемый тестовый сервер (Почасовой) {/* i18n-ignore */}
-                  </strong>
-                  {aezaPlans.length > 0 && (
-                    <span style={{ fontSize: 11, color: "var(--color-text-dim, #777)" }}>
-                      {"Тарифов: "} {aezaPlans.length} {/* i18n-ignore */}
-                    </span>
-                  )}
-                </div>
-                <div style={{ padding: "14px", borderRadius: 8, background: "rgba(59, 130, 246, 0.08)", border: "1px solid rgba(59, 130, 246, 0.25)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                    <div>
-                      <strong style={{ fontSize: 14 }}>MSKs-1 / DEs-1 (NVMe VPS) {/* i18n-ignore */}</strong>
-                      <span style={{ fontSize: 12, color: "var(--color-text-secondary, #888)", display: "block" }}>
-                        1 vCPU • 2 GB RAM • 30 GB NVMe • 25 Гбит/с {/* i18n-ignore */}
-                      </span>
-                    </div>
-                    <strong style={{ fontSize: 15, color: "#60a5fa" }}>
-                      1.40 ₽ / час {/* i18n-ignore */}
-                    </strong>
-                  </div>
-                  <p style={{ fontSize: 12, color: "var(--color-text-secondary, #888)", lineHeight: 1.5, marginBottom: 12 }}>
-                    Самый выгодный тариф для развертывания стенда проекта и тестирования автором tTerm. На 5 часов тестирования спишется всего 7.00 ₽. {/* i18n-ignore */}
-                  </p>
-
-                  <button
-                    type="button"
-                    className="button-accent"
-                    style={{ width: "100%", justifyContent: "center" }}
-                    disabled={isOrderingAeza}
-                    onClick={handleOrderAezaVps}
-                  >
-                    <span>{isOrderingAeza ? "Заказ сервера..." : "🚀 Заказать VPS на 5 часов (7.00 ₽)" /* i18n-ignore */}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Order Result Banner */}
-              {aezaOrderResult && (
-                <div style={{ padding: "12px 14px", borderRadius: 8, background: "rgba(16, 185, 129, 0.1)", border: "1px solid #10b981" }}>
-                  <strong style={{ fontSize: 13, color: "#10b981", display: "block", marginBottom: 4 }}>
-                    ✅ Сервер успешно создан! {/* i18n-ignore */}
-                  </strong>
-                  <div style={{ fontSize: 12, fontFamily: "monospace" }}>
-                    Подключение с MacBook: <code>ssh root@&lt;ip&gt;</code> (по ключу ed25519) {/* i18n-ignore */}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="side-drawer-foot">
-              <button
-                type="button"
-                className="button-plain small"
-                onClick={() => setShowAezaDrawer(false)}
-              >
-                Закрыть {/* i18n-ignore */}
-              </button>
-            </div>
-          </aside>
-        </>
-      )}
 
       {/* Modal: Управление доступом к ноде / контейнеру */}
       {permissionModal.isOpen && (
@@ -2667,6 +2631,15 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
             </div>
           </div>
         </div>
+      )}
+
+      {/* One-Click VPS Deploy & Migration Modal */}
+      {showCloudDeployModal && (
+        <CloudDeployModal
+          isOpen={showCloudDeployModal}
+          onClose={() => setShowCloudDeployModal(false)}
+          defaultEmail={me.email || "admin@example.com"}
+        />
       )}
     </div>
   );

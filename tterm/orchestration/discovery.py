@@ -225,6 +225,11 @@ Linux klim 6.18.50+rpt-rpi-v8 #1 SMP PREEMPT Debian 1:6.18.50-1+rpt1 (2026-09-11
 192.168.0.6 172.17.0.1 172.18.0.1
 ===SYSTEM_END==="""
         self.parse_discovery_output("klim", default_klim_raw)
+        klim_node.cached_passport = {
+            "os": "Raspberry Pi 4 / Debian Linux 12",
+            "docker_containers": [c.model_dump() for c in klim_node.containers],
+            "listening_ports": [f"tcp LISTEN 0 128 0.0.0.0:{p.port} 0.0.0.0:*" for p in klim_node.ports],
+        }
 
         # 2. MacBook Air (macOS Developer Node)
         mac_node = DiscoveredNodeDTO(
@@ -252,8 +257,13 @@ tcp LISTEN 0 512 127.0.0.1:3000 0.0.0.0:*
 ===SYSTEM_BEGIN===
 Darwin MacBook-Air.local 24.3.0 Darwin Kernel Version 24.3.0: arm64
 192.168.0.7
-===SYSTEM_END==="""
+===SYSTEM_END="""
         self.parse_discovery_output("macbook-air", mac_raw)
+        mac_node.cached_passport = {
+            "os": "macOS Sonoma (Darwin arm64)",
+            "docker_containers": [],
+            "listening_ports": [f"tcp LISTEN 0 128 0.0.0.0:{p.port} 0.0.0.0:*" for p in mac_node.ports],
+        }
 
     def parse_ports_output(self, ports_raw: str) -> List[DiscoveredPortDTO]:
         ports: List[DiscoveredPortDTO] = []
@@ -514,14 +524,19 @@ Darwin MacBook-Air.local 24.3.0 Darwin Kernel Version 24.3.0: arm64
         key_path: Optional[str] = None,
         raw_output: Optional[str] = None,
         client: Any = None,
+        agents: Any = None,
+        terminals: Any = None,
+        pool: Any = None,
     ) -> Dict[str, Any]:
         """
         Connects directly to the specified machine, executes discovery probe remotely
         (Docker ps, open listening ports, OS details), parses containers and services,
         and binds them to the node.
 
+        CRITICAL SECURITY & TOPOLOGY RULE:
         NEVER executes against the local tterm host when scanning a remote machine.
-        Falls back to realistic cached machine passport if the machine is unreachable.
+        If the node is remote, it queries via the machine's active agent link, SSH,
+        or uses its real remote passport from the database.
         """
         machine_id = str(machine_id).strip()
         node = self._nodes.get(machine_id)
@@ -546,6 +561,40 @@ Darwin MacBook-Air.local 24.3.0 Darwin Kernel Version 24.3.0: arm64
             node.login = login
         if port:
             node.ssh_port = port
+
+        # 0. Sync fresh machine passport from DB if pool is available
+        if pool:
+            try:
+                row = await pool.fetchrow(
+                    """
+                    SELECT id, name, kind, host, port, login, passport, last_seen_at
+                    FROM machines
+                    WHERE (id::text = $1 OR name = $1) AND removed_at IS NULL
+                    """,
+                    machine_id,
+                )
+                if row:
+                    if row["name"] and (node.name.startswith("Нода ") or node.name.startswith("Машина ")):
+                        node.name = row["name"]
+                    if row["kind"]:
+                        node.kind = row["kind"]
+                    if row["host"]:
+                        node.host = row["host"]
+                        node.ip_address = row["host"]
+                    if row["port"]:
+                        node.ssh_port = row["port"]
+                    if row["login"]:
+                        node.login = row["login"]
+                    pp = row["passport"]
+                    if isinstance(pp, str):
+                        try:
+                            pp = json.loads(pp)
+                        except Exception:
+                            pp = {}
+                    if isinstance(pp, dict) and pp:
+                        node.cached_passport = pp
+            except Exception as exc:
+                log.debug("DB machine lookup in scan_connected_machine: %s", exc)
 
         # 1. If explicit raw output is passed, parse directly
         if raw_output:
@@ -579,20 +628,86 @@ Darwin MacBook-Air.local 24.3.0 Darwin Kernel Version 24.3.0: arm64
             except Exception as exc:
                 log.warning("Scan via provided client for %s failed: %s", machine_id, exc)
 
-        # 3. Remote execution via SSH to the connected machine
+        # 3. Active WebSocket Agent Link (for remote computers / laptops / macOS workstations)
+        if agents is not None:
+            target_link = None
+            try:
+                mid_uuid = uuid.UUID(machine_id)
+                target_link = agents._links.get(mid_uuid)
+            except Exception:
+                pass
+            if not target_link:
+                for uid, l in getattr(agents, "_links", {}).items():
+                    if str(uid) == machine_id or getattr(l, "machine_name", "") == machine_id or getattr(l, "name", "") == machine_id:
+                        target_link = l
+                        break
+
+            if target_link and not getattr(target_link, "gone", False):
+                try:
+                    probe_script = DISCOVERY_SCRIPT
+                    if getattr(target_link, "os", "") and "win" in str(target_link.os).lower():
+                        from ..core import passport
+                        probe_script = passport.POWERSHELL_SCRIPT
+
+                    code, out_b, _ = await target_link.script(probe_script, timeout=12.0)
+                    out_text = out_b.decode("utf-8", "replace") if isinstance(out_b, (bytes, bytearray)) else str(out_b)
+                    containers = self.parse_discovery_output(machine_id, out_text)
+                    log.info("Successfully scanned remote node '%s' via connected agent link", machine_id)
+                    return {
+                        "ok": True,
+                        "node_id": machine_id,
+                        "node": node.to_dict(),
+                        "containers": [c.model_dump() for c in containers],
+                        "ports": [p.to_dict() for p in node.ports],
+                        "method": "agent_link",
+                    }
+                except Exception as exc:
+                    log.warning("Agent scan probe failed for %s: %s", machine_id, exc)
+
+        # 4. If this is confirmed to be the local server (tTerm host itself)
+        import socket
+        local_hn = socket.gethostname().lower()
+        is_local_core = (
+            (node.host in ("127.0.0.1", "localhost", "::1") and machine_id in (local_hn, "localhost", "local"))
+            or (local_hn == "klim" and machine_id == "klim")
+        )
+        if is_local_core:
+            try:
+                proc = await asyncio.create_subprocess_shell(
+                    DISCOVERY_SCRIPT,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout_b, _ = await asyncio.wait_for(proc.communicate(), timeout=8.0)
+                if proc.returncode == 0 or b"===DOCKER_BEGIN===" in stdout_b:
+                    out = stdout_b.decode("utf-8", "replace")
+                    containers = self.parse_discovery_output(machine_id, out)
+                    log.info("Successfully scanned local node '%s' directly", machine_id)
+                    return {
+                        "ok": True,
+                        "node_id": machine_id,
+                        "node": node.to_dict(),
+                        "containers": [c.model_dump() for c in containers],
+                        "ports": [p.to_dict() for p in node.ports],
+                        "method": "local_process",
+                    }
+            except Exception as exc:
+                log.debug("Local scan attempt for %s failed: %s", machine_id, exc)
+
+        # 5. Remote execution via SSH to the connected remote machine
         target_host = node.host or node.ip_address
         target_port = node.ssh_port or 22
         target_login = node.login or "tterm"
 
         destinations_to_try = []
         if machine_id == "klim" or target_host == "192.168.0.6":
-            destinations_to_try.append("klim")
             destinations_to_try.append(f"pi@{target_host or '192.168.0.6'}")
-        elif target_host:
+            destinations_to_try.append("klim")
+        elif target_host and target_host not in ("127.0.0.1", "localhost"):
             if target_login:
                 destinations_to_try.append(f"{target_login}@{target_host}")
             destinations_to_try.append(target_host)
-        else:
+        elif not is_local_core and machine_id not in ("macbook-air", "klim"):
             destinations_to_try.append(machine_id)
 
         scanned_output = None
@@ -601,7 +716,7 @@ Darwin MacBook-Air.local 24.3.0 Darwin Kernel Version 24.3.0: arm64
                 ssh_cmd = [
                     "ssh",
                     "-o", "BatchMode=yes",
-                    "-o", "ConnectTimeout=3",
+                    "-o", "ConnectTimeout=2",
                     "-o", "StrictHostKeyChecking=no",
                     "-o", "UserKnownHostsFile=/dev/null",
                 ]
@@ -615,10 +730,10 @@ Darwin MacBook-Air.local 24.3.0 Darwin Kernel Version 24.3.0: arm64
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                stdout_b, _ = await asyncio.wait_for(proc.communicate(), timeout=10.0)
+                stdout_b, _ = await asyncio.wait_for(proc.communicate(), timeout=8.0)
                 if proc.returncode == 0 or b"===DOCKER_BEGIN===" in stdout_b:
                     scanned_output = stdout_b.decode("utf-8", "replace")
-                    log.info("Successfully scanned remote machine '%s' via %s", machine_id, dest)
+                    log.info("Successfully scanned remote machine '%s' via SSH %s", machine_id, dest)
                     break
             except Exception as exc:
                 log.debug("Remote SSH attempt to %s failed: %s", dest, exc)
@@ -634,9 +749,10 @@ Darwin MacBook-Air.local 24.3.0 Darwin Kernel Version 24.3.0: arm64
                 "method": "remote_ssh",
             }
 
-        # 4. Fallback to cached passport or realistic node profile
+        # 6. Fallback to cached machine passport or realistic node profile
+        # NEVER executes against localhost for a remote node!
         log.warning(
-            "Remote machine '%s' (%s) was unreachable via SSH. Using cached passport fallback.",
+            "Remote machine '%s' (%s) was unreachable via agent/SSH. Using cached passport fallback.",
             machine_id, target_host
         )
         if node.cached_passport:
@@ -654,9 +770,22 @@ Darwin MacBook-Air.local 24.3.0 Darwin Kernel Version 24.3.0: arm64
             "method": "cached_fallback",
         }
 
-    async def scan_all_connected_machines(self) -> List[Dict[str, Any]]:
+    async def scan_all_connected_machines(
+        self,
+        agents: Any = None,
+        terminals: Any = None,
+        pool: Any = None,
+    ) -> List[Dict[str, Any]]:
         """Scans all registered connected machines in parallel."""
-        tasks = [self.scan_connected_machine(node_id) for node_id in list(self._nodes.keys())]
+        tasks = [
+            self.scan_connected_machine(
+                node_id,
+                agents=agents,
+                terminals=terminals,
+                pool=pool,
+            )
+            for node_id in list(self._nodes.keys())
+        ]
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         return [node.to_dict() for node in self._nodes.values()]

@@ -521,16 +521,44 @@ class ScanRequestDTO(BaseModel):
 
 @router.post("/discovery/scan")
 @router.post("/discovery/scan/{node_id}")
-async def scan_node_discovery(node_id: str = "klim", data: ScanRequestDTO | None = None):
+async def scan_node_discovery(
+    node_id: str = "klim",
+    data: ScanRequestDTO | None = None,
+    request: Request = None,
+):
     """Scans or processes discovery probe output for a node."""
     from .discovery import discovery_scanner
+    pool = getattr(getattr(request, "app", None), "state", None)
+    pool_obj = getattr(pool, "pool", None) if pool else None
+    agents_obj = getattr(pool, "agents", None) if pool else None
+    terminals_obj = getattr(pool, "terminals", None) if pool else None
+
     raw_output = data.raw_output if data else ""
     if raw_output:
         containers = discovery_scanner.parse_discovery_output(node_id, raw_output)
-        return {"ok": True, "containers": [c.model_dump() for c in containers]}
+        node = discovery_scanner.get_node(node_id)
+        return {
+            "ok": True,
+            "node_id": node_id,
+            "node": node.to_dict() if node else None,
+            "containers": [c.model_dump() for c in containers],
+            "ports": [p.to_dict() for p in (node.ports if node else [])],
+        }
     else:
-        res = await discovery_scanner.scan_connected_machine(node_id)
-        return {"ok": True, "containers": res.get("containers", [])}
+        res = await discovery_scanner.scan_connected_machine(
+            node_id,
+            agents=agents_obj,
+            terminals=terminals_obj,
+            pool=pool_obj,
+        )
+        return {
+            "ok": True,
+            "node_id": node_id,
+            "node": res.get("node"),
+            "containers": res.get("containers", []),
+            "ports": res.get("ports", []),
+            "method": res.get("method"),
+        }
 
 
 @router.get("/discovery")
@@ -828,9 +856,17 @@ class ScanRemoteDTO(BaseModel):
 
 
 @router.get("/nodes")
-async def list_all_nodes(member_id: Optional[str] = Query(None)):
+async def list_all_nodes(
+    member_id: Optional[str] = Query(None),
+    project_id: Optional[str] = Query(None),
+    request: Request = None,
+):
     """Lists all connected nodes, their containers and open listening ports."""
     from .discovery import discovery_scanner
+    pool = getattr(getattr(request, "app", None), "state", None)
+    pool_obj = getattr(pool, "pool", None) if pool else None
+    if pool_obj:
+        await discovery_scanner.sync_from_machines_db(pool_obj)
     nodes = discovery_scanner.get_all_nodes(member_id)
     return {"ok": True, "nodes": nodes}
 
@@ -846,18 +882,40 @@ async def get_single_node(node_id: str):
 
 
 @router.post("/nodes/scan-all")
-async def scan_all_connected_nodes():
+async def scan_all_connected_nodes(
+    project_id: Optional[str] = Query(None),
+    request: Request = None,
+):
     """Triggers an auto-discovery scan across all connected machines."""
     from .discovery import discovery_scanner
-    nodes = await discovery_scanner.scan_all_connected_machines()
+    pool = getattr(getattr(request, "app", None), "state", None)
+    pool_obj = getattr(pool, "pool", None) if pool else None
+    agents_obj = getattr(pool, "agents", None) if pool else None
+    terminals_obj = getattr(pool, "terminals", None) if pool else None
+    if pool_obj:
+        await discovery_scanner.sync_from_machines_db(pool_obj)
+    nodes = await discovery_scanner.scan_all_connected_machines(
+        agents=agents_obj,
+        terminals=terminals_obj,
+        pool=pool_obj,
+    )
     return {"ok": True, "nodes": nodes, "scanned_count": len(nodes)}
 
 
 @router.post("/nodes/{node_id}/scan")
 @router.post("/nodes/{node_id}/scan-remote")
-async def scan_remote_connected_node(node_id: str, data: Optional[ScanRemoteDTO] = None):
+async def scan_remote_connected_node(
+    node_id: str,
+    data: Optional[ScanRemoteDTO] = None,
+    request: Request = None,
+):
     """Triggers an active remote scan of the connected machine (SSH / agent) rather than local host."""
     from .discovery import discovery_scanner
+    pool = getattr(getattr(request, "app", None), "state", None)
+    pool_obj = getattr(pool, "pool", None) if pool else None
+    agents_obj = getattr(pool, "agents", None) if pool else None
+    terminals_obj = getattr(pool, "terminals", None) if pool else None
+
     host = data.host if data else None
     login = data.login if data else None
     port = data.port if data else None
@@ -868,6 +926,9 @@ async def scan_remote_connected_node(node_id: str, data: Optional[ScanRemoteDTO]
         login=login,
         port=port,
         raw_output=raw_output,
+        agents=agents_obj,
+        terminals=terminals_obj,
+        pool=pool_obj,
     )
     return result
 
@@ -963,44 +1024,146 @@ async def resolve_approval_request(request_id: str, data: ResolveApprovalDTO):
     return {"ok": True, "request": res}
 
 
-# ---------------------------------------------------------------------- Aeza Cloud VPS Provisioning
+# ---------------------------------------------------------------------- Aeza Cloud VPS Provisioning (Personal Vault)
+class AezaConfigDTO(BaseModel):
+    api_key: str
+    user_id: Optional[str] = None
+
+
 class AezaOrderDTO(BaseModel):
     name: str = "tterm-demo"
     product_id: int = 52          # MSKs-1 (1.40 RUB/hour)
     hours: int = 5
     os_id: int = 1                # Ubuntu 24.04
     ssh_key_ids: Optional[List[int]] = None
+    user_id: Optional[str] = None
+
+
+def _extract_user_id(request: Optional[Any] = None, explicit_user_id: Optional[str] = None) -> str:
+    if explicit_user_id and str(explicit_user_id).strip():
+        return str(explicit_user_id).strip()
+    if request is not None:
+        headers = getattr(request, "headers", {})
+        if hasattr(headers, "get"):
+            hdr_user = headers.get("x-user-id")
+            if hdr_user and str(hdr_user).strip():
+                return str(hdr_user).strip()
+        state = getattr(request, "state", None)
+        state_user = getattr(state, "user_id", None)
+        if state_user:
+            return str(state_user)
+        query_params = getattr(request, "query_params", {})
+        if hasattr(query_params, "get") and query_params.get("user_id"):
+            return str(query_params.get("user_id")).strip()
+    return "owner-user"
+
+
+@router.get("/aeza/config")
+async def get_aeza_config(user_id: Optional[str] = Query(None), request: Request = None):
+    """Returns Aeza API configuration status and masked key for the requesting user."""
+    from .aeza_cloud import get_user_key, mask_api_key
+    uid = _extract_user_id(request, user_id)
+    key = get_user_key(uid)
+    return {
+        "ok": True,
+        "configured": bool(key),
+        "masked_key": mask_api_key(key),
+        "user_id": uid,
+    }
+
+
+@router.post("/aeza/config")
+async def save_aeza_config(data: AezaConfigDTO, request: Request = None):
+    """Validates and saves personal Aeza API credentials for the authenticated user."""
+    from .aeza_cloud import AezaClient, mask_api_key, save_user_key
+    uid = _extract_user_id(request, data.user_id)
+    clean_key = (data.api_key or "").strip()
+    if not clean_key:
+        raise HTTPException(status_code=400, detail="API-ключ не может быть пустым")
+
+    # Validate against Aeza API before persisting
+    test_client = AezaClient(api_key=clean_key)
+    try:
+        acc = test_client.get_account_info()
+    except Exception as e:
+        return {
+            "ok": False,
+            "configured": False,
+            "error": f"Ошибка верификации ключа в Aeza: {str(e)}",
+        }
+
+    save_user_key(uid, clean_key)
+    return {
+        "ok": True,
+        "configured": True,
+        "masked_key": mask_api_key(clean_key),
+        "balance": acc.get("balance_rub", 0.0),
+        "email": acc.get("email"),
+        "account": acc,
+    }
+
+
+@router.delete("/aeza/config")
+async def delete_aeza_config(user_id: Optional[str] = Query(None), request: Request = None):
+    """Removes personal Aeza credentials for the user."""
+    from .aeza_cloud import delete_user_key
+    uid = _extract_user_id(request, user_id)
+    deleted = delete_user_key(uid)
+    return {
+        "ok": True,
+        "configured": False,
+        "deleted": deleted,
+    }
 
 
 @router.get("/aeza/account")
-async def get_aeza_account():
-    """Returns Aeza account balance, status, and linked SSH keys."""
-    from .aeza_cloud import aeza_client
+async def get_aeza_account(user_id: Optional[str] = Query(None), request: Request = None):
+    """Returns Aeza account balance, status, and linked SSH keys for the user."""
+    from .aeza_cloud import get_aeza_client, get_user_key
+    uid = _extract_user_id(request, user_id)
+    key = get_user_key(uid)
+    if not key:
+        return {
+            "ok": False,
+            "configured": False,
+            "error": "API-ключ Aeza не настроен в личном кабинете пользователя.",
+        }
+    client = get_aeza_client(user_id=uid)
     try:
-        acc = aeza_client.get_account_info()
-        keys = aeza_client.list_ssh_keys()
-        return {"ok": True, "account": acc, "ssh_keys": keys}
+        acc = client.get_account_info()
+        keys = client.list_ssh_keys()
+        return {"ok": True, "configured": True, "account": acc, "ssh_keys": keys}
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        return {"ok": False, "configured": True, "error": str(e)}
 
 
 @router.get("/aeza/plans")
-async def get_aeza_vps_plans(hourly_only: bool = True):
+async def get_aeza_vps_plans(hourly_only: bool = True, user_id: Optional[str] = Query(None), request: Request = None):
     """Returns available VPS plans with hourly prices."""
-    from .aeza_cloud import aeza_client
+    from .aeza_cloud import get_aeza_client, get_user_key
+    uid = _extract_user_id(request, user_id)
+    key = get_user_key(uid)
+    if not key:
+        return {"ok": False, "configured": False, "plans": [], "error": "API-ключ Aeza не настроен."}
+    client = get_aeza_client(user_id=uid)
     try:
-        plans = aeza_client.list_vps_plans(hourly_only=hourly_only)
-        return {"ok": True, "plans": plans}
+        plans = client.list_vps_plans(hourly_only=hourly_only)
+        return {"ok": True, "configured": True, "plans": plans}
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        return {"ok": False, "configured": True, "plans": [], "error": str(e)}
 
 
 @router.post("/aeza/order")
-async def order_aeza_test_vps(data: AezaOrderDTO):
+async def order_aeza_test_vps(data: AezaOrderDTO, request: Request = None):
     """Creates a temporary hourly VPS server for preview and testing."""
-    from .aeza_cloud import aeza_client
+    from .aeza_cloud import get_aeza_client, get_user_key
+    uid = _extract_user_id(request, data.user_id)
+    key = get_user_key(uid)
+    if not key:
+        return {"ok": False, "configured": False, "error": "API-ключ Aeza не настроен в личном кабинете."}
+    client = get_aeza_client(user_id=uid)
     try:
-        order_res = aeza_client.order_vps(
+        order_res = client.order_vps(
             name=data.name,
             product_id=data.product_id,
             hours=data.hours,
@@ -1013,14 +1176,19 @@ async def order_aeza_test_vps(data: AezaOrderDTO):
 
 
 @router.get("/aeza/services")
-async def list_aeza_services():
-    """Lists active provisioned VPS instances on Aeza."""
-    from .aeza_cloud import aeza_client
+async def list_aeza_services(user_id: Optional[str] = Query(None), request: Request = None):
+    """Lists active provisioned VPS instances on Aeza for user."""
+    from .aeza_cloud import get_aeza_client, get_user_key
+    uid = _extract_user_id(request, user_id)
+    key = get_user_key(uid)
+    if not key:
+        return {"ok": False, "configured": False, "services": [], "error": "API-ключ Aeza не настроен."}
+    client = get_aeza_client(user_id=uid)
     try:
-        services = aeza_client.list_services()
-        return {"ok": True, "services": services}
+        services = client.list_services()
+        return {"ok": True, "configured": True, "services": services}
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        return {"ok": False, "configured": True, "services": [], "error": str(e)}
 
 
 # ---------------------------------------------------------------------- GitHub Web App Authorization
@@ -1516,4 +1684,77 @@ async def get_terminal_sftp_info(
         "ok": True,
         "sftp": creds,
     }
+
+
+# ---------------------------------------------------------------------- One-Click VPS Deploy & Migration
+class CloudDeployStartDTO(BaseModel):
+    host: str
+    port: int = 22
+    user: str = "root"
+    password: Optional[str] = None
+    private_key: Optional[str] = None
+    repo_url: str = "https://github.com/Gakuzi/tterm-web.git"
+    branch: str = "feature/mcp-ai-orchestration-v1"
+    admin_email: str = "admin@example.com"
+    smtp_host: Optional[str] = None
+    smtp_port: int = 587
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    simulation_mode: bool = False
+
+
+class CloudDeployTestEmailDTO(BaseModel):
+    email: str
+    host: Optional[str] = None
+    code: Optional[str] = None
+
+
+@router.post("/cloud-deploy/start")
+async def start_cloud_deploy(data: CloudDeployStartDTO):
+    """Starts an asynchronous one-click VPS deployment and full migration pipeline."""
+    from .cloud_deploy import cloud_deploy_manager
+    engine = cloud_deploy_manager.create_deployment(
+        host=data.host,
+        port=data.port,
+        user=data.user,
+        password=data.password,
+        private_key=data.private_key,
+        repo_url=data.repo_url,
+        branch=data.branch,
+        admin_email=data.admin_email,
+        smtp_host=data.smtp_host,
+        smtp_port=data.smtp_port,
+        smtp_user=data.smtp_user,
+        smtp_password=data.smtp_password,
+        simulation_mode=data.simulation_mode,
+    )
+    # Launch pipeline in background asyncio task
+    asyncio.create_task(engine.run_pipeline())
+    return {"ok": True, "task_id": engine.task_id}
+
+
+@router.get("/cloud-deploy/status/{task_id}")
+async def get_cloud_deploy_status(task_id: str):
+    """Returns real-time progress, step checklist, and console logs for the deployment task."""
+    from .cloud_deploy import cloud_deploy_manager
+    engine = cloud_deploy_manager.get_task(task_id)
+    if not engine:
+        raise HTTPException(status_code=404, detail="Deploy task not found")
+    return {"ok": True, "task": engine.to_dict()}
+
+
+@router.get("/cloud-deploy/tasks")
+async def list_cloud_deploy_tasks():
+    """Lists all active and completed VPS deployment tasks."""
+    from .cloud_deploy import cloud_deploy_manager
+    return {"ok": True, "tasks": cloud_deploy_manager.list_tasks()}
+
+
+@router.post("/cloud-deploy/test-email")
+async def test_cloud_deploy_email(data: CloudDeployTestEmailDTO):
+    """Triggers a test verification code email dispatch to check SMTP delivery."""
+    from .cloud_deploy import cloud_deploy_manager
+    res = await cloud_deploy_manager.test_email(email=data.email, host=data.host, code=data.code)
+    return res
+
 

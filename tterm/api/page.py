@@ -306,7 +306,7 @@ def _moment(ms: int | None) -> dt.datetime | None:
 def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
                     connect_url: str, terminals: Terminals | None = None,
                     agents=None, relay=None, *, secret: bytes, mailer: Mailer,
-                    legal: dict[str, str] | None = None):
+                    legal: dict[str, str] | None = None, signer=None):
     """The ASGI app for the page, wrapped in the page's guard. `legal` has
     the addresses the sign-in screens link to: the Terms of Service, the
     Privacy Policy, and support's email."""

@@ -57,7 +57,7 @@ async def start_signer(settings: Settings) -> asyncio.subprocess.Process:
     proc = await asyncio.create_subprocess_exec(
         sys.executable, "-m", "tterm.signer", cwd=str(ROOT), env=os.environ)
     client = SignerClient(settings.signer_socket, timeout=1)
-    for _ in range(100):
+    for _ in range(300):
         if proc.returncode is not None:
             raise SignerUnavailable("The signer stopped while starting; its "
                                     "message is above.")
@@ -67,7 +67,7 @@ async def start_signer(settings: Settings) -> asyncio.subprocess.Process:
         except SignerUnavailable:
             await asyncio.sleep(0.1)
     proc.terminate()
-    raise SignerUnavailable("The signer did not start within 10 seconds.")
+    raise SignerUnavailable("The signer did not start within 30 seconds.")
 
 
 async def stop_signer(proc: asyncio.subprocess.Process) -> None:

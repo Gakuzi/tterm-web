@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 data/
+.user_aeza_keys.json
+*.local.json
 
 # Our working notes
 PROJECT.md

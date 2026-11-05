@@ -3,11 +3,13 @@ Aeza Cloud API Integration Client.
 
 Manages provisioning and lifecycle of hourly VPS machines for live testing,
 demonstration, and staging of tTerm deployments.
+Keys are isolated per user profile and stored securely in the user's vault.
 """
 from __future__ import annotations
 
 import json
 import logging
+import os
 import ssl
 import urllib.error
 import urllib.request
@@ -16,7 +18,6 @@ from typing import Any, Dict, List, Optional
 log = logging.getLogger("tterm.orchestration.aeza")
 
 AEZA_BASE_URL = "https://my.aeza.ru/api/v2"
-AEZA_DEFAULT_KEY = "1404_2fd3f63e0ec3f58608beb52a738da83b"
 
 
 def _get_ssl_context() -> ssl.SSLContext:
@@ -33,13 +34,127 @@ def _get_ssl_context() -> ssl.SSLContext:
         return ctx
 
 
+class AezaKeyStore:
+    """Secure per-user storage for Aeza Cloud API credentials."""
+
+    def __init__(self, filepath: Optional[str] = None):
+        if filepath:
+            self.filepath = filepath
+        else:
+            env_path = os.environ.get("AEZA_KEYS_FILE")
+            if env_path:
+                self.filepath = env_path
+            else:
+                # Default to .user_aeza_keys.json in workspace or fallback to home
+                base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+                self.filepath = os.path.join(base_dir, ".user_aeza_keys.json")
+
+        self._keys: Dict[str, str] = {}
+        self._load()
+
+    def _load(self) -> None:
+        if os.path.exists(self.filepath):
+            try:
+                with open(self.filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        self._keys = {str(k): str(v) for k, v in data.items()}
+            except Exception as e:
+                log.warning("Could not read Aeza keys from %s: %s", self.filepath, e)
+
+        # Fallback check in user home directory if workspace file has no keys
+        home_fallback = os.path.expanduser("~/.tterm_aeza_keys.json")
+        if not self._keys and os.path.exists(home_fallback):
+            try:
+                with open(home_fallback, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        self._keys.update({str(k): str(v) for k, v in data.items()})
+            except Exception:
+                pass
+
+    def _save(self) -> None:
+        try:
+            dirpath = os.path.dirname(self.filepath)
+            if dirpath and not os.path.exists(dirpath):
+                os.makedirs(dirpath, exist_ok=True)
+            with open(self.filepath, "w", encoding="utf-8") as f:
+                json.dump(self._keys, f, indent=2)
+        except Exception as e:
+            log.warning("Could not persist Aeza keys to %s: %s", self.filepath, e)
+
+    def get_key(self, user_id: str) -> Optional[str]:
+        return self._keys.get(str(user_id))
+
+    def set_key(self, user_id: str, api_key: str) -> None:
+        self._keys[str(user_id)] = api_key.strip()
+        self._save()
+
+    def delete_key(self, user_id: str) -> bool:
+        uid = str(user_id)
+        if uid in self._keys:
+            del self._keys[uid]
+            self._save()
+            return True
+        return False
+
+    def has_key(self, user_id: str) -> bool:
+        return bool(self._keys.get(str(user_id)))
+
+    def list_users(self) -> List[str]:
+        return list(self._keys.keys())
+
+    def get_any_key(self) -> Optional[str]:
+        if self._keys:
+            return next(iter(self._keys.values()))
+        return None
+
+
+# Module singleton keystore
+_keystore = AezaKeyStore()
+
+
+def save_user_key(user_id: str, api_key: str) -> None:
+    """Saves or updates the personal Aeza API key for the given user."""
+    _keystore.set_key(user_id, api_key)
+
+
+def get_user_key(user_id: str) -> Optional[str]:
+    """Retrieves the Aeza API key associated with the user, if present."""
+    return _keystore.get_key(user_id)
+
+
+def delete_user_key(user_id: str) -> bool:
+    """Removes the personal Aeza API key for the specified user."""
+    return _keystore.delete_key(user_id)
+
+
+def mask_api_key(key: Optional[str]) -> Optional[str]:
+    """Returns a masked version of the key for secure UI presentation."""
+    if not key:
+        return None
+    s = str(key).strip()
+    if len(s) <= 8:
+        return "***"
+    return f"{s[:6]}...{s[-4:]}"
+
+
 class AezaClient:
-    def __init__(self, api_key: str = AEZA_DEFAULT_KEY):
-        self.api_key = api_key
+    """Client for Aeza Cloud REST API v2."""
+
+    def __init__(self, api_key: Optional[str] = None):
+        self.api_key = (api_key or "").strip()
         self.base_url = AEZA_BASE_URL
         self._ssl_ctx = _get_ssl_context()
 
+    @property
+    def is_configured(self) -> bool:
+        return bool(self.api_key)
+
     def _request(self, endpoint: str, method: str = "GET", data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        if not self.api_key:
+            raise RuntimeError("Aeza API key is not configured. Please set your API key in Account settings.")
+
         url = f"{self.base_url}{endpoint}"
         body = json.dumps(data).encode("utf-8") if data is not None else None
         headers = {
@@ -67,7 +182,6 @@ class AezaClient:
     def get_account_info(self) -> Dict[str, Any]:
         """Retrieves account balance, email, and currency."""
         res = self._request("/accounts/me")
-        # In Aeza, balance is usually in kopecks / cents
         balance_kopecks = res.get("balance", 0)
         return {
             "id": res.get("id"),
@@ -122,7 +236,6 @@ class AezaClient:
                 "is_available": p.get("isAvailable", True),
             })
 
-        # Sort by hour_price ascending
         plans.sort(key=lambda x: (x["hour_price_rub"] or 999999))
         return plans
 
@@ -148,7 +261,6 @@ class AezaClient:
     ) -> Dict[str, Any]:
         """Provisions a new hourly VPS machine on Aeza."""
         if ssh_key_ids is None:
-            # Auto-discover registered keys
             keys = self.list_ssh_keys()
             ssh_key_ids = [k["id"] for k in keys if "id" in k]
 
@@ -188,4 +300,31 @@ class AezaClient:
         return self._request(f"/services/{service_id}/ctl/restart", method="POST")
 
 
-aeza_client = AezaClient()
+def get_aeza_client(user_id: Optional[str] = None, explicit_key: Optional[str] = None) -> AezaClient:
+    """
+    Returns an AezaClient configured for the specified user.
+    Strictly isolates keys per user: if user_id is provided, only that user's key is used.
+    """
+    key = explicit_key
+    if not key and user_id:
+        key = get_user_key(user_id)
+    elif not key and not user_id:
+        key = os.environ.get("AEZA_API_KEY") or get_user_key("owner-user") or get_user_key("default_user")
+
+    return AezaClient(api_key=key or "")
+
+
+class _DynamicAezaClient(AezaClient):
+    """Dynamic proxy for backward compatibility with code importing `aeza_client`."""
+
+    def __init__(self):
+        super().__init__(api_key="")
+
+    def _get_active(self) -> AezaClient:
+        return get_aeza_client()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._get_active(), name)
+
+
+aeza_client = _DynamicAezaClient()
