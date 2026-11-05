@@ -556,6 +556,7 @@ export interface TelegramAuthStatus {
   ok: boolean;
   bot_configured: boolean;
   bot_username: string;
+  bot_link?: string;
 }
 
 export function telegramAuthStatus(): Promise<TelegramAuthStatus> {
@@ -564,12 +565,32 @@ export function telegramAuthStatus(): Promise<TelegramAuthStatus> {
     .catch(() => ({ ok: false, bot_configured: false, bot_username: "" }));
 }
 
-export function requestTelegramCode(telegramId: string, name?: string): Promise<{ ok: boolean; sent: boolean; delivered_via_bot: boolean; note?: string }> {
+export function createTelegramAuthSession(): Promise<{ ok: boolean; session_token: string; bot_username: string; bot_link: string; auth_url: string }> {
+  return fetch("/api/auth/telegram/create-session", { method: "POST" })
+    .then((r) => r.json())
+    .catch(() => ({ ok: false, session_token: "", bot_username: "", bot_link: "", auth_url: "" }));
+}
+
+export function checkTelegramAuthSession(token: string): Promise<{ ok: boolean; approved: boolean; signedIn?: boolean; name?: string; new?: boolean; result?: SignedInNow }> {
+  return fetch(`/api/auth/telegram/check-session?token=${encodeURIComponent(token)}`, { cache: "no-store" })
+    .then((r) => r.json())
+    .catch(() => ({ ok: false, approved: false }));
+}
+
+export function requestTelegramCode(telegramId: string, name?: string): Promise<{ ok: boolean; sent: boolean; delivered_via_bot: boolean; note?: string; bot_username?: string; bot_link?: string }> {
   return auth("/api/auth/telegram/request-code", { telegram_id: telegramId, name });
 }
 
 export function verifyTelegramCode(telegramId: string, code: string): Promise<SignedInNow> {
   return auth("/api/auth/telegram/verify-code", { telegram_id: telegramId, code });
+}
+
+export function configureTelegramBot(botToken: string, botUsername?: string, chatId?: string): Promise<{ ok: boolean; bot_username?: string; bot_link?: string; message?: string }> {
+  return fetch("/api/auth/telegram/configure", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bot_token: botToken, bot_username: botUsername, chat_id: chatId }),
+  }).then((r) => r.json());
 }
 
 /** Sends a code for signing in to the address. */

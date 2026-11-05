@@ -14,8 +14,10 @@ import {
   useEffect, useRef, useState, type FormEvent, type ReactNode, type Ref,
 } from "react";
 import {
-  askCode, authState, quickSignIn, Refused, requestTelegramCode, setQuickCode, signUp, verifyCode,
-  verifyTelegramCode, type KnownDevice, type Legal, type SignedInNow,
+  askCode, authState, checkTelegramAuthSession, configureTelegramBot, createTelegramAuthSession,
+  quickSignIn, Refused, requestTelegramCode, setQuickCode, signUp, telegramAuthStatus,
+  verifyCode, verifyTelegramCode, type KnownDevice, type Legal, type SignedInNow,
+  type TelegramAuthStatus,
 } from "./api";
 import { useT, type Translate } from "./i18n";
 import { Logo } from "./icons";
@@ -35,7 +37,7 @@ type Step =
   | { kind: "loading" }
   | { kind: "email" }
   | { kind: "code"; email: string }
-  | { kind: "tg_code"; telegramId: string }
+  | { kind: "tg_code"; telegramId: string; botUsername?: string; botLink?: string }
   | { kind: "signup"; email: string }
   | { kind: "offer"; name: string; fresh: boolean }
   | { kind: "pin"; device: KnownDevice };
@@ -125,9 +127,9 @@ export function SignIn(props: Props) {
     setNote(null);
     setStep({ kind: "code", email: sent });
   };
-  const toTelegramCode = (tgId: string) => {
+  const toTelegramCode = (tgId: string, botUsername?: string, botLink?: string) => {
     setNote(null);
-    setStep({ kind: "tg_code", telegramId: tgId });
+    setStep({ kind: "tg_code", telegramId: tgId, botUsername, botLink });
   };
   const inNow = (result: SignedInNow) => {
     setNote(null);
@@ -145,12 +147,22 @@ export function SignIn(props: Props) {
     case "loading":
       break;
     case "email":
-      body = <EmailStep email={email} setEmail={setEmail} onSent={toCode} onTelegramSent={toTelegramCode} />;
+      body = (
+        <EmailStep
+          email={email}
+          setEmail={setEmail}
+          onSent={toCode}
+          onTelegramSent={toTelegramCode}
+          onIn={inNow}
+        />
+      );
       break;
     case "tg_code":
       body = (
         <TelegramCodeStep
           telegramId={step.telegramId}
+          botUsername={step.botUsername}
+          botLink={step.botLink}
           onBack={() => toEmail(null)}
           onIn={inNow}
         />
@@ -263,13 +275,89 @@ function EmailStep(props: {
   email: string;
   setEmail: (email: string) => void;
   onSent: (email: string) => void;
-  onTelegramSent: (tgId: string) => void;
+  onTelegramSent: (tgId: string, botUsername?: string, botLink?: string) => void;
+  onIn: (result: SignedInNow) => void;
 }) {
   const t = useT();
   const [method, setMethod] = useState<"email" | "telegram">("email");
   const [tgId, setTgId] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [tgStatus, setTgStatus] = useState<TelegramAuthStatus | null>(null);
+  const [setupToken, setSetupToken] = useState("");
+  const [showSetup, setShowSetup] = useState(false);
+  const [waitingOneClick, setWaitingOneClick] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    telegramAuthStatus()
+      .then((st) => {
+        if (active) setTgStatus(st);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleStartOneClick = async () => {
+    setBusy(true);
+    setProblem(null);
+    setWaitingOneClick(true);
+    try {
+      const session = await createTelegramAuthSession();
+      if (session.auth_url) {
+        window.open(session.auth_url, "_blank");
+      }
+      // Poll session status
+      const pollTimer = window.setInterval(async () => {
+        try {
+          const check = await checkTelegramAuthSession(session.session_token);
+          if (check.approved && check.result) {
+            window.clearInterval(pollTimer);
+            setWaitingOneClick(false);
+            setBusy(false);
+            props.onIn(check.result);
+          }
+        } catch {
+          // Keep polling until verified or cancelled
+        }
+      }, 1500);
+
+      // Auto cancel polling after 3 minutes
+      window.setTimeout(() => {
+        window.clearInterval(pollTimer);
+        setWaitingOneClick(false);
+        setBusy(false);
+      }, 180000);
+    } catch (err) {
+      setWaitingOneClick(false);
+      setBusy(false);
+      setProblem(err instanceof Error ? err.message : "Не удалось создать сессию Telegram"); // i18n-ignore
+    }
+  };
+
+  const handleConfigureBot = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!setupToken.trim()) return;
+    setBusy(true);
+    setProblem(null);
+    try {
+      const res = await configureTelegramBot(setupToken.trim());
+      setTgStatus({
+        ok: true,
+        bot_configured: true,
+        bot_username: res.bot_username || "",
+        bot_link: res.bot_username ? `https://t.me/${res.bot_username}` : "",
+      });
+      setShowSetup(false);
+      setSetupToken("");
+    } catch (err) {
+      setProblem(err instanceof Error ? err.message : "Неверный токен Telegram-бота"); // i18n-ignore
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -283,7 +371,7 @@ function EmailStep(props: {
         const clean = tgId.trim().replace(/^@/, "");
         if (!clean) throw new Error("Укажите Telegram ID или @username"); // i18n-ignore
         await requestTelegramCode(clean);
-        props.onTelegramSent(clean);
+        props.onTelegramSent(clean, tgStatus?.bot_username, tgStatus?.bot_link);
       }
     } catch (error) {
       setProblem(textOf(error, t));
@@ -320,25 +408,119 @@ function EmailStep(props: {
             autoComplete="email" autoFocus required spellCheck={false}
             aria-label={t("signin.email")} placeholder="you@example.com" value={props.email}
             onChange={(e) => props.setEmail(e.target.value)} />
+          {problem && <p className="signin-error" role="alert">{problem}</p>}
+          <button type="submit" className="button-accent big wide"
+            disabled={busy || !props.email.trim()}>
+            {busy ? t("signin.sending") : t("signin.get_code")}
+          </button>
         </>
       ) : (
         <>
-          <p className="signin-lead">
-            {/* i18n-ignore */}
-            Введите Telegram @username или ID для получения 6-значного кода в боте
-          </p>
-          <input className="text-input signin-input" type="text" name="telegram_id"
-            autoFocus required spellCheck={false}
-            aria-label="Telegram" placeholder="@username или ID" value={tgId} // i18n-ignore
-            onChange={(e) => setTgId(e.target.value)} />
+          {tgStatus?.bot_configured ? (
+            <>
+              <div style={{ marginBottom: 16 }}>
+                <button
+                  type="button"
+                  className="button-accent big wide"
+                  style={{
+                    background: "linear-gradient(135deg, #2AABEE 0%, #229ED9 100%)",
+                    color: "#fff",
+                    fontWeight: 600,
+                    boxShadow: "0 4px 12px rgba(34, 158, 217, 0.35)",
+                    border: "none",
+                  }}
+                  disabled={busy}
+                  onClick={() => void handleStartOneClick()}
+                >
+                  {/* i18n-ignore */}
+                  {waitingOneClick ? "⏳ Ожидание нажатия Start в Telegram..." : `✈️ Войти в 1 клик через @${tgStatus.bot_username || "бота"}`}
+                </button>
+                {waitingOneClick && (
+                  <p className="signin-small" style={{ color: "var(--accent)", marginTop: 8, textAlign: "center" }}>
+                    {/* i18n-ignore */}
+                    <span>Откройте бота в Telegram и нажмите кнопку <strong>«Запустить» (/start)</strong> для автоматического входа.</span>
+                  </p>
+                )}
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "14px 0" }}>
+                <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+                <span style={{ fontSize: 12, color: "var(--dim)" }}>{/* i18n-ignore */}или по коду</span>
+                <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+              </div>
+
+              <p className="signin-lead">
+                {/* i18n-ignore */}
+                Введите ваш Telegram @username или ID для отправки 6-значного кода:
+              </p>
+              <input className="text-input signin-input" type="text" name="telegram_id"
+                autoFocus required spellCheck={false}
+                aria-label="Telegram" placeholder="@username или ID" value={tgId} // i18n-ignore
+                onChange={(e) => setTgId(e.target.value)} />
+
+              {problem && <p className="signin-error" role="alert">{problem}</p>}
+              <button type="submit" className="button-accent big wide"
+                disabled={busy || !tgId.trim()}>
+                {/* i18n-ignore */}
+                {busy ? "Отправка..." : "Получить код в Telegram"}
+              </button>
+            </>
+          ) : (
+            <div style={{ padding: "12px 14px", borderRadius: 8, background: "var(--surface)", border: "1px solid var(--line)" }}>
+              <p className="signin-lead" style={{ margin: "0 0 10px 0" }}>
+                {/* i18n-ignore */}
+                Telegram-бот авторизации пока не подключен к серверу.
+              </p>
+              {!showSetup ? (
+                <button
+                  type="button"
+                  className="button-ghost small wide"
+                  onClick={() => setShowSetup(true)}
+                >
+                  {/* i18n-ignore */}
+                  ⚙️ Подключить Telegram-бота (@BotFather)
+                </button>
+              ) : (
+                <div style={{ marginTop: 8 }}>
+                  <p className="signin-small" style={{ margin: "0 0 8px 0" }}>
+                    {/* i18n-ignore */}
+                    Создайте бота в @BotFather, скопируйте API Token и вставьте его ниже:
+                  </p>
+                  <input
+                    className="text-input signin-input"
+                    type="password"
+                    placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
+                    value={setupToken}
+                    onChange={(e) => setSetupToken(e.target.value)}
+                    style={{ marginBottom: 8 }}
+                  />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      type="button"
+                      className="button-accent small"
+                      disabled={busy || !setupToken.trim()}
+                      onClick={(e) => void handleConfigureBot(e)}
+                    >
+                      {/* i18n-ignore */}
+                      {busy ? "Проверка..." : "Сохранить и включить"}
+                    </button>
+                    <button
+                      type="button"
+                      className="button-ghost small"
+                      onClick={() => setShowSetup(false)}
+                    >
+                      {/* i18n-ignore */}
+                      Отмена
+                    </button>
+                  </div>
+                </div>
+              )}
+              {problem && <p className="signin-error" style={{ marginTop: 8 }} role="alert">{problem}</p>}
+            </div>
+          )}
         </>
       )}
 
-      {problem && <p className="signin-error" role="alert">{problem}</p>}
-      <button type="submit" className="button-accent big wide"
-        disabled={busy || (method === "email" ? !props.email.trim() : !tgId.trim())}>
-        {busy ? t("signin.sending") : (method === "email" ? t("signin.get_code") : "Получить код в Telegram")} {/* i18n-ignore */}
-      </button>
       <p className="signin-small">{t("signin.new_here")}</p>
     </form>
   );
@@ -346,6 +528,8 @@ function EmailStep(props: {
 
 function TelegramCodeStep(props: {
   telegramId: string;
+  botUsername?: string;
+  botLink?: string;
   onBack: () => void;
   onIn: (result: SignedInNow) => void;
 }) {
@@ -401,8 +585,15 @@ function TelegramCodeStep(props: {
     }}>
       <h1>Код из Telegram {/* i18n-ignore */}</h1>
       <p className="signin-lead">
-        Код отправлен в Telegram пользователю <strong className="ink">@{props.telegramId}</strong> {/* i18n-ignore */}
+        {/* i18n-ignore */}
+        <span>Код отправлен в Telegram пользователю <strong className="ink">@{props.telegramId}</strong></span>
       </p>
+      {props.botUsername && (
+        <p className="signin-small" style={{ marginBottom: 12, textAlign: "center" }}>
+          {/* i18n-ignore */}
+          <span>Если бот не прислал сообщение, напишите ему <a href={props.botLink || `https://t.me/${props.botUsername}`} target="_blank" rel="noopener noreferrer">@{props.botUsername}</a> команду <code>/start</code>.</span>
+        </p>
+      )}
       <Slots ref={input} count={CODE_DIGITS} value={code} label="Код из Telegram" // i18n-ignore
         name="code" autoComplete="one-time-code" busy={busy}
         wrong={wrong} onChange={typed} />
