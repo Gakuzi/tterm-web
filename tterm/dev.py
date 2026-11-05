@@ -15,7 +15,7 @@ import sys
 from . import __version__
 from .core import db
 from .core.config import ROOT, Settings
-from .core.mail import BrevoMailer
+from .core.mail import BrevoMailer, SmtpMailer
 from .core.signer_client import SignerClient, SignerUnavailable
 from .server import Core, PortBusy
 
@@ -34,6 +34,8 @@ def banner(settings: Settings, core: Core) -> str:
                "email in .env and start again")
     if isinstance(core.mailer, BrevoMailer):
         email = f"through Brevo, from {settings.mail_from}"
+    elif isinstance(core.mailer, SmtpMailer):
+        email = f"through SMTP {core.mailer.host}:{core.mailer.port}, from {core.mailer.sender}"
     else:
         email = "into this window: the codes for signing in appear here"
     local = settings.page_host in ("127.0.0.1", "localhost", "::1")

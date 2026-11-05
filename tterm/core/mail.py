@@ -106,6 +106,58 @@ class BrevoMailer(Mailer):
             raise MailFailed(f"Brevo answered {status}")
 
 
+class SmtpMailer(Mailer):
+    """Sends emails via SMTP (SSL or STARTTLS)."""
+
+    def __init__(self, host: str, port: int, user: str, password: str,
+                 sender: str, use_ssl: bool = False) -> None:
+        self.host = host
+        self.port = port
+        self.user = user
+        self.password = password
+        self.sender = sender
+        self.use_ssl = use_ssl
+
+    async def send(self, email: Email) -> None:
+        import smtplib
+        import ssl
+        from email.message import EmailMessage
+
+        msg = EmailMessage()
+        msg["Subject"] = email.subject
+        msg["From"] = self.sender
+        msg["To"] = email.to
+        if email.reply_to:
+            msg["Reply-To"] = email.reply_to
+        msg.set_content(email.text)
+        if email.html:
+            msg.add_alternative(email.html, subtype="html")
+
+        def _send() -> None:
+            ctx = ssl.create_default_context()
+            if self.use_ssl:
+                with smtplib.SMTP_SSL(self.host, self.port, context=ctx, timeout=15) as s:
+                    if self.user:
+                        s.login(self.user, self.password)
+                    s.send_message(msg)
+            else:
+                with smtplib.SMTP(self.host, self.port, timeout=15) as s:
+                    try:
+                        s.starttls(context=ctx)
+                    except Exception:
+                        pass
+                    if self.user:
+                        s.login(self.user, self.password)
+                    s.send_message(msg)
+
+        try:
+            await asyncio.to_thread(_send)
+            log.info("email sent via SMTP (%s:%d) to %s: %s", self.host, self.port, email.to, email.subject)
+        except Exception as exc:
+            log.error("could not send email via SMTP to %s: %s", email.to, exc)
+            raise MailFailed(f"SMTP error: {exc}") from exc
+
+
 def parse_sender(sender: str) -> tuple[str, str]:
     """`tTerm <login@tterm.net>` → ("tTerm", "login@tterm.net")."""
     sender = sender.strip()

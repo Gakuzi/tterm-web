@@ -28,7 +28,7 @@ from .core.terminals import Terminals
 from .core.vault import VaultRelay
 from .core.accounts import Person
 from .core.config import Settings
-from .core.mail import BrevoMailer, LogMailer, Mailer
+from .core.mail import BrevoMailer, LogMailer, Mailer, SmtpMailer
 from .core.signer_client import SignerClient, SignerRefused, SignerUnavailable
 
 log = logging.getLogger("tterm")
@@ -114,9 +114,20 @@ class Core:
         self.agents = Agents()
         #: Relays a vault key's signing to the capable page sockets (0.1.17).
         self.vault: VaultRelay | None = None
-        #: How emails go: Brevo, or this window's log.
-        self.mailer: Mailer = (BrevoMailer(settings.brevo_key, settings.mail_from)
-                               if settings.brevo_key else LogMailer())
+        #: How emails go: SMTP, Brevo, or this window's log.
+        if settings.smtp_host and settings.smtp_user:
+            self.mailer: Mailer = SmtpMailer(
+                host=settings.smtp_host,
+                port=settings.smtp_port,
+                user=settings.smtp_user,
+                password=settings.smtp_password,
+                sender=settings.mail_from,
+                use_ssl=settings.smtp_ssl,
+            )
+        elif settings.brevo_key:
+            self.mailer = BrevoMailer(settings.brevo_key, settings.mail_from)
+        else:
+            self.mailer = LogMailer()
         self._servers: list[_Server] = []
         self._tasks: list[asyncio.Task] = []
         self._sockets: list[socket.socket] = []

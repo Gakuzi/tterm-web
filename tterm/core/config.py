@@ -79,8 +79,8 @@ class Settings:
     #: server, where everyone signs up.
     owner_name: str
     owner_email: str
-    #: Email: Brevo's API key, and who the emails are from. Without a key
-    #: each email goes to the log, as on the laptop.
+    #: Email: Brevo's API key, or SMTP configuration, and who the emails are from.
+    #: Without credentials each email goes to the log, as on the laptop.
     brevo_key: str
     mail_from: str
     #: What the sign-in screens link to: the Terms of Service and the Privacy
@@ -101,6 +101,12 @@ class Settings:
     #: the group that may reach the signer's socket, the core's. Empty on
     #: the laptop, where both are the owner.
     signer_group: str
+    #: Optional SMTP configuration
+    smtp_host: str = ""
+    smtp_port: int = 2525
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_ssl: bool = False
 
     @classmethod
     def load(cls, environ: Mapping[str, str] | None = None,
@@ -159,4 +165,9 @@ class Settings:
             signer_dir=signer_dir,
             signer_socket=signer_socket,
             signer_group=get("TTERM_SIGNER_GROUP", ""),
+            smtp_host=get("TTERM_SMTP_HOST", ""),
+            smtp_port=port("TTERM_SMTP_PORT", 2525),
+            smtp_user=get("TTERM_SMTP_USER", ""),
+            smtp_password=get("TTERM_SMTP_PASSWORD", ""),
+            smtp_ssl=get("TTERM_SMTP_SSL", "").lower() in ("true", "1", "yes"),
         )

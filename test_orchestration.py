@@ -1181,5 +1181,39 @@ class TestEncryptedVaultAndTelegram(unittest.TestCase):
         self.assertNotIn("term-1", beta_terms)
 
 
+class TestSmtpMailer(unittest.TestCase):
+    def test_smtp_mailer_init(self):
+        from tterm.core.mail import SmtpMailer, Email
+        mailer = SmtpMailer(
+            host="smtp.beget.com",
+            port=2525,
+            user="klimov@e-klimov.ru",
+            password="test-password",
+            sender="tTerm <klimov@e-klimov.ru>",
+            use_ssl=False,
+        )
+        self.assertEqual(mailer.host, "smtp.beget.com")
+        self.assertEqual(mailer.port, 2525)
+        self.assertEqual(mailer.user, "klimov@e-klimov.ru")
+        self.assertEqual(mailer.sender, "tTerm <klimov@e-klimov.ru>")
+        self.assertFalse(mailer.use_ssl)
+
+    def test_settings_smtp_load(self):
+        from tterm.core.config import Settings
+        env = {
+            "TTERM_SMTP_HOST": "smtp.beget.com",
+            "TTERM_SMTP_PORT": "2525",
+            "TTERM_SMTP_USER": "klimov@e-klimov.ru",
+            "TTERM_SMTP_PASSWORD": "secret-password",
+            "TTERM_MAIL_FROM": "tTerm <klimov@e-klimov.ru>",
+        }
+        s = Settings.load(environ=env)
+        self.assertEqual(s.smtp_host, "smtp.beget.com")
+        self.assertEqual(s.smtp_port, 2525)
+        self.assertEqual(s.smtp_user, "klimov@e-klimov.ru")
+        self.assertEqual(s.smtp_password, "secret-password")
+        self.assertEqual(s.mail_from, "tTerm <klimov@e-klimov.ru>")
+
+
 if __name__ == "__main__":
     unittest.main()
