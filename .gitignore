@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 data/
+*.local.json
+.*.json
 
 # Our working notes
 PROJECT.md

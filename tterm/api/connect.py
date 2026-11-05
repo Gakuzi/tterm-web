@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import ipaddress
 import logging
+from pathlib import Path
 
 import asyncpg
 from fastapi import FastAPI, Request, WebSocket
-from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
 from starlette.requests import HTTPConnection
 
@@ -82,6 +83,60 @@ def create_connect_app(pool: asyncpg.Pool, signer: SignerClient,
                              "version": __version__},
                             headers={"cache-control": "no-store"})
 
+    @app.get("/install.sh")
+    @app.get("/install_computer.sh")
+    async def universal_installer(request: Request) -> Response:
+        """Universal onboarding script for connecting computers (macOS, Linux).
+        Supports multi-hub dual connection and auto discovery."""
+        token = await machines.get_or_create_quick_computer_token(pool)
+        host = request.headers.get("host", "localhost:8291").split(":")[0]
+        web_url = f"http://{host}:8290"
+        script = machines.render_universal_installer(
+            token=token,
+            connect_url=connect_url,
+            web_url=web_url,
+        )
+        return PlainTextResponse(script, headers=SCRIPT_HEADERS)
+
+    @app.get("/install.ps1")
+    @app.get("/install_computer.ps1")
+    async def universal_installer_ps1(request: Request) -> Response:
+        """Universal PowerShell onboarding script for connecting Windows computers."""
+        token = await machines.get_or_create_quick_computer_token(pool)
+        script = machines.render_computer_installer_ps1(token=token, connect_url=connect_url)
+        return PlainTextResponse(script, headers={"content-type": "text/plain; charset=utf-8",
+                                                  "cache-control": "no-store"})
+
+    @app.get("/install.bat")
+    @app.get("/install_windows.bat")
+    async def universal_installer_bat(request: Request) -> Response:
+        """Universal Batch installer for connecting Windows computers in 1 click."""
+        token = await machines.get_or_create_quick_computer_token(pool)
+        content = machines.render_computer_installer_bat(token=token, connect_url=connect_url)
+        return PlainTextResponse(content, headers={"content-type": "text/plain; charset=utf-8",
+                                                   "cache-control": "no-store",
+                                                   "content-disposition": "attachment; filename=tterm-setup.bat"})
+
+    @app.get("/quick_token")
+    async def get_quick_token() -> Response:
+        """Returns a valid 24-hour token for seamless 1-click agent onboarding."""
+        token = await machines.get_or_create_quick_computer_token(pool)
+        return JSONResponse({"ok": True, "token": token})
+
+    @app.get("/tterm-agent.exe")
+    @app.get("/install_windows.exe")
+    async def universal_installer_exe() -> Response:
+        """Native Windows Agent executable for 1-click install and background operation."""
+        exe_path = Path(__file__).resolve().parent.parent / "templates" / "tterm-agent.exe"
+        if exe_path.is_file():
+            return FileResponse(
+                exe_path,
+                media_type="application/vnd.microsoft.portable-executable",
+                filename="tterm-agent.exe",
+                headers={"cache-control": "no-store"}
+            )
+        return PlainTextResponse("Agent binary not found", status_code=404)
+
     @app.get("/s/{token}")
     async def installer(token: str) -> Response:
         # A dead command says so before touching anything on the server.
@@ -101,6 +156,33 @@ def create_connect_app(pool: asyncpg.Pool, signer: SignerClient,
             principal=await machines.install_principal(pool, token),
             connect_url=connect_url)
         return PlainTextResponse(script, headers=SCRIPT_HEADERS)
+
+    @app.get("/c/{token}.ps1")
+    async def computer_installer_ps1(token: str) -> Response:
+        """The PowerShell installer for Windows computers."""
+        problem = await machines.check_token(pool, token, kind="computer")
+        if problem:
+            return PlainTextResponse(machines.refusal_ps1(problem),
+                                     headers={"content-type": "text/plain; charset=utf-8",
+                                              "cache-control": "no-store"})
+        script = machines.render_computer_installer_ps1(token=token,
+                                                        connect_url=connect_url)
+        return PlainTextResponse(script, headers={"content-type": "text/plain; charset=utf-8",
+                                                  "cache-control": "no-store"})
+
+    @app.get("/c/{token}.bat")
+    async def computer_installer_bat(token: str) -> Response:
+        """One-click batch/exe installer for Windows."""
+        problem = await machines.check_token(pool, token, kind="computer")
+        if problem:
+            return PlainTextResponse(f'@echo off\r\necho {problem}\r\npause\r\n',
+                                     headers={"content-type": "text/plain; charset=utf-8",
+                                              "cache-control": "no-store",
+                                              "content-disposition": "attachment; filename=tterm-setup.bat"})
+        content = machines.render_computer_installer_bat(token=token, connect_url=connect_url)
+        return PlainTextResponse(content, headers={"content-type": "text/plain; charset=utf-8",
+                                                   "cache-control": "no-store",
+                                                   "content-disposition": "attachment; filename=tterm-setup.bat"})
 
     @app.get("/c/{token}")
     async def computer_installer(token: str) -> Response:

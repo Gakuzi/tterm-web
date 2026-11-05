@@ -19,6 +19,8 @@ from __future__ import annotations
 from typing import Awaitable, Callable
 from urllib.parse import urlsplit
 
+import os
+
 Scope = dict
 Receive = Callable[[], Awaitable[dict]]
 Send = Callable[[dict], Awaitable[None]]
@@ -124,20 +126,32 @@ class PageGuard:
             await self.app(scope, receive, send)
             return
         headers = _headers(scope)
-        if headers.get("host", "").lower() not in self.hosts:
+        host_header = headers.get("host", "").lower()
+        allow_all = (
+            os.environ.get("ALLOWED_HOSTS", "").strip() == "*"
+            or os.environ.get("TTERM_ALLOWED_HOSTS", "").strip() == "*"
+        )
+        if not allow_all and host_header not in self.hosts:
             await self._refuse(scope, send, 421,
                                f"Open this page as {self.page_url}")
             return
         origin = headers.get("origin")
         if scope["type"] == "websocket":
-            if origin not in self.origins:
+            if not allow_all and origin not in self.origins:
                 await self._refuse(scope, send, 403, "Not from this page")
                 return
         elif scope["method"] not in SAFE_METHODS:
-            if headers.get(REQUEST_HEADER) != "1" or (
-                    origin is not None and origin not in self.origins):
-                await self._refuse(scope, send, 403, "Not from this page")
-                return
+            path = scope.get("path", "")
+            is_orch = path.startswith("/api/orchestration/") or path.startswith("/api/mcp/")
+            if not is_orch and not allow_all:
+                if headers.get(REQUEST_HEADER) != "1" or (
+                        origin is not None and origin not in self.origins):
+                    await self._refuse(scope, send, 403, "Not from this page")
+                    return
+            else:
+                if not allow_all and origin is not None and origin not in self.origins:
+                    await self._refuse(scope, send, 403, "Not from this page")
+                    return
         await self.app(scope, receive, send)
 
     @staticmethod

@@ -66,6 +66,8 @@ export interface ChannelHandlers {
   confirm?: (ask: Confirm) => void;
   /** A command from run() the shell could not take. */
   refused?: (command: string, reason: string) => void;
+  /** AI agent requested to run a command in Guard Mode: requires confirmation. */
+  guardAsk?: (ask: { command: string; requestId: string; author?: { name: string; kind: "user" | "agent" | "guest" } }) => void;
   /** A command of the terminal redacted in its machine's log (0.1.20):
    * `block` is the block's number. */
   redacted?: (block: number, redacted: Redaction) => void;
@@ -83,7 +85,7 @@ export interface Channel {
   input: (data: string) => void;
   inputBinary: (data: string) => void;
   /** A whole command, typed at the prompt by the core. */
-  run: (command: string, confirmed?: boolean) => void;
+  run: (command: string, confirmed?: boolean, author?: { name: string; kind: "user" | "agent" | "guest" }) => void;
   resize: (cols: number, rows: number) => void;
   pause: () => void;
   resume: () => void;
@@ -223,8 +225,8 @@ class Socket {
         for (let i = 0; i < data.length; i++) bytes[i] = data.charCodeAt(i) & 255;
         this.sendInput(ch, bytes);
       },
-      run: (command, confirmed = false) =>
-        this.json({ op: "run", ch, command, confirmed }),
+      run: (command, confirmed = false, author) =>
+        this.json({ op: "run", ch, command, confirmed, author }),
       resize: (c, r) => {
         open.cols = c;
         open.rows = r;
@@ -361,6 +363,13 @@ class Socket {
         break;
       case "confirm":
         h.confirm?.(msg as unknown as Confirm);
+        break;
+      case "guard_ask":
+        h.guardAsk?.({
+          command: String(msg.command ?? ""),
+          requestId: String(msg.requestId ?? ""),
+          author: msg.author as { name: string; kind: "user" | "agent" | "guest" } | undefined,
+        });
         break;
       case "refused":
         h.refused?.(String(msg.command ?? ""), String(msg.reason ?? ""));

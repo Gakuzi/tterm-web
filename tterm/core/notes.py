@@ -54,6 +54,12 @@ WRITERS = ("owner", "admin", "member")
 MANAGERS = ("owner", "admin")
 
 _BLOCK_ID = re.compile(r"[A-Za-z0-9_-]{1,32}")
+
+
+def new_block_id() -> str:
+    """Generate a valid unique ID for a note block."""
+    return uuid.uuid4().hex[:12]
+
 #: Control characters but the tab and the line break: nothing a note needs.
 _CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 #: In a title every control character, the tab and line breaks too, becomes

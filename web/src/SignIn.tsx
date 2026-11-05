@@ -14,8 +14,8 @@ import {
   useEffect, useRef, useState, type FormEvent, type ReactNode, type Ref,
 } from "react";
 import {
-  askCode, authState, quickSignIn, Refused, setQuickCode, signUp, verifyCode,
-  type KnownDevice, type Legal, type SignedInNow,
+  askCode, authState, quickSignIn, Refused, requestTelegramCode, setQuickCode, signUp, verifyCode,
+  verifyTelegramCode, type KnownDevice, type Legal, type SignedInNow,
 } from "./api";
 import { useT, type Translate } from "./i18n";
 import { Logo } from "./icons";
@@ -35,6 +35,7 @@ type Step =
   | { kind: "loading" }
   | { kind: "email" }
   | { kind: "code"; email: string }
+  | { kind: "tg_code"; telegramId: string }
   | { kind: "signup"; email: string }
   | { kind: "offer"; name: string; fresh: boolean }
   | { kind: "pin"; device: KnownDevice };
@@ -124,6 +125,10 @@ export function SignIn(props: Props) {
     setNote(null);
     setStep({ kind: "code", email: sent });
   };
+  const toTelegramCode = (tgId: string) => {
+    setNote(null);
+    setStep({ kind: "tg_code", telegramId: tgId });
+  };
   const inNow = (result: SignedInNow) => {
     setNote(null);
     // Another account in a browser that remembers someone (0.1.8): no
@@ -140,7 +145,16 @@ export function SignIn(props: Props) {
     case "loading":
       break;
     case "email":
-      body = <EmailStep email={email} setEmail={setEmail} onSent={toCode} />;
+      body = <EmailStep email={email} setEmail={setEmail} onSent={toCode} onTelegramSent={toTelegramCode} />;
+      break;
+    case "tg_code":
+      body = (
+        <TelegramCodeStep
+          telegramId={step.telegramId}
+          onBack={() => toEmail(null)}
+          onIn={inNow}
+        />
+      );
       break;
     case "code":
       body = (
@@ -249,8 +263,11 @@ function EmailStep(props: {
   email: string;
   setEmail: (email: string) => void;
   onSent: (email: string) => void;
+  onTelegramSent: (tgId: string) => void;
 }) {
   const t = useT();
+  const [method, setMethod] = useState<"email" | "telegram">("email");
+  const [tgId, setTgId] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -259,8 +276,15 @@ function EmailStep(props: {
     setBusy(true);
     setProblem(null);
     try {
-      const sent = await askCode(props.email);
-      props.onSent(sent.email);
+      if (method === "email") {
+        const sent = await askCode(props.email);
+        props.onSent(sent.email);
+      } else {
+        const clean = tgId.trim().replace(/^@/, "");
+        if (!clean) throw new Error("Укажите Telegram ID или @username"); // i18n-ignore
+        await requestTelegramCode(clean);
+        props.onTelegramSent(clean);
+      }
     } catch (error) {
       setProblem(textOf(error, t));
       setBusy(false);
@@ -270,17 +294,128 @@ function EmailStep(props: {
   return (
     <form className="signin-form" onSubmit={(e) => void submit(e)}>
       <h1>{t("common.sign_in")}</h1>
-      <p className="signin-lead">{t("signin.email_lead")}</p>
-      <input className="text-input signin-input" type="email" name="email"
-        autoComplete="email" autoFocus required spellCheck={false}
-        aria-label={t("signin.email")} placeholder="you@example.com" value={props.email}
-        onChange={(e) => props.setEmail(e.target.value)} />
+      <div className="segmented" style={{ marginBottom: 16 }} role="group">
+        <button
+          type="button"
+          aria-pressed={method === "email"}
+          onClick={() => { setMethod("email"); setProblem(null); }}
+        >
+          {/* i18n-ignore */}
+          ✉️ Email
+        </button>
+        <button
+          type="button"
+          aria-pressed={method === "telegram"}
+          onClick={() => { setMethod("telegram"); setProblem(null); }}
+        >
+          {/* i18n-ignore */}
+          ✈️ Telegram
+        </button>
+      </div>
+
+      {method === "email" ? (
+        <>
+          <p className="signin-lead">{t("signin.email_lead")}</p>
+          <input className="text-input signin-input" type="email" name="email"
+            autoComplete="email" autoFocus required spellCheck={false}
+            aria-label={t("signin.email")} placeholder="you@example.com" value={props.email}
+            onChange={(e) => props.setEmail(e.target.value)} />
+        </>
+      ) : (
+        <>
+          <p className="signin-lead">
+            {/* i18n-ignore */}
+            Введите Telegram @username или ID для получения 6-значного кода в боте
+          </p>
+          <input className="text-input signin-input" type="text" name="telegram_id"
+            autoFocus required spellCheck={false}
+            aria-label="Telegram" placeholder="@username или ID" value={tgId} // i18n-ignore
+            onChange={(e) => setTgId(e.target.value)} />
+        </>
+      )}
+
       {problem && <p className="signin-error" role="alert">{problem}</p>}
       <button type="submit" className="button-accent big wide"
-        disabled={busy || !props.email.trim()}>
-        {busy ? t("signin.sending") : t("signin.get_code")}
+        disabled={busy || (method === "email" ? !props.email.trim() : !tgId.trim())}>
+        {busy ? t("signin.sending") : (method === "email" ? t("signin.get_code") : "Получить код в Telegram")} {/* i18n-ignore */}
       </button>
       <p className="signin-small">{t("signin.new_here")}</p>
+    </form>
+  );
+}
+
+function TelegramCodeStep(props: {
+  telegramId: string;
+  onBack: () => void;
+  onIn: (result: SignedInNow) => void;
+}) {
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [sent, setSent] = useState<string | null>(null);
+  const [wrong, setWrong] = useState(0);
+  const input = useRef<HTMLInputElement>(null);
+  const checking = useRef(false);
+
+  const check = async (value: string) => {
+    if (checking.current) return;
+    checking.current = true;
+    setBusy(true);
+    setProblem(null);
+    setSent(null);
+    try {
+      const result = await verifyTelegramCode(props.telegramId, value);
+      props.onIn(result);
+    } catch (error) {
+      setCode("");
+      setProblem(error instanceof Error ? error.message : "Неверный проверочный код"); // i18n-ignore
+      setWrong((n) => n + 1);
+      setBusy(false);
+      checking.current = false;
+      window.setTimeout(() => input.current?.focus(), 0);
+    }
+  };
+
+  const typed = (value: string) => {
+    setCode(value);
+    if (value.length === CODE_DIGITS) void check(value);
+  };
+
+  const resend = async () => {
+    setProblem(null);
+    setSent(null);
+    try {
+      await requestTelegramCode(props.telegramId);
+      setCode("");
+      setSent("Новый проверочный код отправлен в Telegram"); // i18n-ignore
+      window.setTimeout(() => input.current?.focus(), 0);
+    } catch (error) {
+      setProblem(error instanceof Error ? error.message : "Не удалось отправить код"); // i18n-ignore
+    }
+  };
+
+  return (
+    <form className="signin-form" onSubmit={(e) => {
+      e.preventDefault();
+      if (code.length === CODE_DIGITS) void check(code);
+    }}>
+      <h1>Код из Telegram {/* i18n-ignore */}</h1>
+      <p className="signin-lead">
+        Код отправлен в Telegram пользователю <strong className="ink">@{props.telegramId}</strong> {/* i18n-ignore */}
+      </p>
+      <Slots ref={input} count={CODE_DIGITS} value={code} label="Код из Telegram" // i18n-ignore
+        name="code" autoComplete="one-time-code" busy={busy}
+        wrong={wrong} onChange={typed} />
+      {problem && <p className="signin-error" role="alert">{problem}</p>}
+      {sent && <p className="signin-ok" role="status">{sent}</p>}
+      <div className="signin-links">
+        <button type="button" className="link-button" onClick={() => void resend()}>
+          Запросить код снова {/* i18n-ignore */}
+        </button>
+        <button type="button" className="link-button" onClick={props.onBack}>
+          Выбрать другой способ {/* i18n-ignore */}
+        </button>
+      </div>
     </form>
   );
 }

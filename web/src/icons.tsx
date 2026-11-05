@@ -25,6 +25,13 @@ export const Branch = (p: Props) => (
   </Stroke>
 );
 
+export const Bell = (p: Props) => (
+  <Stroke {...p}>
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+  </Stroke>
+);
+
 /** A failed command: a thick cross. */
 export const Cross = (p: Props) => (
   <Stroke {...p} width={4}><path d="M6 6l12 12M18 6L6 18" /></Stroke>
@@ -431,6 +438,14 @@ export const CloudUp = (p: Props) => (
   </Stroke>
 );
 
+export const Upload = (p: Props) => (
+  <Stroke {...p}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="17 8 12 3 7 8" />
+    <line x1="12" y1="3" x2="12" y2="15" />
+  </Stroke>
+);
+
 export const Cloud = (p: Props) => (
   <Stroke {...p}><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" /></Stroke>
 );
@@ -582,5 +597,19 @@ export const Card = (p: Props) => (
   <Stroke {...p}>
     <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
     <path d="M2.5 10h19M6.5 15h4" />
+  </Stroke>
+);
+
+/** GitHub mark icon */
+export const GitHub = (p: Props) => (
+  <svg width={p.size ?? 18} height={p.size ?? 18} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={p.className}>
+    <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+  </svg>
+);
+
+/** Paperclip attachment icon for messenger-style upload */
+export const Paperclip = (p: Props) => (
+  <Stroke {...p}>
+    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
   </Stroke>
 );

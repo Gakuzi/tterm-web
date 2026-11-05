@@ -16,6 +16,7 @@ import type { TerminalInfo } from "./api";
 import { takePaste } from "./found";
 import { useT } from "./i18n";
 import { keepKeys, typingElsewhere } from "./keys";
+import { notifyCommandCompleted } from "./notifications";
 import { socket, type Channel, type MarkerEvent } from "./socket";
 import type { Shown } from "./theme";
 import { terminalTheme } from "./xtermTheme";
@@ -71,6 +72,7 @@ export function ClassicTerminal(props: Props) {
   const ready = useRef(false);
   const waiting = useRef<{ text: string; n: number } | null>(null);
   const pasteWaiting = useRef(() => {});
+  const lastCommand = useRef<{ command: string; startedAt: number } | null>(null);
 
   useEffect(() => {
     const element = box.current;
@@ -171,7 +173,22 @@ export function ClassicTerminal(props: Props) {
             if (pending < LOW) channel?.resume();
           });
         },
-        marker: (event) => events.current.marker(event),
+        marker: (event) => {
+          if (event.t === "C") {
+            lastCommand.current = { command: event.command, startedAt: event.at };
+          } else if (event.t === "P" && lastCommand.current) {
+            const durationSec = Math.max(0, Math.round((event.at - lastCommand.current.startedAt) / 1000));
+            notifyCommandCompleted({
+              command: lastCommand.current.command,
+              exitCode: event.code,
+              durationSec,
+              terminalId: props.terminalId,
+              inAppNotify: props.notify,
+            });
+            lastCommand.current = null;
+          }
+          events.current.marker(event);
+        },
         state: (terminal) => {
           events.current.state(terminal);
           if (terminal.state === "ended") stop();

@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useBriefly } from "./briefly";
+import { copyToClipboard } from "./clipboard";
 import { useT } from "./i18n";
 import { Check, Close, Copy } from "./icons";
 import { useVaultWindowUp, vaultWindowUp } from "./VaultDialogs";
@@ -136,10 +137,10 @@ export function Removed(props: {
   }, []);
 
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(props.cleanup);
+    const ok = await copyToClipboard(props.cleanup);
+    if (ok) {
       showCopied(true);
-    } catch {
+    } else {
       props.notify(t("confirm.copy_failed"));
     }
   };

@@ -208,6 +208,7 @@ class Block:
     started_at: dt.datetime
     #: The width it ran at: the page draws its output again at this width.
     cols: int = 80
+    author: dict | None = None
     started: float = field(default_factory=time.monotonic)
     head: bytearray = field(default_factory=bytearray)
     tail: deque = field(default_factory=deque)
@@ -283,13 +284,16 @@ class Terminal:
                  owner: Person, machine: Machine, name: str,
                  cols: int, rows: int, agents=None, relay=None,
                  start_in: str = "",
-                 session_id: uuid.UUID | None = None) -> None:
+                 session_id: uuid.UUID | None = None,
+                 project_id: uuid.UUID | None = None) -> None:
         self.id = uuid.uuid4()
         self.pool = pool
         self.signer = signer
         #: The session that opened it (0.1.28, v3): a key server's login is
         #: signed only by that session's sockets.
         self.session_id = session_id
+        #: Project this terminal is explicitly scoped to (or machine's default project)
+        self.project_id = project_id or machine.project_id
         #: The connected agents, for a terminal on a computer.
         self.agents = agents
         #: The vault signing relay (vault.VaultRelay), for a 'key' server.
@@ -335,6 +339,9 @@ class Terminal:
         self._chan: transport.Channel | None = None
         self._pending = bytearray()
         self._block: Block | None = None
+        self._next_author: dict | None = None
+        self.ai_access: bool = True
+        self.ai_mode: str = "execute"
         #: The last commands, to say which one a replay starts inside of.
         self._recent: deque[dict] = deque(maxlen=64)
         #: A command was typed by run() and the shell has not answered with a
@@ -368,12 +375,16 @@ class Terminal:
         agent went away. The shell waits there, and this for it."""
         return self.state == "open" and self._chan is not None and self._chan.away
 
+    def set_next_author(self, author: dict | None) -> None:
+        self._next_author = author
+
     def describe(self) -> dict:
         since = self._chan.since if self.away and self._chan is not None else None
         return {
             "id": str(self.id),
             "machineId": str(self.machine.id),
             "machine": self.machine.name,
+            "projectId": str(self.project_id),
             "label": self.label,
             "name": self.name,
             "state": self.state,
@@ -391,6 +402,8 @@ class Terminal:
             "running": self._running(),
             "vault": self.vault_wait,
             "openedAt": self.opened_at.isoformat(timespec="seconds"),
+            "aiAccess": self.ai_access,
+            "aiMode": self.ai_mode,
         }
 
     def _running(self) -> dict | None:
@@ -400,7 +413,8 @@ class Terminal:
             return None
         return {"command": b.command, "cwd": b.cwd, "branch": b.branch,
                 "seqStart": b.seq_start, "cols": b.cols,
-                "at": int(b.started_at.timestamp() * 1000)}
+                "at": int(b.started_at.timestamp() * 1000),
+                "author": b.author}
 
     def block_at(self, seq: int) -> dict | None:
         """The command whose output goes on past the number `seq`: a replay
@@ -576,6 +590,25 @@ class Terminal:
         expect it would type it in as a command.
         """
         assert self._link is not None
+
+        # For Windows machines, skip Linux/bash deployment scripts and use PowerShell directly
+        link_os = getattr(self._link, "os", "") or ""
+        machine_os = getattr(self.machine, "os", "") or ""
+        passport_os = ""
+        if isinstance(getattr(self.machine, "passport", None), dict):
+            passport_os = self.machine.passport.get("os", "")
+        elif isinstance(getattr(self.machine, "passport", None), str):
+            passport_os = self.machine.passport
+
+        def _is_win(val: Any) -> bool:
+            s = str(val or "").strip().lower()
+            if "darwin" in s or "mac" in s or "apple" in s:
+                return False
+            return "windows" in s or s.startswith("win")
+
+        if _is_win(link_os) or _is_win(machine_os) or _is_win(passport_os):
+            return shell.Plan(shell="powershell", command="powershell.exe", markers=False, blocks=False)
+
         try:
             code, out, err = await self._link.script(shell.deploy_script(),
                                                      DEPLOY_TIMEOUT)
@@ -673,16 +706,18 @@ class Terminal:
                 # One line of several commands: the one before ended here.
                 self._finish_block(prev)
             self._typed = False
+            author = self._next_author
+            self._next_author = None
             self._event({"t": "C", "command": m.field(0), "prev": prev,
-                         "at": at})
+                         "at": at, "author": author})
             self._block = Block(command=m.field(0), cwd=self.cwd,
                                 branch=self.branch, seq_start=self.last_seq,
                                 started_at=dt.datetime.now(dt.UTC),
-                                cols=self.cols)
+                                cols=self.cols, author=author)
             self._recent.append({
                 "command": m.field(0), "cwd": self.cwd, "branch": self.branch,
                 "seqStart": self.last_seq, "seqEnd": None, "cols": self.cols,
-                "at": at})
+                "at": at, "author": author})
 
     def _finish_block(self, exit_code: int | None) -> int:
         """Saves the running command's block; returns how many bytes of
@@ -1092,6 +1127,7 @@ def _block_json(row: asyncpg.Record) -> dict:
         "cut": row["output_cut"],
         "partial": partial,
         "size": size,
+        "author": dict(row)["author"] if "author" in row else None,
         "output": base64.b64encode(tail).decode("ascii"),
     }
 
@@ -1184,14 +1220,15 @@ class Terminals:
     async def open(self, person: Person, machine_id: uuid.UUID, cols: int,
                    rows: int, cwd: str = "", *,
                    session_id: uuid.UUID | None = None,
-                   closed=None) -> Terminal:
+                   closed=None,
+                   project_id: uuid.UUID | None = None) -> Terminal:
         """A new terminal on the machine. `cwd` (0.1.24): the folder to start
         in, the one the terminal it replaces was in; where the login shell
         cannot be told, or the folder is gone, it starts at home.
         `session_id` (0.1.28): the session asking, whose sockets alone sign
         a key server's login; `closed(machine)`, whether the keys are closed
         on that device for this machine: KeysClosed then, and nothing is
-        opened."""
+        opened. `project_id`: explicitly scopes terminal to a project."""
         lock = self._opening.setdefault(person.id, asyncio.Lock())
         async with lock:
             machine = await self._machine(machine_id, person.id)
@@ -1211,7 +1248,8 @@ class Terminals:
                                 owner=person, machine=machine, name=name,
                                 cols=cols, rows=rows, agents=self.agents,
                                 relay=self.relay, start_in=cwd,
-                                session_id=session_id)
+                                session_id=session_id,
+                                project_id=project_id)
             await self.pool.execute(
                 "INSERT INTO terminals (id, machine_id, owner_id, name, kind) "
                 "VALUES ($1, $2, $3, $4, 'term')",
@@ -1219,6 +1257,15 @@ class Terminals:
             self._live[terminal.id] = terminal
             self._peak = max(self._peak, self.open_count())
             self._peak_one = max(self._peak_one, len(self.live(person.id)))
+            try:
+                from ..orchestration.machines_projects import machine_project_manager
+                machine_project_manager.set_terminal_project(
+                    terminal_id=str(terminal.id),
+                    project_id=str(terminal.project_id),
+                    machine_id=str(machine.id),
+                )
+            except Exception as exc:
+                log.debug("machine_project_manager.set_terminal_project failed: %s", exc)
         terminal.start()
         return terminal
 

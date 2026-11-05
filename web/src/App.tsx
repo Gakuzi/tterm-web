@@ -5,7 +5,7 @@ import {
   CoreError, createFolder, createNote, createProject, deleteFolder, deleteNote,
   deleteProject, editProject, endTerminal, loadLogToday, loadNote, loadState, moveMachine,
   moveNote, NoteGone, onSignedOut, openTerminal, removeMachine, renameFolder,
-  renameTerminal, saveLanguage, saveProjectTint, saveTheme, SignedOut, signInApp, signOut,
+  renameMachine, renameTerminal, saveLanguage, saveProjectTint, saveTheme, SignedOut, signInApp, signOut,
   welcomeSeen, type Folder, type FoundBlock, type FoundNote,
   type Machine, type MachineKind, type Note, type NoteSummary, type Project,
   type ProjectFields, type ProjectTint, type State, type TerminalInfo,
@@ -37,6 +37,9 @@ import { FolderDialog } from "./Menus";
 import { NeedAccount, type Need } from "./NeedAccount";
 import { forgetSupportDraft, SupportDialog } from "./SupportDialog";
 import { draftsOf, forgetDrafts, markDeleted } from "./drafts";
+import { initNotificationBot } from "./notifications";
+import { NotificationPromptBanner } from "./NotificationPromptBanner";
+import { NotificationHttpNoticeModal } from "./NotificationHttpNoticeModal";
 import { NoteView, primeNote, type SaveState, type Typed } from "./NoteView";
 import { summary, titled, toMarkdown } from "./noteText";
 import {
@@ -344,6 +347,7 @@ export function App() {
   const [renaming, setRenaming] = useState<Renaming | null>(null);
   const renamingRef = useRef(renaming);
   renamingRef.current = renaming;
+  const [renamingMachine, setRenamingMachine] = useState<string | null>(null);
   const pinnedRef = useRef(pinned);
   pinnedRef.current = pinned;
   /** The mouse is over the sidebar. */
@@ -639,6 +643,11 @@ export function App() {
     toastTimer.current = window.setTimeout(() => setToast(null), TOAST_MS);
   }, []);
 
+  // Web Bot & Multi-Device Push Broadcast: connects background SSE stream across all devices
+  useEffect(() => {
+    return initNotificationBot(state?.me?.id, notYet);
+  }, [state?.me?.id, notYet]);
+
   /** A tab in front: opened if it was not. */
   const openTab = useCallback((tab: string) => {
     setTabs((ts) => withTab(ts, tab));
@@ -692,7 +701,8 @@ export function App() {
    * (0.1.28) the keys are asked for first; `failed`, when it could not be
    * made. */
   const startTerminal = useCallback((machineId: string, instead?: string,
-    then?: (terminalId: string) => void, cwd?: string, failed?: () => void) => {
+    then?: (terminalId: string) => void, cwd?: string, failed?: () => void,
+    projectId?: string) => {
     const machine = byIdRef.current.get(machineId);
     const asked = !!instead && tabKind(instead) === "keys";
     if (machine && !asked && closedRef.current(machine)) {
@@ -700,10 +710,11 @@ export function App() {
       return;
     }
     const { cols, rows } = guessSize();
-    const project = stateNow.current?.projects.find((p) =>
-      p.machines.some((m) => m.id === machineId));
+    const project = projectId
+      ? stateNow.current?.projects.find((p) => p.id === projectId)
+      : stateNow.current?.projects.find((p) => p.machines.some((m) => m.id === machineId));
     if (project) unfold(`p:${project.id}`, `m:${machineId}`);
-    openTerminal(machineId, cols, rows, cwd)
+    openTerminal(machineId, cols, rows, cwd, projectId || project?.id)
       .then((terminal) => {
         setStatuses((all) => {
           const next = { ...all, [terminal.id]: {
@@ -732,14 +743,14 @@ export function App() {
   }, [navigate, refresh, notYet, unfold, askKeys]);
 
   /** A new terminal from a machine's "+": an offline computer says so. */
-  const newTerminal = useCallback((machine: Machine) => {
+  const newTerminal = useCallback((machine: Machine, projectId?: string) => {
     if (machine.kind === "computer" && !machine.online) {
       const seen = lastSeen(machine.lastSeen, say);
       notYet(seen ? say("app.offline_seen", { name: machine.name, seen })
         : say("app.offline", { name: machine.name }));
       return;
     }
-    startTerminal(machine.id);
+    startTerminal(machine.id, undefined, undefined, undefined, undefined, projectId);
   }, [notYet, startTerminal]);
 
   // Removing a machine and ending a terminal ask first (Confirm).
@@ -989,6 +1000,26 @@ export function App() {
         notYet(say("app.no_rename", { why: e.message }));
       });
   }, [notYet, refresh, stopRenaming]);
+
+  /** A machine named in the sidebar. */
+  const onRenameMachine = useCallback((id: string, name: string) => {
+    renameMachine(id, name)
+      .then((info) => {
+        setRenamingMachine(null);
+        setState((s) => s && {
+          ...s,
+          projects: s.projects.map((p) => ({
+            ...p,
+            machines: p.machines.map((m) => (m.id === id ? { ...m, name: info.name } : m)),
+          })),
+        });
+        refresh();
+      })
+      .catch((e: Error) => {
+        setRenamingMachine(null);
+        notYet(say("app.no_rename", { why: e.message }));
+      });
+  }, [notYet, refresh]);
 
   // What open notes tell of themselves.
   const onSummary = useCallback((noteId: string, typed: Typed) => {
@@ -1329,6 +1360,17 @@ export function App() {
     return () => window.removeEventListener("tterm-app", onApp);
   }, [updates.look]);
 
+  useEffect(() => {
+    const handleOpenSection = (event: Event) => {
+      const ce = event as CustomEvent<{ section?: SettingsSection }>;
+      if (ce.detail?.section) {
+        openSettingsNow.current(ce.detail.section);
+      }
+    };
+    window.addEventListener("tterm:open-settings-section", handleOpenSection);
+    return () => window.removeEventListener("tterm:open-settings-section", handleOpenSection);
+  }, []);
+
   if (signedOut) {
     return (
       <SignIn note={signedOut.note} email={lastEmail.current ?? undefined}
@@ -1509,7 +1551,7 @@ export function App() {
           icon: m.kind === "server" ? <Server size={15} /> : <Computer size={15} />,
           muted: offline || waits,
           words: [m.name, m.host, m.os, m.kind].filter(Boolean).join(" "),
-          run: () => newTerminal(m),
+          run: () => newTerminal(m, p.id),
         };
       }),
     }));
@@ -1579,7 +1621,7 @@ export function App() {
           [t("app.search.row_address"), m.host ?? ""], [t("app.search.row_status"), status],
           [t("app.search.row_terminals"), open ? t("app.search.open_count", { n: open }) : ""]] as
           [string, string][]).filter((r) => r[1]),
-        run: () => newTerminal(m), act: t("sidebar.new_terminal"), machineId: m.id,
+        run: () => newTerminal(m, p.id), act: t("sidebar.new_terminal"), machineId: m.id,
         muted: offline || waits,
       };
     }));
@@ -1829,6 +1871,8 @@ export function App() {
         onRename={renameTab}
         onStopRename={stopRenaming} />
 
+      <NotificationPromptBanner notify={notYet} />
+
       {/* Under the Settings window the page stays as it was, but Tab does
           not reach it: nothing typed there goes to a terminal under it. */}
       <div className="stage" inert={settingsOpen}>
@@ -1906,10 +1950,12 @@ export function App() {
         {frontKind === "project" && (
           <div className="page-scroll">
             {pageProject ? (
-              <ProjectPage project={pageProject} me={state.me}
+              <ProjectPage project={pageProject} allProjects={projects} me={state.me}
                 terminals={liveTerminals} dotFor={dotFor} closed={isClosed}
-                local={local}
-                onAddMachine={startAdding} onOpenTerminal={startTerminal}
+                local={local} onRefresh={refresh}
+                onAddMachine={startAdding}
+                onOpenTerminal={(machineId, projectId) =>
+                  startTerminal(machineId, undefined, undefined, undefined, undefined, projectId)}
                 onGoTo={goTo} onRemoveMachine={askRemove}
                 onMoveMachine={pageProject.own && projects.some((p) => p.own &&
                   p.role === "owner" && p.id !== pageProject.id)
@@ -1957,8 +2003,11 @@ export function App() {
             {anyMachine || local ? (
               <Machines projects={projects} terminals={state.terminals} local={local}
                 closed={isClosed}
+                onRefresh={refresh}
                 onAdd={(projectId) => startAdding(projectId)}
-                onOpenTerminal={startTerminal} onGoTo={goTo}
+                onOpenTerminal={(machineId, projectId) =>
+                  startTerminal(machineId, undefined, undefined, undefined, undefined, projectId)}
+                onGoTo={goTo}
                 onRemove={askRemove} />
             ) : (
               <Welcome me={state.me} personal={personal}
@@ -2008,7 +2057,7 @@ export function App() {
           logClosed={isLogClosed}
           onOpenProject={(projectId) => away(() => openTab(projectTab(projectId)))()}
           onAddMachine={(projectId) => startAdding(projectId)}
-          onNewTerminal={(machine) => away(() => newTerminal(machine))()}
+          onNewTerminal={(machine, projId) => away(() => newTerminal(machine, projId))()}
           onGoTo={(id) => {
             goTo(id);
             // It slides away a moment later: a second click names the
@@ -2020,6 +2069,14 @@ export function App() {
             }
           }}
           onEndTerminal={askEnd}
+          renamingMachine={renamingMachine}
+          onStartRenameMachine={(id) => {
+            cancelTimers();
+            setPicking(false);
+            setRenamingMachine(id);
+          }}
+          onRenameMachine={onRenameMachine}
+          onStopRenameMachine={() => setRenamingMachine(null)}
           renaming={renaming?.where === "side" ? renaming.id : null}
           onStartRename={(id) => {
             cancelTimers();
@@ -2239,6 +2296,11 @@ export function App() {
         <Removed name={removed.name} cleanup={removed.cleanup}
           onClose={() => setRemoved(null)} notify={notYet} />
       )}
+
+      <NotificationHttpNoticeModal
+        notify={notYet}
+        onConfigureTelegram={() => openSettings("telegram")}
+      />
 
       <VaultDialogHost />
 

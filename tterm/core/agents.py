@@ -739,6 +739,12 @@ class Agents:
         return len(self._waiting)
 
     def may_wait(self, address: str) -> bool:
+        try:
+            net = ipaddress.ip_network(address, strict=False)
+            if net.is_private or net.is_loopback:
+                return True
+        except ValueError:
+            pass
         if sum(1 for a, _ in self._waiting.values()
                if a == address) >= PENDING_PER_ADDRESS:
             return False
@@ -767,6 +773,12 @@ class Agents:
 
     def struck_out(self, address: str) -> bool:
         """Whether this address failed too often lately to be looked at."""
+        try:
+            net = ipaddress.ip_network(address, strict=False)
+            if net.is_private or net.is_loopback:
+                return False
+        except ValueError:
+            pass
         times = self._strikes.get(address)
         if not times:
             return False
@@ -777,6 +789,12 @@ class Agents:
         return len(recent) >= STRIKES
 
     def strike(self, address: str) -> None:
+        try:
+            net = ipaddress.ip_network(address, strict=False)
+            if net.is_private or net.is_loopback:
+                return
+        except ValueError:
+            pass
         now = time.monotonic()
         if address not in self._strikes and len(self._strikes) >= 4096:
             # Forget the quiet ones first, everyone if that is not enough.
@@ -1146,8 +1164,9 @@ async def _read_passport_again(pool: asyncpg.Pool, machine_id: uuid.UUID,
                                link: AgentLink) -> None:
     """Reads a known computer's passport anew: tools come and go, sudo
     changes, and an older tTerm Web read less of it."""
+    ps = passport.POWERSHELL_SCRIPT if (link.os and link.os.lower().startswith("win")) else passport.SCRIPT
     try:
-        code, out, _ = await link.script(passport.SCRIPT, PASSPORT_TIMEOUT)
+        code, out, _ = await link.script(ps, PASSPORT_TIMEOUT)
     except LinkError as exc:
         log.info("could not read the passport of %s again: %s",
                  link.machine_name, exc)
@@ -1177,8 +1196,9 @@ async def _join(pool: asyncpg.Pool, claimed: asyncpg.Record,
     An agent that goes meanwhile is not added: its command works again
     when it comes back. One that is there but could not answer is added
     with what its hello said."""
+    ps = passport.POWERSHELL_SCRIPT if (link.os and link.os.lower().startswith("win")) else passport.SCRIPT
     try:
-        code, out, _ = await link.script(passport.SCRIPT, PASSPORT_TIMEOUT)
+        code, out, _ = await link.script(ps, PASSPORT_TIMEOUT)
         details = passport.parse(out.decode("utf-8", "replace"))
     except LinkError as exc:
         if link.gone:

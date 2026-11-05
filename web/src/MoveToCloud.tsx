@@ -17,7 +17,7 @@ import { moveToCloud, type MoveMethod, type MoveResult, type SshHost, type SshIn
 import { PageHead, useEscCloses } from "./Account";
 import { list, useT, type Translate } from "./i18n";
 import { Alert, Check, CloudUp, Globe, Key, Lock, Server } from "./icons";
-import { keyKind } from "./Keys";
+import { keyKind } from "./Keys.tsx";
 import { inventory, MoveContext, vaultReady } from "./SshStrip";
 import {
   address, askedAbout, cloudReaches, inTterm, jumpOf, keyFor, lastUsedMs, samePath,

@@ -30,10 +30,19 @@ import { AccountPane, planLine, PlanPane, SUPPORT } from "./Account";
 import { DevicesSection } from "./Devices";
 import { LANGUAGES, useT, type Lang } from "./i18n";
 import {
-  Card, ChevronDown, ChevronLeft, ChevronRight, Close, Computer, Devices, Download, Gear,
-  Key, Monitor, Moon, Person, Search, Sun,
+  Bell, Card, ChevronDown, ChevronLeft, ChevronRight, Close, Computer, Devices, Download, Gear,
+  GitHub, Key, Monitor, Moon, People, Person, Plane, Search, Spark, Sun,
 } from "./icons";
-import { KeysSection } from "./Keys";
+import {
+  getDeviceName, getNotificationSettings, isHttpInsecureContext, playNotificationChime,
+  promptNotificationPermission, saveNotificationSettings, showPushNotification,
+} from "./notifications";
+import { KeysSection } from "./Keys.tsx";
+import { AiSection } from "./AiSection";
+import { GitHubSection } from "./GitHubSection";
+import { TelegramNotificationSection } from "./TelegramNotificationSection";
+import { NotificationHttpNoticeModal } from "./NotificationHttpNoticeModal";
+import { ProjectCollaboration } from "./ProjectCollaboration";
 import { InApp } from "./local";
 import { Group, Row, SearchWords } from "./SettingsRows";
 import { searchWords, sectionsFound, type SettingsSection } from "./settingsSearch";
@@ -97,9 +106,31 @@ const TINTS: { value: ProjectTint; label: string }[] = [
   { value: "block", label: "settings.tint_block" },
 ];
 
-/** Settings › General: how tTerm looks, and its language. */
+/** Settings › General: how tTerm looks, its language, and notification bot. */
 function GeneralPane(props: Props) {
   const t = useT();
+  const [notifySettings, setNotifySettings] = useState(getNotificationSettings);
+  const [permission, setPermission] = useState<NotificationPermission>(() =>
+    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
+  );
+  const [devicesCount, setDevicesCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    void fetch("/api/orchestration/notifications/devices")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok && Array.isArray(d.devices)) {
+          setDevicesCount(d.devices.length);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const updateNotify = (patch: Partial<ReturnType<typeof getNotificationSettings>>) => {
+    const updated = saveNotificationSettings(patch);
+    setNotifySettings(updated);
+  };
+
   return (
     <>
       <Group title={t("settings.appearance")}
@@ -129,6 +160,144 @@ function GeneralPane(props: Props) {
           </div>
         </Row>
       </Group>
+
+      <Group title={"Уведомления и Веб-Бот" /* i18n-ignore */}
+        note={"Оповещения о процессах терминала на всех устройствах (MacBook, iPhone, Android)" /* i18n-ignore */}>
+        <Row label={"Уведомления" /* i18n-ignore */}
+          note={"Включить push-уведомления и оповещения о длительных командах" /* i18n-ignore */}
+          words={"уведомления push включить выключить" /* i18n-ignore */}>
+          <div className="segmented" role="group" aria-label={"Уведомления" /* i18n-ignore */}>
+            <button type="button" aria-pressed={notifySettings.enabled}
+              onClick={() => updateNotify({ enabled: true })}>
+              <Bell size={14} />
+              {"Включены" /* i18n-ignore */}
+            </button>
+            <button type="button" aria-pressed={!notifySettings.enabled}
+              onClick={() => updateNotify({ enabled: false })}>
+              {"Выключены" /* i18n-ignore */}
+            </button>
+          </div>
+        </Row>
+
+        <Row label={"Звуковой сигнал" /* i18n-ignore */}
+          note={"Воспроизведение гармонического сигнала при завершении команд" /* i18n-ignore */}
+          words={"звук сигнал бип колокольчик" /* i18n-ignore */}>
+          <div className="segmented" role="group" aria-label={"Звуковой сигнал" /* i18n-ignore */}>
+            <button type="button" aria-pressed={notifySettings.sound}
+              onClick={() => {
+                updateNotify({ sound: true });
+                playNotificationChime(true);
+              }}>
+              {"Со звуком 🔔" /* i18n-ignore */}
+            </button>
+            <button type="button" aria-pressed={!notifySettings.sound}
+              onClick={() => updateNotify({ sound: false })}>
+              {"Без звука 🔕" /* i18n-ignore */}
+            </button>
+          </div>
+        </Row>
+
+        <Row label={"Порог длительности" /* i18n-ignore */}
+          note={"Автоматически уведомлять о командах, которые длятся дольше порога" /* i18n-ignore */}
+          words={"порог секунд длительные процессы время таймаут" /* i18n-ignore */}>
+          <div className="segmented" role="group" aria-label={"Порог секунд" /* i18n-ignore */}>
+            {[
+              { val: 5, label: "5 сек" /* i18n-ignore */ },
+              { val: 10, label: "10 сек" /* i18n-ignore */ },
+              { val: 30, label: "30 сек" /* i18n-ignore */ },
+              { val: 60, label: "60 сек" /* i18n-ignore */ },
+            ].map((p) => (
+              <button key={p.val} type="button" aria-pressed={notifySettings.thresholdSec === p.val}
+                onClick={() => updateNotify({ thresholdSec: p.val })}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </Row>
+
+        <Row label={"Системный Push" /* i18n-ignore */}
+          note={permission === "granted"
+            ? "Системные push-уведомления браузера разрешены и активны" /* i18n-ignore */
+            : permission === "denied"
+            ? "Уведомления заблокированы в настройках браузера (разрешите их в адресной строке)" /* i18n-ignore */
+            : (!window.isSecureContext && window.location.protocol === "http:")
+            ? "HTTP режим: звук и in-app оповещения активны. Для окон ОС откройте через HTTPS или localhost." /* i18n-ignore */
+            : "Браузер ожидает запроса на отправку системных push-уведомлений" /* i18n-ignore */}
+          words={"браузер push разрешение система звук" /* i18n-ignore */}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {permission === "granted" ? (
+              <>
+                <button type="button" className="button-ghost small"
+                  onClick={() => showPushNotification(
+                    "tTerm: Тестовое уведомление" /* i18n-ignore */,
+                    "Уведомления и звуковой сигнал настроены успешно!" /* i18n-ignore */
+                  )}>
+                  {"Тестовый пуш 🔔" /* i18n-ignore */}
+                </button>
+                <button type="button" className="button-ghost small"
+                  onClick={() => playNotificationChime(true)}
+                  title="Проверить аудио-сигнал" /* i18n-ignore */>
+                  {"Звук 🔊" /* i18n-ignore */}
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="button small"
+                  onClick={async () => {
+                    await promptNotificationPermission(props.notify);
+                    if (typeof window !== "undefined" && "Notification" in window) {
+                      setPermission(Notification.permission);
+                    }
+                  }}>
+                  {"Запросить разрешение в браузере 🔔" /* i18n-ignore */}
+                </button>
+                <button type="button" className="button-ghost small"
+                  onClick={() => playNotificationChime(true)}
+                  title="Проверить аудио-сигнал" /* i18n-ignore */>
+                  {"Звук 🔊" /* i18n-ignore */}
+                </button>
+                {isHttpInsecureContext() && (
+                  <button
+                    type="button"
+                    className="button-ghost small"
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent("tterm:show-http-notify-modal"));
+                    }}
+                    title="Диагностика уведомлений на HTTP и Telegram-бот" /* i18n-ignore */
+                    style={{ color: "#f59e0b" }}
+                  >
+                    {"⚠️ Почему окно не открывается на HTTP?" /* i18n-ignore */}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        </Row>
+
+        <Row label={"Telegram-бот на телефон" /* i18n-ignore */}
+          note={"Мгновенная доставка пуш-уведомлений о завершении долгих команд в Telegram на телефон и планшет" /* i18n-ignore */}
+          words={"telegram телеграм бот уведомления телефон смартфон пуш оповещения" /* i18n-ignore */}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              type="button"
+              className="button-accent small"
+              onClick={() => props.onSection("telegram")}
+            >
+              <Plane size={13} />
+              {"Настроить Telegram-бота ✈️" /* i18n-ignore */}
+            </button>
+          </div>
+        </Row>
+
+        <Row label={"Multi-Device Broadcast" /* i18n-ignore */}
+          note={`Текущее устройство: ${getDeviceName()} • Онлайн подключений: ${devicesCount ?? 1}` /* i18n-ignore */}
+          words={"устройства iphone macbook broadcast stream мультидевайс" /* i18n-ignore */}>
+          <span style={{ fontSize: 12, color: "#10b981", fontWeight: 500 }}>
+            {"Синхронизация активна 📡" /* i18n-ignore */}
+          </span>
+        </Row>
+      </Group>
+
       <Group title={t("language.item")}>
         <Row label={t("settings.language")} note={t("settings.language_note")}
           words={LANGUAGES.map((l) => l.name).join(" ")}>
@@ -156,6 +325,7 @@ export function Settings(props: Props) {
   const [info, setInfo] = useState<AccountInfo | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+
   const editing = useRef(false);
   const scrim = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLElement>(null);
@@ -184,7 +354,8 @@ export function Settings(props: Props) {
       ...THEMES.map((m) => t(m.label)),
       t("settings.tints"), t("settings.tints_note"), ...TINTS.map((m) => t(m.label)),
       t("language.item"), t("settings.language"), t("settings.language_note"),
-      ...LANGUAGES.map((l) => l.name)]);
+      ...LANGUAGES.map((l) => l.name),
+      "уведомления", "звук", "сигнал", "долго", "процессы", "notifications", "sound", "bell", "push", "таймаут"]); // i18n-ignore
     const preferences = local ? [general] : [
       general,
       item("account", <Person size={18} />, t("account.title"), [
@@ -200,10 +371,28 @@ export function Settings(props: Props) {
     const out = [{ title: t("settings.group_preferences"), items: preferences }];
     if (!local) {
       out.push({
+        title: "Проекты и Доступ", // i18n-ignore
+        items: [
+          item("projects", <People size={18} />, "Проект и Команда", [ // i18n-ignore
+            "проекты", "команда", "роли", "rbac", "доступ", "участники", "docker", "нода", "терминалы"]), // i18n-ignore
+        ],
+      });
+      out.push({
         title: t("settings.group_security"), items: [
           item("keys", <Key size={18} />, t("keys.title"), [t("settings.keys_words")]),
           item("devices", <Devices size={18} />, t("devices.title"), [
             t("devices.forget_all"), t("settings.devices_words")]),
+          item("ai", <Spark size={18} />, "AI & MCP", [ // i18n-ignore
+            "ai", "mcp", "agents", "cursor", "claude", "терминал", "ии"]), // i18n-ignore
+        ],
+      });
+      out.push({
+        title: "Интеграции", // i18n-ignore
+        items: [
+          item("github", <GitHub size={18} />, "GitHub", [ // i18n-ignore
+            "github", "гитхаб", "oauth", "репозиторий", "токен", "pat", "коммиты", "ветки", "pr"]), // i18n-ignore
+          item("telegram", <Plane size={18} />, "Telegram-бот", [ // i18n-ignore
+            "telegram", "телеграм", "бот", "уведомления", "bot", "push", "пуш", "оповещения", "телефон"]), // i18n-ignore
         ],
       });
     }
@@ -242,6 +431,8 @@ export function Settings(props: Props) {
   // how it updates, waits for it.
   const onSection = useRef(props.onSection);
   onSection.current = props.onSection;
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(() => props.projects[0]?.id || "default");
+
   useEffect(() => {
     if (local && props.section && props.section !== "general" && props.section !== "updates") {
       onSection.current("");
@@ -312,7 +503,7 @@ export function Settings(props: Props) {
         return (
           <AccountPane me={props.me} support={support} onRenamed={props.onRenamed}
             onPhoto={props.onPhoto} notify={props.notify} onSupport={props.onSupport}
-            editing={editing} />
+            editing={editing} projects={props.projects} />
         );
       case "plan":
         return <PlanPane info={info} problem={problem} />;
@@ -337,6 +528,64 @@ export function Settings(props: Props) {
         return props.here ? <ThisComputerSection here={props.here} /> : null;
       case "updates":
         return <UpdatesSection />;
+      case "projects": {
+        const activeProject = props.projects.find((p) => p.id === selectedProjectId) || props.projects[0] || ({ id: "default", name: "Главный проект", code: "P", own: true, role: "owner" } as any); /* i18n-ignore */
+        return (
+          <div>
+            {props.projects.length > 1 && (
+              <div style={{
+                marginBottom: 20,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 12,
+                padding: "12px 18px",
+                borderRadius: 10,
+                background: "var(--color-bg-secondary, #1e1e24)",
+                border: "1px solid var(--color-border, #33333d)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <People size={18} />
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>Выберите проект для настройки: {/* i18n-ignore */}</span>
+                </div>
+                <select
+                  className="input-select"
+                  value={activeProject.id}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 6,
+                    fontSize: 13,
+                    minWidth: 200,
+                    fontWeight: 600,
+                  }}
+                >
+                  {props.projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.code}) {p.personal ? "[Личный]" /* i18n-ignore */ : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <ProjectCollaboration
+              key={activeProject.id}
+              project={activeProject}
+              terminals={[]}
+              me={props.me}
+              notify={props.notify}
+            />
+          </div>
+        );
+      }
+      case "ai":
+        return <AiSection notify={props.notify} />;
+      case "github":
+        return <GitHubSection notify={props.notify} projects={props.projects} />;
+      case "telegram":
+        return <TelegramNotificationSection notify={props.notify} />;
+
     }
   };
 
@@ -415,6 +664,12 @@ export function Settings(props: Props) {
           )}
         </div>
       </section>
+
+      <NotificationHttpNoticeModal
+        notify={props.notify}
+        onConfigureTelegram={() => props.onSection("telegram")}
+      />
     </div>
+
   );
 }

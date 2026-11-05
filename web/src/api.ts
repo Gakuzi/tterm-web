@@ -78,6 +78,9 @@ export interface Machine {
   /** The person's own (they added it, or nobody is recorded): its log
    * follows their keys on a device (0.1.28); others read it by their role. */
   mine?: boolean;
+  /** Whether the machine is shared across multiple projects. */
+  shared?: boolean;
+  projectId?: string;
 }
 
 export type LoginMethod = "cert" | "key" | "mac";
@@ -221,6 +224,7 @@ export interface TerminalInfo {
   id: string;
   machineId: string;
   machine: string;
+  projectId?: string;
   /** As tabs show it: P/web-01, or P/web-01 · 2 for the second one. */
   label: string;
   name: string;
@@ -250,6 +254,8 @@ export interface TerminalInfo {
   /** Its machine is closed on this device (0.1.28): the core sends only
    * its name and where it is, not what it does. */
   locked?: boolean;
+  aiAccess?: boolean;
+  aiMode?: "execute" | "guard" | "readonly";
 }
 
 export interface RunningCommand {
@@ -259,6 +265,16 @@ export interface RunningCommand {
   seqStart: number;
   cols: number;
   at: number;
+  author?: { name: string; kind: "user" | "agent" | "guest" };
+}
+
+export interface TerminalAccess {
+  terminalId: string;
+  machineId: string;
+  machineName: string;
+  label: string;
+  aiAccess: boolean;
+  aiMode: "execute" | "guard" | "readonly";
 }
 
 /** A finished block as the database keeps it, with the end of its output. */
@@ -286,6 +302,7 @@ export interface StoredBlock {
   notes: LogNote[];
   redacted: Redaction | null;
   canNote: boolean;
+  author?: { name: string; kind: "user" | "agent" | "guest" };
 }
 
 export interface Feed {
@@ -354,6 +371,7 @@ export interface State {
 export interface Install {
   id: string;
   command: string;
+  windowsCommand?: string | null;
   /** For a computer: the agent started by hand, for trying one not yet
    * released. */
   byHand?: string | null;
@@ -532,6 +550,26 @@ async function auth<T>(path: string, body?: unknown): Promise<T> {
 export async function authState(): Promise<AuthState> {
   const response = await fetch("/api/auth/state", { cache: "no-store" });
   return (await check(response)).json();
+}
+
+export interface TelegramAuthStatus {
+  ok: boolean;
+  bot_configured: boolean;
+  bot_username: string;
+}
+
+export function telegramAuthStatus(): Promise<TelegramAuthStatus> {
+  return fetch("/api/auth/telegram/status", { cache: "no-store" })
+    .then((r) => r.json())
+    .catch(() => ({ ok: false, bot_configured: false, bot_username: "" }));
+}
+
+export function requestTelegramCode(telegramId: string, name?: string): Promise<{ ok: boolean; sent: boolean; delivered_via_bot: boolean; note?: string }> {
+  return auth("/api/auth/telegram/request-code", { telegram_id: telegramId, name });
+}
+
+export function verifyTelegramCode(telegramId: string, code: string): Promise<SignedInNow> {
+  return auth("/api/auth/telegram/verify-code", { telegram_id: telegramId, code });
 }
 
 /** Sends a code for signing in to the address. */
@@ -971,6 +1009,13 @@ export async function renameTerminal(id: string,
     change("PATCH", { name })))).json();
 }
 
+/** A name for a machine. */
+export async function renameMachine(id: string,
+  name: string): Promise<{ id: string; name: string }> {
+  return (await check(await fetch(`/api/machines/${id}`,
+    change("PATCH", { name })))).json();
+}
+
 export async function newInstall(projectId: string,
   kind: MachineKind = "server"): Promise<Install> {
   const response = await fetch("/api/installs",
@@ -1000,10 +1045,47 @@ export async function sendSupport(message: {
 /** `cwd` (0.1.24): the folder to start in, the one an ended terminal was
  * in; the core starts there if it can, and at home otherwise. */
 export async function openTerminal(machineId: string, cols: number,
-  rows: number, cwd?: string): Promise<TerminalInfo> {
-  const response = await fetch("/api/terminals",
-    change("POST", cwd ? { machineId, cols, rows, cwd } : { machineId, cols, rows }));
+  rows: number, cwd?: string, projectId?: string): Promise<TerminalInfo> {
+  const payload: Record<string, any> = { machineId, cols, rows };
+  if (cwd) payload.cwd = cwd;
+  if (projectId) payload.projectId = projectId;
+  const response = await fetch("/api/terminals", change("POST", payload));
   return (await check(response)).json();
+}
+
+export async function getMachineProjects(machineId: string): Promise<Array<{ project_id: string; project_name: string; bound_at?: string }>> {
+  try {
+    const response = await fetch(`/api/orchestration/machines/${machineId}/projects`);
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.projects || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function bindMachineToProject(machineId: string, projectId: string, projectName: string = ""): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/orchestration/machines/${machineId}/projects`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId, project_name: projectName }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function unbindMachineFromProject(machineId: string, projectId: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/orchestration/machines/${machineId}/projects/${projectId}`, {
+      method: "DELETE",
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function terminalInfo(id: string): Promise<TerminalInfo | null> {
@@ -1018,6 +1100,22 @@ export async function endTerminal(id: string): Promise<TerminalInfo | null> {
     { method: "DELETE", headers: { "x-tterm": "1" } });
   if (response.status === 404) return null;
   return (await check(response)).json();
+}
+
+export async function getTerminalAccess(terminalId: string): Promise<TerminalAccess> {
+  const response = await fetch(`/api/terminals/${terminalId}/access`, { cache: "no-store" });
+  return (await check(response)).json();
+}
+
+export async function updateTerminalAccess(
+  terminalId: string,
+  data: Partial<TerminalAccess>
+): Promise<TerminalAccess> {
+  return (await check(await fetch(`/api/terminals/${terminalId}/access`, change("PATCH", data)))).json();
+}
+
+export async function revokeTerminalAi(terminalId: string): Promise<{ ok: boolean; revoked: boolean }> {
+  return (await check(await fetch(`/api/terminals/${terminalId}/revoke_ai`, change("POST", {})))).json();
 }
 
 /** Takes a machine out of tTerm Web: its terminals end, a computer's agent
@@ -1628,3 +1726,387 @@ export async function moveToCloud(body: { project: string;
   keys: { path: string; passphrase?: string }[] }): Promise<MoveResult[]> {
   return (await (await check(await fetch("/api/app/move", change("POST", body)))).json()).results;
 }
+
+export interface UploadedFileRecord {
+  id: string;
+  terminal_id: string;
+  filename: string;
+  size: number;
+  path: string;
+  dest_path?: string;
+  target_dir: string;
+  machine_id?: string;
+  machine_name?: string;
+  machine_host?: string;
+  transfer_method?: string;
+  uploaded_at: string;
+}
+
+export interface UploadResponse {
+  ok: boolean;
+  terminal_id: string;
+  count: number;
+  target_dir?: string | null;
+  files: UploadedFileRecord[];
+}
+
+export interface SftpCredentials {
+  host: string;
+  port: number;
+  username: string;
+  machine_name?: string;
+  sftp_url: string;
+  web_dav_hint: string;
+  default_dir: string;
+  terminal_id: string;
+  machine_id?: string | null;
+  auth_methods: string[];
+  command_hint: string;
+  ftp_command_hint?: string;
+  cyberduck_hint?: string;
+}
+
+export async function getTerminalSftpInfo(terminalId: string, machineId?: string): Promise<SftpCredentials> {
+  const query = machineId ? `?machine_id=${encodeURIComponent(machineId)}` : "";
+  const response = await fetch(`/api/orchestration/terminals/${terminalId}/sftp-info${query}`, { cache: "no-store" });
+  const data = await (await check(response)).json();
+  return data.sftp;
+}
+
+export function uploadFilesToTerminal(
+  terminalId: string,
+  files: File[],
+  targetDir?: string,
+  onProgress?: (percent: number) => void
+): Promise<UploadResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `/api/orchestration/terminals/${terminalId}/upload`);
+    xhr.setRequestHeader("x-tterm", "1");
+
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100);
+          onProgress(percent);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          resolve(data);
+        } catch {
+          reject(new Error("Не удалось обработать ответ сервера")); // i18n-ignore
+        }
+      } else {
+        reject(new Error(`Ошибка загрузки: ${xhr.status} ${xhr.statusText}`)); // i18n-ignore
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error("Сетевая ошибка при загрузке файлов")); // i18n-ignore
+    };
+
+    const formData = new FormData();
+    if (targetDir) {
+      formData.append("target_dir", targetDir);
+    }
+    for (const file of files) {
+      formData.append("files", file, file.name);
+    }
+
+    xhr.send(formData);
+  });
+}
+
+// ---------------------------------------------------------------------- GitHub OAuth & API Orchestration
+
+export interface GitHubStatus {
+  ok: boolean;
+  is_authenticated: boolean;
+  auth_type?: string;
+  username?: string;
+  name?: string;
+  email?: string;
+  avatar_url?: string;
+  html_url?: string;
+  public_repos?: number;
+  total_private_repos?: number;
+  masked_token?: string;
+  scopes?: string[];
+  connected_at?: string;
+  oauth_configured?: boolean;
+  client_id?: string | null;
+}
+
+export interface GitHubRepo {
+  id: number;
+  name: string;
+  full_name: string;
+  html_url: string;
+  clone_url: string;
+  ssh_url: string;
+  private: boolean;
+  default_branch: string;
+  description?: string;
+  updated_at?: string;
+}
+
+export async function getGitHubStatus(): Promise<GitHubStatus> {
+  const response = await fetch("/api/orchestration/github/status", { cache: "no-store" });
+  return (await check(response)).json();
+}
+
+export async function getGitHubAuthUrl(redirectUri: string, state = "tterm-gh-state"): Promise<{ ok: boolean; auth_url: string }> {
+  const query = `?redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
+  const response = await fetch(`/api/orchestration/github/auth-url${query}`, { cache: "no-store" });
+  return (await check(response)).json();
+}
+
+export async function connectGitHubToken(token: string): Promise<GitHubStatus> {
+  const response = await fetch("/api/orchestration/github/connect-token", change("POST", { token }));
+  return (await check(response)).json();
+}
+
+export async function configureGitHubOAuthApp(clientId: string, clientSecret: string): Promise<{ ok: boolean; client_id: string }> {
+  const response = await fetch("/api/orchestration/github/configure-app", change("POST", { client_id: clientId, client_secret: clientSecret }));
+  return (await check(response)).json();
+}
+
+export async function githubOAuthCallback(code: string, redirectUri: string): Promise<GitHubStatus> {
+  const query = `?code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+  const response = await fetch(`/api/orchestration/github/callback${query}`, { cache: "no-store" });
+  return (await check(response)).json();
+}
+
+export async function disconnectGitHub(): Promise<{ ok: boolean }> {
+  const response = await fetch("/api/orchestration/github/disconnect", change("POST", {}));
+  return (await check(response)).json();
+}
+
+export async function listGitHubRepositories(): Promise<GitHubRepo[]> {
+  const response = await fetch("/api/orchestration/github/repos", { cache: "no-store" });
+  const data = await (await check(response)).json();
+  return data.repos || [];
+}
+
+export async function createGitHubRepository(params: {
+  name: string;
+  description?: string;
+  private?: boolean;
+  project_id?: string;
+  terminal_id?: string;
+}): Promise<any> {
+  const response = await fetch("/api/orchestration/github/create-repo", change("POST", params));
+  return (await check(response)).json();
+}
+
+export async function createGitHubPullRequest(params: {
+  owner?: string;
+  repo: string;
+  title: string;
+  body?: string;
+  head_branch: string;
+  base_branch?: string;
+}): Promise<any> {
+  const response = await fetch("/api/orchestration/github/create-pr", change("POST", params));
+  return (await check(response)).json();
+}
+
+export async function getGitHubTerminalSetup(): Promise<{
+  ok: boolean;
+  is_authenticated: boolean;
+  setup_command: string;
+  username?: string;
+  email?: string;
+}> {
+  const response = await fetch("/api/orchestration/github/terminal-setup", { cache: "no-store" });
+  return (await check(response)).json();
+}
+
+// ------------------------------------------------------------- Cloud Deploy & Migration
+export interface CloudDeployParams {
+  host: string;
+  port?: number;
+  user?: string;
+  password?: string;
+  private_key?: string;
+  repo_url?: string;
+  branch?: string;
+  admin_email: string;
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_user?: string;
+  smtp_password?: string;
+  simulation_mode?: boolean;
+}
+
+export interface CloudDeployStepInfo {
+  step: number;
+  name: string;
+  status: "pending" | "running" | "completed" | "failed";
+  details: string;
+  updated_at: string;
+}
+
+export interface CloudDeployTask {
+  task_id: string;
+  host: string;
+  port: number;
+  user: string;
+  repo_url: string;
+  branch: string;
+  admin_email: string;
+  simulation_mode: boolean;
+  status: "pending" | "running" | "completed" | "failed";
+  current_step: number;
+  steps_summary: Record<number, CloudDeployStepInfo>;
+  progress_pct: number;
+  logs: string[];
+  result_url: string;
+  error?: string | null;
+  verification_code?: string | null;
+  generated_secrets?: {
+    app_secret?: string | null;
+    admin_email: string;
+  };
+  created_at: string;
+  finished_at?: string | null;
+}
+
+export async function startCloudDeploy(params: CloudDeployParams): Promise<{ ok: boolean; task_id: string }> {
+  const response = await fetch("/api/orchestration/cloud-deploy/start", change("POST", params));
+  return (await check(response)).json();
+}
+
+export async function getCloudDeployStatus(taskId: string): Promise<{ ok: boolean; task: CloudDeployTask }> {
+  const response = await fetch(`/api/orchestration/cloud-deploy/status/${taskId}`, { cache: "no-store" });
+  return (await check(response)).json();
+}
+
+// ---------------------------------------------------------------------- Encrypted Cloud Vault
+export interface VaultOverview {
+  ok: boolean;
+  user_id?: string;
+  encryption: string;
+  configured_services: string[];
+  github_configured: boolean;
+  github_masked?: string | null;
+  github_username?: string | null;
+  github_repos?: string[];
+  telegram_configured: boolean;
+  telegram_bot_token_masked?: string | null;
+  telegram_chat_id?: string | null;
+  telegram_enabled: boolean;
+  has_ai_agent_keys: boolean;
+  notification_settings: Record<string, any>;
+  updated_at?: string | null;
+  error?: string;
+}
+
+export interface VaultData {
+  ok: boolean;
+  user_id?: string;
+  encryption?: string;
+  secrets: {
+    github_token?: string;
+    github_username?: string;
+    github_repos?: string[];
+    telegram_bot_token?: string;
+    telegram_chat_id?: string;
+    telegram_enabled?: boolean;
+    notification_settings?: Record<string, any>;
+    ai_agent_keys?: Record<string, any>;
+    [key: string]: any;
+  };
+  error?: string;
+}
+
+export async function getVaultOverview(): Promise<VaultOverview> {
+  const response = await fetch("/api/orchestration/vault/overview", {
+    cache: "no-store",
+    headers: { "x-tterm": "1" },
+  });
+  return response.json();
+}
+
+export async function getVaultData(): Promise<VaultData> {
+  const response = await fetch("/api/orchestration/vault/data", {
+    cache: "no-store",
+    headers: { "x-tterm": "1" },
+  });
+  return response.json();
+}
+
+export async function saveVaultSecrets(secrets: Record<string, any>, merge = true): Promise<{
+  ok: boolean;
+  user_id?: string;
+  encryption?: string;
+  status?: string;
+  error?: string;
+}> {
+  const response = await fetch("/api/orchestration/vault/save", change("POST", {
+    secrets,
+    merge,
+  }));
+  return response.json();
+}
+
+// ------------------------------------------------ Telegram Push Notification Bot
+export interface TelegramConfigStatus {
+  ok: boolean;
+  configured: boolean;
+  enabled: boolean;
+  chat_id: string;
+  masked_token: string;
+  user_id?: string;
+  error?: string;
+}
+
+export async function getTelegramConfig(): Promise<TelegramConfigStatus> {
+  const response = await fetch("/api/orchestration/notifications/telegram-config", {
+    cache: "no-store",
+    headers: { "x-tterm": "1" },
+  });
+  return response.json();
+}
+
+export async function saveTelegramConfig(params: {
+  bot_token?: string;
+  chat_id?: string;
+  enabled?: boolean;
+}): Promise<TelegramConfigStatus> {
+  const response = await fetch(
+    "/api/orchestration/notifications/telegram-config",
+    change("POST", params)
+  );
+  return response.json();
+}
+
+export async function deleteTelegramConfig(): Promise<{ ok: boolean; configured: boolean }> {
+  const response = await fetch(
+    "/api/orchestration/notifications/telegram-config",
+    change("DELETE", {})
+  );
+  return response.json();
+}
+
+export async function testTelegramNotification(params: {
+  bot_token?: string;
+  chat_id?: string;
+}): Promise<{ ok: boolean; delivered: boolean; message?: string; error?: string }> {
+  const response = await fetch(
+    "/api/orchestration/notifications/telegram-test",
+    change("POST", params)
+  );
+  return response.json();
+}
+
+
+
+
+
+

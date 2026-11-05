@@ -179,7 +179,8 @@ class Core:
                                self.vault, secret=secret, mailer=self.mailer,
                                legal={"terms": s.terms_url,
                                       "privacy": s.privacy_url,
-                                      "support": s.support_email})
+                                      "support": s.support_email},
+                               signer=self.signer)
         connect = create_connect_app(self.pool, self.signer, s.connect_url,
                                      self.agents)
         for app, sock, limits in ((page, self._sockets[0], {}),

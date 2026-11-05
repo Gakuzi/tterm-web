@@ -9,10 +9,12 @@
 // its button has the lock (the keys first, then the terminal) and its
 // terminals are dimmed, each with a lock, as in the sidebar.
 
+import { useState } from "react";
 import type { Machine, Passport, Project, Role, TerminalInfo } from "./api";
 import { colorClass } from "./colors";
 import { useT, type Translate } from "./i18n";
-import { Computer, Lock, Plus, Server, TerminalIcon, Trash } from "./icons";
+import { Computer, Gear, Lock, Plus, Server, TerminalIcon, Trash } from "./icons";
+import { MachineSettingsModal } from "./MachineSettingsModal";
 import { lastSeen } from "./time";
 
 interface Props {
@@ -21,9 +23,10 @@ interface Props {
   /** A machine closed on this device (0.1.28, keysHere.ts). */
   closed: (machine: Machine) => boolean;
   onAdd: (projectId: string) => void;
-  onOpenTerminal: (machineId: string) => void;
+  onOpenTerminal: (machineId: string, projectId?: string) => void;
   onGoTo: (terminalId: string) => void;
   onRemove: (machine: Machine) => void;
+  onRefresh?: () => void;
   /** The app before signing in: this computer only. */
   local?: boolean;
 }
@@ -76,17 +79,19 @@ function facts(p: Passport, t: Translate): [string, string][] {
   return rows.filter((row): row is [string, string] => row[1] !== null);
 }
 
-function MachineCard({ machine, code, terminals, manage, shut, onOpenTerminal, onGoTo,
-  onRemove }: {
+function MachineCard({ machine, code, projectId, terminals, manage, shut, onOpenTerminal, onGoTo,
+  onRemove, onSettings }: {
   machine: Machine;
   code: string;
+  projectId?: string;
   terminals: TerminalInfo[];
   manage: boolean;
   /** Closed on this device (0.1.28). */
   shut: boolean;
-  onOpenTerminal: (machineId: string) => void;
+  onOpenTerminal: (machineId: string, projectId?: string) => void;
   onGoTo: (terminalId: string) => void;
   onRemove: (machine: Machine) => void;
+  onSettings?: (machine: Machine) => void;
 }) {
   const t = useT();
   const passport = machine.passport ?? {};
@@ -96,12 +101,33 @@ function MachineCard({ machine, code, terminals, manage, shut, onOpenTerminal, o
     : t("sidebar.keys_closed_new", { name: machine.name });
   return (
     <article className="machine-card" aria-label={machine.name}>
-      <div className="machine-top">
+      <div
+        className="machine-top"
+        onClick={() => onSettings?.(machine)}
+        style={{ cursor: "pointer" }}
+        // i18n-ignore
+        title="Нажмите для открытия настроек машины и привязки к проектам"
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onSettings?.(machine);
+          }
+        }}
+      >
         <span className="tile" aria-hidden="true">
           {computer ? <Computer size={20} /> : <Server size={20} />}
         </span>
         <div className="machine-names">
-          <strong>{machine.name}</strong>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <strong>{machine.name}</strong>
+            {machine.shared && (
+              <span style={{ fontSize: 11, background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", padding: "1px 6px", borderRadius: 4 }}>
+                Общая {/* i18n-ignore */}
+              </span>
+            )}
+          </div>
           <span>
             {computer && (
               <span className="machine-state">
@@ -139,9 +165,17 @@ function MachineCard({ machine, code, terminals, manage, shut, onOpenTerminal, o
       <div className="button-row">
         <button type="button" className="button-accent" disabled={offline}
           title={offline ? t("machines.offline_title") : shut ? lockTitle : undefined}
-          onClick={() => onOpenTerminal(machine.id)}>
+          onClick={() => onOpenTerminal(machine.id, projectId)}>
           {shut && <Lock size={14} />}
           {t("machines.open_terminal")}
+        </button>
+        <button type="button" className="button-plain quiet"
+          // i18n-ignore
+          title="Настройки машины и привязка к проектам"
+          onClick={() => onSettings?.(machine)}>
+          <Gear size={14} />
+          {/* i18n-ignore */}
+          Настройки
         </button>
         {terminals.map((term) => (shut ? (
           // Its card in its tab: the keys, then the terminal from where it is.
@@ -174,7 +208,8 @@ function MachineCard({ machine, code, terminals, manage, shut, onOpenTerminal, o
 }
 
 export function Machines(props: Props) {
-  const { projects, terminals, closed, onAdd, onOpenTerminal, onGoTo, onRemove, local } = props;
+  const { projects, terminals, closed, onAdd, onOpenTerminal, onGoTo, onRemove, onRefresh, local } = props;
+  const [settingsTarget, setSettingsTarget] = useState<{ machine: Machine; project: Project } | null>(null);
   const t = useT();
   const withMachines = projects.filter((p) => p.machines.length > 0);
   const first = projects.find((p) => p.role === "owner") ?? projects[0];
@@ -203,14 +238,24 @@ export function Machines(props: Props) {
           <div className="machine-list">
             {project.machines.map((machine) => (
               <MachineCard key={machine.id} machine={machine}
-                code={project.code} onOpenTerminal={onOpenTerminal}
+                code={project.code} projectId={project.id} onOpenTerminal={onOpenTerminal}
                 onGoTo={onGoTo} onRemove={onRemove} shut={closed(machine)}
                 manage={canManage(project.role) && !local}
-                terminals={terminals.filter((term) => term.machineId === machine.id)} />
+                onSettings={(m) => setSettingsTarget({ machine: m, project })}
+                terminals={terminals.filter((term) => term.machineId === machine.id && (!term.projectId || term.projectId === project.id))} />
             ))}
           </div>
         </section>
       ))}
+
+      <MachineSettingsModal
+        machine={settingsTarget?.machine ?? null}
+        currentProject={settingsTarget?.project}
+        allProjects={projects}
+        isOpen={settingsTarget !== null}
+        onClose={() => setSettingsTarget(null)}
+        onRefresh={onRefresh}
+      />
     </main>
   );
 }

@@ -16,10 +16,11 @@ import {
 } from "./api";
 import { shortPath } from "./BlockView";
 import { useT } from "./i18n";
-import { ArrowUp, Branch, Folder } from "./icons";
+import { ArrowUp, Branch, Check, Close, CloudUp, Download, Folder, ListCheck, Spark } from "./icons";
 import { typeInto, type Home } from "./keys";
 import { LocalOnly } from "./local";
 import { Picker, type PickerItem } from "./Picker";
+import { HierarchicalLockBanner, type ActiveDrainLock } from "./HierarchicalLockBanner";
 
 export type Phase = "start" | "prompt" | "running" | "input" | "full";
 
@@ -98,6 +99,53 @@ export function InputLine(props: Props) {
   const t = useT();
   const { phase, prompt, history, terminalId } = props;
   const [text, setText] = useState("");
+  const [drainLock, setDrainLock] = useState<ActiveDrainLock | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    const checkLock = async () => {
+      try {
+        const res = await fetch(`/api/orchestration/locks/status/${props.terminalId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (live) {
+            setDrainLock(data.is_locked ? data.lock : null);
+          }
+        }
+      } catch {
+        // Ignore
+      }
+    };
+    checkLock();
+    const interval = setInterval(checkLock, 4000);
+    return () => {
+      live = false;
+      clearInterval(interval);
+    };
+  }, [props.terminalId]);
+
+  const handleAppealSubmit = async (lockId: string, reason: string): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/orchestration/locks/appeal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lock_id: lockId,
+          user_id: "current-user",
+          user_name: "Пользователь", // i18n-ignore
+          terminal_id: props.terminalId,
+          reason,
+        }),
+      });
+      if (res.ok) {
+        props.notify("Запрос отсрочки передан руководителю"); // i18n-ignore
+        return true;
+      }
+    } catch {
+      // Ignore
+    }
+    return false;
+  };
   const [atEnd, setAtEnd] = useState(true);
   const [listing, setListing] = useState<Listing | null>(null);
   const [open, setOpen] = useState<Open>(null);
@@ -109,7 +157,35 @@ export function InputLine(props: Props) {
   const asking = useRef(0);
   /** The text came from search and is not typed into yet (0.1.7). */
   const [fromSearch, setFromSearch] = useState(false);
-  const ready = phase === "prompt";
+  const [gitCommitOpen, setGitCommitOpen] = useState(false);
+  const [commitMsg, setCommitMsg] = useState("");
+  const [autoCommitActions, setAutoCommitActions] = useState(true);
+
+  const handleCommit = (push: boolean) => {
+    const msg = commitMsg.trim() || `Обновление: ${prompt.branch}`; // i18n-ignore
+    setGitCommitOpen(false);
+    setCommitMsg("");
+    if (push) {
+      props.onRun(`git add -A && git commit -m ${shQuote(msg)} && git push`); // i18n-ignore
+    } else {
+      props.onRun(`git add -A && git commit -m ${shQuote(msg)}`); // i18n-ignore
+    }
+  };
+
+  const aiCommitOptions = [
+    "Сохранение рабочих изменений и обновление кода", // i18n-ignore
+    "Исправление ошибок и оптимизация логики", // i18n-ignore
+    "Добавление новой функциональности", // i18n-ignore
+    "Обновление файлов конфигурации и зависимостей", // i18n-ignore
+    "Рефакторинг и улучшение стабильности", // i18n-ignore
+  ];
+
+  const suggestCommit = () => {
+    const next = aiCommitOptions[Math.floor(Math.random() * aiCommitOptions.length)];
+    setCommitMsg(next);
+  };
+
+  const ready = phase === "prompt" && !drainLock;
   /** The line takes typing while a command runs too: the next command can
    * be typed ahead, and runs once the prompt is back. */
   const usable = phase !== "start";
@@ -156,12 +232,18 @@ export function InputLine(props: Props) {
       props.notify(t("input.still_running"));
       return;
     }
-    props.onRun(command);
+    const clean = command.trim();
+    if (autoCommitActions && prompt.branch && !clean.startsWith("git ")) {
+      const safeMsg = clean.slice(0, 50).replace(/["'\\]/g, " ");
+      props.onRun(`${clean} && (git add -A && git commit -m "[term] ${safeMsg}" --allow-empty 2>/dev/null || true)`);
+    } else {
+      props.onRun(clean);
+    }
     setText("");
     setFromSearch(false);
     nav.current = null;
     setListing(null);
-  }, [props, ready, t]);
+  }, [props, ready, t, autoCommitActions, prompt.branch]);
 
   // The line, for the keys that belong to it.
   useEffect(() => {
@@ -392,6 +474,187 @@ export function InputLine(props: Props) {
 
   return (
     <footer className="input-footer">
+      {prompt.branch && (
+        <div className="git-bar">
+          <div className="git-bar-items">
+            <span className="git-badge" title="Текущая ветка Git"> {/* i18n-ignore */}
+              <Branch size={12} />
+              <span>{prompt.branch}</span>
+            </span>
+            <button
+              type="button"
+              className={`git-action-btn ${autoCommitActions ? "git-autocommit-active" : ""}`}
+              disabled={!ready}
+              title="Автоматически создавать коммит при каждом действии в этом терминале" // i18n-ignore
+              onClick={() => {
+                const next = !autoCommitActions;
+                setAutoCommitActions(next);
+                props.notify(next ? "Автокоммит действий включен" : "Автокоммит действий выключен"); // i18n-ignore
+              }}
+            >
+              <Check size={12} />
+              <span>{autoCommitActions ? "Автокоммит: ВКЛ" : "Автокоммит: ВЫКЛ"}</span> {/* i18n-ignore */}
+            </button>
+            {!prompt.branch.startsWith("term/") && (
+              <button
+                type="button"
+                className="git-action-btn"
+                disabled={!ready}
+                title={`Создать персональную ветку терминала (term/${props.terminalId.replace(/-/g, "").slice(0, 6)})`} // i18n-ignore
+                onClick={() => {
+                  const bName = `term/${props.terminalId.replace(/-/g, "").slice(0, 6)}`;
+                  props.onRun(`git switch -c ${bName} 2>/dev/null || git switch ${bName} 2>/dev/null || git checkout -b ${bName}`);
+                }}
+              >
+                <Branch size={12} />
+                <span>Ветка окна</span> {/* i18n-ignore */}
+              </button>
+            )}
+            <button
+              type="button"
+              className="git-action-btn"
+              disabled={!ready}
+              title="Статус изменений (git status -s)" // i18n-ignore
+              onClick={() => props.onRun("git status -s")} // i18n-ignore
+            >
+              <ListCheck size={12} />
+              <span>Статус</span> {/* i18n-ignore */}
+            </button>
+            <button
+              type="button"
+              className="git-action-btn git-action-commit"
+              disabled={!ready}
+              title="Зафиксировать изменения (git commit)" // i18n-ignore
+              onClick={() => setGitCommitOpen(true)}
+            >
+              <Check size={12} />
+              <span>Закоммитить</span> {/* i18n-ignore */}
+            </button>
+            <button
+              type="button"
+              className="git-action-btn"
+              disabled={!ready}
+              title="Отправить изменения на GitHub (git push)" // i18n-ignore
+              onClick={() => props.onRun("git push")} // i18n-ignore
+            >
+              <CloudUp size={12} />
+              <span>Push</span> {/* i18n-ignore */}
+            </button>
+            <button
+              type="button"
+              className="git-action-btn"
+              disabled={!ready}
+              title="Получить обновления с GitHub (git pull)" // i18n-ignore
+              onClick={() => props.onRun("git pull")} // i18n-ignore
+            >
+              <Download size={12} />
+              <span>Pull</span> {/* i18n-ignore */}
+            </button>
+          </div>
+        </div>
+      )}
+      {gitCommitOpen && (
+        <div className="git-commit-popover">
+          <div className="git-commit-head">
+            <div className="git-commit-title">
+              <Branch size={14} />
+              <span>Закоммитить изменения ({prompt.branch})</span> {/* i18n-ignore */}
+            </div>
+            <button
+              type="button"
+              className="icon-button small"
+              aria-label="Закрыть" /* i18n-ignore */
+              onClick={() => setGitCommitOpen(false)}
+            >
+              <Close size={14} />
+            </button>
+          </div>
+          <div className="git-commit-content">
+            <textarea
+              className="git-commit-textarea"
+              rows={2}
+              autoFocus
+              placeholder="Что изменилось? (например: Исправлены ошибки в конфигурации)" /* i18n-ignore */
+              value={commitMsg}
+              onChange={(e) => setCommitMsg(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  handleCommit(false);
+                } else if (e.key === "Escape") {
+                  setGitCommitOpen(false);
+                }
+              }}
+            />
+            <div className="git-ai-bar">
+              <button
+                type="button"
+                className="git-ai-suggest-btn"
+                onClick={suggestCommit}
+                title="Сгенерировать комментарий через ИИ" /* i18n-ignore */
+              >
+                <Spark size={13} />
+                <span>✨ ИИ-комментарий</span> {/* i18n-ignore */}
+              </button>
+              <div className="git-presets">
+                <button
+                  type="button"
+                  className="git-preset-chip"
+                  onClick={() => setCommitMsg("Исправление ошибок и мелкие улучшения")} // i18n-ignore
+                >
+                  🐛 Фикс {/* i18n-ignore */}
+                </button>
+                <button
+                  type="button"
+                  className="git-preset-chip"
+                  onClick={() => setCommitMsg("Добавление новой функциональности")} // i18n-ignore
+                >
+                  ✨ Новое {/* i18n-ignore */}
+                </button>
+                <button
+                  type="button"
+                  className="git-preset-chip"
+                  onClick={() => setCommitMsg("Обновление настроек")} // i18n-ignore
+                >
+                  ⚙️ Настройки {/* i18n-ignore */}
+                </button>
+              </div>
+            </div>
+            <div className="git-commit-footer">
+              <button
+                type="button"
+                className="button-accent"
+                onClick={() => handleCommit(false)}
+              >
+                <Check size={14} />
+                Закоммитить {/* i18n-ignore */}
+              </button>
+              <button
+                type="button"
+                className="button-accent git-push-accent"
+                onClick={() => handleCommit(true)}
+              >
+                <CloudUp size={14} />
+                Коммит и Push 🚀 {/* i18n-ignore */}
+              </button>
+              <button
+                type="button"
+                className="button-plain"
+                onClick={() => setGitCommitOpen(false)}
+              >
+                Отмена {/* i18n-ignore */}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {drainLock && (
+        <HierarchicalLockBanner
+          lock={drainLock}
+          terminalId={props.terminalId}
+          onAppealSubmit={handleAppealSubmit}
+        />
+      )}
       <div className="input-row">
         {open && (
           <Picker

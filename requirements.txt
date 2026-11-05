@@ -10,6 +10,7 @@ websockets>=17
 asyncpg>=0.32
 # SSH to servers: connecting them (0.0.3) and their terminals (0.0.4).
 asyncssh>=2.24,<3
+python-multipart>=0.0.9
 
 # cryptography 49+ dropped wheels for Intel Macs, where pip would build it
 # from source and fail without Rust. 48.0.1 is the last that installs there.

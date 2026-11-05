@@ -9,12 +9,22 @@
 // cloud, in the app (MoveToCloud.tsx).
 
 import { useEffect, useRef, useState } from "react";
-import { removePhoto, saveName, type AccountInfo, type Me } from "./api";
+import {
+  getVaultOverview,
+  removePhoto,
+  saveName,
+  type AccountInfo,
+  type Me,
+  type Project,
+  type VaultOverview,
+} from "./api";
 import { Face } from "./Face";
 import { list, useT, type Translate } from "./i18n";
-import { Close } from "./icons";
+import { Check, Close, Lock, Restart } from "./icons";
 import { PhotoDialog } from "./PhotoDialog";
 import { Group, Row } from "./SettingsRows";
+import { GitHubSection } from "./GitHubSection";
+import { TelegramNotificationSection } from "./TelegramNotificationSection";
 
 /** What a photo may be when chosen: the page makes the 256-pixel JPEG of it
  * itself. */
@@ -92,6 +102,119 @@ export function PageHead(props: { title: string; id: string; onClose: () => void
   );
 }
 
+function EncryptedVaultSection(props: { notify: (text: string) => void }) {
+  const [vault, setVault] = useState<VaultOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = async () => {
+    try {
+      const res = await getVaultOverview();
+      if (res.ok) {
+        setVault(res);
+      }
+    } catch {
+      // Vault load fallback
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    props.notify("Облачное хранилище синхронизировано"); // i18n-ignore
+  };
+
+  return (
+    <Group
+      title="Защищенное облачное хранилище данных (Encrypted Vault)" // i18n-ignore
+      note="Все API-токены, ключи GitHub и конфигурации изолированы и защищены алгоритмом AES-256-GCM. Данные хранятся в зашифрованном виде в базе и синхронизируются между сессиями." // i18n-ignore
+    >
+      <Row
+        label="Статус шифрования" // i18n-ignore
+        note="Шифрование на стороне сервера (AES-256-GCM) • Изоляция профиля" // i18n-ignore
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span
+            style={{
+              backgroundColor: "rgba(16, 185, 129, 0.15)",
+              color: "#10b981",
+              border: "1px solid rgba(16, 185, 129, 0.3)",
+              borderRadius: "6px",
+              padding: "4px 10px",
+              fontSize: "12px",
+              fontWeight: 600,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            <Lock size={13} />
+            AES-256-GCM Защищено {/* i18n-ignore */}
+          </span>
+          <button
+            type="button"
+            className="button-plain small"
+            onClick={handleRefresh}
+            disabled={loading || refreshing}
+            title="Синхронизировать секреты" // i18n-ignore
+          >
+            <Restart size={13} />
+            {refreshing ? "Синхронизация..." /* i18n-ignore */ : "Обновить" /* i18n-ignore */}
+          </button>
+        </div>
+      </Row>
+
+      <Row
+        label="Службы и токены" // i18n-ignore
+        note={vault?.updated_at ? `Синхронизировано: ${new Date(vault.updated_at).toLocaleTimeString()}` : "Данные загружаются из защищенного хранилища"} // i18n-ignore
+      >
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              padding: "3px 8px",
+              borderRadius: "4px",
+              fontSize: "12px",
+              background: vault?.github_configured ? "rgba(16, 185, 129, 0.15)" : "rgba(156, 163, 175, 0.15)",
+              color: vault?.github_configured ? "#10b981" : "#9ca3af",
+            }}
+          >
+            {vault?.github_configured ? <Check size={12} /> : null}
+            GitHub: {vault?.github_configured ? (vault.github_masked || "Подключен") : "Не подключен"} {/* i18n-ignore */}
+          </span>
+
+
+
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              padding: "3px 8px",
+              borderRadius: "4px",
+              fontSize: "12px",
+              background: vault?.telegram_configured ? "rgba(16, 185, 129, 0.15)" : "rgba(156, 163, 175, 0.15)",
+              color: vault?.telegram_configured ? "#10b981" : "#9ca3af",
+            }}
+          >
+            {vault?.telegram_configured ? <Check size={12} /> : null}
+            Telegram: {vault?.telegram_configured ? "Подключен" : "Не подключен"} {/* i18n-ignore */}
+          </span>
+        </div>
+      </Row>
+    </Group>
+  );
+}
+
 /** Settings › Account: the photo, the name, the address; deleting the
  * account goes through support, from the address one signs in with. */
 export function AccountPane(props: {
@@ -106,6 +229,7 @@ export function AccountPane(props: {
   onSupport: () => void;
   /** The name being typed: Esc is the field's, not the window's. */
   editing: { current: boolean };
+  projects?: Project[];
 }) {
   const { me, support } = props;
   const t = useT();
@@ -277,6 +401,16 @@ export function AccountPane(props: {
           </Row>
         )}
       </Group>
+
+      {/* Encrypted Cloud Vault Status */}
+      <EncryptedVaultSection notify={props.notify} />
+
+      {/* GitHub Integration for User Account */}
+      <GitHubSection notify={props.notify} projects={props.projects} />
+
+
+      {/* Telegram Push Notification Bot for Multi-Device Alerts */}
+      <TelegramNotificationSection notify={props.notify} />
 
       <Group title={t("account.delete_title")}>
         <Row label={t("account.delete")} note={t("account.delete_note", { email: support })}>

@@ -33,6 +33,7 @@ from ..core.terminals import (KeysClosed, NotAllowed, NotOpen, Terminal,
 from .connect import client_ip
 from .security import PAGE_HEADERS, AddHeaders, PageGuard, page_csp
 from .ws import SIGNED_OUT_CLOSE, PageSocket, page_json
+from ..orchestration.api import router as orchestration_router
 
 NO_STORE = {"cache-control": "no-store"}
 #: Stage 1 builds the page with stable file names, so the browser must ask
@@ -144,6 +145,7 @@ class TerminalRequest(BaseModel):
     #: ended starts where it was. One the shell cannot be told is ignored
     #: (shell.start_in); the limit is only one for the size of the request.
     cwd: str = Field("", max_length=65536)
+    projectId: uuid.UUID | None = None
 
 
 class SupportBody(BaseModel):
@@ -196,7 +198,8 @@ class MoveBody(BaseModel):
 
 
 class TerminalPatch(BaseModel):
-    name: str
+    name: str | None = None
+    projectId: uuid.UUID | None = None
 
 
 #: A line the input line may ask Tab about, at most.
@@ -222,6 +225,10 @@ class ReachableBody(BaseModel):
 class OwnLineBody(BaseModel):
     project: uuid.UUID
     name: str = ""
+
+
+class MachinePatch(BaseModel):
+    name: str
 
 
 class LogNoteBody(BaseModel):
@@ -301,7 +308,7 @@ def _moment(ms: int | None) -> dt.datetime | None:
 def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
                     connect_url: str, terminals: Terminals | None = None,
                     agents=None, relay=None, *, secret: bytes, mailer: Mailer,
-                    legal: dict[str, str] | None = None):
+                    legal: dict[str, str] | None = None, signer=None):
     """The ASGI app for the page, wrapped in the page's guard. `legal` has
     the addresses the sign-in screens link to: the Terms of Service, the
     Privacy Policy, and support's email."""
@@ -456,6 +463,13 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         return machine
     app = FastAPI(title="tTerm Web", version=__version__, docs_url=None,
                   redoc_url=None, openapi_url=None)
+    app.state.pool = pool
+    app.state.terminals = terminals
+    app.state.agents = agents
+    app.state.signer = signer
+    app.include_router(orchestration_router)
+    from tterm.orchestration.telegram_auth import router as telegram_auth_router
+    app.include_router(telegram_auth_router)
     dist = dist.resolve()
 
     @app.exception_handler(SignedOut)
@@ -789,6 +803,58 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         return _json({"ok": True, "service": "tterm-web page",
                       "version": __version__})
 
+    @app.get("/install.sh")
+    @app.get("/install_computer.sh")
+    async def page_universal_installer(request: Request) -> Response:
+        """Universal onboarding script for connecting computers (macOS, Linux)."""
+        token = await machines.get_or_create_quick_computer_token(pool)
+        host = request.headers.get("host", "localhost:8290").split(":")[0]
+        script = machines.render_universal_installer(
+            token=token,
+            connect_url=connect_url,
+            web_url=f"http://{host}:8290",
+        )
+        return PlainTextResponse(script, headers={"content-type": "text/x-shellscript; charset=utf-8", "cache-control": "no-store"})
+
+    @app.get("/install.ps1")
+    @app.get("/install_computer.ps1")
+    async def page_quick_installer_ps1(request: Request) -> Response:
+        """Universal PowerShell onboarding script for connecting Windows computers."""
+        token = await machines.get_or_create_quick_computer_token(pool)
+        script = machines.render_computer_installer_ps1(token=token, connect_url=connect_url)
+        return PlainTextResponse(script, headers={"content-type": "text/plain; charset=utf-8",
+                                                  "cache-control": "no-store"})
+
+    @app.get("/install.bat")
+    @app.get("/install_windows.bat")
+    async def page_quick_installer_bat(request: Request) -> Response:
+        """Universal Batch installer for connecting Windows computers in 1 click."""
+        token = await machines.get_or_create_quick_computer_token(pool)
+        content = machines.render_computer_installer_bat(token=token, connect_url=connect_url)
+        return PlainTextResponse(content, headers={"content-type": "text/plain; charset=utf-8",
+                                                   "cache-control": "no-store",
+                                                   "content-disposition": "attachment; filename=tterm-setup.bat"})
+
+    @app.get("/quick_token")
+    async def page_quick_token() -> Response:
+        """Returns a valid 24-hour token for seamless 1-click agent onboarding."""
+        token = await machines.get_or_create_quick_computer_token(pool)
+        return JSONResponse({"ok": True, "token": token})
+
+    @app.get("/tterm-agent.exe")
+    @app.get("/install_windows.exe")
+    async def page_download_agent_exe() -> Response:
+        """Native Windows Agent executable for 1-click install and background operation."""
+        exe_path = Path(__file__).resolve().parent.parent / "templates" / "tterm-agent.exe"
+        if exe_path.is_file():
+            return FileResponse(
+                exe_path,
+                media_type="application/vnd.microsoft.portable-executable",
+                filename="tterm-agent.exe",
+                headers={"cache-control": "no-store"}
+            )
+        return PlainTextResponse("Agent binary not found", status_code=404)
+
     # ------------------------------------------------- within a session
 
     @app.get("/api/state")
@@ -801,6 +867,26 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         # their text: the sidebar and the project's page (0.1.0).
         folders = await notes.folders_of(
             pool, [uuid.UUID(p["id"]) for p in listed])
+
+        all_machines = {}
+        for p in listed:
+            for m in p["machines"]:
+                all_machines[m["id"]] = m
+
+        try:
+            from ..orchestration.machines_projects import machine_project_manager
+            for project in listed:
+                p_id = str(project["id"])
+                existing_machine_ids = {m["id"] for m in project["machines"]}
+                delegated_ids = machine_project_manager.get_machines_for_project(p_id)
+                for d_id in delegated_ids:
+                    if d_id not in existing_machine_ids and d_id in all_machines:
+                        shared_m = dict(all_machines[d_id])
+                        shared_m["shared"] = True
+                        project["machines"].append(shared_m)
+        except Exception as exc:
+            log.debug("could not augment project machines with delegated: %s", exc)
+
         for project in listed:
             project["machines"] = [with_agents(m) for m in project["machines"]]
             project["folders"] = folders.get(project["id"], [])
@@ -958,6 +1044,7 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         except ValueError as exc:
             return _json({"error": str(exc)}, 422)
         return _json({"id": str(install.id), "command": install.command,
+                      "windowsCommand": install.windows_command,
                       "byHand": install.by_hand,
                       "expiresAt": install.expires_at.isoformat(),
                       "minutes": machines.INSTALL_MINUTES}, 201)
@@ -1018,6 +1105,22 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
             pool, terminals.signer if terminals is not None else None,
             removed, who))
 
+    @app.patch("/api/machines/{machine_id}")
+    async def rename_machine(machine_id: uuid.UUID, body: MachinePatch,
+                             session: auth.Session = Depends(signed_in)) -> Response:
+        """Gives the machine a new name within its project."""
+        if (closed := await closed_machine(machine_id, session)) is not None:
+            return closed
+        try:
+            updated = await machines.rename(pool, session.person.id, machine_id, body.name)
+        except PermissionError as exc:
+            return _json({"error": str(exc)}, 403)
+        except ValueError as exc:
+            return _json({"error": str(exc)}, 400)
+        if updated is None:
+            return _json({"error": "no such machine"}, 404)
+        return _json(updated)
+
     @app.post("/api/machines/{machine_id}/move")
     async def move_machine(machine_id: uuid.UUID, body: MoveBody,
                            session: auth.Session = Depends(signed_in)) -> Response:
@@ -1071,7 +1174,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
             terminal = await terminals.open(session.person, request.machineId,
                                             request.cols, request.rows,
                                             request.cwd, session_id=session.id,
-                                            closed=await closed_to(session))
+                                            closed=await closed_to(session),
+                                            project_id=request.projectId)
         except NotAllowed as exc:
             return _json({"error": str(exc)}, 404)
         except KeysClosed as exc:
@@ -1111,8 +1215,24 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         if (closed := await closed_terminal(terminal_id, session)) is not None:
             return closed
         try:
-            terminal = await terminals.rename(terminal_id, session.person.id,
-                                              body.name)
+            if body.name is not None:
+                terminal = await terminals.rename(terminal_id, session.person.id,
+                                                  body.name)
+            else:
+                terminal = terminals.get(terminal_id, session.person.id)
+                if terminal is None:
+                    return _json({"error": "no such terminal"}, 404)
+            if body.projectId is not None:
+                terminal.project_id = body.projectId
+                try:
+                    from ..orchestration.machines_projects import machine_project_manager
+                    machine_project_manager.set_terminal_project(
+                        terminal_id=str(terminal.id),
+                        project_id=str(terminal.project_id),
+                        machine_id=str(terminal.machine.id),
+                    )
+                except Exception as exc:
+                    log.debug("machine_project_manager.set_terminal_project failed: %s", exc)
         except LookupError:
             return _json({"error": "no such terminal"}, 404)
         except NotOpen as exc:
@@ -1136,6 +1256,56 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
             return _json({"error": "no such terminal"}, 404)
         await terminal.close()
         return _json(terminal.describe())
+
+    @app.get("/api/terminals/{terminal_id}/access")
+    async def terminal_access_get(terminal_id: uuid.UUID,
+                                  session: auth.Session = Depends(signed_in)) -> Response:
+        """Terminal access permissions and RBAC state for AI agents and team."""
+        if terminals is None:
+            return _json({"error": "terminals are not running"}, 503)
+        terminal = terminals.get(terminal_id, session.person.id)
+        if terminal is None:
+            return _json({"error": "no such terminal"}, 404)
+        return _json({
+            "terminalId": str(terminal.id),
+            "machineId": str(terminal.machine.id),
+            "machineName": terminal.machine.name,
+            "label": terminal.label,
+            "aiAccess": getattr(terminal, "ai_access", True),
+            "aiMode": getattr(terminal, "ai_mode", "execute"),
+        })
+
+    @app.patch("/api/terminals/{terminal_id}/access")
+    async def terminal_access_patch(terminal_id: uuid.UUID,
+                                    data: dict,
+                                    session: auth.Session = Depends(signed_in)) -> Response:
+        """Updates AI and team access settings for this terminal."""
+        if terminals is None:
+            return _json({"error": "terminals are not running"}, 503)
+        terminal = terminals.get(terminal_id, session.person.id)
+        if terminal is None:
+            return _json({"error": "no such terminal"}, 404)
+        if "aiAccess" in data:
+            terminal.ai_access = bool(data["aiAccess"])
+        if "aiMode" in data and data["aiMode"] in ("execute", "guard", "readonly"):
+            terminal.ai_mode = str(data["aiMode"])
+        return _json({
+            "terminalId": str(terminal.id),
+            "aiAccess": terminal.ai_access,
+            "aiMode": terminal.ai_mode,
+        })
+
+    @app.post("/api/terminals/{terminal_id}/revoke_ai")
+    async def terminal_revoke_ai(terminal_id: uuid.UUID,
+                                 session: auth.Session = Depends(signed_in)) -> Response:
+        """Immediately revokes AI agent access to this terminal."""
+        if terminals is None:
+            return _json({"error": "terminals are not running"}, 503)
+        terminal = terminals.get(terminal_id, session.person.id)
+        if terminal is None:
+            return _json({"error": "no such terminal"}, 404)
+        terminal.ai_access = False
+        return _json({"ok": True, "revoked": True, "terminalId": str(terminal.id)})
 
     @app.get("/api/terminals/{terminal_id}/blocks")
     async def terminal_blocks(terminal_id: uuid.UUID, before: int | None = None,

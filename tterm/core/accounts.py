@@ -352,7 +352,7 @@ async def projects_of(pool: asyncpg.Pool, user_id: uuid.UUID) -> list[dict]:
         pp = json.loads(m["passport"]) if m["passport"] else {}
         pp["commands_count"] = m["commands"]
         seen = m["last_seen_at"]
-        by_project.setdefault(m["project_id"], []).append({
+        m_dict = {
             "id": str(m["id"]), "kind": m["kind"], "name": m["name"],
             "host": m["host"], "os": pp.get("os"), "passport": pp,
             # When its agent was last connected, for a computer: "last seen
@@ -366,7 +366,45 @@ async def projects_of(pool: asyncpg.Pool, user_id: uuid.UUID) -> list[dict]:
             # The person's own (they added it, or nobody is recorded): its
             # log follows their keys on a device (0.1.28); other members
             # read a log by their role.
-            "mine": bool(m["mine"])})
+            "mine": bool(m["mine"])}
+        by_project.setdefault(m["project_id"], []).append(m_dict)
+
+    # Multi-project mapping: if a machine is bound to multiple projects, surface it in each
+    try:
+        from ..orchestration.machines_projects import machine_project_manager
+        all_user_project_ids = {str(r["id"]) for r in rows}
+        for m in machines:
+            m_id_str = str(m["id"])
+            m_name_lower = m["name"].lower()
+            bound_project_ids = set()
+            for b in machine_project_manager.get_projects_for_machine(m_id_str):
+                bound_project_ids.add(b["project_id"])
+            for b in machine_project_manager.get_projects_for_machine(m_name_lower):
+                bound_project_ids.add(b["project_id"])
+
+            for pid_str in bound_project_ids:
+                if pid_str in all_user_project_ids and pid_str != str(m["project_id"]):
+                    try:
+                        pid_uuid = uuid.UUID(pid_str)
+                    except ValueError:
+                        continue
+                    existing = by_project.setdefault(pid_uuid, [])
+                    if not any(x["id"] == m_id_str for x in existing):
+                        pp_m = json.loads(m["passport"]) if m["passport"] else {}
+                        seen_m = m["last_seen_at"]
+                        bound_dict = {
+                            "id": m_id_str, "kind": m["kind"], "name": m["name"],
+                            "host": m["host"], "os": pp_m.get("os"), "passport": pp_m,
+                            "lastSeen": int(seen_m.timestamp() * 1000) if seen_m else None,
+                            "method": m["login_method"],
+                            "via": ({"id": str(m["via_machine_id"]), "name": m["via_name"]}
+                                    if m["via_machine_id"] is not None else None),
+                            "mine": bool(m["mine"]),
+                            "shared": True,
+                        }
+                        existing.append(bound_dict)
+    except Exception as e:
+        log.debug("Multi-project machine mapping error in projects_of: %s", e)
     return [{
         "id": str(r["id"]),
         "name": r["name"],

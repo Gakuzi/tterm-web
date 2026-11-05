@@ -15,20 +15,24 @@
 // sends that device nothing of what they do).
 
 import { useEffect, useState } from "react";
-import type {
-  Folder, Machine, MachineKind, Me, NoteSummary, Project, TerminalInfo, Who,
+import {
+  bindMachineToProject, unbindMachineFromProject,
+  type Folder, type Machine, type MachineKind, type Me, type NoteSummary, type Project, type TerminalInfo, type Who,
 } from "./api";
 import { shortPath } from "./BlockView";
 import { Face } from "./Face";
 import { colorClass, terminalName } from "./colors";
 import { useT } from "./i18n";
 import {
-  Computer, Doc, Folder as FolderIcon, FolderPlus, ListCheck, Lock, Pencil,
+  Branch, Close, Computer, Doc, Folder as FolderIcon, FolderPlus, Gear, Layers, ListCheck, Lock, Pencil, People,
   Plus, Server, Trash,
 } from "./icons";
 import { FolderMenuItems, MenuButton, NoteMenuItems } from "./Menus";
 import { NameInput } from "./NameInput";
 import { titled } from "./noteText";
+import { ClientInstallerBanner } from "./ClientInstallerBanner";
+import { ProjectCollaboration } from "./ProjectCollaboration";
+import { MachineSettingsModal } from "./MachineSettingsModal";
 import {
   deletesFolder, deletesNote, manages, writes,
 } from "./rights";
@@ -44,6 +48,8 @@ const ROLE_LINE: Record<Project["role"], string> = {
 
 interface Props {
   project: Project;
+  allProjects?: Project[];
+  onRefresh?: () => void;
   me: Me;
   /** The app before signing in: this computer only (0.1.4). */
   local?: boolean;
@@ -53,7 +59,7 @@ interface Props {
   /** A machine closed on this device (0.1.28, keysHere.ts). */
   closed: (machine: Machine) => boolean;
   onAddMachine: (projectId: string, kind?: MachineKind) => void;
-  onOpenTerminal: (machineId: string) => void;
+  onOpenTerminal: (machineId: string, projectId?: string) => void;
   onGoTo: (terminalId: string) => void;
   onRemoveMachine: (machine: Machine) => void;
   /** Moves a machine to another project of one's own: only when there is
@@ -194,6 +200,97 @@ function TerminalRow({ term, me, dot, shut, onGoTo, naming }: {
   );
 }
 
+
+
+function AttachExistingMachineModal(props: {
+  project: Project;
+  availableMachines: Machine[];
+  isOpen: boolean;
+  onClose: () => void;
+  onRefresh?: () => void;
+}) {
+  const { project, availableMachines, isOpen, onClose, onRefresh } = props;
+  const [attachingId, setAttachingId] = useState<string | null>(null);
+
+  if (!isOpen) return null;
+
+  const handleAttach = async (m: Machine) => {
+    setAttachingId(m.id);
+    await bindMachineToProject(m.id, project.id, project.name);
+    setAttachingId(null);
+    onRefresh?.();
+    onClose();
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)",
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, backdropFilter: "blur(2px)"
+    }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
+        background: "var(--color-bg-primary, #18181b)", border: "1px solid var(--color-border, #333)",
+        borderRadius: "12px", padding: "20px 24px", width: "440px", maxWidth: "90vw", boxShadow: "0 10px 25px rgba(0,0,0,0.4)"
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Server size={18} />
+            <strong style={{ fontSize: 16 }}>
+              {/* i18n-ignore */}
+              Подключить существующую машину
+            </strong>
+          </div>
+          <button type="button" className="button-ghost small" onClick={onClose} style={{ padding: "4px 8px" }}>
+            <Close size={16} />
+          </button>
+        </div>
+        <p style={{ fontSize: 13, color: "var(--color-text-secondary, #999)", marginBottom: 14, lineHeight: 1.4 }}>
+          {/* i18n-ignore */}
+          Подключите машину к проекту «{project.name}». Машина появится в списке, а её терминалы в этом проекте будут изолированы.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "240px", overflowY: "auto", marginBottom: 16 }}>
+          {availableMachines.length === 0 ? (
+            <div style={{ padding: "16px", textAlign: "center", color: "var(--color-text-secondary, #888)", fontSize: 13 }}>
+              {/* i18n-ignore */}
+              Все доступные машины уже добавлены в этот проект.
+            </div>
+          ) : (
+            availableMachines.map((m) => (
+              <div key={m.id} style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px",
+                borderRadius: "8px", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.08)"
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {m.kind === "computer" ? <Computer size={16} /> : <Server size={16} />}
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</div>
+                    <div style={{ fontSize: 11, color: "var(--color-text-secondary, #888)" }}>
+                      {[m.os, m.host].filter(Boolean).join(" · ")}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="button-accent small"
+                  disabled={attachingId === m.id}
+                  onClick={() => handleAttach(m)}
+                >
+                  {/* i18n-ignore */}
+                  {attachingId === m.id ? "Подключение..." : "Подключить"}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button type="button" className="button-ghost small" onClick={onClose}>
+            Отмена {/* i18n-ignore */}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MachineCard(props: {
   machine: Machine;
   project: Project;
@@ -202,10 +299,12 @@ function MachineCard(props: {
   dotFor: (terminal: TerminalInfo) => Dot;
   /** Closed on this device (0.1.28). */
   shut: boolean;
-  onOpenTerminal: (machineId: string) => void;
+  onOpenTerminal: (machineId: string, projectId?: string) => void;
   onGoTo: (terminalId: string) => void;
   onRemoveMachine: (machine: Machine) => void;
   onMoveMachine?: (machine: Machine) => void;
+  onManageProjects?: (machine: Machine) => void;
+  onUnbindMachine?: (machine: Machine) => void;
   naming: Naming;
   notYet: (what: string) => void;
   /** The app before signing in: the computer it runs on stays. */
@@ -219,10 +318,29 @@ function MachineCard(props: {
   return (
     <div className="pp-card">
       <div className="pp-card-head">
-        <span className="pp-card-name">
+        <span
+          className="pp-card-name"
+          style={{ cursor: "pointer" }}
+          // i18n-ignore
+          title="Нажмите, чтобы открыть настройки машины и привязку к проектам"
+          onClick={() => props.onManageProjects?.(m)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              props.onManageProjects?.(m);
+            }
+          }}
+        >
           {computer ? <Computer size={16} /> : <Server size={16} />}
           {m.name}
         </span>
+        {m.shared && (
+          <span style={{ fontSize: 11, background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", padding: "2px 6px", borderRadius: 4, fontWeight: 500 }}>
+            Общая {/* i18n-ignore */}
+          </span>
+        )}
         {m.host && <span className="pp-mono">{m.host}</span>}
         {m.os && <span className="pp-dim">{m.os}</span>}
         {computer && (
@@ -233,6 +351,17 @@ function MachineCard(props: {
           </span>
         )}
         <span className="pp-card-actions">
+          <button
+            type="button"
+            className="button-ghost small"
+            // i18n-ignore
+            title="Настройки машины и привязка к проектам"
+            onClick={() => props.onManageProjects?.(m)}
+          >
+            <Gear size={14} />
+            {/* i18n-ignore */}
+            Настройки
+          </button>
           <button type="button" className={shut && !offline ? "button-ghost small closed" : "button-ghost small"}
             title={offline ? t("projectpage.offline_title", { machine: m.name })
               : shut ? (computer ? t("sidebar.keys_closed_mac")
@@ -242,7 +371,7 @@ function MachineCard(props: {
               ? props.notYet(seen
                 ? t("projectpage.offline_wait_seen", { machine: m.name, seen })
                 : t("projectpage.offline_wait", { machine: m.name }))
-              : props.onOpenTerminal(m.id))}>
+              : props.onOpenTerminal(m.id, props.project.id))}>
             {shut && !offline ? <Lock size={14} /> : <Plus size={14} />}
             {t("projectpage.new_terminal")}
           </button>
@@ -252,6 +381,18 @@ function MachineCard(props: {
                 : t("projectpage.remove_machine")}>
               {(close) => (
                 <>
+                  {props.onManageProjects && (
+                    <button type="button" className="menu-item" role="menuitem"
+                      onClick={() => {
+                        close();
+                        props.onManageProjects?.(m);
+                      }}>
+                      <Layers size={15} />
+                      <span className="menu-text">
+                        Проекты машины... {/* i18n-ignore */}
+                      </span>
+                    </button>
+                  )}
                   {props.onMoveMachine && (
                     <button type="button" className="menu-item" role="menuitem"
                       onClick={() => {
@@ -260,6 +401,18 @@ function MachineCard(props: {
                       }}>
                       <FolderIcon size={15} />
                       <span className="menu-text">{t("projectpage.move_machine")}</span>
+                    </button>
+                  )}
+                  {m.shared && props.onUnbindMachine && (
+                    <button type="button" className="menu-item" role="menuitem"
+                      onClick={() => {
+                        close();
+                        props.onUnbindMachine?.(m);
+                      }}>
+                      <Close size={15} />
+                      <span className="menu-text">
+                        Отвязать от проекта {/* i18n-ignore */}
+                      </span>
                     </button>
                   )}
                   <button type="button" className="menu-item danger" role="menuitem"
@@ -355,6 +508,9 @@ export function ProjectPage(props: Props) {
   const { project, me } = props;
   const t = useT();
   const [, setTick] = useState(0);
+  const [activeTab, setActiveTab] = useState<"overview" | "git_notes" | "team_ai" | "containers">("overview");
+  const [managingProjectsMachine, setManagingProjectsMachine] = useState<Machine | null>(null);
+  const [attachExistingOpen, setAttachExistingOpen] = useState(false);
 
   // "5 min ago" and "running for 3 minutes" go on counting.
   useEffect(() => {
@@ -363,7 +519,7 @@ export function ProjectPage(props: Props) {
   }, []);
 
   const machineIds = new Set(project.machines.map((m) => m.id));
-  const running = props.terminals.filter((term) => machineIds.has(term.machineId));
+  const running = props.terminals.filter((term) => machineIds.has(term.machineId) && (!term.projectId || term.projectId === project.id));
   // Nobody else in it: Personal, and until people come, every project.
   const alone = project.personal || project.alone;
   const line = [
@@ -379,6 +535,19 @@ export function ProjectPage(props: Props) {
     renaming: props.renaming, onStartRename: props.onStartRename,
     onRename: props.onRename, onStopRename: props.onStopRename,
   };
+
+  const allProjects = props.allProjects || [project];
+  const currentMachineIds = new Set(project.machines.map((m) => m.id));
+  const availableOtherMachines: Machine[] = [];
+  const seenOther = new Set<string>();
+  for (const p of allProjects) {
+    for (const m of p.machines) {
+      if (!currentMachineIds.has(m.id) && !seenOther.has(m.id)) {
+        seenOther.add(m.id);
+        availableOtherMachines.push(m);
+      }
+    }
+  }
 
   return (
     <main className="project-view" aria-labelledby="pp-title">
@@ -398,6 +567,56 @@ export function ProjectPage(props: Props) {
         <p>{line}</p>
       </div>
 
+      <div className="pp-tabs-nav" style={{
+        display: "flex",
+        gap: 8,
+        borderBottom: "1px solid var(--sep, #2d3139)",
+        marginBottom: 20,
+        paddingBottom: 8,
+        flexWrap: "wrap",
+      }}>
+        <button
+          type="button"
+          className={activeTab === "overview" ? "button-accent small" : "button-ghost small"}
+          onClick={() => setActiveTab("overview")}
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
+        >
+          <Server size={14} />
+          <span>Обзор (Машины и Заметки) {/* i18n-ignore */}</span>
+        </button>
+        <button
+          type="button"
+          className={activeTab === "git_notes" ? "button-accent small" : "button-ghost small"}
+          onClick={() => setActiveTab("git_notes")}
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
+        >
+          <Branch size={14} />
+          <span>Git & Заметки GitHub {/* i18n-ignore */}</span>
+        </button>
+        <button
+          type="button"
+          className={activeTab === "team_ai" ? "button-accent small" : "button-ghost small"}
+          onClick={() => setActiveTab("team_ai")}
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
+        >
+          <People size={14} />
+          <span>Команда и Доступ ИИ {/* i18n-ignore */}</span>
+        </button>
+        <button
+          type="button"
+          className={activeTab === "containers" ? "button-accent small" : "button-ghost small"}
+          onClick={() => setActiveTab("containers")}
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
+        >
+          <Layers size={14} />
+          <span>Контейнеры & Порты {/* i18n-ignore */}</span>
+        </button>
+      </div>
+
+      {activeTab === "overview" && (
+        <>
+          <ClientInstallerBanner />
+
       <section className="pp-section" aria-labelledby="pp-machines">
         <div className="pp-section-head">
           <div className="pp-section-title">
@@ -406,11 +625,21 @@ export function ProjectPage(props: Props) {
               : t("projectpage.machines_shared")}</span>
           </div>
           {addsMachines && (
-            <button type="button" className="button-plain small"
-              onClick={() => props.onAddMachine(project.id)}>
-              <Plus size={14} />
-              {t("projectpage.add_machine")}
-            </button>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button type="button" className="button-plain small"
+                onClick={() => props.onAddMachine(project.id)}>
+                <Plus size={14} />
+                {t("projectpage.add_machine")}
+              </button>
+              {availableOtherMachines.length > 0 && (
+                <button type="button" className="button-plain small"
+                  onClick={() => setAttachExistingOpen(true)}
+                  title="Подключить машину из другого проекта" /* i18n-ignore */>
+                  <Layers size={14} />
+                  Подключить имеющуюся машину {/* i18n-ignore */}
+                </button>
+              )}
+            </div>
           )}
         </div>
         {project.machines.length === 0 ? (
@@ -439,7 +668,13 @@ export function ProjectPage(props: Props) {
                 terminals={running.filter((term) => term.machineId === m.id)}
                 dotFor={props.dotFor} shut={props.closed(m)} onOpenTerminal={props.onOpenTerminal}
                 onGoTo={props.onGoTo} onRemoveMachine={props.onRemoveMachine}
-                onMoveMachine={props.onMoveMachine} naming={naming}
+                onMoveMachine={props.onMoveMachine}
+                onManageProjects={(mach) => setManagingProjectsMachine(mach)}
+                onUnbindMachine={async (mach) => {
+                  await unbindMachineFromProject(mach.id, project.id);
+                  props.onRefresh?.();
+                }}
+                naming={naming}
                 notYet={props.notYet} local={props.local} />
             ))}
           </div>
@@ -571,6 +806,34 @@ export function ProjectPage(props: Props) {
           </div>
         </section>
       )}
+      </>
+      )}
+
+      {activeTab !== "overview" && (
+        <ProjectCollaboration
+          project={project}
+          terminals={running}
+          me={me}
+          activeSection={activeTab}
+          onRefresh={props.onRefresh}
+        />
+      )}
+
+      <MachineSettingsModal
+        machine={managingProjectsMachine}
+        currentProject={project}
+        allProjects={allProjects}
+        isOpen={managingProjectsMachine !== null}
+        onClose={() => setManagingProjectsMachine(null)}
+        onRefresh={props.onRefresh}
+      />
+      <AttachExistingMachineModal
+        project={project}
+        availableMachines={availableOtherMachines}
+        isOpen={attachExistingOpen}
+        onClose={() => setAttachExistingOpen(false)}
+        onRefresh={props.onRefresh}
+      />
     </main>
   );
 }

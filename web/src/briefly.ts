@@ -27,13 +27,9 @@ export function useBriefly<T>(): [T | null, (value: T) => void, () => void] {
   return [value, show, hide];
 }
 
+import { copyToClipboard } from "./clipboard";
+
 /** Puts text on the clipboard: whether the browser let the page do it. */
 export async function toClipboard(text: string): Promise<boolean> {
-  try {
-    if (!navigator.clipboard) return false;
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
+  return copyToClipboard(text);
 }

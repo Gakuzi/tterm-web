@@ -11,12 +11,16 @@ import type { LogNote, Me, Redaction } from "./api";
 import { useBriefly } from "./briefly";
 import { useT } from "./i18n";
 import {
-  Branch, Check, Close, Collapse, Copy, CopyText, Cross, Expand, Link, NoteAdd, Rerun,
-  Stop,
+  Bell, Branch, Check, Close, Collapse, Copy, CopyText, Cross, Expand, Link, NoteAdd, Person, Rerun,
+  Spark, Stop,
 } from "./icons";
 import { plainly } from "./logday";
 import { RedactedMark, Thread } from "./LogNotes";
 import { markIn, marked } from "./marks";
+import {
+  isBlockWatched, notifyCommandCompleted,
+  requestNotificationPermission, setBlockWatched,
+} from "./notifications";
 import type { Rendered } from "./render";
 
 /** Lines of a long output shown before "Show all". */
@@ -53,6 +57,7 @@ export interface FeedBlock {
   notes: LogNote[];
   redacted: Redaction | null;
   canNote: boolean;
+  author?: { name: string; kind: "user" | "agent" | "guest" };
 }
 
 /** What a block's copy buttons copy. */
@@ -80,6 +85,76 @@ interface Props {
   me: Me;
   /** A note under the block (0.1.20): whether it was saved. */
   onNote: (block: FeedBlock, text: string) => Promise<boolean>;
+  onRunFix?: (command: string) => void;
+  notify?: (text: string) => void;
+}
+
+export function diagnoseError(command: string, exitCode: number | null): { reason: string; fix?: string } {
+  const cmd = command.trim();
+  const first = cmd.split(/\s+/)[0] || "";
+
+  if (exitCode === 127) {
+    return {
+      reason: `Команда «${first}» не найдена в системе. Проверьте правильность написания или установите нужный пакет.`, // i18n-ignore
+      fix: `which ${first}`,
+    };
+  }
+  if (exitCode === 126) {
+    return {
+      reason: `Недостаточно прав для запуска «${first}» (Permission Denied).`, // i18n-ignore
+      fix: `sudo ${cmd}`,
+    };
+  }
+  if (exitCode === 130) {
+    return {
+      reason: "Команда была прервана пользователем комбинацией клавиш Ctrl+C (сигнал SIGINT).", // i18n-ignore
+    };
+  }
+  if (exitCode === 137) {
+    return {
+      reason: "Процесс принудительно остановлен системой (сигнал SIGKILL / нехватка памяти Out of Memory).", // i18n-ignore
+    };
+  }
+  if (cmd.startsWith("git push")) {
+    return {
+      reason: "Отправка на GitHub отклонена. На удалённом сервере есть новые коммиты, которых нет в вашей локальной копии.", // i18n-ignore
+      fix: "git pull --rebase",
+    };
+  }
+  if (cmd.startsWith("git commit") && cmd.includes("-m")) {
+    return {
+      reason: "Не удалось создать коммит. Возможно, файлы не были добавлены в индекс через git add.", // i18n-ignore
+      fix: `git add -A && ${cmd}`,
+    };
+  }
+  if (cmd.startsWith("docker ") && !cmd.startsWith("sudo ")) {
+    return {
+      reason: "Для работы с Docker требуются права суперпользователя или добавление в группу docker.", // i18n-ignore
+      fix: `sudo ${cmd}`,
+    };
+  }
+  if (cmd.startsWith("apt ") || cmd.startsWith("apt-get ")) {
+    if (!cmd.startsWith("sudo ")) {
+      return {
+        reason: "Для установки и обновления пакетов apt требуются права администратора.", // i18n-ignore
+        fix: `sudo ${cmd}`,
+      };
+    }
+    return {
+      reason: "Ошибка базы данных apt. Возможно, процесс заблокирован другим активным обновлением.", // i18n-ignore
+      fix: "sudo fuser -vki /var/lib/dpkg/lock-frontend",
+    };
+  }
+  if (cmd.startsWith("systemctl ") && !cmd.startsWith("sudo ")) {
+    return {
+      reason: "Управление службами systemd требует повышенных привилегий.", // i18n-ignore
+      fix: `sudo ${cmd}`,
+    };
+  }
+  return {
+    reason: `Команда завершилась с ошибкой (код возврата: ${exitCode}). Проверьте параметры запуска.`, // i18n-ignore
+    fix: cmd.startsWith("sudo ") ? undefined : `sudo ${cmd}`,
+  };
 }
 
 export function shortPath(cwd: string, home?: string): string {
@@ -129,6 +204,43 @@ export function BlockView(props: Props) {
   const running = block.state !== "done";
   const failed = block.state === "done" && block.exitCode !== null &&
     block.exitCode !== 0;
+  const [aiHelpOpen, setAiHelpOpen] = useState(false);
+  const [bellActive, setBellActive] = useState(() => isBlockWatched(block.key));
+  const wasRunning = useRef(running);
+
+  useEffect(() => {
+    setBellActive(isBlockWatched(block.key));
+  }, [block.key]);
+
+  useEffect(() => {
+    if (wasRunning.current && !running) {
+      const durationSec = block.startedAt && block.finishedAt
+        ? Math.max(0, Math.round((block.finishedAt - block.startedAt) / 1000))
+        : 0;
+      notifyCommandCompleted({
+        command: block.command,
+        exitCode: block.exitCode,
+        durationSec,
+        blockId: block.key,
+        inAppNotify: props.notify,
+      });
+      setBellActive(false);
+    }
+    wasRunning.current = running;
+  }, [running, block.command, block.exitCode, block.key, block.startedAt, block.finishedAt, props.notify]);
+
+  const toggleBell = async () => {
+    const next = !bellActive;
+    if (next) {
+      await requestNotificationPermission();
+    }
+    setBlockWatched(block.key, next, {
+      command: block.command,
+      startedAt: block.startedAt ?? Date.now(),
+    });
+    setBellActive(next);
+  };
+
   const lines = block.rendered?.lines ?? [];
   const shown = block.expanded ? lines : lines.slice(-SHOW_LINES);
   const hidden = lines.length - shown.length;
@@ -192,9 +304,11 @@ export function BlockView(props: Props) {
       aria-hidden="true" />;
   }
 
+  const authorClass = block.author?.kind ? ` block-by-${block.author.kind}` : "";
+
   return (
     <section id={`b${block.seqStart}`}
-      className={"block" + (running ? " live" : "") + (failed ? " failed" : "") +
+      className={"block" + authorClass + (running ? " live" : "") + (failed ? " failed" : "") +
         (props.flash ? " flash" : "") + (found ? " found" : "")}
       aria-label={what}>
       <div className="block-head">
@@ -206,6 +320,23 @@ export function BlockView(props: Props) {
           </code>
         )}
         <span className="block-meta">
+          {block.author && (
+            <span className={`chip-author chip-author-${block.author.kind}`}>
+              {block.author.kind === "agent" ? (
+                <>
+                  <Spark size={11} />
+                  <span>{block.author.name || "ИИ-Агент"}</span> {/* i18n-ignore */}
+                </>
+              ) : block.author.kind === "guest" ? (
+                <span>{/* i18n-ignore */}👥 {block.author.name || "Гость"}</span>
+              ) : (
+                <>
+                  <Person size={11} />
+                  <span>{block.author.name || "Вы"}</span> {/* i18n-ignore */}
+                </>
+              )}
+            </span>
+          )}
           {found && found.length > 0 && (
             <span className="found-pill">{t("block.found")}</span>
           )}
@@ -216,7 +347,18 @@ export function BlockView(props: Props) {
           )}
           {block.state === "running" && <span className="amber">{t("block.running")}</span>}
           {failed && (
-            <span className="red">{t("block.exit", { code: String(block.exitCode) })}</span>
+            <>
+              <span className="red">{t("block.exit", { code: String(block.exitCode) })}</span>
+              <button
+                type="button"
+                className="chip-ai-help"
+                title="Помощь ИИ: объяснить причину ошибки и предложить решение" // i18n-ignore
+                onClick={() => setAiHelpOpen(!aiHelpOpen)}
+              >
+                <Spark size={11} />
+                <span>Помощь ИИ</span> {/* i18n-ignore */}
+              </button>
+            </>
           )}
           {running && block.startedAt ? <Ticking since={block.startedAt} />
             : block.startedAt && block.finishedAt
@@ -229,13 +371,33 @@ export function BlockView(props: Props) {
           {!running && <span>{clock(block.startedAt)}</span>}
         </span>
         {running ? (
-          <button type="button" className="block-stop" onClick={props.onStop}
-            title={t("block.stop_title")}>
-            <Stop size={11} />
-            {t("block.stop")}
-            {/* i18n-ignore */}
-            <kbd>⌃C</kbd>
-          </button>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <button
+              type="button"
+              className={`button-ghost small ${bellActive ? "pressed" : ""}`}
+              onClick={toggleBell}
+              title={bellActive ? "Уведомление при завершении активно" /* i18n-ignore */ : "Уведомить push при завершении" /* i18n-ignore */}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                color: bellActive ? "#a855f7" : undefined,
+                background: bellActive ? "rgba(168, 85, 247, 0.15)" : undefined,
+                padding: "2px 8px",
+                fontSize: 11,
+              }}
+            >
+              <Bell size={12} />
+              {bellActive ? "Уведомлю 🔔" /* i18n-ignore */ : "🔔" /* i18n-ignore */}
+            </button>
+            <button type="button" className="block-stop" onClick={props.onStop}
+              title={t("block.stop_title")}>
+              <Stop size={11} />
+              {t("block.stop")}
+              {/* i18n-ignore */}
+              <kbd>⌃C</kbd>
+            </button>
+          </div>
         ) : redacted ? (
           <div role="group" aria-label={t("block.actions")}
             className={"block-actions" + (copied ? " acted" : "")}>
@@ -301,6 +463,39 @@ export function BlockView(props: Props) {
           </div>
         )}
       </div>
+      {failed && aiHelpOpen && (() => {
+        const diag = diagnoseError(block.command, block.exitCode);
+        return (
+          <div className="block-ai-assist">
+            <div className="block-ai-head">
+              <Spark size={13} />
+              <span>Анализ ошибки от ИИ</span> {/* i18n-ignore */}
+            </div>
+            <div className="block-ai-desc">{diag.reason}</div>
+            <div className="block-ai-fix-row">
+              {diag.fix && props.onRunFix && (
+                <button
+                  type="button"
+                  className="ai-fix-button"
+                  onClick={() => props.onRunFix?.(diag.fix!)}
+                  title="Выполнить команду исправления в терминале" // i18n-ignore
+                >
+                  <Spark size={12} />
+                  <span>Исправить:</span> {/* i18n-ignore */}
+                  <code>{diag.fix}</code> {/* i18n-ignore */}
+                </button>
+              )}
+              <button
+                type="button"
+                className="button-plain small"
+                onClick={() => setAiHelpOpen(false)}
+              >
+                Скрыть {/* i18n-ignore */}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
       {live ? (
         <div className="live-clip" ref={props.clipRef}
           style={{ height: props.clipHeight ?? 0 }} />

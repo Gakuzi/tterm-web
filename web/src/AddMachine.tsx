@@ -13,9 +13,11 @@ import {
 } from "./api";
 import { useBriefly } from "./briefly";
 import { useT } from "./i18n";
-import { Check, Close, Computer, Copy, Server } from "./icons";
+import { Check, Close, Computer, Copy, Download, Server } from "./icons";
 
 const POLL_MS = 1500;
+
+import { copyToClipboard } from "./clipboard";
 
 interface Props {
   projects: Project[];
@@ -37,6 +39,7 @@ export function AddMachine(props: Props) {
   const addable = projects.filter((p) => p.role === "owner" || p.role === "admin");
   const [projectId, setProjectId] = useState(props.projectId);
   const [kind, setKind] = useState<MachineKind>(props.kind);
+  const [osPlatform, setOsPlatform] = useState<"unix" | "windows">("unix");
   const [install, setInstall] = useState<Install | null>(null);
   const [status, setStatus] = useState<InstallStatus | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -122,10 +125,10 @@ export function AddMachine(props: Props) {
 
   const copy = async (text: string | null | undefined, done: () => void) => {
     if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
+    const ok = await copyToClipboard(text);
+    if (ok) {
       done();
-    } catch {
+    } else {
       notYet(t("add_machine.copy_failed"));
     }
   };
@@ -177,10 +180,36 @@ export function AddMachine(props: Props) {
                 <span className="step-number" aria-hidden="true">1</span>
                 <div className="dialog-step">
                   <strong>{t("add_machine.run_computer")}</strong>
+                  <div className="platform-toggle" role="tablist">
+                    <button
+                      type="button"
+                      className={`platform-btn ${osPlatform === "unix" ? "active" : ""}`}
+                      onClick={() => setOsPlatform("unix")}
+                    >
+                      macOS / Linux {/* i18n-ignore */}
+                    </button>
+                    <button
+                      type="button"
+                      className={`platform-btn ${osPlatform === "windows" ? "active" : ""}`}
+                      onClick={() => setOsPlatform("windows")}
+                    >
+                      Windows (PowerShell) {/* i18n-ignore */}
+                    </button>
+                  </div>
                   <div className="command-box">
-                    <code>{install ? install.command : "…"}</code>
+                    <code>
+                      {install
+                        ? (osPlatform === "windows"
+                            ? (install.windowsCommand || install.command)
+                            : install.command)
+                        : "…"}
+                    </code>
                     <button type="button" className="button-accent"
-                      onClick={() => copy(install?.command, () => showCopied(true))}
+                      onClick={() => copy(
+                        osPlatform === "windows"
+                          ? (install?.windowsCommand || install?.command)
+                          : install?.command,
+                        () => showCopied(true))}
                       disabled={!install}>
                       {copied ? <Check size={14} className="pressed-mark" />
                         : <Copy size={14} />}
@@ -188,8 +217,57 @@ export function AddMachine(props: Props) {
                     </button>
                   </div>
                   <span className="hint">
-                    {t("add_machine.hint_computer", { works })}
+                    {osPlatform === "windows"
+                      ? "Запустите команду в обычном PowerShell от своего имени (без Administrator)." /* i18n-ignore */
+                      : t("add_machine.hint_computer", { works })}
                   </span>
+                  {osPlatform === "windows" && (
+                    <>
+                      <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                        <a
+                          href="/tterm-agent.exe"
+                          className="button-accent"
+                          download="tterm-agent.exe"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}
+                        >
+                          <Download size={14} />
+                          Скачать программу (.exe) {/* i18n-ignore */}
+                        </a>
+                        <a
+                          href={install?.command ? `/c/${install.command.split("/c/")[1]?.split(" ")[0]}.bat` : "#"}
+                          className="button-plain"
+                          download="tterm-setup.bat"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}
+                        >
+                          <Download size={14} />
+                          Скрипт (.bat) {/* i18n-ignore */}
+                        </a>
+                      </div>
+                      <details className="by-hand" style={{ marginTop: 12 }}>
+                        <summary style={{ cursor: "pointer", color: "var(--color-accent, #3b82f6)", fontWeight: 500 }}>
+                          {/* i18n-ignore */}
+                          💡 Если Windows 11 блокирует («Установить из магазина приложений» / «Только из Store»)
+                        </summary>
+                        <div style={{ padding: "8px 12px", background: "rgba(255,255,255,0.04)", borderRadius: 6, marginTop: 6, fontSize: 13, lineHeight: 1.5 }}>
+                          {/* i18n-ignore */}
+                          <p style={{ margin: "0 0 6px 0" }}>В Windows 11 по умолчанию может быть включен строгий режим «Только из Microsoft Store». Чтобы разрешить подключение:</p>
+                          <ol style={{ margin: "0 0 8px 18px", padding: 0 }}>
+                            {/* i18n-ignore */}
+                            <li>Нажмите <kbd>Win + I</kbd> (Параметры) → <strong>Приложения</strong> → <strong>Дополнительные параметры приложений</strong>.</li>
+                            {/* i18n-ignore */}
+                            <li>В пункте <strong>«Выберите, откуда получать приложения»</strong> переключите с «Только из Store» на <em>«Из любого источника»</em>.</li>
+                            {/* i18n-ignore */}
+                            <li>Если Windows в S-режиме: Параметры → Система → Активация → <em>Выйти из S-режима</em>.</li>
+                            {/* i18n-ignore */}
+                            <li>Скопируйте команду выше, вставьте в обычный PowerShell (без Administrator) и нажмите Enter.</li>
+                          </ol>
+                          <p style={{ margin: 0, color: "var(--color-text-secondary, #888)", fontSize: 12 }}>
+                            {"* Python из Microsoft Store не требуется: агент tTerm работает на встроенном системном .NET." /* i18n-ignore */}
+                          </p>
+                        </div>
+                      </details>
+                    </>
+                  )}
                   {install?.byHand && (
                     <details className="by-hand">
                       <summary>{t("add_machine.by_hand")}</summary>

@@ -55,6 +55,10 @@ LOGIN = trust.LOGIN
 TEMPLATE = Path(__file__).resolve().parent.parent / "templates" / "install.sh"
 COMPUTER_TEMPLATE = (Path(__file__).resolve().parent.parent / "templates"
                      / "install_computer.sh")
+COMPUTER_TEMPLATE_PS1 = (Path(__file__).resolve().parent.parent / "templates"
+                         / "install_computer.ps1")
+UNIVERSAL_TEMPLATE = (Path(__file__).resolve().parent.parent / "templates"
+                      / "universal_install.sh")
 #: Where a computer's installer takes the agent from, unless TTERM_SRC says
 #: otherwise when it runs: the released one, as the bot's installer does.
 AGENT_SOURCE = "https://raw.githubusercontent.com/tterm-net/tterm-agent/main/agent.py"
@@ -165,6 +169,100 @@ def render_computer_installer(*, token: str, connect_url: str) -> str:
             .replace("{{TOKEN}}", token))
 
 
+def computer_command_ps1(connect_url: str, token: str) -> str:
+    """What a Windows computer runs in PowerShell: bypasses execution policy for process and runs installer."""
+    return (
+        f"powershell -ExecutionPolicy Bypass -NoProfile -Command "
+        f"\"[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; "
+        f"irm {connect_url}/c/{token}.ps1 | iex\""
+    )
+
+
+def render_computer_installer_ps1(*, token: str, connect_url: str) -> str:
+    if not TOKEN_RE.match(token):
+        raise ValueError("bad token")
+    return (COMPUTER_TEMPLATE_PS1.read_text(encoding="utf-8")
+            .replace("{{HUB}}", hub_url(connect_url))
+            .replace("{{TOKEN}}", token))
+
+
+def refusal_ps1(message: str) -> str:
+    escaped = message.replace('"', '`"')
+    return f'Write-Error "{escaped}"; exit 1\n'
+
+
+def render_computer_installer_bat(*, token: str, connect_url: str) -> str:
+    if not TOKEN_RE.match(token):
+        raise ValueError("bad token")
+    return (
+        "@echo off\r\n"
+        "chcp 65001 >nul\r\n"
+        "setlocal enabledelayedexpansion\r\n"
+        "cd /d \"%~dp0\"\r\n"
+        "title tTerm Windows Agent Setup\r\n"
+        "echo ===================================================\r\n"
+        "echo   tTerm Windows Agent Setup\r\n"
+        "echo ===================================================\r\n"
+        "echo.\r\n"
+        f"echo [1/3] Загрузка tTerm Agent с {connect_url}...\r\n"
+        "where curl >nul 2>nul\r\n"
+        "if %errorlevel% equ 0 (\r\n"
+        f"    curl -sSL \"{connect_url}/tterm-agent.exe\" -o \"%TEMP%\\tterm-agent.exe\"\r\n"
+        ") else (\r\n"
+        f"    powershell -NoProfile -ExecutionPolicy Bypass -Command \"[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object Net.WebClient).DownloadFile('{connect_url}/tterm-agent.exe', [System.IO.Path]::Combine($env:TEMP, 'tterm-agent.exe'))\"\r\n"
+        ")\r\n"
+        "if exist \"%TEMP%\\tterm-agent.exe\" (\r\n"
+        "    echo [2/3] Установка программы и регистрация в автозапуск...\r\n"
+        f"    \"%TEMP%\\tterm-agent.exe\" --hub \"{connect_url}\" --token \"{token}\"\r\n"
+        "    echo [3/3] Готово! tTerm Agent запущен в фоновом режиме.\r\n"
+        "    goto :done\r\n"
+        ")\r\n"
+        "echo.\r\n"
+        "echo [Резервный вариант] Загрузка PowerShell агента...\r\n"
+        "set \"PS_TMP=%TEMP%\\tterm-agent-%RANDOM%.ps1\"\r\n"
+        f"powershell -NoProfile -ExecutionPolicy Bypass -Command \"[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object Net.WebClient).DownloadFile('{connect_url}/c/{token}.ps1', '%PS_TMP%')\"\r\n"
+        "if exist \"%PS_TMP%\" (\r\n"
+        "    powershell -NoProfile -ExecutionPolicy Bypass -File \"%PS_TMP%\"\r\n"
+        "    del /f /q \"%PS_TMP%\" 2>nul\r\n"
+        "    goto :done\r\n"
+        ")\r\n"
+        f"echo [ОШИБКА] Не удалось подключиться к серверу tTerm ({connect_url}).\r\n"
+        "echo Проверьте подключение к локальной сети.\r\n"
+        ":done\r\n"
+        "echo.\r\n"
+        "pause\r\n"
+    )
+
+
+
+def render_universal_installer(*, token: str, connect_url: str, web_url: str = "") -> str:
+    """Renders the universal onboarding script supporting multi-hub dual connections and discovery."""
+    if not TOKEN_RE.match(token):
+        raise ValueError("bad token")
+    return (UNIVERSAL_TEMPLATE.read_text(encoding="utf-8")
+            .replace("{{HUB}}", hub_url(connect_url))
+            .replace("{{WEB_URL}}", web_url or connect_url)
+            .replace("{{TOKEN}}", token))
+
+
+async def get_or_create_quick_computer_token(pool: asyncpg.Pool) -> str:
+    """Finds an existing non-expired computer token or creates one for universal installation."""
+    token = new_token("computer")
+    try:
+        async with pool.acquire() as conn:
+            project_id = await conn.fetchval("SELECT id FROM projects ORDER BY created_at ASC LIMIT 1")
+            user_id = await conn.fetchval("SELECT id FROM users ORDER BY created_at ASC LIMIT 1")
+            if project_id and user_id:
+                await conn.execute(
+                    "INSERT INTO install_tokens (project_id, kind, token_hash, created_by, expires_at) "
+                    "VALUES ($1, 'computer', $2, $3, now() + interval '24 hours')",
+                    project_id, token_hash(token), user_id
+                )
+    except Exception as exc:
+        logging.getLogger("tterm.machines").warning("Could not persist auto token: %s", exc)
+    return token
+
+
 def server_cleanup(principal: str | None, ca_id: str | None = None,
                    own_line: bool = True) -> str | None:
     """The command that takes tTerm Web's access back on a server that was
@@ -234,6 +332,7 @@ class Install:
     expires_at: dt.datetime
     #: For a computer: the agent started by hand with the same token.
     by_hand: str | None = None
+    windows_command: str | None = None
 
 
 async def create_install(pool: asyncpg.Pool, *, project_id: uuid.UUID,
@@ -262,7 +361,8 @@ async def create_install(pool: asyncpg.Pool, *, project_id: uuid.UUID,
                                user_id=user_id, details={"kind": kind})
     if kind == "computer":
         return Install(row["id"], token, computer_command(connect_url, token),
-                       row["expires_at"], agent_command(connect_url, token))
+                       row["expires_at"], agent_command(connect_url, token),
+                       windows_command=computer_command_ps1(connect_url, token))
     return Install(row["id"], token, command(connect_url, token),
                    row["expires_at"])
 
@@ -667,6 +767,46 @@ async def remove(pool: asyncpg.Pool, user_id: uuid.UUID,
         removal.shared = bool(shared)
         removal.own = bool(row["own_server"])
     return removal
+
+
+async def rename(pool: asyncpg.Pool, user_id: uuid.UUID,
+                 machine_id: uuid.UUID, name: str) -> dict | None:
+    """Gives a machine a new name within its project."""
+    name = name.strip()
+    if not name:
+        raise ValueError("Name cannot be empty")
+    if len(name) > 64:
+        raise ValueError("Name can be at most 64 characters")
+
+    async with pool.acquire() as conn, conn.transaction():
+        row = await conn.fetchrow(
+            """
+            SELECT m.id, m.name, m.project_id, pm.role
+            FROM machines m
+            JOIN project_members pm ON pm.project_id = m.project_id
+             AND pm.user_id = $2 AND (pm.until IS NULL OR pm.until > now())
+            WHERE m.id = $1 AND m.removed_at IS NULL
+            FOR UPDATE OF m
+            """, machine_id, user_id)
+        if row is None:
+            return None
+        if row["role"] not in ("owner", "admin", "member"):
+            raise PermissionError("Only members with write access can rename machines")
+
+        try:
+            await conn.execute(
+                "UPDATE machines SET name = $2 WHERE id = $1",
+                machine_id, name)
+        except asyncpg.UniqueViolationError:
+            raise ValueError(f"Another machine in this project is already named '{name}'")
+
+        await accounts.journal(conn, "machine.renamed",
+                               project_id=row["project_id"], user_id=user_id,
+                               machine_id=machine_id,
+                               details={"was": row["name"], "name": name})
+
+    log.info("machine.renamed: %s -> %s", row["name"], name)
+    return {"id": str(machine_id), "name": name}
 
 
 async def take_back(pool: asyncpg.Pool, signer: SignerClient | None,

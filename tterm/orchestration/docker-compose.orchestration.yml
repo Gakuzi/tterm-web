@@ -1,0 +1,95 @@
+version: "3.8"
+
+networks:
+  # Isolated bridge network for Project Dev Team
+  proj_dev_isolated_bridge:
+    driver: bridge
+    internal: false
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"  # Disallow cross-container direct sniffing
+
+services:
+  # --------------------------------------------------------------------------
+  # Database: PostgreSQL with RBAC & Container Metadata
+  # --------------------------------------------------------------------------
+  orchestration_db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tterm_orchestration
+      POSTGRES_USER: tterm_orchestrator
+      POSTGRES_PASSWORD: secure_orchestration_db_pass
+    volumes:
+      - pgdata_orchestration:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    ports:
+      - "127.0.0.1:5433:5432"
+
+  # --------------------------------------------------------------------------
+  # Orchestration & RBAC API Controller
+  # --------------------------------------------------------------------------
+  orchestrator_api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - orchestration_db
+    environment:
+      DATABASE_URL: postgresql://tterm_orchestrator:secure_orchestration_db_pass@orchestration_db:5432/tterm_orchestration
+      HOST_PUBLIC_IP: "127.0.0.1"
+    ports:
+      - "8300:8300"
+    volumes:
+      # NOTE: Only the orchestrator control plane interacts with Docker API
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  # --------------------------------------------------------------------------
+  # Example: Hardened Developer Container (Container Developer Role)
+  # --------------------------------------------------------------------------
+  dev_container_example:
+    image: ubuntu:24.04
+    container_name: dev_container_demo
+    restart: unless-stopped
+    networks:
+      - proj_dev_isolated_bridge
+    ports:
+      # External Host Port 2222 mapped to Container OpenSSH Port 22
+      - "127.0.0.1:2222:22"
+    # cgroups limits
+    cpus: 1.5
+    mem_limit: 1024m
+    memswap_limit: 1024m
+    pids_limit: 256
+    # Security Anti-Escape Controls
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - NET_BIND_SERVICE
+    # STRICT FORBIDDEN: NEVER mount /var/run/docker.sock here!
+    volumes:
+      - dev_home_data:/home/developer
+    environment:
+      - SSH_USER=developer
+      - TZ=UTC
+    command: >
+      bash -c "
+        apt-get update &&
+        apt-get install -y openssh-server sudo &&
+        useradd -m -s /bin/bash developer &&
+        mkdir -p /home/developer/.ssh &&
+        chmod 700 /home/developer/.ssh &&
+        echo 'PermitRootLogin no' >> /etc/ssh/sshd_config &&
+        echo 'PasswordAuthentication no' >> /etc/ssh/sshd_config &&
+        mkdir -p /run/sshd &&
+        exec /usr/sbin/sshd -D -e
+      "
+
+volumes:
+  pgdata_orchestration:
+  dev_home_data:
