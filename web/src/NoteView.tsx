@@ -786,21 +786,47 @@ export function NoteView(props: Props) {
             <FolderIcon size={13} />
             <span className="note-where-name">{folderName}</span>
           </span>
-          <MenuButton label={t("note_view.menu")}
-            title={elsewhere && note.canDelete
-              ? t("note_view.menu_title_move")
-              : t("note_view.menu_title")}
-            className="note-menu">
-            {(close) => (
-              <NoteMenuItems folders={folders} folderId={folderId}
-                canWrite={note.canWrite} canDelete={note.canDelete}
-                elsewhere={elsewhere} author={note.createdBy?.firstName ?? null}
-                close={close}
-                onMove={move} onMoveOut={() => props.onMoveOut(noteId)}
-                onCopy={copyMarkdown}
-                onDelete={() => props.onDelete(noteId, docRef.current?.title ?? note.title)} />
-            )}
-          </MenuButton>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button
+              type="button"
+              className="button-ghost small"
+              style={{ fontSize: 11, padding: "3px 8px", display: "inline-flex", alignItems: "center", gap: 4 }}
+              title="Закоммитить заметку как Markdown файл в репозиторий GitHub" /* i18n-ignore */
+              onClick={async () => {
+                try {
+                  const res = await fetch(`/api/orchestration/notes/${noteId}/commit-to-github?project_id=${project?.id || "default"}&author=${encodeURIComponent(me.name || "user")}`, {
+                    method: "POST",
+                    headers: { "x-tterm": "1" },
+                  });
+                  const data = await res.json();
+                  if (data.ok) {
+                    alert(`✅ Заметка закоммичена в GitHub репозиторий!\n${data.commit_message || data.file || ""}`); // i18n-ignore
+                  } else {
+                    alert(`ℹ️ ${data.error || "Не удалось отправить в GitHub"}`); // i18n-ignore
+                  }
+                } catch {
+                  alert("Ошибка соединения при отправке заметки в GitHub"); // i18n-ignore
+                }
+              }}
+            >
+              <span>🐙 В GitHub</span> {/* i18n-ignore */}
+            </button>
+            <MenuButton label={t("note_view.menu")}
+              title={elsewhere && note.canDelete
+                ? t("note_view.menu_title_move")
+                : t("note_view.menu_title")}
+              className="note-menu">
+              {(close) => (
+                <NoteMenuItems folders={folders} folderId={folderId}
+                  canWrite={note.canWrite} canDelete={note.canDelete}
+                  elsewhere={elsewhere} author={note.createdBy?.firstName ?? null}
+                  close={close}
+                  onMove={move} onMoveOut={() => props.onMoveOut(noteId)}
+                  onCopy={copyMarkdown}
+                  onDelete={() => props.onDelete(noteId, docRef.current?.title ?? note.title)} />
+              )}
+            </MenuButton>
+          </div>
         </div>
         <textarea ref={title} className="note-title" value={doc.title} rows={1}
           placeholder={t("note.untitled")} aria-label={t("note_view.title")} maxLength={200}

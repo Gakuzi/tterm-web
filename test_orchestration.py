@@ -1336,6 +1336,39 @@ class TestEncryptedVaultAndTelegram(unittest.TestCase):
         self.assertEqual(engine.status, "failed")
         self.assertIn("прервано", engine.error)
 
+    def test_markdown_to_blocks_conversion(self):
+        """Verifies converting Markdown text with checklists and headings into tTerm blocks and back."""
+        from tterm.orchestration.github_notes import markdown_to_blocks, blocks_to_markdown
+        md = "# Заголовок проекта\n\n## Чеклист задач\n- [ ] Задача 1\n- [x] Задача 2 выполнена\n\nОбычный текст параграфа.\n\n```python\nprint('hello')\n```\n\n---"
+        blocks = markdown_to_blocks(md)
+        self.assertTrue(len(blocks) >= 5)
+        types = [b["type"] for b in blocks]
+        self.assertIn("h", types)
+        self.assertIn("todo", types)
+        self.assertIn("p", types)
+        self.assertIn("code", types)
+        self.assertIn("hr", types)
+
+        todos = [b for b in blocks if b["type"] == "todo"]
+        self.assertFalse(todos[0]["done"])
+        self.assertTrue(todos[1]["done"])
+
+        reconstructed_md = blocks_to_markdown("Заголовок проекта", blocks)
+        self.assertIn("# Заголовок проекта", reconstructed_md)
+        self.assertIn("- [ ] Задача 1", reconstructed_md)
+        self.assertIn("- [x] Задача 2 выполнена", reconstructed_md)
+
+    def test_private_ip_never_struck_out(self):
+        """Verifies private LAN IPs are never rate-limited or struck out."""
+        from tterm.core.agents import Agents
+        agents = Agents()
+        # Add 25 strikes for local network IP
+        for _ in range(25):
+            agents.strike("192.168.0.6")
+        self.assertFalse(agents.struck_out("192.168.0.6"))
+        self.assertFalse(agents.struck_out("127.0.0.1"))
+        self.assertFalse(agents.struck_out("10.0.1.15"))
+
 
 if __name__ == "__main__":
     unittest.main()

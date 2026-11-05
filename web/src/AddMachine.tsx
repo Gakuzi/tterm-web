@@ -223,7 +223,16 @@ export function AddMachine(props: Props) {
                   </span>
                   {osPlatform === "windows" && (
                     <>
-                      <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center" }}>
+                      <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                        <a
+                          href="/tterm-agent.exe"
+                          className="button-accent"
+                          download="tterm-agent.exe"
+                          style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}
+                        >
+                          <Download size={14} />
+                          Скачать программу (.exe) {/* i18n-ignore */}
+                        </a>
                         <a
                           href={install?.command ? `/c/${install.command.split("/c/")[1]?.split(" ")[0]}.bat` : "#"}
                           className="button-plain"
@@ -231,7 +240,7 @@ export function AddMachine(props: Props) {
                           style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none" }}
                         >
                           <Download size={14} />
-                          Скачать установщик (tterm-setup.bat) {/* i18n-ignore */}
+                          Скрипт (.bat) {/* i18n-ignore */}
                         </a>
                       </div>
                       <details className="by-hand" style={{ marginTop: 12 }}>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { Project, TerminalInfo, Me, Machine } from "./api";
 import {
-  Branch, Check, Close, Computer, Copy, Key, Layers,
+  Branch, Check, Close, Computer, Copy, Folder as FolderIcon, Key, Layers,
   Link as LinkIcon, Lock, Pencil, People, Person, Plus, Restart, Search, Server, Spark, Trash, Warning
 } from "./icons";
 import { useBriefly } from "./briefly";
@@ -226,6 +226,9 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
   const [isCreatingRepo, setIsCreatingRepo] = useState(false);
   const [autoBranchPerTerminal, setAutoBranchPerTerminal] = useState(true);
   const [autoCommitActions, setAutoCommitActions] = useState(true);
+  const [useGithubNotes, setUseGithubNotes] = useState(false);
+  const [commitsAsNotes, setCommitsAsNotes] = useState(true);
+  const [isSyncingNotes, setIsSyncingNotes] = useState(false);
   const [isSavingGit, setIsSavingGit] = useState(false);
   const [terminalBranches, setTerminalBranches] = useState<Record<string, { branch_name: string; auto_commit: boolean; commits_count: number }>>({});
   const [copiedBranchScript, showCopiedBranchScript] = useBriefly<string>();
@@ -459,6 +462,19 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
       })
       .catch(() => {});
 
+    // Fetch GitHub notes integration config
+    fetch(`/api/orchestration/projects/${project.id}/notes-config`, {
+      headers: { "x-tterm": "1" },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (live && data?.ok) {
+          if (typeof data.use_github_as_notes === "boolean") setUseGithubNotes(data.use_github_as_notes);
+          if (typeof data.commits_as_notes === "boolean") setCommitsAsNotes(data.commits_as_notes);
+        }
+      })
+      .catch(() => {});
+
     // Fetch terminal branch mapping for open terminals
     terminals.forEach((t) => {
       fetch(`/api/orchestration/terminals/${t.id}/git-branch?project_id=${project.id}&label=${encodeURIComponent(t.name || "")}&user=${encodeURIComponent(me.name || "user")}`, {
@@ -551,10 +567,25 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
           default_branch: gitBranch,
           auto_branch_per_terminal: autoBranchPerTerminal,
           auto_commit_actions: autoCommitActions,
+          use_github_notes: useGithubNotes,
+          notes_folder_in_repo: "docs",
+          auto_sync_commits_as_notes: commitsAsNotes,
         }),
       });
+
+      // Save Notes synchronization config
+      await fetch(`/api/orchestration/projects/${project.id}/notes-config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify({
+          use_github_as_notes: useGithubNotes,
+          notes_folder_in_repo: "docs",
+          commits_as_notes: commitsAsNotes,
+        }),
+      });
+
       if (res.ok) {
-        if (notify) notify("Конфигурация репозитория и веток терминалов успешно сохранена!"); // i18n-ignore
+        if (notify) notify("Конфигурация репозитория, веток и заметок GitHub сохранена!"); // i18n-ignore
       } else {
         if (notify) notify("Ошибка при сохранении конфигурации Git"); // i18n-ignore
       }
@@ -562,6 +593,26 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
       if (notify) notify("Сетевая ошибка при сохранении Git-конфигурации"); // i18n-ignore
     } finally {
       setIsSavingGit(false);
+    }
+  };
+
+  const handleSyncNotesWithGithub = async () => {
+    setIsSyncingNotes(true);
+    try {
+      const res = await fetch(`/api/orchestration/projects/${project.id}/notes-sync`, {
+        method: "POST",
+        headers: { "x-tterm": "1" },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (notify) notify(data.message || `Синхронизировано ${data.synced_notes_count} заметок из GitHub!`); // i18n-ignore
+      } else {
+        if (notify) notify("Ошибка синхронизации заметок из GitHub"); // i18n-ignore
+      }
+    } catch {
+      if (notify) notify("Сетевая ошибка синхронизации заметок"); // i18n-ignore
+    } finally {
+      setIsSyncingNotes(false);
     }
   };
 
@@ -1611,6 +1662,38 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
                 (команды логируются в формате <code>[term] команда (by автор)</code>) {/* i18n-ignore */}
               </span>
             </label>
+            <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "4px 0" }} />
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
+              <input
+                type="checkbox"
+                checked={useGithubNotes}
+                onChange={(e) => setUseGithubNotes(e.target.checked)}
+              />
+              <strong>Использовать GitHub для хранения заметок проекта {/* i18n-ignore */}</strong>
+              <span style={{ color: "var(--color-text-secondary, #888)", fontSize: 12 }}>
+                (хранит общие заметки как файлы <code>.md</code> в репозитории; личные заметки хранятся в приватной БД) {/* i18n-ignore */}
+              </span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, marginLeft: 22 }}>
+              <input
+                type="checkbox"
+                checked={commitsAsNotes}
+                onChange={(e) => setCommitsAsNotes(e.target.checked)}
+              />
+              <span>Фиксировать историю коммитов проекта как структурированные заметки с чеклистами {/* i18n-ignore */}</span>
+            </label>
+            <div style={{ display: "flex", gap: 10, marginTop: 6, marginLeft: 22 }}>
+              <button
+                type="button"
+                className="button-plain small"
+                onClick={handleSyncNotesWithGithub}
+                disabled={isSyncingNotes}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                <FolderIcon size={13} />
+                <span>{isSyncingNotes ? "Синхронизация..." : "🔄 Синхронизировать заметки из GitHub репозитория"} {/* i18n-ignore */}</span>
+              </button>
+            </div>
           </div>
 
           {/* Terminal Branches List */}

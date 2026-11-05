@@ -154,6 +154,21 @@ func loadOrInitConfig(appDir, hubArg, tokenArg, nameArg string) *Config {
 		cfg.Key = generateSecureKey()
 	}
 
+	if cfg.Token == "" {
+		tokenURL := fmt.Sprintf("%s/quick_token", strings.TrimRight(cfg.Hub, "/"))
+		client := &http.Client{Timeout: 5 * time.Second}
+		if resp, err := client.Get(tokenURL); err == nil && resp.StatusCode == 200 {
+			var result struct {
+				Token string `json:"token"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&result); err == nil && result.Token != "" {
+				cfg.Token = result.Token
+				log.Printf("[Setup] Acquired 1-click enrollment token from hub: %s...", safePrefix(cfg.Token, 8))
+			}
+			resp.Body.Close()
+		}
+	}
+
 	// Persist
 	if data, err := json.MarshalIndent(cfg, "", "  "); err == nil {
 		_ = os.WriteFile(cfgPath, data, 0644)

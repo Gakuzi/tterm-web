@@ -354,34 +354,40 @@ try {
     Write-Host "  (Handshake note: $_. Agent will connect in background)" -ForegroundColor Gray
 }
 
-# Set up silent autostart via Windows VBS wrapper (no flashing window)
-$startupFolder = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Startup)
+# Clean up any legacy or broken start_agent.vbs
 $vbsPath = Join-Path $DIR "start_agent.vbs"
-$vbsContent = @"
-Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$AGENT_SCRIPT`"", 0, False
-"@
-Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII
+if (Test-Path $vbsPath) {
+    Remove-Item -Path $vbsPath -Force -ErrorAction SilentlyContinue
+}
 
+# 1. Register autostart via Windows Registry Run key (standard, clean, no VBScript)
+try {
+    $runCmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$AGENT_SCRIPT`""
+    Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "tTermAgent" -Value $runCmd -ErrorAction SilentlyContinue
+    Write-Host "  Autostart registered in Windows Registry Run" -ForegroundColor Green
+} catch {}
+
+# 2. Also register in Windows Startup folder (running PowerShell directly in hidden mode)
+$startupFolder = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Startup)
 $shortcutPath = Join-Path $startupFolder "tTermAgent.lnk"
 try {
     $wscript = New-Object -ComObject WScript.Shell
     $shortcut = $wscript.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = "wscript.exe"
-    $shortcut.Arguments = "`"$vbsPath`""
+    $shortcut.TargetPath = "powershell.exe"
+    $shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$AGENT_SCRIPT`""
     $shortcut.WindowStyle = 7
     $shortcut.Description = "tTerm Web Agent"
     $shortcut.Save()
-    Write-Host "  Autostart registered in Windows Startup" -ForegroundColor Green
+    Write-Host "  Autostart registered in Windows Startup folder" -ForegroundColor Green
 } catch {
-    Write-Host "  Warning: Could not create startup shortcut: $_" -ForegroundColor Yellow
+    Write-Host "  (Note: Startup folder registration: $_)" -ForegroundColor Gray
 }
 
-# Start agent in background
+# 3. Start agent right now silently in background
 try {
-    Start-Process "wscript.exe" -ArgumentList "`"$vbsPath`""
-} catch {
     Start-Process powershell.exe -ArgumentList "-WindowStyle Hidden -ExecutionPolicy Bypass -NoProfile -File `"$AGENT_SCRIPT`"" -WindowStyle Hidden
+} catch {
+    Write-Host "  Warning: Could not start background process: $_" -ForegroundColor Yellow
 }
 
 Write-Host ""

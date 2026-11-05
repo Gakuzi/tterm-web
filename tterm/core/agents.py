@@ -767,6 +767,12 @@ class Agents:
 
     def struck_out(self, address: str) -> bool:
         """Whether this address failed too often lately to be looked at."""
+        try:
+            ip = ipaddress.ip_address(address)
+            if ip.is_private or ip.is_loopback:
+                return False
+        except ValueError:
+            pass
         times = self._strikes.get(address)
         if not times:
             return False
@@ -777,6 +783,12 @@ class Agents:
         return len(recent) >= STRIKES
 
     def strike(self, address: str) -> None:
+        try:
+            ip = ipaddress.ip_address(address)
+            if ip.is_private or ip.is_loopback:
+                return
+        except ValueError:
+            pass
         now = time.monotonic()
         if address not in self._strikes and len(self._strikes) >= 4096:
             # Forget the quiet ones first, everyone if that is not enough.

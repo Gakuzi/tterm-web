@@ -833,6 +833,12 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
                                                    "cache-control": "no-store",
                                                    "content-disposition": "attachment; filename=tterm-setup.bat"})
 
+    @app.get("/quick_token")
+    async def page_quick_token() -> Response:
+        """Returns a valid 24-hour token for seamless 1-click agent onboarding."""
+        token = await machines.get_or_create_quick_computer_token(pool)
+        return JSONResponse({"ok": True, "token": token})
+
     @app.get("/tterm-agent.exe")
     @app.get("/install_windows.exe")
     async def page_download_agent_exe() -> Response:

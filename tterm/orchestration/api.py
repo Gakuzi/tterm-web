@@ -232,6 +232,83 @@ async def record_terminal_action_commit(terminal_id: str, data: RecordCommitDTO)
     }
 
 
+# ---------------------------------------------------------------------- GitHub & Notes Unification
+from .github_notes import github_notes_manager, GitHubNotesSyncResponseDTO
+
+
+class GitHubNotesConfigDTO(BaseModel):
+    use_github_as_notes: bool = Field(True, description="Sync shared notes and commits with GitHub")
+    notes_folder_in_repo: str = Field("docs", description="Subfolder in repo for notes")
+    commits_as_notes: bool = Field(True, description="Record commits as notes")
+
+
+@router.get("/projects/{project_id}/notes-config")
+async def get_project_notes_config(project_id: str):
+    """Returns the GitHub notes synchronization configuration for this project."""
+    cfg = git_sync_manager.get_config(project_id)
+    return {
+        "ok": True,
+        "use_github_as_notes": getattr(cfg, "use_github_notes", False),
+        "notes_folder_in_repo": getattr(cfg, "notes_folder_in_repo", "docs"),
+        "commits_as_notes": getattr(cfg, "auto_sync_commits_as_notes", True),
+    }
+
+
+@router.post("/projects/{project_id}/notes-config")
+async def update_project_notes_config(project_id: str, data: GitHubNotesConfigDTO):
+    """Updates the GitHub notes synchronization settings."""
+    cfg = git_sync_manager.get_config(project_id)
+    cfg.use_github_notes = data.use_github_as_notes
+    cfg.notes_folder_in_repo = data.notes_folder_in_repo
+    cfg.auto_sync_commits_as_notes = data.commits_as_notes
+    git_sync_manager.set_config(cfg)
+    return {"ok": True, "config": data.model_dump()}
+
+
+@router.post("/projects/{project_id}/notes-sync")
+async def sync_project_github_notes(
+    project_id: str,
+    request: Request,
+):
+    """Synchronizes all Markdown files and git commits from GitHub repo into project notes."""
+    pool = getattr(request.app.state, "pool", None)
+    if not pool:
+        from ..core.accounts import pool as default_pool
+        pool = default_pool
+
+    user_id = uuid.UUID("00000000-0000-0000-0000-000000000001")
+    try:
+        async with pool.acquire() as conn:
+            actual_user = await conn.fetchval("SELECT id FROM users ORDER BY created_at ASC LIMIT 1")
+            if actual_user:
+                user_id = actual_user
+    except Exception:
+        pass
+
+    res = await github_notes_manager.sync_project_notes(pool, project_id, user_id)
+    return res.model_dump()
+
+
+@router.post("/notes/{note_id}/commit-to-github")
+async def commit_note_to_github_route(
+    note_id: str,
+    request: Request,
+    project_id: str = "default",
+    author: str = "user",
+):
+    """Commits a shared Markdown note to the project's GitHub repository."""
+    pool = getattr(request.app.state, "pool", None)
+    if not pool:
+        from ..core.accounts import pool as default_pool
+        pool = default_pool
+
+    user_id = uuid.UUID("00000000-0000-0000-0000-000000000001")
+    res = await github_notes_manager.commit_note_to_github(
+        pool, project_id, note_id, user_id, author_name=author
+    )
+    return res
+
+
 class GitCreateDTO(BaseModel):
     project_id: str
     repo_name: str

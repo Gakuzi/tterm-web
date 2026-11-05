@@ -21,6 +21,9 @@ class ProjectGitConfigDTO(BaseModel):
     default_branch: str = Field("main", description="Base trunk branch")
     auto_branch_per_terminal: bool = Field(True, description="Whether each terminal creates its own isolated git branch")
     auto_commit_actions: bool = Field(True, description="Whether every command executed in terminal is recorded as a commit")
+    use_github_notes: bool = Field(False, description="Whether project shared notes are stored and synced with GitHub")
+    notes_folder_in_repo: str = Field("docs", description="Subfolder in repo for notes")
+    auto_sync_commits_as_notes: bool = Field(True, description="Record commits as structured notes")
 
 
 class TerminalGitBranchDTO(BaseModel):
