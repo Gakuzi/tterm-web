@@ -31,10 +31,11 @@ import { DevicesSection } from "./Devices";
 import { LANGUAGES, useT, type Lang } from "./i18n";
 import {
   Card, ChevronDown, ChevronLeft, ChevronRight, Close, Computer, Devices, Download, Gear,
-  Key, Monitor, Moon, Person, Search, Spark, Sun,
+  Key, Monitor, Moon, People, Person, Search, Spark, Sun,
 } from "./icons";
 import { KeysSection } from "./Keys.tsx";
 import { AiSection } from "./AiSection";
+import { ProjectCollaboration } from "./ProjectCollaboration";
 import { InApp } from "./local";
 import { Group, Row, SearchWords } from "./SettingsRows";
 import { searchWords, sectionsFound, type SettingsSection } from "./settingsSearch";
@@ -201,6 +202,13 @@ export function Settings(props: Props) {
     const out = [{ title: t("settings.group_preferences"), items: preferences }];
     if (!local) {
       out.push({
+        title: "Проекты и Доступ", // i18n-ignore
+        items: [
+          item("projects", <People size={18} />, "Проект и Команда", [ // i18n-ignore
+            "проекты", "команда", "роли", "rbac", "доступ", "участники", "docker", "нода", "терминалы"]), // i18n-ignore
+        ],
+      });
+      out.push({
         title: t("settings.group_security"), items: [
           item("keys", <Key size={18} />, t("keys.title"), [t("settings.keys_words")]),
           item("devices", <Devices size={18} />, t("devices.title"), [
@@ -340,6 +348,15 @@ export function Settings(props: Props) {
         return props.here ? <ThisComputerSection here={props.here} /> : null;
       case "updates":
         return <UpdatesSection />;
+      case "projects":
+        return (
+          <ProjectCollaboration
+            project={props.projects[0] || ({ id: "default", name: "Главный проект", code: "P", own: true, role: "owner" } as any)} // i18n-ignore
+            terminals={[]}
+            me={props.me}
+            notify={props.notify}
+          />
+        );
       case "ai":
         return <AiSection notify={props.notify} />;
     }

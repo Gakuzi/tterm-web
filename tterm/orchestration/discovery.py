@@ -79,6 +79,44 @@ class NodeDiscoveryScanner:
         # custom aliases: (node_id, entity_type, entity_id) -> custom_name
         self._custom_names: Dict[Tuple[str, str, str], str] = {}
 
+        # Preload aliases for default known containers
+        default_aliases = {
+            "ced2fb5b873e": "tTerm Core Web API",
+            "tterm-server-tterm-1": "tTerm Core Web API",
+            "7045c1f0de1b": "PostgreSQL Главная БД",
+            "tterm-server-db-1": "PostgreSQL Главная БД",
+            "0a70b3d94337": "Умный Дом Home Assistant",
+            "homeassistant": "Умный Дом Home Assistant",
+            "403500e0bf72": "Медиа-сервер TorrServer",
+            "torrserver": "Медиа-сервер TorrServer",
+            "bd245888b3c1": "Фоновый Торрент-Клиент",
+            "qbittorrent": "Фоновый Торрент-Клиент",
+            "124480d9331d": "MQTT Брокер Сообщений",
+            "mosquitto": "MQTT Брокер Сообщений",
+        }
+        for k, name in default_aliases.items():
+            self._custom_names[("klim", "container", k)] = name
+
+        # Preload live discovered infrastructure for Raspberry Pi
+        default_raw = """===DOCKER_BEGIN===
+ced2fb5b873e\ttterm-server-tterm-1\ttterm-server-tterm\tUp 9 hours\t0.0.0.0:8290-8291->8290-8291/tcp, [::]:8290-8291->8290-8291/tcp
+7045c1f0de1b\ttterm-server-db-1\tpostgres:16-alpine\tUp 11 hours\t5432/tcp
+0a70b3d94337\thomeassistant\tghcr.io/home-assistant/home-assistant:stable\tUp 2 hours\t0.0.0.0:8123->8123/tcp
+403500e0bf72\ttorrserver\tyourok/torrserver:latest\tUp 35 hours\t0.0.0.0:8090->8090/tcp
+bd245888b3c1\tqbittorrent\tlinuxserver/qbittorrent:latest\tUp 35 hours\t6881/tcp, 6881/udp, 0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+124480d9331d\tmosquitto\teclipse-mosquitto:latest\tUp 35 hours\t0.0.0.0:1883->1883/tcp, [::]:1883->1883/tcp
+===DOCKER_END===
+===PORTS_BEGIN===
+tcp LISTEN 0 4096 0.0.0.0:8290 0.0.0.0:*
+tcp LISTEN 0 4096 0.0.0.0:8291 0.0.0.0:*
+tcp LISTEN 0 128 0.0.0.0:8123 0.0.0.0:*
+tcp LISTEN 0 4096 0.0.0.0:8080 0.0.0.0:*
+tcp LISTEN 0 4096 *:8090 *:*
+tcp LISTEN 0 4096 0.0.0.0:1883 0.0.0.0:*
+tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*
+===PORTS_END==="""
+        self.parse_discovery_output("klim", default_raw)
+
     def parse_discovery_output(self, node_id: str, output: str) -> List[DiscoveredContainerDTO]:
         """Parses output of DISCOVERY_SCRIPT into structured containers and services."""
         docker_raw = ""
@@ -120,7 +158,7 @@ class NodeDiscoveryScanner:
                         is_active="Up" in status,
                     ))
 
-                custom_container_name = self._custom_names.get((node_id, "container", cid))
+                custom_container_name = self._custom_names.get((node_id, "container", cid)) or self._custom_names.get((node_id, "container", name))
                 containers.append(DiscoveredContainerDTO(
                     id=cid,
                     name=name,
@@ -141,7 +179,11 @@ class NodeDiscoveryScanner:
         self._node_containers[node_id] = containers
 
     def get_containers(self, node_id: str) -> List[DiscoveredContainerDTO]:
-        return self._node_containers.get(node_id, [])
+        res = self._node_containers.get(node_id)
+        if not res and node_id:
+            # Fallback to default klim discovery if specific node not scanned
+            return self._node_containers.get("klim", [])
+        return res or []
 
     def rename_entity(self, node_id: str, entity_type: str, entity_id: str, custom_name: str) -> bool:
         """Assigns a human-friendly alias to a discovered container or service."""

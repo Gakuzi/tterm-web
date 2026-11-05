@@ -233,25 +233,140 @@ class RenameEntityDTO(BaseModel):
     custom_name: str
 
 
+# ---------------------------------------------------------------------- Project Members & Scoped Permissions
+class ProjectMemberDTO(BaseModel):
+    id: str
+    name: str
+    email: str
+    role: str = "container_developer"  # "project_admin", "node_admin", "container_developer", "service_operator"
+    is_ai: bool = False
+    terminals_allowed: List[str] = Field(default_factory=lambda: ["*"])
+    containers_allowed: List[str] = Field(default_factory=lambda: ["*"])
+    ai_mode: str = "guard"  # "execute", "guard", "readonly"
+
+_DEFAULT_MEMBERS = [
+    {
+        "id": "owner-user",
+        "name": "Евгений (Владелец)",
+        "email": "eklimov84@gmail.com",
+        "role": "project_admin",
+        "is_ai": False,
+        "terminals_allowed": ["*"],
+        "containers_allowed": ["*"],
+        "ai_mode": "execute",
+    },
+    {
+        "id": "ai-antigravity",
+        "name": "Antigravity (ИИ-Ассистент)",
+        "email": "ai@antigravity.internal",
+        "role": "container_developer",
+        "is_ai": True,
+        "terminals_allowed": ["*"],
+        "containers_allowed": ["tterm-server-tterm-1"],
+        "ai_mode": "guard",
+    },
+    {
+        "id": "dlg-author",
+        "name": "Денис Герасименко (Автор tTerm)",
+        "email": "denis@tterm.net",
+        "role": "node_admin",
+        "is_ai": False,
+        "terminals_allowed": ["*"],
+        "containers_allowed": ["*"],
+        "ai_mode": "execute",
+    },
+]
+_PROJECT_MEMBERS_STORE: Dict[str, List[Dict[str, Any]]] = {}
+
+
+@router.get("/projects/{project_id}/members")
+async def list_project_members(project_id: str):
+    """Returns members of the project workspace with their assigned roles and scopes."""
+    members = _PROJECT_MEMBERS_STORE.get(project_id)
+    if members is None:
+        members = [dict(m) for m in _DEFAULT_MEMBERS]
+        _PROJECT_MEMBERS_STORE[project_id] = members
+    return {"ok": True, "members": members}
+
+
+@router.post("/projects/{project_id}/members")
+async def add_or_update_project_member(project_id: str, data: ProjectMemberDTO):
+    """Adds a new member or updates an existing member in the project."""
+    members = _PROJECT_MEMBERS_STORE.get(project_id)
+    if members is None:
+        members = [dict(m) for m in _DEFAULT_MEMBERS]
+        _PROJECT_MEMBERS_STORE[project_id] = members
+
+    found = False
+    for i, m in enumerate(members):
+        if m["id"] == data.id or m["email"] == data.email:
+            members[i] = data.model_dump()
+            found = True
+            break
+    if not found:
+        members.append(data.model_dump())
+
+    return {"ok": True, "member": data.model_dump()}
+
+
+@router.delete("/projects/{project_id}/members/{user_id}")
+async def remove_project_member(project_id: str, user_id: str):
+    """Removes a member from the project workspace."""
+    members = _PROJECT_MEMBERS_STORE.get(project_id)
+    if members is None:
+        members = [dict(m) for m in _DEFAULT_MEMBERS]
+        _PROJECT_MEMBERS_STORE[project_id] = members
+    _PROJECT_MEMBERS_STORE[project_id] = [m for m in members if m["id"] != user_id]
+    return {"ok": True, "removed_id": user_id}
+
+
+@router.patch("/projects/{project_id}/members/{user_id}")
+async def update_member_permissions(project_id: str, user_id: str, payload: Dict[str, Any]):
+    """Updates roles, terminals_allowed or containers_allowed for a member."""
+    members = _PROJECT_MEMBERS_STORE.get(project_id)
+    if members is None:
+        members = [dict(m) for m in _DEFAULT_MEMBERS]
+        _PROJECT_MEMBERS_STORE[project_id] = members
+
+    updated = None
+    for m in members:
+        if m["id"] == user_id:
+            if "role" in payload:
+                m["role"] = payload["role"]
+            if "terminals_allowed" in payload:
+                m["terminals_allowed"] = payload["terminals_allowed"]
+            if "containers_allowed" in payload:
+                m["containers_allowed"] = payload["containers_allowed"]
+            if "ai_mode" in payload:
+                m["ai_mode"] = payload["ai_mode"]
+            updated = m
+            break
+    if not updated:
+        raise HTTPException(status_code=404, detail="Member not found")
+    return {"ok": True, "member": updated}
+
+
+# ---------------------------------------------------------------------- Node Auto-Discovery
+class ScanRequestDTO(BaseModel):
+    raw_output: str = ""
+
+
+@router.post("/discovery/scan")
 @router.post("/discovery/scan/{node_id}")
-async def scan_node_discovery(node_id: str, raw_output: str = ""):
+async def scan_node_discovery(node_id: str = "klim", data: ScanRequestDTO | None = None):
     """Scans or processes discovery probe output for a node."""
     from .discovery import discovery_scanner
-    if not raw_output:
-        # Default mock probe for development and testing
-        raw_output = """===DOCKER_BEGIN===
-0e64525d5026\ttterm-server-tterm-1\ttterm-server-tterm\tUp 15 minutes\t0.0.0.0:8290-8291->8290-8291/tcp
-7045c1f0de1b\ttterm-postgres-db\tpostgres:16-alpine\tUp 2 hours\t5432/tcp
-===DOCKER_END===
-===PORTS_BEGIN===
-tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*
-===PORTS_END==="""
-    containers = discovery_scanner.parse_discovery_output(node_id, raw_output)
+    raw_output = data.raw_output if data else ""
+    if raw_output:
+        containers = discovery_scanner.parse_discovery_output(node_id, raw_output)
+    else:
+        containers = discovery_scanner.get_containers(node_id)
     return {"ok": True, "containers": [c.model_dump() for c in containers]}
 
 
+@router.get("/discovery")
 @router.get("/discovery/{node_id}")
-async def get_node_discovery(node_id: str):
+async def get_node_discovery(node_id: str = "klim"):
     """Returns all discovered containers and services for a node."""
     from .discovery import discovery_scanner
     containers = discovery_scanner.get_containers(node_id)

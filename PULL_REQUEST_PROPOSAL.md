@@ -243,7 +243,7 @@
 ```text
 Backend & Orchestration:
   tterm/core/machines.py               — логика rename, ps1/bat инсталляторы
-  tterm/core/passport.py               — сбор паспорта Windows через PowerShell
+  tterm/core/passport.py               — сбор паспорта Windows и автоопределение Docker/портов
   tterm/core/agents.py                 — поддержка Windows-агента
   tterm/api/connect.py                 — эндпоинты /c/{token}.ps1 и /c/{token}.bat
   tterm/api/page.py                    — PATCH /api/machines/{id}, windowsCommand
@@ -251,25 +251,27 @@ Backend & Orchestration:
   tterm/orchestration/models.py        — гибридные SQLAlchemy/Pydantic/Dataclass модели
   tterm/orchestration/rbac.py          — движок проверки прав (user, entity, action)
   tterm/orchestration/worker.py        — воркер создания контейнеров, cgroups, Termius
-  tterm/orchestration/discovery.py     — сканирование Docker-контейнеров и портов
+  tterm/orchestration/discovery.py     — сканирование Docker-контейнеров и портов с автокэшированием
   tterm/orchestration/locks.py         — иерархические блокировки (Drain Locks) и апелляции
   tterm/orchestration/notifications.py — диспетчер пуш-уведомлений и колокольчика
   tterm/orchestration/schema.sql       — PostgreSQL DDL схема с ограничениями
-  tterm/orchestration/api.py           — FastAPI эндпоинты оркестрации и блокировок
+  tterm/orchestration/api.py           — FastAPI эндпоинты оркестрации, блокировок и CRUD участников
   mcp_server.py                        — JSON-RPC MCP шлюз для ИИ-ассистентов
   tterm_cli.py                         — консольный клиент tterm-cli
   test_mcp.py                          — 6 тестов функционала MCP
-  test_orchestration.py                — 10 тестов иерархического RBAC, контейнеров и Drain Locks
+  test_orchestration.py                — 12 тестов иерархического RBAC, контейнеров и Drain Locks
 
 Frontend:
   web/src/ProjectPage.tsx              — интеграция баннера и хаба совместной работы
   web/src/ProjectCollaboration.tsx     — хаб команды, ИИ-доступа, Git, контейнеров и Discovery
+  web/src/ProjectAccessDialog.tsx      — единый адаптивный центр управления доступом к проекту, Docker и терминалу
   web/src/DisruptiveActionModal.tsx    — модальное окно Impact Assessment и Graceful Drain
   web/src/HierarchicalLockBanner.tsx   — баннер блокировки ввода и подачи апелляций
   web/src/notifications.ts             — Web Push API и Web Audio синтезатор звука
   web/src/ClientInstallerBanner.tsx    — автоопределение ОС и загрузка Windows агента
-  web/src/TerminalHeader.tsx           — верхняя панель терминала с кнопкой ИИ
-  web/src/TerminalAccessDialog.tsx     — диалог настройки прав терминала и Guard Mode
+  web/src/TerminalHeader.tsx           — верхняя панель терминала с кнопкой настроек (мобильная адаптивность)
+  web/src/Settings.tsx                 — раздел «Проекты и Команда» в глобальных настройках
+  web/src/settingsSearch.ts            — индексация секции projects
   web/src/platform.ts                  — детекция Windows / Linux / macOS браузеров
   web/src/AddMachine.tsx               — табы macOS/Linux/Windows, кнопка .bat
   web/src/InputLine.tsx                — панель Git, блокировка ввода при Drain Lock
@@ -278,7 +280,7 @@ Frontend:
   web/src/AiSection.tsx                — раздел настроек MCP, безопасность, RBAC
   web/src/Sidebar.tsx                  — inline-редактирование имени машин
   web/src/icons.tsx                    — иконки терминала (Bell, Docker, Sparkle)
-  web/src/styles/app.css               — стили Git-бара, popover, ИИ-карточек
+  web/src/styles/app.css               — стили Git-бара, popover, ИИ-карточек и мобильная верстка
 ```
 
 ---

@@ -145,6 +145,31 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
   const [copiedSshConfig, showCopiedSshConfig] = useBriefly<boolean>();
   const [copiedSshCmd, showCopiedSshCmd] = useBriefly<boolean>();
 
+  // Auto-fetch discovered containers and members on mount
+  useState(() => {
+    fetch("/api/orchestration/discovery/klim", {
+      headers: { "x-tterm": "1" },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.containers?.length) {
+          setContainers(data.containers);
+        }
+      })
+      .catch(() => {});
+
+    fetch(`/api/orchestration/projects/${project.id}/members`, {
+      headers: { "x-tterm": "1" },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.members?.length) {
+          setMembers(data.members);
+        }
+      })
+      .catch(() => {});
+  });
+
   const inviteLink = `${window.location.origin}/#invite=${project.id}&token=tt_inv_${project.id.slice(0, 8)}`;
 
   const termiusJson = JSON.stringify({
@@ -177,7 +202,11 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
   const handleScanNode = async () => {
     setScanLoading(true);
     try {
-      const res = await fetch("/api/orchestration/discovery/scan/klim", { method: "POST" });
+      const res = await fetch("/api/orchestration/discovery/scan/klim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify({ raw_output: "" }),
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.containers && data.containers.length > 0) {
@@ -204,7 +233,7 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
     try {
       await fetch("/api/orchestration/discovery/rename", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
         body: JSON.stringify({
           node_id: "klim",
           entity_type: "container",
@@ -228,7 +257,7 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
     try {
       const res = await fetch("/api/orchestration/locks/check", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
         body: JSON.stringify({
           entity_type: entityType,
           entity_id: entityId,

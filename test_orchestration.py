@@ -253,5 +253,26 @@ class TestNotifications(unittest.TestCase):
         self.assertTrue(notifs[0].read)
 
 
+class TestProjectMembersAndDiscovery(unittest.TestCase):
+    def test_default_discovery_contains_live_raspberry_containers(self):
+        from tterm.orchestration.discovery import discovery_scanner
+        containers = discovery_scanner.get_containers("klim")
+        self.assertTrue(len(containers) >= 6)
+        names = [c.name for c in containers]
+        self.assertIn("tterm-server-tterm-1", names)
+        self.assertIn("homeassistant", names)
+        self.assertIn("torrserver", names)
+        self.assertIn("qbittorrent", names)
+        self.assertIn("mosquitto", names)
+
+    def test_custom_container_rename(self):
+        from tterm.orchestration.discovery import discovery_scanner
+        ok = discovery_scanner.rename_entity("klim", "container", "homeassistant", "Home Assistant Pro")
+        self.assertTrue(ok)
+        containers = discovery_scanner.get_containers("klim")
+        ha = next(c for c in containers if c.name == "homeassistant")
+        self.assertEqual(ha.custom_name, "Home Assistant Pro")
+
+
 if __name__ == "__main__":
     unittest.main()

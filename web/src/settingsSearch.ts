@@ -9,7 +9,7 @@
 // (tests/settings.test.ts).
 
 /** The sections, as their addresses name them. */
-export const SECTIONS = ["general", "account", "plan", "keys", "devices", "computer",
+export const SECTIONS = ["general", "account", "plan", "projects", "keys", "devices", "computer",
   "updates", "ai"] as const;
 export type SettingsSection = (typeof SECTIONS)[number];
 
