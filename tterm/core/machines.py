@@ -170,8 +170,12 @@ def render_computer_installer(*, token: str, connect_url: str) -> str:
 
 
 def computer_command_ps1(connect_url: str, token: str) -> str:
-    """What a Windows computer runs in PowerShell: irm .../c/<token>.ps1 | iex"""
-    return f"irm {connect_url}/c/{token}.ps1 | iex"
+    """What a Windows computer runs in PowerShell: bypasses execution policy for process and runs installer."""
+    return (
+        f"powershell -ExecutionPolicy Bypass -NoProfile -Command "
+        f"\"[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; "
+        f"irm {connect_url}/c/{token}.ps1 | iex\""
+    )
 
 
 def render_computer_installer_ps1(*, token: str, connect_url: str) -> str:
@@ -193,13 +197,22 @@ def render_computer_installer_bat(*, token: str, connect_url: str) -> str:
     return (
         "@echo off\r\n"
         "chcp 65001 >nul\r\n"
+        "title tTerm Windows Agent\r\n"
+        "echo ===================================================\r\n"
+        "echo   Подключение Windows к tTerm Web\r\n"
+        "echo ===================================================\r\n"
         "echo.\r\n"
-        "echo   Подключение компьютера к tTerm Web...\r\n"
+        "echo Запуск установки агента tTerm...\r\n"
+        f"powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $s=(New-Object Net.WebClient).DownloadString('{connect_url}/c/{token}.ps1'); Invoke-Expression $s\"\r\n"
+        "if %errorlevel% neq 0 (\r\n"
+        "    echo.\r\n"
+        "    echo [ВНИМАНИЕ] Если Windows 11 заблокировала запуск:\r\n"
+        "    echo 1. Откройте Параметры -> Приложения -> Дополнительные параметры приложений\r\n"
+        "    echo 2. В 'Выберите, откуда получать приложения' выберите 'Из любого источника'\r\n"
+        "    echo.\r\n"
+        ")\r\n"
         "echo.\r\n"
-        f"powershell -NoProfile -ExecutionPolicy Bypass -Command \"irm {connect_url}/c/{token}.ps1 | iex\"\r\n"
-        "echo.\r\n"
-        "echo Готово! Окно закроется через 5 секунд...\r\n"
-        "timeout /t 5 >nul\r\n"
+        "pause\r\n"
     )
 
 

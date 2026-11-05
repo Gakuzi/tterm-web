@@ -466,6 +466,8 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
     app.state.agents = agents
     app.state.signer = signer
     app.include_router(orchestration_router)
+    from tterm.orchestration.telegram_auth import router as telegram_auth_router
+    app.include_router(telegram_auth_router)
     dist = dist.resolve()
 
     @app.exception_handler(SignedOut)

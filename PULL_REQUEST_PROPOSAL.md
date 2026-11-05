@@ -291,6 +291,23 @@
 * **Плавающий виджет (Floating Pill):** возможность свернуть процесс развертывания в компактное плавающее окно в углу экрана с индикацией прогресса (%), описанием шага и возможностью моментальной отмены развертывания (`✕ Прервать`).
 * **Корректная привязка хостов:** автоматическая генерация `.env` с адресом нового VPS и поддержка `TTERM_ALLOWED_HOSTS=*`, исключающая ошибку 421 Misdirected Request.
 
+### 17. Мгновенная авторизация через Telegram (`/api/auth/telegram`)
+
+Для пользователей, у которых нет локального почтового сервера (SMTP) или кому удобнее заходить без ожидания почты, добавлен полноценный провайдер авторизации через Telegram:
+* **Маршруты в [`tterm/orchestration/telegram_auth.py`](file:///Users/evgeniy/Documents/antigravity/tterm-web/tterm/orchestration/telegram_auth.py):**
+  * `POST /api/auth/telegram/request-code`: отправляет 6-значный одноразовый код прямо в Telegram пользователю через настроенного бота (или выводит код в консоль сервера в режиме разработки).
+  * `POST /api/auth/telegram/verify-code`: проверяет код, регистрирует аккаунт или находит существующий, и выдает стандартную безопасную сессионную cookie `session` (`__Host-session` на HTTPS).
+  * `POST /api/auth/telegram/login-widget`: проверяет HMAC-SHA256 подпись данных официального Telegram Login Widget.
+* **Интерфейс входа в [`web/src/SignIn.tsx`](file:///Users/evgeniy/Documents/antigravity/tterm-web/web/src/SignIn.tsx):**
+  * Переключатель `[ ✉️ Email ] [ ✈️ Telegram ]` на главном экране входа.
+  * Быстрый ввод имени пользователя или ID, получение кода в боте и моментальный вход без зависимостей от SMTP.
+
+### 18. Мессенджер-загрузка файлов (`📎`) и поддержка Windows 11
+
+* **Мессенджер-интерфейс загрузки файлов:** В [`web/src/TerminalHeader.tsx`](file:///Users/evgeniy/Documents/antigravity/tterm-web/web/src/TerminalHeader.tsx) слева рядом с бейджем рабочей директории терминала добавлена иконка скрепки (`📎`), позволяющая в 1 клик прикрепить и загрузить локальные файлы прямо в текущую папку терминала.
+* **Нативный прием на Windows:** [`FileUploadGateway`](file:///Users/evgeniy/Documents/antigravity/tterm-web/tterm/orchestration/file_upload.py) определяет тип подключенной машины и генерирует нативный декодер PowerShell (`[System.Convert]::FromBase64String` и `[System.IO.File]::WriteAllBytes`), гарантируя загрузку на Windows без bash-зависимостей.
+* **Обход ограничений Windows 11:** В инсталлятор [`tterm/templates/install_computer.ps1`](file:///Users/evgeniy/Documents/antigravity/tterm-web/tterm/templates/install_computer.ps1) добавлена автоматическая проверка TLS 1.2, корректное протокольное сообщение `{"t": "hello"}` и запуск в обход ExecutionPolicy без необходимости прав администратора и без открытия Microsoft Store.
+
 ---
 
 ## 🗂 Сводка затронутых файлов
@@ -301,9 +318,10 @@ Backend & Orchestration:
   tterm/core/passport.py               — сбор паспорта Windows и автоопределение Docker/портов
   tterm/core/agents.py                 — поддержка Windows-агента
   tterm/api/connect.py                 — эндпоинты /c/{token}.ps1 и /c/{token}.bat
-  tterm/api/page.py                    — PATCH /api/machines/{id}, windowsCommand
+  tterm/api/page.py                    — PATCH /api/machines/{id}, windowsCommand, роутер Telegram Auth
   tterm/api/security.py                — PageGuard с поддержкой TTERM_ALLOWED_HOSTS=* и изоляцией
-  tterm/templates/install_computer.ps1 — нативный PowerShell-агент для Windows
+  tterm/templates/install_computer.ps1 — нативный PowerShell-агент для Windows с TLS 1.2 и автозапуском
+  tterm/orchestration/telegram_auth.py — провайдер авторизации через Telegram (код и виджет)
   tterm/orchestration/models.py        — гибридные SQLAlchemy/Pydantic/Dataclass модели
   tterm/orchestration/rbac.py          — движок проверки прав (user, entity, action)
   tterm/orchestration/worker.py        — воркер создания контейнеров, cgroups, Termius
@@ -333,7 +351,8 @@ Frontend:
   web/src/TelegramNotificationSection.tsx — настройка Telegram Push-бота
   web/src/CloudDeployModal.tsx         — модальное окно развертывания с плавающим Floating Pill
   web/src/ClientInstallerBanner.tsx    — автоопределение ОС и загрузка Windows агента
-  web/src/TerminalHeader.tsx           — верхняя панель терминала с кнопкой настроек (⚙️)
+  web/src/SignIn.tsx                   — выбор метода входа (Email / Telegram) и ввод кода
+  web/src/TerminalHeader.tsx           — верхняя панель терминала со скрепкой (📎) и настройками (⚙️)
   web/src/Settings.tsx                 — раздел настроек, Telegram-бот, хостинг и интеграции
   web/src/Account.tsx                  — профиль пользователя, статус Encrypted Vault и токены
   web/src/AezaSection.tsx              — управление почасовым VPS-хостингом и балансом

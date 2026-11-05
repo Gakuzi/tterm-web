@@ -18,7 +18,7 @@ export function ClientInstallerBanner() {
   };
 
   // i18n-ignore
-  const windowsPsCmd = `powershell -ExecutionPolicy Bypass -Command "iwr -useb ${window.location.protocol}//${window.location.hostname}:8291/install_computer.ps1 | iex"`;
+  const windowsPsCmd = `powershell -ExecutionPolicy Bypass -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iwr -useb ${window.location.protocol}//${window.location.hostname}:8291/install_computer.ps1 | iex"`;
   // i18n-ignore
   const linuxCmd = `curl -sSL ${window.location.protocol}//${window.location.hostname}:8291/install.sh | bash`;
 

@@ -95,9 +95,21 @@ class FileUploadGateway:
             elif resolved_target_dir == "~" and home:
                 resolved_target_dir = home
 
-            dest_path = f"{resolved_target_dir.rstrip('/')}/{clean_name}"
-
             link = getattr(term, "_link", None)
+            is_windows = bool(
+                (machine and getattr(machine, "os", "").lower().startswith("win"))
+                or (link and getattr(link, "os", "").lower().startswith("win"))
+                or (len(resolved_target_dir) >= 2 and resolved_target_dir[1] == ":")
+                or "\\" in resolved_target_dir
+            )
+
+            if is_windows:
+                clean_target = resolved_target_dir.replace("/", "\\").rstrip("\\")
+                dest_path = f"{clean_target}\\{clean_name}"
+            else:
+                clean_target = resolved_target_dir.rstrip("/")
+                dest_path = f"{clean_target}/{clean_name}"
+
             uploaded_to_machine = False
 
             # Method 1: SshLink with live SSH connection & SFTP
@@ -115,12 +127,25 @@ class FileUploadGateway:
                 except Exception as sftp_err:
                     log.warning("SFTP direct upload failed on %s: %s, falling back to script", machine_name, sftp_err)
 
-            # Method 2: Script execution via Link (works for AgentLink & SshLink)
+            # Method 2: Script execution via Link (works for AgentLink on Windows/macOS/Linux & SshLink)
             if not uploaded_to_machine and link is not None and hasattr(link, "script"):
                 try:
                     b64_content = base64.b64encode(content_bytes).decode("ascii")
-                    # Safe shell decode script supporting base64 -d (Linux), base64 -D (macOS BSD), openssl, or python3
-                    script = f"""
+                    if is_windows:
+                        # PowerShell script for Windows agent
+                        t_dir_json = json.dumps(clean_target)
+                        d_path_json = json.dumps(dest_path)
+                        script = f"""
+$tDir = {t_dir_json}
+$dPath = {d_path_json}
+if (-not (Test-Path -Path $tDir)) {{ New-Item -ItemType Directory -Path $tDir -Force | Out-Null }}
+$bytes = [System.Convert]::FromBase64String("{b64_content}")
+[System.IO.File]::WriteAllBytes($dPath, $bytes)
+if (Test-Path -Path $dPath) {{ exit 0 }} else {{ exit 1 }}
+"""
+                    else:
+                        # Bash / sh script for Linux & macOS
+                        script = f"""
 mkdir -p {shlex.quote(resolved_target_dir)}
 cat << 'EOF_TTERM_UPLOAD' | (base64 -d 2>/dev/null || base64 -D 2>/dev/null || openssl base64 -d 2>/dev/null || python3 -m base64 -d 2>/dev/null) > {shlex.quote(dest_path)}
 {b64_content}

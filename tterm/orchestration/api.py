@@ -1876,7 +1876,12 @@ async def upload_terminal_files(
     target_dir: Optional[str] = None
 
     if "multipart/form-data" in content_type:
-        form = await request.form()
+        try:
+            form = await request.form()
+        except Exception as form_err:
+            log.warning("Form parsing failed: %s", form_err)
+            raise HTTPException(status_code=400, detail=f"Ошибка обработки формы загрузки: {form_err}")
+
         target_dir = form.get("target_dir")
         if isinstance(target_dir, str) and not target_dir.strip():
             target_dir = None
@@ -1885,14 +1890,18 @@ async def upload_terminal_files(
             if hasattr(value, "filename") and hasattr(value, "read"):
                 fname = getattr(value, "filename", None) or "uploaded_file"
                 content = await value.read()
-                saved = await file_upload_gateway.upload_file(
-                    terminal_id=terminal_id,
-                    filename=fname,
-                    content_bytes=content,
-                    target_dir=str(target_dir) if target_dir else None,
-                    request=request,
-                )
-                results.append(saved)
+                try:
+                    saved = await file_upload_gateway.upload_file(
+                        terminal_id=terminal_id,
+                        filename=fname,
+                        content_bytes=content,
+                        target_dir=str(target_dir) if target_dir else None,
+                        request=request,
+                    )
+                    results.append(saved)
+                except Exception as up_err:
+                    log.error("Failed to upload file %s: %s", fname, up_err)
+                    raise HTTPException(status_code=500, detail=f"Ошибка при загрузке {fname}: {up_err}")
     else:
         # JSON payload (base64)
         try:

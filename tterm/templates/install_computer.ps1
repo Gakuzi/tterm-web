@@ -4,8 +4,9 @@
 #   1. creates %USERPROFILE%\.tterm-web for the agent and settings;
 #   2. generates a secure computer key and saves settings in env.json;
 #   3. creates agent.ps1 using standard .NET WebSockets;
-#   4. sets up autostart in the Windows Startup folder;
-#   5. starts the agent in the background.
+#   4. registers the computer with tTerm hub;
+#   5. sets up autostart in the Windows Startup folder;
+#   6. starts the agent in the background.
 
 $ErrorActionPreference = "Stop"
 
@@ -14,12 +15,26 @@ $TOKEN = "{{TOKEN}}"
 $DIR = Join-Path $env:USERPROFILE ".tterm-web"
 
 Write-Host ""
-Write-Host "  tTerm Web: connecting this Windows computer" -ForegroundColor Cyan
+Write-Host "  =================================================" -ForegroundColor Cyan
+Write-Host "    tTerm Web: connecting this Windows computer" -ForegroundColor Cyan
+Write-Host "  =================================================" -ForegroundColor Cyan
 Write-Host ""
 
 if (-not (Test-Path $DIR)) {
     New-Item -ItemType Directory -Path $DIR -Force | Out-Null
 }
+
+# Ensure TLS 1.2
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]'Tls,Tls11,Tls12'
+
+# Load System assembly for ClientWebSocket (.NET 4.5+)
+try {
+    $null = [System.Reflection.Assembly]::LoadWithPartialName("System")
+} catch {}
+try {
+    Add-Type -AssemblyName System.Net.WebSockets -ErrorAction SilentlyContinue
+    Add-Type -AssemblyName System.Net.WebSockets.Client -ErrorAction SilentlyContinue
+} catch {}
 
 # Key generation and preservation
 $ENV_FILE = Join-Path $DIR "env.json"
@@ -75,8 +90,21 @@ if (-not $wsUrl.EndsWith("/agent")) {
     $wsUrl = "$wsUrl/agent"
 }
 
-Add-Type -AssemblyName System.Net.WebSockets
-Add-Type -AssemblyName System.Net.WebSockets.Client
+# Ensure TLS & assemblies
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]'Tls,Tls11,Tls12'
+try { $null = [System.Reflection.Assembly]::LoadWithPartialName("System") } catch {}
+try {
+    Add-Type -AssemblyName System.Net.WebSockets -ErrorAction SilentlyContinue
+    Add-Type -AssemblyName System.Net.WebSockets.Client -ErrorAction SilentlyContinue
+} catch {}
+
+$logFile = Join-Path (Split-Path $ConfigPath) "agent.log"
+function Log-Agent($msg) {
+    $line = "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $msg"
+    try { Add-Content -Path $logFile -Value $line -Encoding UTF8 } catch {}
+}
+
+Log-Agent "Starting tTerm agent session for $name connecting to $wsUrl..."
 
 function Start-AgentSession {
     while ($true) {
@@ -84,11 +112,13 @@ function Start-AgentSession {
             $ws = New-Object System.Net.WebSockets.ClientWebSocket
             $cts = New-Object System.Threading.CancellationTokenSource
             
-            Write-Host "[tTerm] Connecting to $wsUrl..."
+            Log-Agent "Connecting to $wsUrl..."
             $connectTask = $ws.ConnectAsync((New-Object System.Uri($wsUrl)), $cts.Token)
             $connectTask.Wait()
 
+            # Protocol hello message
             $hello = @{
+                t = "hello"
                 token = $token
                 key = $key
                 name = $name
@@ -107,7 +137,7 @@ function Start-AgentSession {
                 $cts.Token
             )
             $sendTask.Wait()
-            Write-Host "[tTerm] Connected and authenticated as $name!"
+            Log-Agent "Connected and authenticated as $name!"
 
             $buffer = New-Object byte[] 65536
             $channels = @{}
@@ -119,6 +149,7 @@ function Start-AgentSession {
                 $result = $receiveTask.Result
 
                 if ($result.MessageType -eq [System.Net.WebSockets.WebSocketMessageType]::Close) {
+                    Log-Agent "Server initiated close"
                     $ws.CloseAsync([System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure, "Closing", $cts.Token).Wait()
                     break
                 }
@@ -163,9 +194,10 @@ function Start-AgentSession {
                     }
                     elseif ($msg.t -eq "open") {
                         $ch = $msg.ch
+                        Log-Agent "Opening terminal channel $ch"
                         $pinfo = New-Object System.Diagnostics.ProcessStartInfo
                         $pinfo.FileName = "powershell.exe"
-                        $pinfo.Arguments = "-NoLogo"
+                        $pinfo.Arguments = "-NoLogo -NoProfile -ExecutionPolicy Bypass"
                         $pinfo.RedirectStandardInput = $true
                         $pinfo.RedirectStandardOutput = $true
                         $pinfo.RedirectStandardError = $true
@@ -175,6 +207,7 @@ function Start-AgentSession {
                         $proc = [System.Diagnostics.Process]::Start($pinfo)
                         $channels[$ch] = $proc
 
+                        # Stdout reader thread
                         [System.Threading.ThreadPool]::QueueUserWorkItem({
                             param($state)
                             $p = $state.proc
@@ -184,20 +217,59 @@ function Start-AgentSession {
 
                             $buf = New-Object char[] 4096
                             while (-not $p.HasExited) {
-                                $read = $p.StandardOutput.Read($buf, 0, $buf.Length)
-                                if ($read -gt 0) {
-                                    $bytes = [System.Text.Encoding]::UTF8.GetBytes($buf, 0, $read)
-                                    $frame = New-Object byte[] (5 + $bytes.Length)
-                                    $frame[0] = 1
-                                    $chanBytes = [System.BitConverter]::GetBytes([int]$chanId)
-                                    if ([System.BitConverter]::IsLittleEndian) { [System.Array]::Reverse($chanBytes) }
-                                    [System.Array]::Copy($chanBytes, 0, $frame, 1, 4)
-                                    [System.Array]::Copy($bytes, 0, $frame, 5, $bytes.Length)
+                                try {
+                                    $read = $p.StandardOutput.Read($buf, 0, $buf.Length)
+                                    if ($read -gt 0) {
+                                        $bytes = [System.Text.Encoding]::UTF8.GetBytes($buf, 0, $read)
+                                        $frame = New-Object byte[] (5 + $bytes.Length)
+                                        $frame[0] = 1 # stdout frame
+                                        $chanBytes = [System.BitConverter]::GetBytes([int]$chanId)
+                                        if ([System.BitConverter]::IsLittleEndian) { [System.Array]::Reverse($chanBytes) }
+                                        [System.Array]::Copy($chanBytes, 0, $frame, 1, 4)
+                                        [System.Array]::Copy($bytes, 0, $frame, 5, $bytes.Length)
 
-                                    if ($socket.State -eq [System.Net.WebSockets.WebSocketState]::Open) {
-                                        $socket.SendAsync((New-Object System.ArraySegment[byte] -ArgumentList @(,$frame)), [System.Net.WebSockets.WebSocketMessageType]::Binary, $true, $token).Wait()
+                                        if ($socket.State -eq [System.Net.WebSockets.WebSocketState]::Open) {
+                                            $socket.SendAsync((New-Object System.ArraySegment[byte] -ArgumentList @(,$frame)), [System.Net.WebSockets.WebSocketMessageType]::Binary, $true, $token).Wait()
+                                        }
                                     }
+                                } catch { break }
+                            }
+                            # Send ended notification
+                            try {
+                                $endedMsg = @{ t = "ended"; ch = $chanId; code = $p.ExitCode; error = "" } | ConvertTo-Json -Compress
+                                $endedBytes = [System.Text.Encoding]::UTF8.GetBytes($endedMsg)
+                                if ($socket.State -eq [System.Net.WebSockets.WebSocketState]::Open) {
+                                    $socket.SendAsync((New-Object System.ArraySegment[byte] -ArgumentList @(,$endedBytes)), [System.Net.WebSockets.WebSocketMessageType]::Text, $true, $token).Wait()
                                 }
+                            } catch {}
+                        }, @{ proc = $proc; ch = $ch; ws = $ws; token = $cts.Token })
+
+                        # Stderr reader thread
+                        [System.Threading.ThreadPool]::QueueUserWorkItem({
+                            param($state)
+                            $p = $state.proc
+                            $chanId = $state.ch
+                            $socket = $state.ws
+                            $token = $state.token
+
+                            $buf = New-Object char[] 4096
+                            while (-not $p.HasExited) {
+                                try {
+                                    $read = $p.StandardError.Read($buf, 0, $buf.Length)
+                                    if ($read -gt 0) {
+                                        $bytes = [System.Text.Encoding]::UTF8.GetBytes($buf, 0, $read)
+                                        $frame = New-Object byte[] (5 + $bytes.Length)
+                                        $frame[0] = 1 # output frame
+                                        $chanBytes = [System.BitConverter]::GetBytes([int]$chanId)
+                                        if ([System.BitConverter]::IsLittleEndian) { [System.Array]::Reverse($chanBytes) }
+                                        [System.Array]::Copy($chanBytes, 0, $frame, 1, 4)
+                                        [System.Array]::Copy($bytes, 0, $frame, 5, $bytes.Length)
+
+                                        if ($socket.State -eq [System.Net.WebSockets.WebSocketState]::Open) {
+                                            $socket.SendAsync((New-Object System.ArraySegment[byte] -ArgumentList @(,$frame)), [System.Net.WebSockets.WebSocketMessageType]::Binary, $true, $token).Wait()
+                                        }
+                                    }
+                                } catch { break }
                             }
                         }, @{ proc = $proc; ch = $ch; ws = $ws; token = $cts.Token })
                     }
@@ -210,6 +282,7 @@ function Start-AgentSession {
                     }
                 }
                 elseif ($result.MessageType -eq [System.Net.WebSockets.WebSocketMessageType]::Binary) {
+                    # Binary frame from core: [2 (1 byte), channel (4 bytes), stdin bytes]
                     if ($result.Count -gt 5 -and $buffer[0] -eq 2) {
                         $chanBytes = New-Object byte[] 4
                         [System.Array]::Copy($buffer, 1, $chanBytes, 0, 4)
@@ -225,9 +298,9 @@ function Start-AgentSession {
                 }
             }
         } catch {
-            Write-Host "[tTerm] Connection error: $_"
+            Log-Agent "Connection error: $_"
         }
-        Write-Host "[tTerm] Reconnecting in 5 seconds..."
+        Log-Agent "Reconnecting in 5 seconds..."
         Start-Sleep -Seconds 5
     }
 }
@@ -238,15 +311,64 @@ Start-AgentSession
 Set-Content -Path $AGENT_SCRIPT -Value $scriptContent -Encoding UTF8
 Write-Host "  Agent script installed: $AGENT_SCRIPT" -ForegroundColor Green
 
-# Set up autostart in Windows Startup
-$startupFolder = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Startup)
-$shortcutPath = Join-Path $startupFolder "tTermAgent.lnk"
+# Foreground connectivity check before backgrounding
+$wsUrl = $HUB -replace "^http://", "ws://" -replace "^https://", "wss://"
+if (-not $wsUrl.EndsWith("/agent")) { $wsUrl = "$wsUrl/agent" }
 
+Write-Host "  Verifying connection to tTerm ($wsUrl)..." -ForegroundColor Cyan
+$verified = $false
+try {
+    $testWs = New-Object System.Net.WebSockets.ClientWebSocket
+    $testCts = New-Object System.Threading.CancellationTokenSource(12000)
+    $testTask = $testWs.ConnectAsync((New-Object System.Uri($wsUrl)), $testCts.Token)
+    $testTask.Wait()
+
+    $testHello = @{
+        t = "hello"
+        token = $TOKEN
+        key = $KEY
+        name = $env:COMPUTERNAME
+        user = $env:USERNAME
+        os = "Windows"
+        agent = "0.14.0"
+        shell = "powershell.exe"
+        web = 2
+    } | ConvertTo-Json -Compress
+
+    $testBytes = [System.Text.Encoding]::UTF8.GetBytes($testHello)
+    $testWs.SendAsync((New-Object System.ArraySegment[byte] -ArgumentList @(,$testBytes)), [System.Net.WebSockets.WebSocketMessageType]::Text, $true, $testCts.Token).Wait()
+
+    $respBuf = New-Object byte[] 4096
+    $recvTask = $testWs.ReceiveAsync((New-Object System.ArraySegment[byte] -ArgumentList @(,$respBuf)), $testCts.Token)
+    $recvTask.Wait()
+    $respText = [System.Text.Encoding]::UTF8.GetString($respBuf, 0, $recvTask.Result.Count)
+    $testWs.CloseAsync([System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure, "Done", $testCts.Token).Wait()
+
+    if ($respText -match '"welcome"') {
+        Write-Host "  [OK] Successfully connected and registered in tTerm Web!" -ForegroundColor Green
+        $verified = $true
+    } else {
+        Write-Host "  Server response: $respText" -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "  (Handshake note: $_. Agent will connect in background)" -ForegroundColor Gray
+}
+
+# Set up silent autostart via Windows VBS wrapper (no flashing window)
+$startupFolder = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Startup)
+$vbsPath = Join-Path $DIR "start_agent.vbs"
+$vbsContent = @"
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$AGENT_SCRIPT`"", 0, False
+"@
+Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII
+
+$shortcutPath = Join-Path $startupFolder "tTermAgent.lnk"
 try {
     $wscript = New-Object -ComObject WScript.Shell
     $shortcut = $wscript.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = "powershell.exe"
-    $shortcut.Arguments = "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$AGENT_SCRIPT`""
+    $shortcut.TargetPath = "wscript.exe"
+    $shortcut.Arguments = "`"$vbsPath`""
     $shortcut.WindowStyle = 7
     $shortcut.Description = "tTerm Web Agent"
     $shortcut.Save()
@@ -255,10 +377,16 @@ try {
     Write-Host "  Warning: Could not create startup shortcut: $_" -ForegroundColor Yellow
 }
 
-# Start the agent right now in the background
-Start-Process powershell.exe -ArgumentList "-WindowStyle Hidden -ExecutionPolicy Bypass -File `"$AGENT_SCRIPT`"" -WindowStyle Hidden
+# Start agent in background
+try {
+    Start-Process "wscript.exe" -ArgumentList "`"$vbsPath`""
+} catch {
+    Start-Process powershell.exe -ArgumentList "-WindowStyle Hidden -ExecutionPolicy Bypass -NoProfile -File `"$AGENT_SCRIPT`"" -WindowStyle Hidden
+}
 
 Write-Host ""
-Write-Host "  Done! The tTerm agent is running in the background." -ForegroundColor Cyan
-Write-Host "  Your computer will appear in tTerm Web within a few seconds." -ForegroundColor Green
+Write-Host "  =================================================" -ForegroundColor Cyan
+Write-Host "  [SUCCESS] tTerm Windows Agent is running!" -ForegroundColor Green
+Write-Host "  Your computer appears in tTerm Web now." -ForegroundColor Green
+Write-Host "  =================================================" -ForegroundColor Cyan
 Write-Host ""

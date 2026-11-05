@@ -9695,6 +9695,26 @@ mark.log-hit {
   font-size: 11px;
 }
 
+.strip-btn-attach {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 4px;
+  margin-left: 4px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.strip-btn-attach:hover {
+  background: var(--shade);
+  color: #10b981;
+  transform: scale(1.15);
+}
+
 .strip-running-pill {
   color: #f59e0b;
   font-weight: 600;

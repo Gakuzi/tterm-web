@@ -548,6 +548,26 @@ export async function authState(): Promise<AuthState> {
   return (await check(response)).json();
 }
 
+export interface TelegramAuthStatus {
+  ok: boolean;
+  bot_configured: boolean;
+  bot_username: string;
+}
+
+export function telegramAuthStatus(): Promise<TelegramAuthStatus> {
+  return fetch("/api/auth/telegram/status", { cache: "no-store" })
+    .then((r) => r.json())
+    .catch(() => ({ ok: false, bot_configured: false, bot_username: "" }));
+}
+
+export function requestTelegramCode(telegramId: string, name?: string): Promise<{ ok: boolean; sent: boolean; delivered_via_bot: boolean; note?: string }> {
+  return auth("/api/auth/telegram/request-code", { telegram_id: telegramId, name });
+}
+
+export function verifyTelegramCode(telegramId: string, code: string): Promise<SignedInNow> {
+  return auth("/api/auth/telegram/verify-code", { telegram_id: telegramId, code });
+}
+
 /** Sends a code for signing in to the address. */
 export function askCode(email: string): Promise<{ email: string; minutes: number }> {
   return auth("/api/auth/code", { email });

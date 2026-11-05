@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Me, TerminalInfo } from "./api";
-import { Branch, Folder, FolderOpen, Gear, Upload } from "./icons";
+import { Branch, Folder, FolderOpen, Gear, Paperclip } from "./icons";
 import { ModeToggle } from "./InputLine";
 import { ProjectAccessDialog } from "./ProjectAccessDialog";
 
@@ -44,6 +44,20 @@ export function TerminalHeader(props: Props) {
             <div className="strip-cwd" title={where}>
               <Folder size={12} />
               <span>{where}</span>
+              {!isEnded && onUploadClick && (
+                <button
+                  type="button"
+                  className="strip-btn-attach"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUploadClick();
+                  }}
+                  title={`Прикрепить и загрузить файл в ${where}`} /* i18n-ignore */
+                  aria-label={`Прикрепить файл в ${where}`} /* i18n-ignore */
+                >
+                  <Paperclip size={12} />
+                </button>
+              )}
             </div>
           )}
 
@@ -63,19 +77,6 @@ export function TerminalHeader(props: Props) {
         </div>
 
         <div className="strip-right">
-          {!isEnded && onUploadClick && (
-            <button
-              type="button"
-              className="strip-btn-upload"
-              onClick={onUploadClick}
-              title={where ? `Загрузить файлы на ${machineName || "машину"} в ${where}` : `Загрузить файлы на ${machineName || "машину"}`} // i18n-ignore
-              aria-label="Загрузить файлы" // i18n-ignore
-            >
-              <Upload size={13} />
-              <span className="strip-btn-text">{/* i18n-ignore */}Загрузить</span>
-            </button>
-          )}
-
           {!isEnded && onSftpClick && (
             <button
               type="button"
