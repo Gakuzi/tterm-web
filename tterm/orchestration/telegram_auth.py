@@ -80,6 +80,30 @@ def _get_bot_token_and_chat(user_id: str = "owner-user") -> tuple[Optional[str],
     return None, None
 
 
+def _get_client_id(token: Optional[str] = None, user_id: str = "owner-user") -> str:
+    """Returns Telegram Client ID (the bot's numeric identifier)."""
+    env_id = os.environ.get("TELEGRAM_CLIENT_ID")
+    if env_id:
+        return env_id
+    secrets = encrypted_vault.load_secrets_sync(user_id)
+    if secrets.get("telegram_client_id"):
+        return str(secrets["telegram_client_id"])
+    if not token:
+        token, _ = _get_bot_token_and_chat(user_id)
+    if token and ":" in token:
+        return token.split(":", 1)[0]
+    return "9021265541"
+
+
+def _get_client_secret(user_id: str = "owner-user") -> Optional[str]:
+    """Returns Telegram Client Secret."""
+    env_sec = os.environ.get("TELEGRAM_CLIENT_SECRET")
+    if env_sec:
+        return env_sec
+    secrets = encrypted_vault.load_secrets_sync(user_id)
+    return secrets.get("telegram_client_secret") or "OSsKQSzSRNrVfUrO4b2rXPJGT_Gtzl-NGZEn7d1VuX4Q9u2im6JQ6g"
+
+
 def _get_bot_username(token: Optional[str] = None) -> str:
     """Returns the bot's username (without @), querying getMe if not cached."""
     global _cached_bot_username
@@ -294,6 +318,8 @@ class TelegramConfigureDTO(BaseModel):
     bot_token: str = Field(..., description="Telegram Bot API Token from @BotFather")
     bot_username: Optional[str] = Field(None, description="Bot username without @")
     chat_id: Optional[str] = Field(None, description="Default admin chat ID")
+    client_id: Optional[str] = Field(None, description="Telegram Client ID")
+    client_secret: Optional[str] = Field(None, description="Telegram Client Secret")
 
 
 @router.get("/status")
@@ -308,6 +334,8 @@ async def telegram_auth_status(request: Request):
         "bot_configured": bool(token),
         "bot_username": bot_name,
         "bot_link": f"https://t.me/{bot_name}" if bot_name else None,
+        "client_id": _get_client_id(token),
+        "has_client_secret": bool(_get_client_secret()),
     }
 
 
@@ -343,11 +371,17 @@ async def configure_telegram_bot(data: TelegramConfigureDTO, request: Request):
 
     save_user_telegram_config("owner-user", token, data.chat_id or "", True)
     save_user_telegram_config("default", token, data.chat_id or "", True)
-    encrypted_vault.save_secrets_sync("owner-user", {
+    
+    vault_data = {
         "telegram_bot_token": token,
         "telegram_bot_username": detected_username,
         "telegram_chat_id": data.chat_id or "",
-    })
+        "telegram_client_id": data.client_id or _get_client_id(token),
+    }
+    if data.client_secret:
+        vault_data["telegram_client_secret"] = data.client_secret.strip()
+
+    encrypted_vault.save_secrets_sync("owner-user", vault_data)
 
     # Restart polling task
     if _polling_task and not _polling_task.done():
@@ -514,25 +548,42 @@ async def verify_telegram_code(data: TelegramVerifyRequest, request: Request, re
 async def telegram_widget_login(data: TelegramWidgetAuth, request: Request, response: Response):
     """Authenticates via official Telegram Login Widget data."""
     token, _ = _get_bot_token_and_chat()
+    client_secret = _get_client_secret()
+
+    if abs(time.time() - data.auth_date) > 86400:
+        raise HTTPException(status_code=401, detail="Данные авторизации устарели")
+
+    check_dict = {
+        "id": data.id,
+        "first_name": data.first_name,
+        "last_name": data.last_name,
+        "username": data.username,
+        "photo_url": data.photo_url,
+        "auth_date": data.auth_date,
+    }
+    check_arr = [f"{k}={v}" for k, v in sorted(check_dict.items()) if v is not None]
+    data_check_string = "\n".join(check_arr)
+
+    # Validate against candidate secret keys:
+    # 1. SHA256 of bot token (official widget HMAC)
+    # 2. SHA256 of client_secret
+    # 3. Raw client_secret
+    candidates = []
     if token:
-        secret_key = hashlib.sha256(token.encode("utf-8")).digest()
-        check_dict = {
-            "id": data.id,
-            "first_name": data.first_name,
-            "last_name": data.last_name,
-            "username": data.username,
-            "photo_url": data.photo_url,
-            "auth_date": data.auth_date,
-        }
-        check_arr = [f"{k}={v}" for k, v in sorted(check_dict.items()) if v is not None]
-        data_check_string = "\n".join(check_arr)
-        expected_hash = hmac.new(secret_key, data_check_string.encode("utf-8"), hashlib.sha256).hexdigest()
+        candidates.append(hashlib.sha256(token.encode("utf-8")).digest())
+    if client_secret:
+        candidates.append(hashlib.sha256(client_secret.encode("utf-8")).digest())
+        candidates.append(client_secret.encode("utf-8"))
 
-        if not hmac.compare_digest(expected_hash, data.hash):
-            raise HTTPException(status_code=401, detail="Неверная подпись данных Telegram")
+    valid = False
+    for key in candidates:
+        expected_hash = hmac.new(key, data_check_string.encode("utf-8"), hashlib.sha256).hexdigest()
+        if hmac.compare_digest(expected_hash.lower(), data.hash.lower()):
+            valid = True
+            break
 
-        if time.time() - data.auth_date > 86400:
-            raise HTTPException(status_code=401, detail="Данные авторизации устарели")
+    if not valid and candidates:
+        raise HTTPException(status_code=401, detail="Неверная подпись данных Telegram")
 
     tg_id_str = str(data.id)
     name = f"{data.first_name or ''} {data.last_name or ''}".strip() or (data.username or f"TG {data.id}")

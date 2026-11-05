@@ -557,6 +557,8 @@ export interface TelegramAuthStatus {
   bot_configured: boolean;
   bot_username: string;
   bot_link?: string;
+  client_id?: string;
+  has_client_secret?: boolean;
 }
 
 export function telegramAuthStatus(): Promise<TelegramAuthStatus> {
