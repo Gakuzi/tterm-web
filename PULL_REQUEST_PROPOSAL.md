@@ -1,7 +1,7 @@
 # 🤝 Предложение о слиянии (Pull Request Proposal)
 
 **Кому:** Денису Герасименко ([@DLGerasimenko](https://github.com/DLGerasimenko))  
-**От:** Евгения Климова ([@Gakuzi](https://github.com/Gakuzi), Telegram: [@eklimov84](https://t.me/eklimov84), Email: eklimov84@gmail.com)  
+**От:** Евгения Климова ([@Gakuzi](https://github.com/Gakuzi), Telegram: [@eklimov](https://t.me/eklimov))  
 **Ветка разработки:** `feature/mcp-ai-integration`  
 **Статус тестирования:** ✅ Все тесты пройдены, 0 ошибок типизации, проверено в рабочей среде на Raspberry Pi и Debian Linux.
 
@@ -384,8 +384,7 @@ Frontend:
 
 Денис, если потребуется что-то скорректировать, вынести в отдельные модули или настроить под твое видение дальнейшей архитектуры — я на связи:
 
-* **Telegram:** [@eklimov84](https://t.me/eklimov84)
-* **Email:** [eklimov84@gmail.com](mailto:eklimov84@gmail.com)
+* **Telegram:** [@eklimov](https://t.me/eklimov)
 * **GitHub:** [Gakuzi](https://github.com/Gakuzi)
 
 Буду рад вашему ответу и совместной работе над развитием сервиса!

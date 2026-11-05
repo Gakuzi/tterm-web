@@ -814,6 +814,39 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         )
         return PlainTextResponse(script, headers={"content-type": "text/x-shellscript; charset=utf-8", "cache-control": "no-store"})
 
+    @app.get("/install.ps1")
+    @app.get("/install_computer.ps1")
+    async def page_quick_installer_ps1(request: Request) -> Response:
+        """Universal PowerShell onboarding script for connecting Windows computers."""
+        token = await machines.get_or_create_quick_computer_token(pool)
+        script = machines.render_computer_installer_ps1(token=token, connect_url=connect_url)
+        return PlainTextResponse(script, headers={"content-type": "text/plain; charset=utf-8",
+                                                  "cache-control": "no-store"})
+
+    @app.get("/install.bat")
+    @app.get("/install_windows.bat")
+    async def page_quick_installer_bat(request: Request) -> Response:
+        """Universal Batch installer for connecting Windows computers in 1 click."""
+        token = await machines.get_or_create_quick_computer_token(pool)
+        content = machines.render_computer_installer_bat(token=token, connect_url=connect_url)
+        return PlainTextResponse(content, headers={"content-type": "text/plain; charset=utf-8",
+                                                   "cache-control": "no-store",
+                                                   "content-disposition": "attachment; filename=tterm-setup.bat"})
+
+    @app.get("/tterm-agent.exe")
+    @app.get("/install_windows.exe")
+    async def page_download_agent_exe() -> Response:
+        """Native Windows Agent executable for 1-click install and background operation."""
+        exe_path = Path(__file__).resolve().parent.parent / "templates" / "tterm-agent.exe"
+        if exe_path.is_file():
+            return FileResponse(
+                exe_path,
+                media_type="application/vnd.microsoft.portable-executable",
+                filename="tterm-agent.exe",
+                headers={"cache-control": "no-store"}
+            )
+        return PlainTextResponse("Agent binary not found", status_code=404)
+
     # ------------------------------------------------- within a session
 
     @app.get("/api/state")

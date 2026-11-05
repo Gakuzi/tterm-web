@@ -90,19 +90,28 @@ export function ClientInstallerBanner() {
       {selectedOs === "windows" && (
         <div>
           <p style={{ margin: "0 0 10px 0", fontSize: 13, color: "var(--color-text-secondary, #999)" }}>
-            Агент tTerm для Windows позволяет подключать локальные сессии PowerShell и CMD к веб-интерфейсу, управлять терминалами и предоставлять доступ ИИ-ассистентам. {/* i18n-ignore */}
+            Нативная программа tTerm Agent для Windows автоматически подключает PowerShell к веб-интерфейсу, настраивает автозапуск при старте системы и работает тихо в фоновом режиме. {/* i18n-ignore */}
           </p>
-          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
             <a
-              href="/install_windows.bat"
-              download="install_windows.bat"
+              href={`${window.location.protocol}//${window.location.hostname}:8291/tterm-agent.exe`}
+              download="tterm-agent.exe"
               className="button-accent"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", padding: "6px 14px" }}
+              style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none", padding: "8px 16px", fontWeight: 600 }}
             >
-              <Download size={15} />
-              Скачать установщик (.bat) {/* i18n-ignore */}
+              <Download size={16} />
+              Скачать программу (.exe) {/* i18n-ignore */}
             </a>
-            <span style={{ fontSize: 12, color: "var(--color-text-secondary, #888)" }}>или запустить в консоли: {/* i18n-ignore */}</span>
+            <a
+              href={`${window.location.protocol}//${window.location.hostname}:8291/install_windows.bat`}
+              download="tterm-setup.bat"
+              className="button-ghost"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", padding: "8px 14px", fontSize: 13 }}
+            >
+              <Computer size={14} />
+              Скрипт (.bat) {/* i18n-ignore */}
+            </a>
+            <span style={{ fontSize: 12, color: "var(--color-text-secondary, #888)" }}>или запустить в PowerShell: {/* i18n-ignore */}</span>
           </div>
           <div style={{
             display: "flex",

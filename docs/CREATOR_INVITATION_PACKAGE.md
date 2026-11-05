@@ -1,7 +1,7 @@
 # 🤝 Creator Invitation & Pull Request Review Package
 
 **Кому:** Денису Герасименко ([@DLGerasimenko](https://github.com/DLGerasimenko)) — автору и создателю tTerm  
-**От:** Евгения Климова ([@Gakuzi](https://github.com/Gakuzi), Telegram: [@eklimov84](https://t.me/eklimov84), Email: eklimov84@gmail.com)  
+**От:** Евгения Климова ([@Gakuzi](https://github.com/Gakuzi), Telegram: [@eklimov](https://t.me/eklimov))  
 **Репозиторий (Fork):** [`https://github.com/Gakuzi/tterm-web.git`](https://github.com/Gakuzi/tterm-web.git)  
 **Ветки разработки:** `feature/mcp-ai-orchestration-v1` и `feature/mcp-ai-integration`  
 **Базовый релиз:** tTerm Web v0.1.28 (`origin/main`)  
@@ -181,6 +181,6 @@ Looking forward to your review and feedback!
 
 * **Разработчик:** Евгений Климов  
 * **GitHub:** [@Gakuzi](https://github.com/Gakuzi)  
-* **Telegram:** [@eklimov84](https://t.me/eklimov84)  
-* **Email:** [eklimov84@gmail.com](mailto:eklimov84@gmail.com)  
+* **Telegram:** [@eklimov](https://t.me/eklimov)  
+* **GitHub:** [Gakuzi](https://github.com/Gakuzi)  
 * **Форк репозитория:** [`https://github.com/Gakuzi/tterm-web`](https://github.com/Gakuzi/tterm-web) (ветка `feature/mcp-ai-integration`)

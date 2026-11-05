@@ -15,10 +15,11 @@ from __future__ import annotations
 
 import ipaddress
 import logging
+from pathlib import Path
 
 import asyncpg
 from fastapi import FastAPI, Request, WebSocket
-from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
 from starlette.requests import HTTPConnection
 
@@ -96,6 +97,39 @@ def create_connect_app(pool: asyncpg.Pool, signer: SignerClient,
             web_url=web_url,
         )
         return PlainTextResponse(script, headers=SCRIPT_HEADERS)
+
+    @app.get("/install.ps1")
+    @app.get("/install_computer.ps1")
+    async def universal_installer_ps1(request: Request) -> Response:
+        """Universal PowerShell onboarding script for connecting Windows computers."""
+        token = await machines.get_or_create_quick_computer_token(pool)
+        script = machines.render_computer_installer_ps1(token=token, connect_url=connect_url)
+        return PlainTextResponse(script, headers={"content-type": "text/plain; charset=utf-8",
+                                                  "cache-control": "no-store"})
+
+    @app.get("/install.bat")
+    @app.get("/install_windows.bat")
+    async def universal_installer_bat(request: Request) -> Response:
+        """Universal Batch installer for connecting Windows computers in 1 click."""
+        token = await machines.get_or_create_quick_computer_token(pool)
+        content = machines.render_computer_installer_bat(token=token, connect_url=connect_url)
+        return PlainTextResponse(content, headers={"content-type": "text/plain; charset=utf-8",
+                                                   "cache-control": "no-store",
+                                                   "content-disposition": "attachment; filename=tterm-setup.bat"})
+
+    @app.get("/tterm-agent.exe")
+    @app.get("/install_windows.exe")
+    async def universal_installer_exe() -> Response:
+        """Native Windows Agent executable for 1-click install and background operation."""
+        exe_path = Path(__file__).resolve().parent.parent / "templates" / "tterm-agent.exe"
+        if exe_path.is_file():
+            return FileResponse(
+                exe_path,
+                media_type="application/vnd.microsoft.portable-executable",
+                filename="tterm-agent.exe",
+                headers={"cache-control": "no-store"}
+            )
+        return PlainTextResponse("Agent binary not found", status_code=404)
 
     @app.get("/s/{token}")
     async def installer(token: str) -> Response:

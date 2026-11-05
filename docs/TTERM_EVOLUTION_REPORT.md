@@ -3,7 +3,7 @@
 
 **Автор оригинального проекта:** Денис Герасименко ([@DLGerasimenko](https://github.com/DLGerasimenko))  
 **Репозиторий оригинала:** [`https://github.com/DLGerasimenko/tterm-web.git`](https://github.com/DLGerasimenko/tterm-web.git) (релиз `0.1.28`, ветка `main`)  
-**Разработчик расширенной платформы:** Евгений Климов ([@Gakuzi](https://github.com/Gakuzi), Telegram: [@eklimov84](https://t.me/eklimov84))  
+**Разработчик расширенной платформы:** Евгений Климов ([@Gakuzi](https://github.com/Gakuzi), Telegram: [@eklimov](https://t.me/eklimov))  
 **Ветка проекта:** `feature/mcp-ai-integration`  
 **Дата отчета:** Ноябрь 2026 г.
 
