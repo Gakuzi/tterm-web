@@ -11346,4 +11346,61 @@ input:checked + .slider:before {
   border: 1px solid var(--line);
 }
 
+/* -------------------------------- Notification Prompt Banner -------------------------------- */
+.notify-prompt-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  background: linear-gradient(90deg, rgba(30, 58, 138, 0.35) 0%, rgba(15, 23, 42, 0.6) 100%);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+  color: var(--ink);
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  animation: slideDown 0.3s ease-out;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 20;
+}
+
+.notify-prompt-banner-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  flex-shrink: 0;
+}
+
+.notify-prompt-banner-body {
+  flex: 1;
+  min-width: 240px;
+}
+
+.notify-prompt-banner-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #bfdbfe;
+  margin-bottom: 2px;
+}
+
+.notify-prompt-banner-desc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dim);
+  line-height: 1.4;
+}
+
+.notify-prompt-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+
 

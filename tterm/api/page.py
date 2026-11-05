@@ -461,6 +461,10 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         return machine
     app = FastAPI(title="tTerm Web", version=__version__, docs_url=None,
                   redoc_url=None, openapi_url=None)
+    app.state.pool = pool
+    app.state.terminals = terminals
+    app.state.agents = agents
+    app.state.signer = signer
     app.include_router(orchestration_router)
     dist = dist.resolve()
 

@@ -38,6 +38,7 @@ import { NeedAccount, type Need } from "./NeedAccount";
 import { forgetSupportDraft, SupportDialog } from "./SupportDialog";
 import { draftsOf, forgetDrafts, markDeleted } from "./drafts";
 import { initNotificationBot } from "./notifications";
+import { NotificationPromptBanner } from "./NotificationPromptBanner";
 import { NoteView, primeNote, type SaveState, type Typed } from "./NoteView";
 import { summary, titled, toMarkdown } from "./noteText";
 import {
@@ -1855,6 +1856,8 @@ export function App() {
         }}
         onRename={renameTab}
         onStopRename={stopRenaming} />
+
+      <NotificationPromptBanner notify={notYet} />
 
       {/* Under the Settings window the page stays as it was, but Tab does
           not reach it: nothing typed there goes to a terminal under it. */}

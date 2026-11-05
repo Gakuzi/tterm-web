@@ -68,7 +68,7 @@ export function TerminalHeader(props: Props) {
               type="button"
               className="strip-btn-upload"
               onClick={onUploadClick}
-              title={where ? `Загрузить файлы в ${where}` : "Загрузить файлы в терминал"} // i18n-ignore
+              title={where ? `Загрузить файлы на ${machineName || "машину"} в ${where}` : `Загрузить файлы на ${machineName || "машину"}`} // i18n-ignore
               aria-label="Загрузить файлы" // i18n-ignore
             >
               <Upload size={13} />
@@ -81,7 +81,7 @@ export function TerminalHeader(props: Props) {
               type="button"
               className="strip-btn-sftp"
               onClick={onSftpClick}
-              title="Параметры SFTP / FTP подключения к окружению терминала" // i18n-ignore
+              title={`Параметры SFTP / FTP подключения к ${machineName || "машине"}`} // i18n-ignore
               aria-label="SFTP / FTP" // i18n-ignore
             >
               <FolderOpen size={13} />

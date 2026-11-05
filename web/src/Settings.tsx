@@ -35,7 +35,7 @@ import {
 } from "./icons";
 import {
   getDeviceName, getNotificationSettings, playNotificationChime,
-  requestNotificationPermission, saveNotificationSettings, showPushNotification,
+  promptNotificationPermission, saveNotificationSettings, showPushNotification,
 } from "./notifications";
 import { KeysSection } from "./Keys.tsx";
 import { AiSection } from "./AiSection";
@@ -215,36 +215,48 @@ function GeneralPane(props: Props) {
 
         <Row label={"Системный Push" /* i18n-ignore */}
           note={permission === "granted"
-            ? "Системные push-уведомления браузера разрешены" /* i18n-ignore */
+            ? "Системные push-уведомления браузера разрешены и активны" /* i18n-ignore */
             : permission === "denied"
-            ? "Уведомления заблокированы в настройках браузера" /* i18n-ignore */
-            : "Требуется разрешение браузера для отправки системных push" /* i18n-ignore */}
-          words={"браузер push разрешение система" /* i18n-ignore */}>
-          {permission === "granted" ? (
-            <button type="button" className="button-ghost small"
-              onClick={() => showPushNotification(
-                "tTerm: Тестовое уведомление" /* i18n-ignore */,
-                "Уведомления и звуковой сигнал настроены успешно!" /* i18n-ignore */
-              )}>
-              {"Тестовый пуш 🔔" /* i18n-ignore */}
-            </button>
-          ) : (
-            <button type="button" className="button small"
-              onClick={async () => {
-                const ok = await requestNotificationPermission();
-                if (typeof window !== "undefined" && "Notification" in window) {
-                  setPermission(Notification.permission);
-                }
-                if (ok) {
-                  showPushNotification(
-                    "tTerm: Разрешено" /* i18n-ignore */,
-                    "Уведомления успешно активированы!" /* i18n-ignore */
-                  );
-                }
-              }}>
-              {"Запросить разрешение" /* i18n-ignore */}
-            </button>
-          )}
+            ? "Уведомления заблокированы в настройках браузера (разрешите их в адресной строке)" /* i18n-ignore */
+            : (!window.isSecureContext && window.location.protocol === "http:")
+            ? "HTTP режим: звук и in-app оповещения активны. Для окон ОС откройте через HTTPS или localhost." /* i18n-ignore */
+            : "Браузер ожидает запроса на отправку системных push-уведомлений" /* i18n-ignore */}
+          words={"браузер push разрешение система звук" /* i18n-ignore */}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {permission === "granted" ? (
+              <>
+                <button type="button" className="button-ghost small"
+                  onClick={() => showPushNotification(
+                    "tTerm: Тестовое уведомление" /* i18n-ignore */,
+                    "Уведомления и звуковой сигнал настроены успешно!" /* i18n-ignore */
+                  )}>
+                  {"Тестовый пуш 🔔" /* i18n-ignore */}
+                </button>
+                <button type="button" className="button-ghost small"
+                  onClick={() => playNotificationChime(true)}
+                  title="Проверить аудио-сигнал" /* i18n-ignore */>
+                  {"Звук 🔊" /* i18n-ignore */}
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="button small"
+                  onClick={async () => {
+                    await promptNotificationPermission();
+                    if (typeof window !== "undefined" && "Notification" in window) {
+                      setPermission(Notification.permission);
+                    }
+                  }}>
+                  {"Запросить разрешение в браузере 🔔" /* i18n-ignore */}
+                </button>
+                <button type="button" className="button-ghost small"
+                  onClick={() => playNotificationChime(true)}
+                  title="Проверить аудио-сигнал" /* i18n-ignore */>
+                  {"Звук 🔊" /* i18n-ignore */}
+                </button>
+              </>
+            )}
+          </div>
         </Row>
 
         <Row label={"Multi-Device Broadcast" /* i18n-ignore */}

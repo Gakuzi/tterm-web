@@ -195,23 +195,115 @@ export function playNotificationChime(success = true) {
   }
 }
 
-// ------------------------------------------------ Browser Native Push
-export async function requestNotificationPermission(): Promise<boolean> {
-  if (typeof window === "undefined" || !("Notification" in window)) {
-    return false;
-  }
-  if (Notification.permission === "granted") {
-    return true;
-  }
-  if (Notification.permission !== "denied") {
-    try {
-      const perm = await Notification.requestPermission();
-      return perm === "granted";
-    } catch {
-      return false;
+// ------------------------------------------------ Tab Title Flashing
+let titleFlashInterval: number | null = null;
+let originalDocTitle = "";
+
+export function flashTabTitle(alertText: string) {
+  if (typeof document === "undefined" || !document.hidden) return;
+  if (!originalDocTitle) originalDocTitle = document.title;
+  if (titleFlashInterval) clearInterval(titleFlashInterval);
+
+  let step = 0;
+  titleFlashInterval = window.setInterval(() => {
+    if (!document.hidden) {
+      stopTabTitleFlashing();
+      return;
     }
+    document.title = step % 2 === 0 ? `🔔 ${alertText}` : originalDocTitle;
+    step++;
+  }, 1000);
+
+  const onFocus = () => {
+    stopTabTitleFlashing();
+    window.removeEventListener("focus", onFocus);
+  };
+  window.addEventListener("focus", onFocus);
+}
+
+export function stopTabTitleFlashing() {
+  if (titleFlashInterval) {
+    clearInterval(titleFlashInterval);
+    titleFlashInterval = null;
   }
-  return false;
+  if (originalDocTitle && typeof document !== "undefined") {
+    document.title = originalDocTitle;
+    originalDocTitle = "";
+  }
+}
+
+// ------------------------------------------------ Browser Native Push & Diagnostics
+export interface NotificationStatus {
+  supported: boolean;
+  permission: NotificationPermission | "unsupported";
+  isSecureContext: boolean;
+  isHttpOrigin: boolean;
+}
+
+export function getNotificationStatus(): NotificationStatus {
+  const hasWindow = typeof window !== "undefined";
+  if (!hasWindow || !("Notification" in window)) {
+    return {
+      supported: false,
+      permission: "unsupported",
+      isSecureContext: hasWindow ? Boolean(window.isSecureContext) : false,
+      isHttpOrigin: hasWindow ? window.location.protocol === "http:" : false,
+    };
+  }
+  return {
+    supported: true,
+    permission: Notification.permission,
+    isSecureContext: Boolean(window.isSecureContext),
+    isHttpOrigin: window.location.protocol === "http:",
+  };
+}
+
+export async function promptNotificationPermission(
+  notify?: (text: string) => void
+): Promise<{ granted: boolean; reason?: string }> {
+  if (typeof window === "undefined" || !("Notification" in window)) {
+    notify?.("⚠️ Браузер не поддерживает Web Notifications API"); // i18n-ignore
+    return { granted: false, reason: "unsupported" };
+  }
+
+  // Modern browsers require direct user interaction for requestPermission
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm === "granted") {
+      saveNotificationSettings({ enabled: true, nativeNotification: true });
+      playNotificationChime(true);
+      try {
+        new Notification("✅ tTerm: Уведомления включены!", { // i18n-ignore
+          body: "Вы будете получать системные уведомления о завершении долгих процессов и фоновых сборок.", // i18n-ignore
+          icon: "/favicon.svg",
+        });
+      } catch {
+        // Fallback if Notification constructor fails in context
+      }
+      notify?.("✅ Системные уведомления успешно разрешены в браузере!"); // i18n-ignore
+      return { granted: true };
+    } else if (perm === "denied") {
+      notify?.("⚠️ Уведомления отклонены. Разрешите их в настройках сайта (иконка замка в адресной строке)."); // i18n-ignore
+      return { granted: false, reason: "denied" };
+    }
+  } catch (err) {
+    // If requestPermission rejects (e.g. Insecure HTTP origin restrictions)
+    console.warn("requestPermission failed:", err);
+  }
+
+  // If permission is still default or rejected due to HTTP
+  if (!window.isSecureContext && window.location.protocol === "http:") {
+    playNotificationChime(true);
+    notify?.("ℹ️ На HTTP (IP-адрес) браузер блокирует нативные окна ОС. Включены звук (Web Audio), баннеры в приложении и мигание вкладки!"); // i18n-ignore
+    return { granted: false, reason: "insecure_http" };
+  }
+
+  return { granted: false, reason: "cancelled" };
+}
+
+export async function requestNotificationPermission(): Promise<boolean> {
+  const res = await promptNotificationPermission();
+  return res.granted;
 }
 
 export function showPushNotification(
@@ -224,6 +316,7 @@ export function showPushNotification(
   if (!settings.enabled) return;
 
   playNotificationChime();
+  flashTabTitle(title);
 
   if (settings.nativeNotification && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
     try {

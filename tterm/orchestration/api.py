@@ -1435,11 +1435,12 @@ async def upload_terminal_files(
             if hasattr(value, "filename") and hasattr(value, "read"):
                 fname = getattr(value, "filename", None) or "uploaded_file"
                 content = await value.read()
-                saved = file_upload_gateway.save_uploaded_file(
+                saved = await file_upload_gateway.upload_file(
                     terminal_id=terminal_id,
                     filename=fname,
                     content_bytes=content,
                     target_dir=str(target_dir) if target_dir else None,
+                    request=request,
                 )
                 results.append(saved)
     else:
@@ -1462,11 +1463,12 @@ async def upload_terminal_files(
                     content = base64.b64decode(b64)
                 except Exception as e:
                     raise HTTPException(status_code=400, detail=f"Invalid base64 in {fname}: {e}")
-                saved = file_upload_gateway.save_uploaded_file(
+                saved = await file_upload_gateway.upload_file(
                     terminal_id=terminal_id,
                     filename=fname,
                     content_bytes=content,
                     target_dir=str(target_dir) if target_dir else None,
+                    request=request,
                 )
                 results.append(saved)
         elif "content_base64" in body:
@@ -1476,11 +1478,12 @@ async def upload_terminal_files(
                 content = base64.b64decode(b64)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"Invalid base64: {e}")
-            saved = file_upload_gateway.save_uploaded_file(
+            saved = await file_upload_gateway.upload_file(
                 terminal_id=terminal_id,
                 filename=fname,
                 content_bytes=content,
                 target_dir=str(target_dir) if target_dir else None,
+                request=request,
             )
             results.append(saved)
 
@@ -1499,10 +1502,15 @@ async def upload_terminal_files(
 @router.get("/terminals/{terminal_id}/sftp-info")
 async def get_terminal_sftp_info(
     terminal_id: str,
+    request: Request,
     machine_id: Optional[str] = Query(None),
 ):
-    """Returns SFTP / FTP direct access configuration for the terminal environment."""
-    creds = file_upload_gateway.get_sftp_credentials(terminal_id=terminal_id, machine_id=machine_id)
+    """Returns SFTP / FTP direct access configuration for the target machine environment."""
+    creds = file_upload_gateway.get_sftp_credentials(
+        terminal_id=terminal_id,
+        machine_id=machine_id,
+        request=request,
+    )
     return {
         "ok": True,
         "sftp": creds,

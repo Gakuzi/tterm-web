@@ -1672,7 +1672,12 @@ export interface UploadedFileRecord {
   filename: string;
   size: number;
   path: string;
+  dest_path?: string;
   target_dir: string;
+  machine_id?: string;
+  machine_name?: string;
+  machine_host?: string;
+  transfer_method?: string;
   uploaded_at: string;
 }
 
@@ -1688,6 +1693,7 @@ export interface SftpCredentials {
   host: string;
   port: number;
   username: string;
+  machine_name?: string;
   sftp_url: string;
   web_dav_hint: string;
   default_dir: string;
@@ -1696,6 +1702,7 @@ export interface SftpCredentials {
   auth_methods: string[];
   command_hint: string;
   ftp_command_hint?: string;
+  cyberduck_hint?: string;
 }
 
 export async function getTerminalSftpInfo(terminalId: string, machineId?: string): Promise<SftpCredentials> {

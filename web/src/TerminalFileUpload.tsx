@@ -75,7 +75,7 @@ export const TerminalFileUpload = forwardRef<
       setUploadFileName(nameSummary);
 
       try {
-        await uploadFilesToTerminal(
+        const res = await uploadFilesToTerminal(
           terminalId,
           files,
           targetDir,
@@ -85,10 +85,12 @@ export const TerminalFileUpload = forwardRef<
         );
 
         setUploadProgress(100);
+        const targetMach = res.files?.[0]?.machine_name || machineName || "машину"; // i18n-ignore
+        const targetPath = res.files?.[0]?.dest_path || targetLabel;
         if (files.length === 1) {
-          notify(`Файл "${files[0].name}" успешно загружен в ${targetLabel}`); // i18n-ignore
+          notify(`Файл "${files[0].name}" успешно загружен на ${targetMach} (${targetPath})`); // i18n-ignore
         } else {
-          notify(`Успешно загружено файлов: ${files.length} в ${targetLabel}`); // i18n-ignore
+          notify(`Успешно загружено файлов: ${files.length} на ${targetMach} (${targetPath})`); // i18n-ignore
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Ошибка при загрузке файлов"; // i18n-ignore
@@ -211,11 +213,11 @@ export const TerminalFileUpload = forwardRef<
             </div>
             <h3 className="dropzone-title">
               {/* i18n-ignore */}
-              📥 Отпустите файлы для загрузки в {cwdDisplay}
+              📥 Отпустите файлы для загрузки на {machineName || "ноду"}: в {cwdDisplay}
             </h3>
             <p className="dropzone-subtitle">
               {/* i18n-ignore */}
-              Файлы сохраняются прямо в файловую систему окружения терминала
+              Файлы сохраняются прямо в файловую систему машины {machineName || "терминала"}
             </p>
           </div>
         </div>
