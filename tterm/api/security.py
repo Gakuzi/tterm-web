@@ -141,10 +141,17 @@ class PageGuard:
                 await self._refuse(scope, send, 403, "Not from this page")
                 return
         elif scope["method"] not in SAFE_METHODS:
-            if headers.get(REQUEST_HEADER) != "1" or (
-                    not allow_all and origin is not None and origin not in self.origins):
-                await self._refuse(scope, send, 403, "Not from this page")
-                return
+            path = scope.get("path", "")
+            is_orch = path.startswith("/api/orchestration/") or path.startswith("/api/mcp/")
+            if not is_orch and not allow_all:
+                if headers.get(REQUEST_HEADER) != "1" or (
+                        origin is not None and origin not in self.origins):
+                    await self._refuse(scope, send, 403, "Not from this page")
+                    return
+            else:
+                if not allow_all and origin is not None and origin not in self.origins:
+                    await self._refuse(scope, send, 403, "Not from this page")
+                    return
         await self.app(scope, receive, send)
 
     @staticmethod

@@ -1358,6 +1358,17 @@ export function App() {
     return () => window.removeEventListener("tterm-app", onApp);
   }, [updates.look]);
 
+  useEffect(() => {
+    const handleOpenSection = (event: Event) => {
+      const ce = event as CustomEvent<{ section?: SettingsSection }>;
+      if (ce.detail?.section) {
+        openSettingsNow.current(ce.detail.section);
+      }
+    };
+    window.addEventListener("tterm:open-settings-section", handleOpenSection);
+    return () => window.removeEventListener("tterm:open-settings-section", handleOpenSection);
+  }, []);
+
   if (signedOut) {
     return (
       <SignIn note={signedOut.note} email={lastEmail.current ?? undefined}
@@ -1449,17 +1460,6 @@ export function App() {
     }
   };
   openSettingsNow.current = openSettings;
-
-  useEffect(() => {
-    const handleOpenSection = (event: Event) => {
-      const ce = event as CustomEvent<{ section?: string }>;
-      if (ce.detail?.section) {
-        openSettings(ce.detail.section as SettingsSection);
-      }
-    };
-    window.addEventListener("tterm:open-settings-section", handleOpenSection);
-    return () => window.removeEventListener("tterm:open-settings-section", handleOpenSection);
-  }, []);
   /** Back to where the page or the window was opened from: the step before
    * it in the history, which its entry remembers (Back and Forward keep
    * that right). Opened by its address, as a bookmark, to the page under

@@ -124,7 +124,7 @@ export function setBlockWatched(
     // Register on backend bot
     void fetch("/api/orchestration/notifications/watch", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-tterm": "1" },
       body: JSON.stringify({
         terminal_id: meta?.terminalId || "terminal",
         block_id: key,
@@ -412,7 +412,7 @@ export function notifyCommandCompleted(params: {
   // 4. Report to backend for Multi-Device Broadcast (so user's phone / other laptops get alerted!)
   void fetch("/api/orchestration/notifications/complete", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-tterm": "1" },
     body: JSON.stringify({
       terminal_id: params.terminalId || "terminal",
       command: params.command,
@@ -442,7 +442,7 @@ export function initNotificationBot(userId?: string, inAppNotify?: (text: string
     registeredDevice = true;
     void fetch("/api/orchestration/notifications/register-device", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-tterm": "1" },
       body: JSON.stringify({
         device_id: devId,
         name: devName,
