@@ -437,6 +437,8 @@ export function Settings(props: Props) {
   // how it updates, waits for it.
   const onSection = useRef(props.onSection);
   onSection.current = props.onSection;
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(() => props.projects[0]?.id || "default");
+
   useEffect(() => {
     if (local && props.section && props.section !== "general" && props.section !== "updates") {
       onSection.current("");
@@ -532,19 +534,61 @@ export function Settings(props: Props) {
         return props.here ? <ThisComputerSection here={props.here} /> : null;
       case "updates":
         return <UpdatesSection />;
-      case "projects":
+      case "projects": {
+        const activeProject = props.projects.find((p) => p.id === selectedProjectId) || props.projects[0] || ({ id: "default", name: "Главный проект", code: "P", own: true, role: "owner" } as any); /* i18n-ignore */
         return (
-          <ProjectCollaboration
-            project={props.projects[0] || ({ id: "default", name: "Главный проект", code: "P", own: true, role: "owner" } as any)} // i18n-ignore
-            terminals={[]}
-            me={props.me}
-            notify={props.notify}
-          />
+          <div>
+            {props.projects.length > 1 && (
+              <div style={{
+                marginBottom: 20,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 12,
+                padding: "12px 18px",
+                borderRadius: 10,
+                background: "var(--color-bg-secondary, #1e1e24)",
+                border: "1px solid var(--color-border, #33333d)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <People size={18} />
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>Выберите проект для настройки: {/* i18n-ignore */}</span>
+                </div>
+                <select
+                  className="input-select"
+                  value={activeProject.id}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 6,
+                    fontSize: 13,
+                    minWidth: 200,
+                    fontWeight: 600,
+                  }}
+                >
+                  {props.projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.code}) {p.personal ? "[Личный]" /* i18n-ignore */ : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <ProjectCollaboration
+              key={activeProject.id}
+              project={activeProject}
+              terminals={[]}
+              me={props.me}
+              notify={props.notify}
+            />
+          </div>
         );
+      }
       case "ai":
         return <AiSection notify={props.notify} />;
       case "github":
-        return <GitHubSection notify={props.notify} />;
+        return <GitHubSection notify={props.notify} projects={props.projects} />;
       case "hosting":
         return (
           <AezaSection

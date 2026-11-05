@@ -586,6 +586,18 @@ class Terminal:
         expect it would type it in as a command.
         """
         assert self._link is not None
+
+        # For Windows machines, skip Linux/bash deployment scripts and use PowerShell directly
+        link_os = getattr(self._link, "os", "") or ""
+        machine_os = getattr(self.machine, "os", "") or ""
+        passport_os = ""
+        if isinstance(getattr(self.machine, "passport", None), dict):
+            passport_os = self.machine.passport.get("os", "")
+        elif isinstance(getattr(self.machine, "passport", None), str):
+            passport_os = self.machine.passport
+        if "win" in str(link_os).lower() or "win" in str(machine_os).lower() or "win" in str(passport_os).lower():
+            return shell.Plan(shell="powershell", command="powershell.exe", markers=False, blocks=False)
+
         try:
             code, out, err = await self._link.script(shell.deploy_script(),
                                                      DEPLOY_TIMEOUT)

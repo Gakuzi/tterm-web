@@ -6,12 +6,18 @@ and automatic action commit tracking for terminal sessions.
 """
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
+from pathlib import Path
 from typing import Dict, List, Optional
 from .models import BaseModel, Field
 
 log = logging.getLogger("tterm.orchestration.git_sync")
+
+DEFAULT_CONFIG_FILE = Path(os.getenv("GIT_CONFIGS_FILE", Path.home() / ".tterm-web" / "project_git_configs.json"))
+
 
 
 class ProjectGitConfigDTO(BaseModel):
@@ -37,40 +43,60 @@ class TerminalGitBranchDTO(BaseModel):
 
 
 class GitSyncManager:
-    """Manages project Git repositories and per-terminal branches."""
+    """Manages project Git repositories and per-terminal branches with disk persistence."""
 
-    def __init__(self):
-        # project_id -> ProjectGitConfigDTO
-        self._configs: Dict[str, ProjectGitConfigDTO] = {
-            "default": ProjectGitConfigDTO(
-                project_id="default",
-                repo_url="https://github.com/DLGerasimenko/tterm-web.git",
-                provider="github",
-                default_branch="main",
-                auto_branch_per_terminal=True,
-                auto_commit_actions=True,
-            )
-        }
-        # terminal_id -> TerminalGitBranchDTO
+    def __init__(self, config_file: Optional[Path] = None):
+        self._config_file = config_file or DEFAULT_CONFIG_FILE
+        self._configs: Dict[str, ProjectGitConfigDTO] = {}
         self._terminal_branches: Dict[str, TerminalGitBranchDTO] = {}
+        self._load_from_disk()
+
+    def _load_from_disk(self) -> None:
+        try:
+            if self._config_file.is_file():
+                with open(self._config_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    for pid, item in data.items():
+                        self._configs[pid] = ProjectGitConfigDTO(**item)
+                log.info("Loaded %d project git configs from %s", len(self._configs), self._config_file)
+        except Exception as e:
+            log.warning("Could not load project git configs from disk: %s", e)
+
+    def _save_to_disk(self) -> None:
+        try:
+            self._config_file.parent.mkdir(parents=True, exist_ok=True)
+            serializable = {pid: cfg.model_dump() for pid, cfg in self._configs.items()}
+            with open(self._config_file, "w", encoding="utf-8") as f:
+                json.dump(serializable, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            log.warning("Could not persist project git configs to disk: %s", e)
 
     def get_config(self, project_id: str) -> ProjectGitConfigDTO:
         if project_id not in self._configs:
+            fallback_repo = "https://github.com/DLGerasimenko/tterm-web.git" if project_id == "default" else ""
             self._configs[project_id] = ProjectGitConfigDTO(
                 project_id=project_id,
-                repo_url="https://github.com/DLGerasimenko/tterm-web.git",
+                repo_url=fallback_repo,
                 provider="github",
                 default_branch="main",
                 auto_branch_per_terminal=True,
                 auto_commit_actions=True,
+                use_github_notes=False,
+                notes_folder_in_repo="docs",
+                auto_sync_commits_as_notes=True,
             )
         return self._configs[project_id]
 
     def set_config(self, config: ProjectGitConfigDTO) -> ProjectGitConfigDTO:
         self._configs[config.project_id] = config
-        log.info("Project '%s' git repo bound to %s (auto_branch=%s)",
-                 config.project_id, config.repo_url, config.auto_branch_per_terminal)
+        self._save_to_disk()
+        log.info("Project '%s' git repo bound to %s (auto_branch=%s, saved_to_disk=%s)",
+                 config.project_id, config.repo_url, config.auto_branch_per_terminal, self._config_file)
         return config
+
+    def get_all_configs(self) -> Dict[str, ProjectGitConfigDTO]:
+        return dict(self._configs)
+
 
     def get_or_create_terminal_branch(
         self,

@@ -56,10 +56,12 @@ func main() {
 	tokenFlag := flag.String("token", "", "One-time enrollment token")
 	nameFlag := flag.String("name", "", "Computer name")
 	daemonFlag := flag.Bool("daemon", false, "Run in background daemon mode")
+	foregroundFlag := flag.Bool("foreground", false, "Run in foreground console for debugging")
 	installFlag := flag.Bool("install", false, "Install to AppData, configure autostart, and run")
 	uninstallFlag := flag.Bool("uninstall", false, "Remove from autostart and AppData")
 	statusFlag := flag.Bool("status", false, "Display status of tTerm agent")
 	flag.Parse()
+	_ = installFlag
 
 	userProfile := os.Getenv("USERPROFILE")
 	if userProfile == "" {
@@ -93,13 +95,16 @@ func main() {
 
 	cfg := loadOrInitConfig(appDir, *hubFlag, *tokenFlag, *nameFlag)
 
-	// If run by user double-click (no flags, not already daemon), install autostart and launch background daemon
-	if !*daemonFlag && !*installFlag && len(os.Args) <= 1 {
-		installAndLaunchDaemon(cfg, appDir)
+	// If explicit foreground mode requested, run agent loop directly in current console
+	if *foregroundFlag {
+		log.Printf("[tTerm Windows Agent v%s] Starting session (foreground)...", appVersion)
+		log.Printf("[Config] Hub: %s | Computer: %s | Key: %s...", cfg.Hub, cfg.Name, safePrefix(cfg.Key, 8))
+		runAgentLoop(cfg)
 		return
 	}
 
-	if *installFlag {
+	// If not already in background daemon mode, configure autostart, copy to AppData and launch detached daemon
+	if !*daemonFlag {
 		installAndLaunchDaemon(cfg, appDir)
 		return
 	}
@@ -193,8 +198,12 @@ func installAndLaunchDaemon(cfg *Config, appDir string) {
 	_ = os.MkdirAll(installDir, 0755)
 
 	targetExe := filepath.Join(installDir, "tterm-agent.exe")
+
+	// Stop any previously running instance if updating binary
 	currentExe, err := os.Executable()
 	if err == nil && filepath.Clean(currentExe) != filepath.Clean(targetExe) {
+		_ = exec.Command("taskkill", "/F", "/IM", "tterm-agent.exe").Run()
+		time.Sleep(300 * time.Millisecond)
 		_ = copyFile(currentExe, targetExe)
 	}
 
@@ -212,14 +221,17 @@ func installAndLaunchDaemon(cfg *Config, appDir string) {
 		_ = exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psScript).Run()
 	}
 
-	// Launch background process
+	// Launch completely detached background daemon via PowerShell Start-Process (independent desktop session process)
+	psSpawn := fmt.Sprintf(`Start-Process -FilePath '%s' -ArgumentList '--daemon' -WindowStyle Hidden`, targetExe)
+	_ = exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psSpawn).Run()
+
+	// Also launch directly with Win32 DETACHED_PROCESS and CREATE_NEW_PROCESS_GROUP flags as robust fallback
 	bgCmd := exec.Command(targetExe, "--daemon")
-	if err := bgCmd.Start(); err != nil {
-		// Fallback: run current binary with --daemon
-		log.Printf("Background start note: %v. Running in current process.", err)
-		runAgentLoop(cfg)
-		return
+	bgCmd.SysProcAttr = &syscall.SysProcAttr{
+		CreationFlags: 0x08000000 | 0x00000200 | 0x00000008, // CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS
+		HideWindow:    true,
 	}
+	_ = bgCmd.Start()
 
 	msg := fmt.Sprintf("tTerm Windows Agent успешно установлен и подключен!\n\n"+
 		"• Сервер: %s\n"+
@@ -433,7 +445,15 @@ func handleTextMessage(data []byte, cfg *Config) {
 		wsWriteMu.Unlock()
 
 	case "run":
-		runID, _ := msg["id"].(string)
+		var runID int64
+		switch v := msg["id"].(type) {
+		case float64:
+			runID = int64(v)
+		case int64:
+			runID = v
+		case int:
+			runID = int64(v)
+		}
 		scriptText, _ := msg["script"].(string)
 		go executeScriptRun(runID, scriptText)
 
@@ -457,8 +477,9 @@ func handleTextMessage(data []byte, cfg *Config) {
 	}
 }
 
-func executeScriptRun(runID, script string) {
+func executeScriptRun(runID int64, script string) {
 	cmd := exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	outBytes, err := cmd.CombinedOutput()
 
 	code := 0
@@ -551,7 +572,7 @@ func openTerminalChannel(ch uint32) {
 		chanMu.Unlock()
 
 		endedMsg := map[string]interface{}{
-			"t":     "ended",
+			"t":     "exit",
 			"ch":    ch,
 			"code":  exitCode,
 			"error": "",

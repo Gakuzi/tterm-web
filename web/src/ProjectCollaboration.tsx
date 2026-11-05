@@ -217,7 +217,7 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
     },
   ]);
 
-  const [gitRepo, setGitRepo] = useState("https://github.com/DLGerasimenko/tterm-web.git");
+  const [gitRepo, setGitRepo] = useState("");
   const [gitBranch, setGitBranch] = useState("main");
   const [gitMode, setGitMode] = useState<"bind" | "create">("bind");
   const [newRepoName, setNewRepoName] = useState("");
@@ -419,7 +419,7 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
       })
       .catch(() => {});
 
-    // 3. Fetch GitHub Auth Status
+    // 3. Fetch GitHub Auth Status & auto-load user repos
     fetch("/api/orchestration/github/status", {
       headers: { "x-tterm": "1" },
     })
@@ -427,6 +427,18 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
       .then((data) => {
         if (live && data?.ok) {
           setGithubStatus(data);
+          if (data.is_authenticated) {
+            fetch("/api/orchestration/github/repos", {
+              headers: { "x-tterm": "1" },
+            })
+              .then((r) => (r.ok ? r.json() : null))
+              .then((reposData) => {
+                if (live && reposData?.repos) {
+                  setUserGithubRepos(reposData.repos);
+                }
+              })
+              .catch(() => {});
+          }
         }
       })
       .catch(() => {});
@@ -450,7 +462,7 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (live && data?.config) {
-          if (data.config.repo_url) setGitRepo(data.config.repo_url);
+          setGitRepo(data.config.repo_url || "");
           if (data.config.default_branch) setGitBranch(data.config.default_branch);
           if (typeof data.config.auto_branch_per_terminal === "boolean") {
             setAutoBranchPerTerminal(data.config.auto_branch_per_terminal);
@@ -1527,6 +1539,7 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
               <select
                 className="input-select"
                 style={{ fontSize: 12, padding: "4px 8px" }}
+                value={userGithubRepos.find((r) => r.html_url + ".git" === gitRepo || r.html_url === gitRepo) ? (userGithubRepos.find((r) => r.html_url + ".git" === gitRepo || r.html_url === gitRepo)!.html_url + ".git") : ""}
                 onChange={(e) => {
                   if (e.target.value) {
                     setGitRepo(e.target.value);
@@ -1555,7 +1568,7 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
                   type="text"
                   className="input-text"
                   value={gitRepo}
-                  placeholder="https://github.com/DLGerasimenko/tterm-web.git"
+                  placeholder="https://github.com/username/repository.git"
                   onChange={(e) => setGitRepo(e.target.value)}
                   style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }}
                 />

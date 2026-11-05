@@ -13,19 +13,43 @@ set CONNECT_URL=%1
 if "%CONNECT_URL%"=="" set CONNECT_URL=http://192.168.0.6:8291
 
 echo Connecting to tTerm Web at %CONNECT_URL%...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; $ProgressPreference = 'SilentlyContinue'; try { $s = (New-Object Net.WebClient).DownloadString('%CONNECT_URL%/install_computer.ps1'); Invoke-Expression $s } catch { Write-Error $_.Exception.Message; exit 1 }"
+echo [1/2] Загрузка tTerm Agent...
 
-if %ERRORLEVEL% neq 0 (
-    echo.
-    echo [ERROR] Agent setup failed with exit code %ERRORLEVEL%.
-    echo If Windows 11 blocked PowerShell execution:
-    echo 1. Open Settings - Apps - Advanced app settings
-    echo 2. Set 'Choose where to get apps' to 'Anywhere'
-    echo.
+set "AGENT_EXE=%TEMP%\tterm-agent.exe"
+if exist "%AGENT_EXE%" del /f /q "%AGENT_EXE%" 2>nul
+
+where curl >nul 2>nul
+if %ERRORLEVEL% equ 0 (
+    curl -f -sSL "%CONNECT_URL%/tterm-agent.exe" -o "%AGENT_EXE%"
 ) else (
-    echo.
-    echo [OK] tTerm Agent successfully registered and started!
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference = 'SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object Net.WebClient).DownloadFile('%CONNECT_URL%/tterm-agent.exe', [System.IO.Path]::Combine($env:TEMP, 'tterm-agent.exe'))"
 )
 
+if exist "%AGENT_EXE%" (
+    echo [2/2] Запуск мастера установки и фоновой службы...
+    start "" "%AGENT_EXE%" --hub "%CONNECT_URL%"
+    echo.
+    echo [OK] tTerm Agent успешно запущен!
+    goto :done
+)
+
+echo.
+echo [Резервный вариант] Загрузка PowerShell агента...
+set "PS_TMP=%TEMP%\tterm-agent-setup.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$ProgressPreference = 'SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object Net.WebClient).DownloadFile('%CONNECT_URL%/install_computer.ps1', [System.IO.Path]::Combine($env:TEMP, 'tterm-agent-setup.ps1'))"
+
+if exist "%PS_TMP%" (
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%PS_TMP%"
+    del /f /q "%PS_TMP%" 2>nul
+    echo.
+    echo [OK] tTerm PowerShell Agent успешно установлен!
+    goto :done
+)
+
+echo.
+echo [ERROR] Не удалось загрузить агент с сервера %CONNECT_URL%.
+echo Проверьте подключение к локальной сети.
+
+:done
 echo.
 pause

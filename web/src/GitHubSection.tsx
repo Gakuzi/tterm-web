@@ -24,6 +24,7 @@ import { Group, Row } from "./SettingsRows";
 interface Props {
   notify: (text: string) => void;
   compact?: boolean;
+  projects?: Array<{ id: string; name: string; code?: string }>;
 }
 
 export function GitHubSection(props: Props) {
@@ -43,6 +44,12 @@ export function GitHubSection(props: Props) {
   const [newRepoDesc, setNewRepoDesc] = useState("Managed by tTerm"); // i18n-ignore
   const [newRepoPrivate, setNewRepoPrivate] = useState(false);
   const [creatingRepo, setCreatingRepo] = useState(false);
+
+  // Project bindings state
+  const [projectBindings, setProjectBindings] = useState<Record<string, string>>({});
+  const [selectedProjectForRepo, setSelectedProjectForRepo] = useState<Record<string, string>>({});
+  const [bindingRepo, setBindingRepo] = useState<string | null>(null);
+
 
   // OAuth App custom config toggle
   const [showOAuthConfig, setShowOAuthConfig] = useState(false);
@@ -92,6 +99,7 @@ export function GitHubSection(props: Props) {
         }
       }
       setStatus(st);
+      void loadGitConfigs();
       if (st.is_authenticated) {
         void loadRepos();
       }
@@ -113,6 +121,76 @@ export function GitHubSection(props: Props) {
       setLoadingRepos(false);
     }
   };
+
+  const loadGitConfigs = async () => {
+    try {
+      const res = await fetch("/api/orchestration/git-configs", { headers: { "x-tterm": "1" } });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.configs) {
+          const map: Record<string, string> = {};
+          for (const [pid, cfg] of Object.entries(data.configs)) {
+            if ((cfg as any).repo_url) {
+              const cleanUrl = (cfg as any).repo_url.toLowerCase().replace(/\.git$/, "");
+              map[cleanUrl] = pid;
+            }
+          }
+          setProjectBindings(map);
+        }
+      }
+    } catch {}
+  };
+
+  const handleBindRepoToProject = async (repo: GitHubRepo, projectId: string) => {
+    if (!projectId) {
+      notify("Пожалуйста, выберите проект для привязки"); // i18n-ignore
+      return;
+    }
+    const targetProject = props.projects?.find((p) => p.id === projectId);
+    const projName = targetProject ? targetProject.name : projectId;
+    const repoUrl = repo.html_url.endsWith(".git") ? repo.html_url : `${repo.html_url}.git`;
+    setBindingRepo(repo.name);
+    try {
+      const res = await fetch(`/api/orchestration/projects/${projectId}/git-config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify({
+          project_id: projectId,
+          repo_url: repoUrl,
+          provider: "github",
+          default_branch: repo.default_branch || "main",
+          auto_branch_per_terminal: true,
+          auto_commit_actions: true,
+          use_github_notes: true,
+          notes_folder_in_repo: "docs",
+          auto_sync_commits_as_notes: true,
+        }),
+      });
+
+      // Also ensure notes-config is saved
+      await fetch(`/api/orchestration/projects/${projectId}/notes-config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify({
+          use_github_as_notes: true,
+          notes_folder_in_repo: "docs",
+          commits_as_notes: true,
+        }),
+      });
+
+      if (res.ok) {
+        notify(`Репозиторий ${repo.name} успешно привязан к проекту "${projName}"!`); // i18n-ignore
+        void loadGitConfigs();
+      } else {
+        notify("Ошибка при сохранении привязки репозитория"); // i18n-ignore
+      }
+    } catch {
+      notify("Сетевая ошибка при привязке репозитория"); // i18n-ignore
+    } finally {
+      setBindingRepo(null);
+    }
+  };
+
 
   // Check URL query parameters for OAuth callback (?code=...&state=...)
   useEffect(() => {
@@ -504,50 +582,101 @@ export function GitHubSection(props: Props) {
                   Репозитории пользователя ({repos.length}) {/* i18n-ignore */}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  {repos.slice(0, 15).map((r) => (
-                    <div
-                      key={r.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "6px 8px",
-                        borderRadius: "6px",
-                        backgroundColor: "var(--ground, #0D0E11)",
-                        fontSize: "13px",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontWeight: 500, color: "var(--ink, #EDEFF3)" }}>{r.name}</span>
-                        {r.private && (
-                          <span
-                            style={{
-                              fontSize: "10px",
-                              padding: "1px 6px",
-                              borderRadius: "4px",
-                              backgroundColor: "var(--amber-tint, rgba(233, 163, 63, .12))",
-                              color: "var(--amber, #E9A33F)",
-                            }}
-                          >
-                            private {/* i18n-ignore */}
-                          </span>
-                        )}
-                        <span style={{ fontSize: "11px", color: "var(--faint, #7D838E)" }}>
-                          ({r.default_branch})
-                        </span>
-                      </div>
-                      <a
-                        href={r.html_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="button-plain small"
-                        style={{ padding: "2px 6px" }}
-                        title="Открыть на GitHub" /* i18n-ignore */
+                  {repos.slice(0, 15).map((r) => {
+                    const cleanUrl = r.html_url.toLowerCase().replace(/\.git$/, "");
+                    const boundProjectId = projectBindings[cleanUrl];
+                    const boundProject = boundProjectId && props.projects ? props.projects.find((p) => p.id === boundProjectId) : null;
+                    const chosenProjectId = selectedProjectForRepo[r.name] || boundProjectId || (props.projects?.[0]?.id || "");
+
+                    return (
+                      <div
+                        key={r.id}
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 6,
+                          padding: "8px 10px",
+                          borderRadius: "6px",
+                          backgroundColor: "var(--ground, #0D0E11)",
+                          fontSize: "13px",
+                          border: boundProject ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid transparent", /* i18n-ignore */
+                        }}
                       >
-                        <Link size={12} />
-                      </a>
-                    </div>
-                  ))}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontWeight: 600, color: "var(--ink, #EDEFF3)" }}>{r.name}</span>
+                            {r.private && (
+                              <span
+                                style={{
+                                  fontSize: "10px",
+                                  padding: "1px 6px",
+                                  borderRadius: "4px",
+                                  backgroundColor: "var(--amber-tint, rgba(233, 163, 63, .12))",
+                                  color: "var(--amber, #E9A33F)",
+                                }}
+                              >
+                                private {/* i18n-ignore */}
+                              </span>
+                            )}
+                            <span style={{ fontSize: "11px", color: "var(--faint, #7D838E)" }}>
+                              ({r.default_branch})
+                            </span>
+                            {boundProject && (
+                              <span style={{
+                                fontSize: "11px",
+                                padding: "1px 6px",
+                                borderRadius: "4px",
+                                background: "rgba(16, 185, 129, 0.15)",
+                                color: "#10b981",
+                                border: "1px solid rgba(16, 185, 129, 0.3)",
+                                fontWeight: 600,
+                              }}>
+                                ✓ Привязан к: {boundProject.name} {/* i18n-ignore */}
+                              </span>
+                            )}
+                          </div>
+                          <a
+                            href={r.html_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="button-plain small"
+                            style={{ padding: "2px 6px" }}
+                            title="Открыть на GitHub" /* i18n-ignore */
+                          >
+                            <Link size={12} />
+                          </a>
+                        </div>
+
+                        {props.projects && props.projects.length > 0 && (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 2 }}>
+                            <span style={{ fontSize: 11, color: "var(--dim, #9AA0AA)" }}>Привязать к проекту: {/* i18n-ignore */}</span>
+                            <select
+                              className="input-select"
+                              style={{ fontSize: 11, padding: "2px 6px", height: 26, borderRadius: 4, minWidth: 160 }}
+                              value={chosenProjectId}
+                              onChange={(e) => setSelectedProjectForRepo((prev) => ({ ...prev, [r.name]: e.target.value }))}
+                            >
+                              <option value="">-- Выбрать проект -- {/* i18n-ignore */}</option>
+                              {props.projects.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} ({p.code || "P"})
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              className="button-accent small"
+                              style={{ padding: "2px 10px", height: 26, fontSize: 11 }}
+                              disabled={bindingRepo === r.name || !chosenProjectId}
+                              onClick={() => void handleBindRepoToProject(r, chosenProjectId)}
+                            >
+                              {bindingRepo === r.name ? "Сохранение..." : "Сохранить"} {/* i18n-ignore */}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

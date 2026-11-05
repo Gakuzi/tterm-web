@@ -183,6 +183,13 @@ async def bind_git_repository(
 from .git_sync import git_sync_manager, ProjectGitConfigDTO
 
 
+@router.get("/git-configs")
+async def list_all_project_git_configs():
+    """Returns Git repository bindings for all configured projects."""
+    all_configs = git_sync_manager.get_all_configs()
+    return {"ok": True, "configs": {pid: cfg.model_dump() for pid, cfg in all_configs.items()}}
+
+
 @router.get("/projects/{project_id}/git-config")
 async def get_project_git_config(project_id: str):
     """Returns the Git repository binding and terminal branch settings for a project."""
