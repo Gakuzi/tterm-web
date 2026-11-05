@@ -2048,6 +2048,133 @@ export async function listAezaServices(): Promise<{
   return response.json();
 }
 
+// ---------------------------------------------------------------------- Encrypted Cloud Vault
+export interface VaultOverview {
+  ok: boolean;
+  user_id?: string;
+  encryption: string;
+  configured_services: string[];
+  github_configured: boolean;
+  github_masked?: string | null;
+  github_username?: string | null;
+  github_repos?: string[];
+  aeza_configured: boolean;
+  aeza_masked?: string | null;
+  aeza_balance?: number | null;
+  aeza_account_id?: string | null;
+  telegram_configured: boolean;
+  telegram_bot_token_masked?: string | null;
+  telegram_chat_id?: string | null;
+  telegram_enabled: boolean;
+  has_ai_agent_keys: boolean;
+  notification_settings: Record<string, any>;
+  updated_at?: string | null;
+  error?: string;
+}
+
+export interface VaultData {
+  ok: boolean;
+  user_id?: string;
+  encryption?: string;
+  secrets: {
+    github_token?: string;
+    github_username?: string;
+    github_repos?: string[];
+    aeza_api_key?: string;
+    aeza_balance?: number;
+    aeza_account_id?: string;
+    telegram_bot_token?: string;
+    telegram_chat_id?: string;
+    telegram_enabled?: boolean;
+    notification_settings?: Record<string, any>;
+    ai_agent_keys?: Record<string, any>;
+    [key: string]: any;
+  };
+  error?: string;
+}
+
+export async function getVaultOverview(): Promise<VaultOverview> {
+  const response = await fetch("/api/orchestration/vault/overview", {
+    cache: "no-store",
+    headers: { "x-tterm": "1" },
+  });
+  return response.json();
+}
+
+export async function getVaultData(): Promise<VaultData> {
+  const response = await fetch("/api/orchestration/vault/data", {
+    cache: "no-store",
+    headers: { "x-tterm": "1" },
+  });
+  return response.json();
+}
+
+export async function saveVaultSecrets(secrets: Record<string, any>, merge = true): Promise<{
+  ok: boolean;
+  user_id?: string;
+  encryption?: string;
+  status?: string;
+  error?: string;
+}> {
+  const response = await fetch("/api/orchestration/vault/save", change("POST", {
+    secrets,
+    merge,
+  }));
+  return response.json();
+}
+
+// ------------------------------------------------ Telegram Push Notification Bot
+export interface TelegramConfigStatus {
+  ok: boolean;
+  configured: boolean;
+  enabled: boolean;
+  chat_id: string;
+  masked_token: string;
+  user_id?: string;
+  error?: string;
+}
+
+export async function getTelegramConfig(): Promise<TelegramConfigStatus> {
+  const response = await fetch("/api/orchestration/notifications/telegram-config", {
+    cache: "no-store",
+    headers: { "x-tterm": "1" },
+  });
+  return response.json();
+}
+
+export async function saveTelegramConfig(params: {
+  bot_token?: string;
+  chat_id?: string;
+  enabled?: boolean;
+}): Promise<TelegramConfigStatus> {
+  const response = await fetch(
+    "/api/orchestration/notifications/telegram-config",
+    change("POST", params)
+  );
+  return response.json();
+}
+
+export async function deleteTelegramConfig(): Promise<{ ok: boolean; configured: boolean }> {
+  const response = await fetch(
+    "/api/orchestration/notifications/telegram-config",
+    change("DELETE", {})
+  );
+  return response.json();
+}
+
+export async function testTelegramNotification(params: {
+  bot_token?: string;
+  chat_id?: string;
+}): Promise<{ ok: boolean; delivered: boolean; message?: string; error?: string }> {
+  const response = await fetch(
+    "/api/orchestration/notifications/telegram-test",
+    change("POST", params)
+  );
+  return response.json();
+}
+
+
+
 
 
 

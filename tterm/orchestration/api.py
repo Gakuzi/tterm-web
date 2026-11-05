@@ -762,16 +762,36 @@ async def get_active_watches_status(
     }
 
 
+def _extract_user_id(request: Optional[Any] = None, explicit_user_id: Optional[str] = None) -> str:
+    if explicit_user_id and str(explicit_user_id).strip():
+        return str(explicit_user_id).strip()
+    if request is not None:
+        headers = getattr(request, "headers", {})
+        if hasattr(headers, "get"):
+            hdr_user = headers.get("x-user-id")
+            if hdr_user and str(hdr_user).strip():
+                return str(hdr_user).strip()
+        state = getattr(request, "state", None)
+        state_user = getattr(state, "user_id", None)
+        if state_user:
+            return str(state_user)
+        query_params = getattr(request, "query_params", {})
+        if hasattr(query_params, "get") and query_params.get("user_id"):
+            return str(query_params.get("user_id")).strip()
+    return "owner-user"
+
+
 @router.post("/notifications/complete")
-async def report_command_completed(data: CommandCompletedDTO):
-    """Reports completion of a command, triggering multi-device broadcast across all connected devices."""
+async def report_command_completed(data: CommandCompletedDTO, request: Request = None):
+    """Reports completion of a command, triggering multi-device broadcast across all connected devices and Telegram."""
+    uid = _extract_user_id(request, data.user_id)
     resolved = await notifications_bot.broadcast_command_completed(
         terminal_id=data.terminal_id,
         command=data.command,
         exit_code=data.exit_code,
         duration_sec=data.duration_sec,
         block_id=data.block_id,
-        user_id=data.user_id,
+        user_id=uid,
         initiator_device_id=data.initiator_device_id,
     )
     return {
@@ -836,6 +856,102 @@ async def list_user_notifications(user_id: str = Query(...), unread_only: bool =
     from .notifications import notification_hub
     notifs = notification_hub.get_notifications(user_id, unread_only)
     return {"ok": True, "notifications": [n.model_dump() for n in notifs]}
+
+
+# ---------------------------------------------------------------------- Telegram Push Notification Bot
+class TelegramTestDTO(BaseModel):
+    bot_token: Optional[str] = None
+    chat_id: Optional[str] = None
+    user_id: Optional[str] = None
+
+
+class TelegramConfigDTO(BaseModel):
+    bot_token: Optional[str] = None
+    chat_id: Optional[str] = None
+    enabled: bool = True
+    user_id: Optional[str] = None
+
+
+@router.post("/notifications/telegram-test")
+async def test_telegram_notification(data: TelegramTestDTO, request: Request = None):
+    """Sends a test Telegram notification message to verify token and chat ID."""
+    from .notifications_bot import (
+        async_send_telegram_alert,
+        get_user_telegram_config,
+    )
+    uid = _extract_user_id(request, data.user_id)
+    cfg = get_user_telegram_config(uid)
+
+    token = (data.bot_token or cfg.get("bot_token") or "").strip()
+    chat = (str(data.chat_id) if data.chat_id is not None else str(cfg.get("chat_id") or "")).strip()
+
+    if not token or not chat:
+        raise HTTPException(
+            status_code=400,
+            detail="Необходимо указать Bot Token и Chat ID для проверки",
+        )
+
+    test_body = "✅ tTerm: Уведомления через Telegram успешно настроены и подключены к вашему аккаунту!"
+    delivered = await async_send_telegram_alert(
+        bot_token=token,
+        chat_id=chat,
+        title="tTerm Test Notification",
+        body=test_body,
+        metadata=None,
+    )
+
+    return {
+        "ok": delivered,
+        "delivered": delivered,
+        "message": test_body if delivered else "Не удалось отправить сообщение в Telegram (проверьте токен бота и chat ID)",
+    }
+
+
+@router.get("/notifications/telegram-config")
+async def get_telegram_config(user_id: Optional[str] = Query(None), request: Request = None):
+    """Returns Telegram notification bot status and masked token for the current user."""
+    from .notifications_bot import get_user_telegram_config
+    uid = _extract_user_id(request, user_id)
+    cfg = get_user_telegram_config(uid)
+    return {
+        "ok": True,
+        "configured": cfg.get("configured", False),
+        "enabled": cfg.get("enabled", True),
+        "chat_id": cfg.get("chat_id", ""),
+        "masked_token": cfg.get("masked_token", ""),
+        "user_id": uid,
+    }
+
+
+@router.post("/notifications/telegram-config")
+async def save_telegram_config(data: TelegramConfigDTO, request: Request = None):
+    """Saves Telegram bot credentials for the user."""
+    from .notifications_bot import save_user_telegram_config
+    uid = _extract_user_id(request, data.user_id)
+    cfg = save_user_telegram_config(
+        user_id=uid,
+        bot_token=data.bot_token or "",
+        chat_id=data.chat_id or "",
+        enabled=data.enabled,
+    )
+    return {
+        "ok": True,
+        "configured": cfg.get("configured", False),
+        "enabled": cfg.get("enabled", True),
+        "chat_id": cfg.get("chat_id", ""),
+        "masked_token": cfg.get("masked_token", ""),
+        "user_id": uid,
+    }
+
+
+@router.delete("/notifications/telegram-config")
+async def delete_telegram_config(user_id: Optional[str] = Query(None), request: Request = None):
+    """Removes user's Telegram bot configuration."""
+    from .notifications_bot import delete_user_telegram_config
+    uid = _extract_user_id(request, user_id)
+    deleted = delete_user_telegram_config(uid)
+    return {"ok": True, "deleted": deleted, "configured": False}
+
 
 
 
@@ -1039,31 +1155,30 @@ class AezaOrderDTO(BaseModel):
     user_id: Optional[str] = None
 
 
-def _extract_user_id(request: Optional[Any] = None, explicit_user_id: Optional[str] = None) -> str:
-    if explicit_user_id and str(explicit_user_id).strip():
-        return str(explicit_user_id).strip()
-    if request is not None:
-        headers = getattr(request, "headers", {})
-        if hasattr(headers, "get"):
-            hdr_user = headers.get("x-user-id")
-            if hdr_user and str(hdr_user).strip():
-                return str(hdr_user).strip()
-        state = getattr(request, "state", None)
-        state_user = getattr(state, "user_id", None)
-        if state_user:
-            return str(state_user)
-        query_params = getattr(request, "query_params", {})
-        if hasattr(query_params, "get") and query_params.get("user_id"):
-            return str(query_params.get("user_id")).strip()
-    return "owner-user"
+class VaultSaveDTO(BaseModel):
+    user_id: Optional[str] = None
+    secrets: Dict[str, Any]
+    merge: bool = True
 
 
 @router.get("/aeza/config")
 async def get_aeza_config(user_id: Optional[str] = Query(None), request: Request = None):
     """Returns Aeza API configuration status and masked key for the requesting user."""
-    from .aeza_cloud import get_user_key, mask_api_key
+    from .aeza_cloud import get_user_key, mask_api_key, save_user_key
+    from .encrypted_vault import encrypted_vault
     uid = _extract_user_id(request, user_id)
     key = get_user_key(uid)
+    if not key:
+        pool = getattr(getattr(request, "app", None), "state", None)
+        pool_obj = getattr(pool, "pool", None) if pool else None
+        try:
+            secrets = await encrypted_vault.load_secrets(uid, pool=pool_obj)
+            vault_key = secrets.get("aeza_api_key")
+            if vault_key:
+                key = str(vault_key).strip()
+                save_user_key(uid, key)
+        except Exception:
+            pass
     return {
         "ok": True,
         "configured": bool(key),
@@ -1076,6 +1191,7 @@ async def get_aeza_config(user_id: Optional[str] = Query(None), request: Request
 async def save_aeza_config(data: AezaConfigDTO, request: Request = None):
     """Validates and saves personal Aeza API credentials for the authenticated user."""
     from .aeza_cloud import AezaClient, mask_api_key, save_user_key
+    from .encrypted_vault import encrypted_vault
     uid = _extract_user_id(request, data.user_id)
     clean_key = (data.api_key or "").strip()
     if not clean_key:
@@ -1093,6 +1209,22 @@ async def save_aeza_config(data: AezaConfigDTO, request: Request = None):
         }
 
     save_user_key(uid, clean_key)
+    # Persist to cloud encrypted vault
+    pool = getattr(getattr(request, "app", None), "state", None)
+    pool_obj = getattr(pool, "pool", None) if pool else None
+    try:
+        await encrypted_vault.save_secrets(
+            uid,
+            {
+                "aeza_api_key": clean_key,
+                "aeza_balance": acc.get("balance_rub", 0.0),
+                "aeza_account_id": acc.get("email"),
+            },
+            pool=pool_obj,
+        )
+    except Exception as e:
+        log.warning("Could not persist Aeza key to encrypted vault: %s", e)
+
     return {
         "ok": True,
         "configured": True,
@@ -1107,8 +1239,20 @@ async def save_aeza_config(data: AezaConfigDTO, request: Request = None):
 async def delete_aeza_config(user_id: Optional[str] = Query(None), request: Request = None):
     """Removes personal Aeza credentials for the user."""
     from .aeza_cloud import delete_user_key
+    from .encrypted_vault import encrypted_vault
     uid = _extract_user_id(request, user_id)
     deleted = delete_user_key(uid)
+    pool = getattr(getattr(request, "app", None), "state", None)
+    pool_obj = getattr(pool, "pool", None) if pool else None
+    try:
+        await encrypted_vault.delete_secret_keys(
+            uid,
+            ["aeza_api_key", "aeza_balance", "aeza_account_id"],
+            pool=pool_obj,
+        )
+    except Exception as e:
+        log.warning("Could not delete Aeza key from encrypted vault: %s", e)
+
     return {
         "ok": True,
         "configured": False,
@@ -1219,10 +1363,22 @@ class GitHubCreatePRDTO(BaseModel):
 
 
 @router.get("/github/status")
-async def get_github_auth_status():
+async def get_github_auth_status(request: Request = None):
     """Returns the current GitHub authorization status and profile."""
     from .github_app import github_manager
+    from .encrypted_vault import encrypted_vault
+    uid = _extract_user_id(request, None)
     status = github_manager.get_auth_status()
+    if not status.get("is_authenticated"):
+        pool = getattr(getattr(request, "app", None), "state", None)
+        pool_obj = getattr(pool, "pool", None) if pool else None
+        try:
+            secrets = await encrypted_vault.load_secrets(uid, pool=pool_obj)
+            vault_token = secrets.get("github_token")
+            if vault_token:
+                status = github_manager.connect_with_token(vault_token)
+        except Exception:
+            pass
     return {"ok": True, **status}
 
 
@@ -1235,11 +1391,26 @@ async def get_github_oauth_url(redirect_uri: str = Query(...), state: str = Quer
 
 
 @router.post("/github/connect-token")
-async def connect_github_token(data: GitHubTokenConnectDTO):
+async def connect_github_token(data: GitHubTokenConnectDTO, request: Request = None):
     """Authorizes tTerm using a GitHub Personal Access Token or OAuth Access Token."""
-    from .github_app import github_manager
+    from .github_app import github_manager, save_github_token
+    from .encrypted_vault import encrypted_vault
+    uid = _extract_user_id(request, None)
     try:
-        status = github_manager.connect_with_token(data.token)
+        status = save_github_token(data.token, user_id=uid)
+        pool = getattr(getattr(request, "app", None), "state", None)
+        pool_obj = getattr(pool, "pool", None) if pool else None
+        try:
+            await encrypted_vault.save_secrets(
+                uid,
+                {
+                    "github_token": data.token.strip(),
+                    "github_username": status.get("username"),
+                },
+                pool=pool_obj,
+            )
+        except Exception as e:
+            log.warning("Could not persist GitHub token to encrypted vault: %s", e)
         return {"ok": True, **status}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1254,22 +1425,132 @@ async def configure_github_oauth_app(data: GitHubOAuthConfigDTO):
 
 
 @router.get("/github/callback")
-async def github_oauth_callback(code: str = Query(...), redirect_uri: str = Query(...)):
+async def github_oauth_callback(code: str = Query(...), redirect_uri: str = Query(...), request: Request = None):
     """Handles OAuth callback from GitHub and exchanges authorization code for access token."""
     from .github_app import github_manager
+    from .encrypted_vault import encrypted_vault
+    uid = _extract_user_id(request, None)
     try:
         status = github_manager.exchange_code_for_token(code, redirect_uri)
+        pool = getattr(getattr(request, "app", None), "state", None)
+        pool_obj = getattr(pool, "pool", None) if pool else None
+        token = github_manager._auth.get("access_token") if github_manager._auth else None
+        if token:
+            try:
+                await encrypted_vault.save_secrets(
+                    uid,
+                    {
+                        "github_token": token,
+                        "github_username": status.get("username"),
+                    },
+                    pool=pool_obj,
+                )
+            except Exception:
+                pass
         return {"ok": True, **status}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/github/disconnect")
-async def disconnect_github_account():
+async def disconnect_github_account(request: Request = None):
     """Disconnects GitHub account and revokes session."""
     from .github_app import github_manager
+    from .encrypted_vault import encrypted_vault
+    uid = _extract_user_id(request, None)
     ok = github_manager.disconnect()
+    pool = getattr(getattr(request, "app", None), "state", None)
+    pool_obj = getattr(pool, "pool", None) if pool else None
+    try:
+        await encrypted_vault.delete_secret_keys(
+            uid,
+            ["github_token", "github_username", "github_repos"],
+            pool=pool_obj,
+        )
+    except Exception as e:
+        log.warning("Could not remove GitHub token from encrypted vault: %s", e)
     return {"ok": ok}
+
+
+# ---------------------------------------------------------------------- Encrypted Cloud Vault Endpoints
+@router.get("/vault/overview")
+async def get_vault_overview(user_id: Optional[str] = Query(None), request: Request = None):
+    """Returns masked summary of credentials stored in the user's AES-256-GCM encrypted vault."""
+    from .encrypted_vault import encrypted_vault
+    uid = _extract_user_id(request, user_id)
+    pool = getattr(getattr(request, "app", None), "state", None)
+    pool_obj = getattr(pool, "pool", None) if pool else None
+    try:
+        overview = await encrypted_vault.get_masked_overview(uid, pool=pool_obj)
+        return overview
+    except Exception as e:
+        return {
+            "ok": False,
+            "user_id": uid,
+            "error": f"Failed to read vault overview: {e}",
+            "configured_services": [],
+        }
+
+
+@router.get("/vault/data")
+async def get_vault_data(user_id: Optional[str] = Query(None), request: Request = None):
+    """Returns decrypted secrets for the authenticated user session."""
+    from .encrypted_vault import encrypted_vault
+    uid = _extract_user_id(request, user_id)
+    pool = getattr(getattr(request, "app", None), "state", None)
+    pool_obj = getattr(pool, "pool", None) if pool else None
+    try:
+        secrets = await encrypted_vault.load_secrets(uid, pool=pool_obj)
+        return {
+            "ok": True,
+            "user_id": uid,
+            "encryption": "AES-256-GCM",
+            "secrets": secrets,
+        }
+    except Exception as e:
+        return {
+            "ok": False,
+            "user_id": uid,
+            "error": f"Failed to decrypt vault data: {e}",
+            "secrets": {},
+        }
+
+
+@router.post("/vault/save")
+async def save_vault_secrets(data: VaultSaveDTO, request: Request = None):
+    """Encrypts and persists user secrets with AES-256-GCM at rest."""
+    from .encrypted_vault import encrypted_vault
+    from .aeza_cloud import save_user_key
+    from .github_app import github_manager
+
+    uid = _extract_user_id(request, data.user_id)
+    pool = getattr(getattr(request, "app", None), "state", None)
+    pool_obj = getattr(pool, "pool", None) if pool else None
+
+    try:
+        saved = await encrypted_vault.save_secrets(uid, data.secrets, pool=pool_obj, merge=data.merge)
+
+        # Synchronize in-memory singletons if matching keys provided
+        if "aeza_api_key" in data.secrets and data.secrets["aeza_api_key"]:
+            save_user_key(uid, data.secrets["aeza_api_key"])
+        if "github_token" in data.secrets and data.secrets["github_token"]:
+            try:
+                github_manager.connect_with_token(data.secrets["github_token"])
+            except Exception:
+                pass
+
+        return {
+            "ok": True,
+            "user_id": uid,
+            "encryption": "AES-256-GCM",
+            "status": "encrypted_and_persisted",
+        }
+    except Exception as e:
+        return {
+            "ok": False,
+            "user_id": uid,
+            "error": f"Failed to encrypt and save secrets: {e}",
+        }
 
 
 @router.get("/github/repos")
@@ -1748,6 +2029,14 @@ async def list_cloud_deploy_tasks():
     """Lists all active and completed VPS deployment tasks."""
     from .cloud_deploy import cloud_deploy_manager
     return {"ok": True, "tasks": cloud_deploy_manager.list_tasks()}
+
+
+@router.post("/cloud-deploy/cancel/{task_id}")
+async def cancel_cloud_deploy(task_id: str):
+    """Cancels a running deployment task."""
+    from .cloud_deploy import cloud_deploy_manager
+    ok = cloud_deploy_manager.cancel_task(task_id)
+    return {"ok": ok, "task_id": task_id}
 
 
 @router.post("/cloud-deploy/test-email")

@@ -78,6 +78,24 @@ class GitHubAppManager:
 
         # Authenticated user session
         self._auth: Optional[Dict[str, Any]] = _load_auth_cache()
+        if not self._auth:
+            try:
+                from .encrypted_vault import encrypted_vault
+                secrets = encrypted_vault.load_secrets_sync("owner-user")
+                saved_token = secrets.get("github_token")
+                if saved_token:
+                    self._auth = {
+                        "is_authenticated": True,
+                        "auth_type": "oauth_token",
+                        "username": secrets.get("github_username") or "github-user",
+                        "name": secrets.get("github_username") or "GitHub User",
+                        "email": f"{secrets.get('github_username', 'user')}@users.noreply.github.com",
+                        "scopes": DEFAULT_SCOPES,
+                        "access_token": saved_token,
+                        "connected_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+                    }
+            except Exception:
+                pass
 
     def is_authenticated(self) -> bool:
         """Returns True if a GitHub user is currently authenticated."""
@@ -158,6 +176,17 @@ class GitHubAppManager:
             "connected_at": dt.datetime.now(dt.timezone.utc).isoformat(),
         }
         _save_auth_cache(self._auth)
+        try:
+            from .encrypted_vault import encrypted_vault
+            encrypted_vault.save_secrets_sync(
+                "owner-user",
+                {
+                    "github_token": clean_token,
+                    "github_username": self._auth.get("username"),
+                },
+            )
+        except Exception:
+            pass
         log.info("GitHub account connected successfully: @%s (%s)", self._auth["username"], self._auth["name"])
         return self.get_auth_status()
 
@@ -193,6 +222,11 @@ class GitHubAppManager:
         """Disconnects GitHub account."""
         self._auth = None
         _save_auth_cache(None)
+        try:
+            from .encrypted_vault import encrypted_vault
+            encrypted_vault.delete_secret_keys_sync("owner-user", ["github_token", "github_username", "github_repos"])
+        except Exception:
+            pass
         log.info("GitHub account disconnected")
         return True
 
@@ -390,3 +424,32 @@ class GitHubAppManager:
 
 
 github_manager = GitHubAppManager()
+
+
+def save_github_token(token: str, user_id: str = "owner-user") -> Dict[str, Any]:
+    """Saves GitHub access token into the encrypted vault and connects the account."""
+    clean = token.strip()
+    status = github_manager.connect_with_token(clean)
+    try:
+        from .encrypted_vault import encrypted_vault
+        encrypted_vault.save_secrets_sync(
+            user_id,
+            {
+                "github_token": clean,
+                "github_username": status.get("username"),
+            },
+        )
+    except Exception as e:
+        log.warning("Could not persist github token to encrypted vault: %s", e)
+    return status
+
+
+def load_github_token(user_id: str = "owner-user") -> Optional[str]:
+    """Retrieves GitHub token from the encrypted vault."""
+    try:
+        from .encrypted_vault import encrypted_vault
+        secrets = encrypted_vault.load_secrets_sync(user_id)
+        return secrets.get("github_token")
+    except Exception:
+        return None
+

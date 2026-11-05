@@ -1293,5 +1293,49 @@ class TestCloudDeploy(unittest.TestCase):
         asyncio.run(_run())
 
 
+class TestEncryptedVaultAndTelegram(unittest.TestCase):
+    def test_encrypted_vault_aes_gcm(self):
+        """Verifies AES-256-GCM encryption, decryption, and masking in EncryptedUserVault."""
+        import asyncio
+        from tterm.orchestration.encrypted_vault import EncryptedUserVault, mask_secret
+
+        vault = EncryptedUserVault()
+
+        async def _run():
+            secrets_data = {
+                "github_token": "ghp_secureSecretToken123456789",
+                "aeza_api_key": "1404_abc123xyz987654",
+                "telegram_bot_token": "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+                "telegram_chat_id": "987654321",
+                "telegram_enabled": True,
+            }
+            saved = await vault.save_secrets("test-user-vault", secrets_data)
+            self.assertEqual(saved["github_token"], "ghp_secureSecretToken123456789")
+
+            loaded = await vault.load_secrets("test-user-vault")
+            self.assertEqual(loaded["aeza_api_key"], "1404_abc123xyz987654")
+            self.assertEqual(loaded["telegram_chat_id"], "987654321")
+
+            overview = await vault.get_masked_overview("test-user-vault")
+            self.assertTrue(overview["ok"])
+            self.assertTrue(overview["github"]["configured"])
+            self.assertTrue(overview["github"]["masked_token"].startswith("ghp_"))
+            self.assertTrue(overview["aeza"]["configured"])
+            self.assertTrue(overview["telegram"]["configured"])
+            self.assertEqual(overview["telegram"]["chat_id"], "987654321")
+
+        asyncio.run(_run())
+
+    def test_cloud_deploy_cancel(self):
+        """Verifies cancelling a running deployment task."""
+        from tterm.orchestration.cloud_deploy import cloud_deploy_manager
+        engine = cloud_deploy_manager.create_deployment(host="10.0.0.1", simulation_mode=True)
+        engine.status = "running"
+        ok = cloud_deploy_manager.cancel_task(engine.task_id)
+        self.assertTrue(ok)
+        self.assertEqual(engine.status, "failed")
+        self.assertIn("прервано", engine.error)
+
+
 if __name__ == "__main__":
     unittest.main()

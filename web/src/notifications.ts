@@ -238,23 +238,35 @@ export interface NotificationStatus {
   permission: NotificationPermission | "unsupported";
   isSecureContext: boolean;
   isHttpOrigin: boolean;
+  insecureHttp: boolean;
+}
+
+export function isHttpInsecureContext(): boolean {
+  if (typeof window === "undefined") return false;
+  return !window.isSecureContext && window.location.protocol === "http:";
 }
 
 export function getNotificationStatus(): NotificationStatus {
   const hasWindow = typeof window !== "undefined";
   if (!hasWindow || !("Notification" in window)) {
+    const isSec = hasWindow ? Boolean(window.isSecureContext) : false;
+    const isHttp = hasWindow ? window.location.protocol === "http:" : false;
     return {
       supported: false,
       permission: "unsupported",
-      isSecureContext: hasWindow ? Boolean(window.isSecureContext) : false,
-      isHttpOrigin: hasWindow ? window.location.protocol === "http:" : false,
+      isSecureContext: isSec,
+      isHttpOrigin: isHttp,
+      insecureHttp: !isSec && isHttp,
     };
   }
+  const isSec = Boolean(window.isSecureContext);
+  const isHttp = window.location.protocol === "http:";
   return {
     supported: true,
     permission: Notification.permission,
-    isSecureContext: Boolean(window.isSecureContext),
-    isHttpOrigin: window.location.protocol === "http:",
+    isSecureContext: isSec,
+    isHttpOrigin: isHttp,
+    insecureHttp: !isSec && isHttp,
   };
 }
 
@@ -264,6 +276,17 @@ export async function promptNotificationPermission(
   if (typeof window === "undefined" || !("Notification" in window)) {
     notify?.("⚠️ Браузер не поддерживает Web Notifications API"); // i18n-ignore
     return { granted: false, reason: "unsupported" };
+  }
+
+  // Modern browsers silently block/reject requestPermission on insecure HTTP origins (e.g. http://192.168.0.6:8290)
+  if (isHttpInsecureContext()) {
+    saveNotificationSettings({ enabled: true, sound: true, nativeNotification: true });
+    playNotificationChime(true);
+    notify?.("ℹ️ На HTTP (IP-адрес) браузер блокирует нативные окна ОС. Включены звук, мигание вкладки и Telegram-бот!"); // i18n-ignore
+    window.dispatchEvent(new CustomEvent("tterm:show-http-notify-modal", {
+      detail: { origin: window.location.origin }
+    }));
+    return { granted: false, reason: "insecure_http" };
   }
 
   // Modern browsers require direct user interaction for requestPermission
@@ -292,9 +315,12 @@ export async function promptNotificationPermission(
   }
 
   // If permission is still default or rejected due to HTTP
-  if (!window.isSecureContext && window.location.protocol === "http:") {
+  if (isHttpInsecureContext()) {
     playNotificationChime(true);
-    notify?.("ℹ️ На HTTP (IP-адрес) браузер блокирует нативные окна ОС. Включены звук (Web Audio), баннеры в приложении и мигание вкладки!"); // i18n-ignore
+    notify?.("ℹ️ На HTTP (IP-адрес) браузер блокирует нативные окна ОС. Включены звук, мигание вкладки и Telegram-бот!"); // i18n-ignore
+    window.dispatchEvent(new CustomEvent("tterm:show-http-notify-modal", {
+      detail: { origin: window.location.origin }
+    }));
     return { granted: false, reason: "insecure_http" };
   }
 

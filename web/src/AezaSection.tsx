@@ -8,9 +8,11 @@ import {
   getAezaAccount,
   getAezaConfig,
   getAezaPlans,
+  getVaultData,
   listAezaServices,
   orderAezaVps,
   saveAezaConfig,
+  saveVaultSecrets,
   type AezaAccountInfo,
   type AezaConfigStatus,
   type AezaPlan,
@@ -66,7 +68,25 @@ export function AezaSection(props: Props) {
   const loadAll = async () => {
     try {
       setErrorMsg(null);
-      const cfg = await getAezaConfig();
+      let cfg = await getAezaConfig();
+      if (!cfg.configured) {
+        try {
+          const vault = await getVaultData();
+          if (vault.ok && vault.secrets?.aeza_api_key) {
+            const savedRes = await saveAezaConfig(vault.secrets.aeza_api_key);
+            if (savedRes.ok) {
+              cfg = {
+                ok: true,
+                configured: true,
+                masked_key: savedRes.masked_key ?? null,
+                user_id: cfg.user_id,
+              };
+            }
+          }
+        } catch {
+          // Cloud vault read fallback
+        }
+      }
       setConfig(cfg);
 
       if (cfg.configured) {
@@ -117,6 +137,7 @@ export function AezaSection(props: Props) {
     try {
       const res = await saveAezaConfig(cleanKey);
       if (res.ok) {
+        void saveVaultSecrets({ aeza_api_key: cleanKey });
         notify("API-ключ Aeza успешно сохранен и привязан к вашему профилю!"); // i18n-ignore
         setSuccessMsg("Ключ успешно верифицирован в Aeza"); // i18n-ignore
         setApiKeyInput("");

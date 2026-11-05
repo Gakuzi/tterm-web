@@ -31,16 +31,18 @@ import { DevicesSection } from "./Devices";
 import { LANGUAGES, useT, type Lang } from "./i18n";
 import {
   Bell, Card, ChevronDown, ChevronLeft, ChevronRight, Close, Cloud, Computer, Devices, Download, Gear,
-  GitHub, Key, Monitor, Moon, People, Person, Search, Spark, Sun,
+  GitHub, Key, Monitor, Moon, People, Person, Plane, Search, Spark, Sun,
 } from "./icons";
 import {
-  getDeviceName, getNotificationSettings, playNotificationChime,
+  getDeviceName, getNotificationSettings, isHttpInsecureContext, playNotificationChime,
   promptNotificationPermission, saveNotificationSettings, showPushNotification,
 } from "./notifications";
 import { KeysSection } from "./Keys.tsx";
 import { AiSection } from "./AiSection";
 import { GitHubSection } from "./GitHubSection";
 import { AezaSection } from "./AezaSection";
+import { TelegramNotificationSection } from "./TelegramNotificationSection";
+import { NotificationHttpNoticeModal } from "./NotificationHttpNoticeModal";
 import { CloudDeployModal } from "./CloudDeployModal";
 import { ProjectCollaboration } from "./ProjectCollaboration";
 import { InApp } from "./local";
@@ -244,7 +246,7 @@ function GeneralPane(props: Props) {
               <>
                 <button type="button" className="button small"
                   onClick={async () => {
-                    await promptNotificationPermission();
+                    await promptNotificationPermission(props.notify);
                     if (typeof window !== "undefined" && "Notification" in window) {
                       setPermission(Notification.permission);
                     }
@@ -256,8 +258,36 @@ function GeneralPane(props: Props) {
                   title="Проверить аудио-сигнал" /* i18n-ignore */>
                   {"Звук 🔊" /* i18n-ignore */}
                 </button>
+                {isHttpInsecureContext() && (
+                  <button
+                    type="button"
+                    className="button-ghost small"
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent("tterm:show-http-notify-modal"));
+                    }}
+                    title="Диагностика уведомлений на HTTP и Telegram-бот" /* i18n-ignore */
+                    style={{ color: "#f59e0b" }}
+                  >
+                    {"⚠️ Почему окно не открывается на HTTP?" /* i18n-ignore */}
+                  </button>
+                )}
               </>
             )}
+          </div>
+        </Row>
+
+        <Row label={"Telegram-бот на телефон" /* i18n-ignore */}
+          note={"Мгновенная доставка пуш-уведомлений о завершении долгих команд в Telegram на телефон и планшет" /* i18n-ignore */}
+          words={"telegram телеграм бот уведомления телефон смартфон пуш оповещения" /* i18n-ignore */}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              type="button"
+              className="button-accent small"
+              onClick={() => props.onSection("telegram")}
+            >
+              <Plane size={13} />
+              {"Настроить Telegram-бота ✈️" /* i18n-ignore */}
+            </button>
           </div>
         </Row>
 
@@ -367,6 +397,8 @@ export function Settings(props: Props) {
             "github", "гитхаб", "oauth", "репозиторий", "токен", "pat", "коммиты", "ветки", "pr"]), // i18n-ignore
           item("hosting", <Cloud size={18} />, "Хостинг и VPS", [ // i18n-ignore
             "hosting", "хостинг", "aeza", "аэза", "vps", "сервер", "облако", "деплой", "ключ", "баланс", "купить"]), // i18n-ignore
+          item("telegram", <Plane size={18} />, "Telegram-бот", [ // i18n-ignore
+            "telegram", "телеграм", "бот", "уведомления", "bot", "push", "пуш", "оповещения", "телефон"]), // i18n-ignore
         ],
       });
     }
@@ -523,6 +555,8 @@ export function Settings(props: Props) {
             }}
           />
         );
+      case "telegram":
+        return <TelegramNotificationSection notify={props.notify} />;
 
     }
   };
@@ -611,6 +645,11 @@ export function Settings(props: Props) {
           defaultEmail={props.me?.email || "admin@example.com"}
         />
       )}
+
+      <NotificationHttpNoticeModal
+        notify={props.notify}
+        onConfigureTelegram={() => props.onSection("telegram")}
+      />
     </div>
 
   );

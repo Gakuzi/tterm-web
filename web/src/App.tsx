@@ -39,6 +39,7 @@ import { forgetSupportDraft, SupportDialog } from "./SupportDialog";
 import { draftsOf, forgetDrafts, markDeleted } from "./drafts";
 import { initNotificationBot } from "./notifications";
 import { NotificationPromptBanner } from "./NotificationPromptBanner";
+import { NotificationHttpNoticeModal } from "./NotificationHttpNoticeModal";
 import { NoteView, primeNote, type SaveState, type Typed } from "./NoteView";
 import { summary, titled, toMarkdown } from "./noteText";
 import {
@@ -1448,6 +1449,17 @@ export function App() {
     }
   };
   openSettingsNow.current = openSettings;
+
+  useEffect(() => {
+    const handleOpenSection = (event: Event) => {
+      const ce = event as CustomEvent<{ section?: string }>;
+      if (ce.detail?.section) {
+        openSettings(ce.detail.section as SettingsSection);
+      }
+    };
+    window.addEventListener("tterm:open-settings-section", handleOpenSection);
+    return () => window.removeEventListener("tterm:open-settings-section", handleOpenSection);
+  }, []);
   /** Back to where the page or the window was opened from: the step before
    * it in the history, which its entry remembers (Back and Forward keep
    * that right). Opened by its address, as a bookmark, to the page under
@@ -2277,6 +2289,11 @@ export function App() {
         <Removed name={removed.name} cleanup={removed.cleanup}
           onClose={() => setRemoved(null)} notify={notYet} />
       )}
+
+      <NotificationHttpNoticeModal
+        notify={notYet}
+        onConfigureTelegram={() => openSettings("telegram")}
+      />
 
       <VaultDialogHost />
 

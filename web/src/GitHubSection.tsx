@@ -10,8 +10,10 @@ import {
   disconnectGitHub,
   getGitHubAuthUrl,
   getGitHubStatus,
+  getVaultData,
   githubOAuthCallback,
   listGitHubRepositories,
+  saveVaultSecrets,
   type GitHubRepo,
   type GitHubStatus,
 } from "./api";
@@ -62,7 +64,33 @@ export function GitHubSection(props: Props) {
   const loadStatus = async () => {
     try {
       setErrorMsg(null);
-      const st = await getGitHubStatus();
+      let st = await getGitHubStatus();
+      if (!st.is_authenticated) {
+        try {
+          const vault = await getVaultData();
+          if (vault.ok && vault.secrets?.github_token) {
+            const connectRes = await connectGitHubToken(vault.secrets.github_token);
+            if (connectRes.ok && (connectRes as any).username) {
+              st = {
+                ok: true,
+                is_authenticated: true,
+                username: (connectRes as any).username,
+                name: (connectRes as any).name,
+                email: (connectRes as any).email,
+                avatar_url: (connectRes as any).avatar_url,
+                html_url: (connectRes as any).html_url,
+                public_repos: (connectRes as any).public_repos || 0,
+                total_private_repos: (connectRes as any).total_private_repos || 0,
+                scopes: (connectRes as any).scopes || [],
+                masked_token: (connectRes as any).masked_token,
+                connected_at: (connectRes as any).connected_at,
+              };
+            }
+          }
+        } catch {
+          // Cloud vault read fallback
+        }
+      }
       setStatus(st);
       if (st.is_authenticated) {
         void loadRepos();
@@ -141,6 +169,7 @@ export function GitHubSection(props: Props) {
     setConnecting(true);
     try {
       const st = await connectGitHubToken(cleanToken);
+      void saveVaultSecrets({ github_token: cleanToken });
       setStatus(st);
       setTokenInput("");
       notify(`GitHub аккаунт подключен: @${st.username || "пользователь"}`); // i18n-ignore

@@ -325,10 +325,20 @@ class VpsDeployEngine:
                 "PORT=8290\n"
                 "CONNECT_PORT=8291\n"
                 "ALLOWED_HOSTS=*\n"
+                "TTERM_ALLOWED_HOSTS=*\n"
+                "TTERM_PAGE_HOST=0.0.0.0\n"
+                "TTERM_PAGE_PORT=8290\n"
+                f"TTERM_PAGE_URL=http://{self.host}:8290\n"
+                "TTERM_CONNECT_HOST=0.0.0.0\n"
+                "TTERM_CONNECT_PORT=8291\n"
+                f"TTERM_CONNECT_URL=http://{self.host}:8291\n"
+                f"TTERM_DATABASE_URL=postgresql://tterm:{postgres_password}@db:5432/tterm_web\n"
+                f"TTERM_OWNER_EMAIL={self.admin_email}\n"
+                "TTERM_OWNER_NAME=Admin\n"
                 f"APP_SECRET={app_secret}\n"
                 "POSTGRES_USER=tterm\n"
                 f"POSTGRES_PASSWORD={postgres_password}\n"
-                "POSTGRES_DB=tterm\n"
+                "POSTGRES_DB=tterm_web\n"
                 f"ADMIN_EMAIL={self.admin_email}\n"
                 f"SMTP_HOST={self.smtp_host or ''}\n"
                 f"SMTP_PORT={self.smtp_port}\n"
@@ -559,6 +569,18 @@ class CloudDeployManager:
 
     def get_task(self, task_id: str) -> Optional[VpsDeployEngine]:
         return self.tasks.get(task_id)
+
+    def cancel_task(self, task_id: str) -> bool:
+        engine = self.tasks.get(task_id)
+        if engine and engine.status == "running":
+            engine.status = "failed"
+            engine.error = "Развертывание прервано пользователем"
+            engine.finished_at = _iso_now()
+            engine.log("⚠️ Развертывание прервано пользователем.")
+            if engine.current_step in engine.steps_summary:
+                engine.set_step_status(engine.current_step, "failed", "Прервано пользователем")
+            return True
+        return False
 
     def list_tasks(self) -> List[Dict[str, Any]]:
         return [engine.to_dict() for engine in self.tasks.values()]

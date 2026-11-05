@@ -10,7 +10,7 @@
 
 /** The sections, as their addresses name them. */
 export const SECTIONS = ["general", "account", "plan", "projects", "keys", "devices", "computer",
-  "updates", "ai", "github", "hosting"] as const;
+  "updates", "ai", "github", "hosting", "telegram"] as const;
 export type SettingsSection = (typeof SECTIONS)[number];
 
 /** /settings, or /settings/<section>: null where it is not Settings, the

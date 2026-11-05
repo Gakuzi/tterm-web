@@ -56,11 +56,26 @@ export function CloudDeployModal({
   const [taskId, setTaskId] = useState<string | null>(null);
   const [task, setTask] = useState<CloudDeployTask | null>(null);
   const [isStarting, setIsStarting] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [copied, setCopied] = useState(false);
   const [testEmailResult, setTestEmailResult] = useState<string | null>(null);
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
+
+  const handleCancelDeploy = async () => {
+    if (!taskId) return;
+    try {
+      await fetch(`/api/orchestration/cloud-deploy/cancel/${taskId}`, { method: "POST" });
+      const res = await getCloudDeployStatus(taskId);
+      if (res.ok && res.task) {
+        setTask(res.task);
+        setView("failed");
+      }
+    } catch (e) {
+      console.error("Cancel failed:", e);
+    }
+  };
 
   // Sync defaultHost if provided
   useEffect(() => {
@@ -208,6 +223,100 @@ export function CloudDeployModal({
     { num: 7, name: "Проверка отправки email с кодом", icon: <Mail size={16} /> }, // i18n-ignore
   ];
 
+  if (!isOpen) return null;
+
+  if (isMinimized) {
+    const isCompleted = task?.status === "completed" || view === "completed";
+    const isFailed = task?.status === "failed" || view === "failed";
+
+    return (
+      <div
+        className="cloud-deploy-floating-pill"
+        style={{
+          position: "fixed",
+          bottom: 24,
+          right: 24,
+          zIndex: 99999,
+          background: isCompleted ? "#064e3b" : isFailed ? "#7f1d1d" : "#0f172a",
+          border: `1px solid ${isCompleted ? "#10b981" : isFailed ? "#ef4444" : "rgba(16, 185, 129, 0.4)"}`,
+          borderRadius: 12,
+          padding: "12px 18px",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.6)",
+          color: "#f8fafc",
+          maxWidth: 480,
+        }}
+      >
+        <span style={{ fontSize: 18 }}>
+          {isCompleted ? "✅" : isFailed ? "❌" : "🚀"}
+        </span>
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <div style={{ fontWeight: 600, fontSize: 13 }}>
+            {isCompleted
+              ? `Развернуто на ${host}!` /* i18n-ignore */
+              : isFailed
+              ? ("Развертывание прервано / ошибка" /* i18n-ignore */)
+              : (`Установка на ${host || "VPS"}: ${task?.progress_pct ?? 0}%` /* i18n-ignore */)}
+          </div>
+          <div style={{ fontSize: 11, color: "#cbd5e1", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {isCompleted
+              ? `Доступно на http://${host}:8290` /* i18n-ignore */
+              : isFailed
+              ? (task?.error || ("Произошла ошибка" /* i18n-ignore */))
+              : (task?.steps_summary?.[task?.current_step]?.name || ("Выполняется установка..." /* i18n-ignore */))}
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {isCompleted && (
+            <a
+              href={`http://${host}:8290`}
+              target="_blank"
+              rel="noreferrer"
+              className="button-accent small"
+              style={{ textDecoration: "none" }}
+            >
+              {"Открыть ↗" /* i18n-ignore */}
+            </a>
+          )}
+          <button
+            type="button"
+            className="button-plain small"
+            onClick={() => setIsMinimized(false)}
+            title={"Развернуть полный ход установки" /* i18n-ignore */}
+          >
+            {"Развернуть ⤢" /* i18n-ignore */}
+          </button>
+          {!isCompleted && !isFailed && (
+            <button
+              type="button"
+              className="button-ghost small"
+              onClick={() => void handleCancelDeploy()}
+              title={"Прервать ход установки" /* i18n-ignore */}
+              style={{ color: "#ef4444" }}
+            >
+              {"✕ Прервать" /* i18n-ignore */}
+            </button>
+          )}
+          {(isCompleted || isFailed) && (
+            <button
+              type="button"
+              className="button-ghost small"
+              onClick={() => {
+                setIsMinimized(false);
+                onClose();
+              }}
+              title={"Закрыть" /* i18n-ignore */}
+            >
+              <Close size={13} />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="dialog-overlay" onClick={onClose} style={{ zIndex: 10000 }}>
       <div
@@ -259,14 +368,27 @@ export function CloudDeployModal({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            className="button-ghost small"
-            onClick={onClose}
-            style={{ color: "#94a3b8" }}
-          >
-            <Close size={16} />
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {(view === "deploying" || taskId) && (
+              <button
+                type="button"
+                className="button-ghost small"
+                onClick={() => setIsMinimized(true)}
+                title={"Скрыть ход установки (свернуть в плавающее окно)" /* i18n-ignore */}
+                style={{ color: "#94a3b8", display: "inline-flex", alignItems: "center", gap: 4 }}
+              >
+                <span>➖ Скрыть ход установки</span> {/* i18n-ignore */}
+              </button>
+            )}
+            <button
+              type="button"
+              className="button-ghost small"
+              onClick={onClose}
+              style={{ color: "#94a3b8" }}
+            >
+              <Close size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Content Body */}
@@ -919,9 +1041,25 @@ export function CloudDeployModal({
           )}
 
           {view === "deploying" && (
-            <button type="button" className="button-ghost small" onClick={onClose}>
-              Свернуть в фоновый режим {/* i18n-ignore */}
-            </button>
+            <>
+              <button
+                type="button"
+                className="button small"
+                onClick={() => setIsMinimized(true)}
+                title={"Скрыть ход установки (свернуть в плавающее окно)" /* i18n-ignore */}
+              >
+                <span>➖ Скрыть ход установки</span> {/* i18n-ignore */}
+              </button>
+              <button
+                type="button"
+                className="button-ghost small"
+                onClick={() => void handleCancelDeploy()}
+                style={{ color: "#ef4444" }}
+                title={"Остановить и отменить развертывание" /* i18n-ignore */}
+              >
+                <span>✕ Прервать развертывание</span> {/* i18n-ignore */}
+              </button>
+            </>
           )}
 
           {view === "completed" && (

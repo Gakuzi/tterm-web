@@ -84,19 +84,45 @@ class AezaKeyStore:
             log.warning("Could not persist Aeza keys to %s: %s", self.filepath, e)
 
     def get_key(self, user_id: str) -> Optional[str]:
-        return self._keys.get(str(user_id))
+        uid = str(user_id)
+        key = self._keys.get(uid)
+        if not key:
+            try:
+                from .encrypted_vault import encrypted_vault
+                secrets = encrypted_vault.load_secrets_sync(uid)
+                vault_key = secrets.get("aeza_api_key")
+                if vault_key:
+                    self._keys[uid] = str(vault_key).strip()
+                    return self._keys[uid]
+            except Exception:
+                pass
+        return key
 
     def set_key(self, user_id: str, api_key: str) -> None:
-        self._keys[str(user_id)] = api_key.strip()
+        uid = str(user_id)
+        clean = api_key.strip()
+        self._keys[uid] = clean
         self._save()
+        try:
+            from .encrypted_vault import encrypted_vault
+            encrypted_vault.save_secrets_sync(uid, {"aeza_api_key": clean})
+        except Exception:
+            pass
 
     def delete_key(self, user_id: str) -> bool:
         uid = str(user_id)
+        deleted = False
         if uid in self._keys:
             del self._keys[uid]
             self._save()
-            return True
-        return False
+            deleted = True
+        try:
+            from .encrypted_vault import encrypted_vault
+            encrypted_vault.delete_secret_keys_sync(uid, ["aeza_api_key", "aeza_balance", "aeza_account_id"])
+            deleted = True
+        except Exception:
+            pass
+        return deleted
 
     def has_key(self, user_id: str) -> bool:
         return bool(self._keys.get(str(user_id)))
