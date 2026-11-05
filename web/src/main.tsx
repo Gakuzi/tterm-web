@@ -1,6 +1,34 @@
 // First of all: style elements made by the page carry the one-time number
 // the page's security policy asks for (see styleNonce.ts).
 import "./styleNonce";
+
+// Protect against browser extensions (translation tools, i18next/Locize, Grammarly, etc.)
+// modifying or wrapping text nodes, which causes React's reconciler to throw:
+// "NotFoundError: Failed to execute 'removeChild' on 'Node'" or 'insertBefore'.
+if (typeof Node !== "undefined" && Node.prototype) {
+  const originalRemoveChild = Node.prototype.removeChild;
+  Node.prototype.removeChild = function <T extends Node>(child: T): T {
+    if (child.parentNode !== this) {
+      if (typeof console !== "undefined" && console.warn) {
+        console.warn("Prevented React removeChild crash on modified/foreign node:", child);
+      }
+      return child;
+    }
+    return originalRemoveChild.call(this, child) as T;
+  };
+
+  const originalInsertBefore = Node.prototype.insertBefore;
+  Node.prototype.insertBefore = function <T extends Node>(newNode: T, referenceNode: Node | null): T {
+    if (referenceNode && referenceNode.parentNode !== this) {
+      if (typeof console !== "undefined" && console.warn) {
+        console.warn("Prevented React insertBefore crash on modified/foreign reference node:", referenceNode);
+      }
+      return this.appendChild(newNode) as T;
+    }
+    return originalInsertBefore.call(this, newNode, referenceNode) as T;
+  };
+}
+
 // Fonts live with the page, not at Google: otherwise every visit would tell
 // Google the visitor's address.
 import "@fontsource-variable/manrope";

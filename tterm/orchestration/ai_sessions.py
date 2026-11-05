@@ -83,24 +83,6 @@ class AIAgentSessionManager:
             created_at=now,
         )
 
-        # Preload active session
-        self._sessions["sess-ai-antigravity-1"] = AIAgentSessionDTO(
-            session_id="sess-ai-antigravity-1",
-            token=default_token,
-            agent_name="Antigravity (MCP Сессия 1)",
-            project_id="default-project",
-            allowed_terminals=["c56de979-35aa-4828-9056-3dbaab629e0d"],
-            allowed_nodes=["klim"],
-            role="container_developer",
-            ai_mode="guard",
-            status="ONLINE",
-            connected_at=now,
-            last_active_at=now,
-            current_command="git status",
-            total_commands=12,
-            blocked=False,
-        )
-
     def generate_agent_key(
         self,
         project_id: str = "default-project",
@@ -192,21 +174,12 @@ class AIAgentSessionManager:
             ai_mode = key.ai_mode
             name = agent_name or key.agent_name
 
-        # Find existing session for this assistant to prevent duplication
-        target_sid = session_id
-        if not target_sid or target_sid not in self._sessions:
-            # Check for existing session with same agent name or token
-            for sid, s in list(self._sessions.items()):
-                if (token and s.token == token) or (name and s.agent_name == name) or sid.startswith("sess-ai-mcp"):
-                    target_sid = sid
-                    break
+        # Find existing session for this assistant or use canonical ID to prevent duplication
+        target_sid = session_id or "sess-ai-antigravity"
 
-        if not target_sid:
-            target_sid = "sess-ai-antigravity"
-
-        # Prune old duplicate sess-ai-mcp-* sessions
+        # Prune old duplicate sess-ai-mcp-* or legacy sessions
         for sid in list(self._sessions.keys()):
-            if sid != target_sid and (sid.startswith("sess-ai-mcp") or (self._sessions[sid].agent_name == name)):
+            if sid != target_sid and (sid.startswith("sess-ai-mcp") or sid == "sess-ai-antigravity-1" or (self._sessions[sid].agent_name == name)):
                 self._sessions.pop(sid, None)
 
         if target_sid in self._sessions:
@@ -243,6 +216,11 @@ class AIAgentSessionManager:
 
     def list_sessions(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Returns connected AI agent sessions, deduplicating by assistant name."""
+        # Prune any stale mock or duplicate sessions
+        for sid in list(self._sessions.keys()):
+            if sid.startswith("sess-ai-mcp") or sid == "sess-ai-antigravity-1":
+                self._sessions.pop(sid, None)
+
         results = []
         seen_names = set()
         # Sort by latest activity

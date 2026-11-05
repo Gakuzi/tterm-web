@@ -314,24 +314,7 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
   const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
 
   // AI Sessions & Scoped Key Generator state
-  const [aiSessions, setAiSessions] = useState<AIAgentSession[]>([
-    {
-      session_id: "sess-ai-antigravity-1",
-      token: "tt_ai_default_antigravity_mcp_key_2026",
-      agent_name: "Antigravity (MCP Сессия 1)", /* i18n-ignore */
-      project_id: "default-project",
-      allowed_terminals: ["c56de979-35aa-4828-9056-3dbaab629e0d"],
-      allowed_nodes: ["klim"],
-      role: "container_developer",
-      ai_mode: "guard",
-      status: "ONLINE",
-      connected_at: new Date().toISOString(),
-      last_active_at: new Date().toISOString(),
-      current_command: "git status", /* i18n-ignore */
-      total_commands: 12,
-      blocked: false,
-    },
-  ]);
+  const [aiSessions, setAiSessions] = useState<AIAgentSession[]>([]);
   const [showAiKeyModal, setShowAiKeyModal] = useState(false);
   const [selectedTerminalForAi, setSelectedTerminalForAi] = useState<string>(
     terminals.find((t) => t.id === "c56de979-35aa-4828-9056-3dbaab629e0d")?.id || terminals[0]?.id || "c56de979-35aa-4828-9056-3dbaab629e0d"
@@ -509,7 +492,14 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (live && data?.sessions) {
-            setAiSessions(data.sessions);
+            const map = new Map<string, AIAgentSession>();
+            for (const s of data.sessions) {
+              const key = s.agent_name || s.session_id;
+              if (!map.has(key) || new Date(s.last_active_at) > new Date(map.get(key)!.last_active_at)) {
+                map.set(key, s);
+              }
+            }
+            setAiSessions(Array.from(map.values()));
           }
         })
         .catch(() => {});
@@ -2279,7 +2269,7 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
                 onClick={() => copyText(inviteLink, showCopiedInvite)}
               >
                 {copiedInvite ? <Check size={14} /> : <Copy size={14} />}
-                {copiedInvite ? "Скопировано" /* i18n-ignore */ : "Копировать" /* i18n-ignore */}
+                <span>{copiedInvite ? "Скопировано" /* i18n-ignore */ : "Копировать" /* i18n-ignore */}</span>
               </button>
             </div>
 

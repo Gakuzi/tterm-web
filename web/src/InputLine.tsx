@@ -627,7 +627,7 @@ export function InputLine(props: Props) {
                 onClick={() => handleCommit(false)}
               >
                 <Check size={14} />
-                Закоммитить {/* i18n-ignore */}
+                <span>Закоммитить</span> {/* i18n-ignore */}
               </button>
               <button
                 type="button"
@@ -635,14 +635,14 @@ export function InputLine(props: Props) {
                 onClick={() => handleCommit(true)}
               >
                 <CloudUp size={14} />
-                Коммит и Push 🚀 {/* i18n-ignore */}
+                <span>Коммит и Push 🚀</span> {/* i18n-ignore */}
               </button>
               <button
                 type="button"
                 className="button-plain"
                 onClick={() => setGitCommitOpen(false)}
               >
-                Отмена {/* i18n-ignore */}
+                <span>Отмена</span> {/* i18n-ignore */}
               </button>
             </div>
           </div>
@@ -679,7 +679,7 @@ export function InputLine(props: Props) {
             <button type="button" className="chip chip-branch" disabled={!ready}
               title={t("input.switch_branch")} onClick={() => openPicker("branches")}>
               <Branch size={12} />
-              {prompt.branch}
+              <span>{prompt.branch}</span>
             </button>
           )}
           {prompt.venv && <span className="chip-venv">({prompt.venv})</span>}

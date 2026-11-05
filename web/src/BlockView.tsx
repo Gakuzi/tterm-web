@@ -328,7 +328,7 @@ export function BlockView(props: Props) {
                   <span>{block.author.name || "ИИ-Агент"}</span> {/* i18n-ignore */}
                 </>
               ) : block.author.kind === "guest" ? (
-                <span>{/* i18n-ignore */}👥 {block.author.name || "Гость"}</span>
+                <span>👥 <span>{/* i18n-ignore */ block.author.name || "Гость"}</span></span>
               ) : (
                 <>
                   <Person size={11} />
@@ -388,12 +388,12 @@ export function BlockView(props: Props) {
               }}
             >
               <Bell size={12} />
-              {bellActive ? "Уведомлю 🔔" /* i18n-ignore */ : "🔔" /* i18n-ignore */}
+              <span>{bellActive ? "Уведомлю 🔔" /* i18n-ignore */ : "🔔" /* i18n-ignore */}</span>
             </button>
             <button type="button" className="block-stop" onClick={props.onStop}
               title={t("block.stop_title")}>
               <Stop size={11} />
-              {t("block.stop")}
+              <span>{t("block.stop")}</span>
               {/* i18n-ignore */}
               <kbd>⌃C</kbd>
             </button>

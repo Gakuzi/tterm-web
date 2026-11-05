@@ -26,7 +26,7 @@
 // although the page took it for open, the card comes over it, until the
 // keys are proved open here and the socket attaches it again.
 
-import { useEffect, useRef, useState } from "react";
+import { Component, useEffect, useRef, useState, type ErrorInfo, type ReactNode } from "react";
 import { endTerminal, terminalInfo, type Me, type TerminalInfo,
   type TerminalState } from "./api";
 import { shortPath } from "./BlockView";
@@ -106,6 +106,62 @@ interface Props {
   here?: boolean;
   /** Who is looking: notes under blocks (0.1.20). */
   me: Me;
+}
+
+class TerminalErrorBoundary extends Component<
+  { children: ReactNode; fallbackKey?: string },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode; fallbackKey?: string }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("TerminalErrorBoundary caught rendering error:", error, errorInfo);
+  }
+
+  componentDidUpdate(prevProps: { children: ReactNode; fallbackKey?: string }) {
+    if (prevProps.fallbackKey !== this.props.fallbackKey && this.state.hasError) {
+      this.setState({ hasError: false, error: null });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100%",
+          padding: 24,
+          background: "var(--bg, #0b0f19)",
+          color: "var(--ink, #fff)",
+          textAlign: "center",
+          gap: 12,
+        }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Терминал защищен от сбоя DOM {/* i18n-ignore */}</h3>
+          <p style={{ margin: 0, color: "var(--dim, #94a3b8)", maxWidth: 420, fontSize: 13 }}>
+            Произошла попытка модификации DOM внешним расширением. Терминал и сессия сохранены на сервере. {/* i18n-ignore */}
+          </p>
+          <button
+            type="button"
+            className="button-accent"
+            onClick={() => this.setState({ hasError: false, error: null })}
+          >
+            Возобновить терминал {/* i18n-ignore */}
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 export function TerminalView(props: Props) {
@@ -271,6 +327,7 @@ export function TerminalView(props: Props) {
           isEnded={isEnded}
           containerRef={terminalAreaRef}
         />
+        <TerminalErrorBoundary fallbackKey={`${terminalId}-${shownMode}`}>
         {shownMode === "classic" ? (
           <>
             <div className="classic-wrap">
@@ -299,6 +356,7 @@ export function TerminalView(props: Props) {
             paste={props.paste} me={props.me}
             after={props.here ? (b, all) => <SshStrip block={b} blocks={all} /> : undefined} />
         )}
+        </TerminalErrorBoundary>
         {state === "connecting" && !missing && info?.vault && !lockedHere && (
           <VaultLocked machine={info.machine} fingerprint={info.vault.key}
             keyName={info.vault.keyName} />
