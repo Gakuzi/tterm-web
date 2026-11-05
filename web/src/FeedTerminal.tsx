@@ -439,6 +439,8 @@ export function FeedTerminal(props: Props) {
         const live = st.live;
         if (!live) return;
         st.live = null;
+        isFull.current = false;
+        setFullscreen(false);
         st.knownSeq = Math.max(st.knownSeq, seqEnd);
         const key = live.key;
         setBlocks((bs) => bs.map((b) => b.key === key ? {
@@ -459,7 +461,11 @@ export function FeedTerminal(props: Props) {
             buffer.length >= KEEP_LINES + xterm.rows), alt: live.alt };
           // A full-screen program that never switched back (killed, or its
           // ssh connection gone) must not keep the screen.
-          if (xterm.buffer.active.type === "alternate") xterm.reset();
+          if (xterm.buffer.active.type === "alternate") {
+            xterm.reset();
+            isFull.current = false;
+            setFullscreen(false);
+          }
           setBlocks((bs) => bs.map((b) => b.key === key
             ? { ...b, rendered, partial: b.partial || live.dropped } : b));
           setLiveKey((k) => (k === key ? null : k));
@@ -498,6 +504,8 @@ export function FeedTerminal(props: Props) {
       // The terminal ended: a command still running ended with it, and
       // nothing takes keys any more.
       const stopTerminal = () => {
+        isFull.current = false;
+        setFullscreen(false);
         if (st.live) finishLive(null, 0, Date.now(), st.knownSeq);
         dropInput();
         clearPending();
@@ -644,6 +652,8 @@ export function FeedTerminal(props: Props) {
               setHistory((h) => [ev.command, ...h.filter((x) => x !== ev.command)]);
             }
           } else {
+            isFull.current = false;
+            setFullscreen(false);
             if (st.live) finishLive(ev.code, ev.trim, ev.at, seq - 1);
             // A prompt with no start before it: the shell did not run what
             // was typed (a syntax error, say). What it said goes in a block.

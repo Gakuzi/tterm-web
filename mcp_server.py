@@ -41,29 +41,46 @@ logging.basicConfig(level=logging.INFO, stream=sys.stderr, format="[tterm-mcp] %
 log = logging.getLogger("tterm-mcp")
 
 TTERM_CONFIG_PATH = os.path.expanduser("~/.config/tterm/config.json")
-_config = {}
-if os.path.exists(TTERM_CONFIG_PATH):
-    try:
-        with open(TTERM_CONFIG_PATH, "r", encoding="utf-8") as f:
-            _config = json.load(f)
-    except Exception:
-        pass
 
-TTERM_URL = os.environ.get("TTERM_URL", _config.get("url", "http://localhost:8290")).rstrip("/")
-TTERM_SESSION = os.environ.get("TTERM_SESSION", _config.get("session", ""))
-TTERM_AI_TOKEN = os.environ.get("TTERM_AI_TOKEN", _config.get("token", _config.get("agent_token", "")))
-ALLOWED_TERMINAL = os.environ.get("ALLOWED_TERMINAL", _config.get("allowed_terminal", ""))
-MCP_SESSION_ID = os.environ.get("MCP_SESSION_ID", f"sess-ai-mcp-{time.strftime('%H%M%S')}")
+
+def _get_config() -> dict[str, Any]:
+    if os.path.exists(TTERM_CONFIG_PATH):
+        try:
+            with open(TTERM_CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def _get_url() -> str:
+    return os.environ.get("TTERM_URL", _get_config().get("url", "http://localhost:8290")).rstrip("/")
+
+
+def _get_session() -> str:
+    return os.environ.get("TTERM_SESSION", _get_config().get("session", ""))
+
+
+def _get_ai_token() -> str:
+    cfg = _get_config()
+    return os.environ.get("TTERM_AI_TOKEN", cfg.get("token", cfg.get("agent_token", "")))
+
+
+def _get_allowed_terminal() -> str:
+    return os.environ.get("ALLOWED_TERMINAL", _get_config().get("allowed_terminal", ""))
+
+
+MCP_SESSION_ID = os.environ.get("MCP_SESSION_ID", _get_config().get("session_id", "sess-ai-antigravity"))
 
 
 def _ping_session(terminal_id: str = "", command: str = "") -> dict[str, Any]:
     """Reports MCP activity and heartbeats the AI agent session in tTerm."""
     try:
         payload = {
-            "token": TTERM_AI_TOKEN,
+            "token": _get_ai_token(),
             "session_id": MCP_SESSION_ID,
             "agent_name": "Antigravity AI (MCP)",
-            "terminal_id": terminal_id or ALLOWED_TERMINAL,
+            "terminal_id": terminal_id or _get_allowed_terminal(),
             "command": command,
         }
         return _request("POST", "/api/orchestration/ai-sessions/ping", payload)
@@ -72,17 +89,20 @@ def _ping_session(terminal_id: str = "", command: str = "") -> dict[str, Any]:
 
 
 def _request(method: str, path: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
-    url = f"{TTERM_URL}{path}"
+    tterm_url = _get_url()
+    tterm_session = _get_session()
+    tterm_token = _get_ai_token()
+    url = f"{tterm_url}{path}"
     headers = {
         "x-tterm": "1",
         "Accept": "application/json",
-        "Origin": TTERM_URL,
-        "Referer": f"{TTERM_URL}/",
-        "X-AI-Token": TTERM_AI_TOKEN,
+        "Origin": tterm_url,
+        "Referer": f"{tterm_url}/",
+        "X-AI-Token": tterm_token,
         "X-AI-Session": MCP_SESSION_ID,
     }
-    if TTERM_SESSION:
-        headers["Cookie"] = f"__Host-tterm-session={TTERM_SESSION}; tterm-session={TTERM_SESSION}"
+    if tterm_session:
+        headers["Cookie"] = f"__Host-tterm-session={tterm_session}; tterm-session={tterm_session}"
 
     body = None
     if data is not None:
@@ -183,18 +203,21 @@ def read_terminal(terminal_id: str) -> str:
 
 
 async def _run_command_ws(terminal_id: str, command: str, timeout: float = 30.0, author: dict[str, Any] | None = None) -> dict[str, Any]:
-    if ALLOWED_TERMINAL and terminal_id != ALLOWED_TERMINAL:
-        raise PermissionError(f"Access denied: AI Agent is restricted to terminal {ALLOWED_TERMINAL}")
+    allowed_term = _get_allowed_terminal()
+    if allowed_term and terminal_id != allowed_term:
+        raise PermissionError(f"Access denied: AI Agent is restricted to terminal {allowed_term}")
 
     _ping_session(terminal_id, command)
 
-    ws_scheme = "wss" if TTERM_URL.startswith("https") else "ws"
-    ws_host = TTERM_URL.split("://", 1)[1]
+    tterm_url = _get_url()
+    tterm_session = _get_session()
+    ws_scheme = "wss" if tterm_url.startswith("https") else "ws"
+    ws_host = tterm_url.split("://", 1)[1]
     ws_url = f"{ws_scheme}://{ws_host}/api/ws"
 
     headers = [
-        ("Cookie", f"__Host-tterm-session={TTERM_SESSION}; tterm-session={TTERM_SESSION}"),
-        ("Origin", TTERM_URL),
+        ("Cookie", f"__Host-tterm-session={tterm_session}; tterm-session={tterm_session}"),
+        ("Origin", tterm_url),
     ]
 
     ssl_ctx = None
@@ -214,9 +237,9 @@ async def _run_command_ws(terminal_id: str, command: str, timeout: float = 30.0,
             "op": "attach",
             "ch": 1,
             "id": terminal_id,
-            "cols": 80,
-            "rows": 24,
-            "focus": True,
+            "cols": 0,
+            "rows": 0,
+            "focus": False,
         }))
 
         # Send command to run with author metadata

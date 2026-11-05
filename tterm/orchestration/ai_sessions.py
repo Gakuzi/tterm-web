@@ -176,15 +176,15 @@ class AIAgentSessionManager:
     ) -> Dict[str, Any]:
         """Registers a live AI agent session or heartbeats an existing one."""
         key = self._keys.get(token)
-        now = dt.datetime.now(dt.timezone.utc).isoformat()
+        now_dt = dt.datetime.now(dt.timezone.utc)
+        now = now_dt.isoformat()
 
         if not key or key.revoked:
-            # Fallback for session without pre-registered key (e.g. legacy session cookie)
             project_id = "default-project"
             allowed_terms = [terminal_id] if terminal_id else ["*"]
             role = "container_developer"
             ai_mode = "guard"
-            name = agent_name or "AI Assistant"
+            name = agent_name or "Antigravity (ИИ)"
         else:
             project_id = key.project_id
             allowed_terms = key.allowed_terminals
@@ -192,17 +192,36 @@ class AIAgentSessionManager:
             ai_mode = key.ai_mode
             name = agent_name or key.agent_name
 
-        sess_id = session_id or f"sess-ai-{uuid.uuid4().hex[:6]}"
-        if sess_id in self._sessions:
-            sess = self._sessions[sess_id]
+        # Find existing session for this assistant to prevent duplication
+        target_sid = session_id
+        if not target_sid or target_sid not in self._sessions:
+            # Check for existing session with same agent name or token
+            for sid, s in list(self._sessions.items()):
+                if (token and s.token == token) or (name and s.agent_name == name) or sid.startswith("sess-ai-mcp"):
+                    target_sid = sid
+                    break
+
+        if not target_sid:
+            target_sid = "sess-ai-antigravity"
+
+        # Prune old duplicate sess-ai-mcp-* sessions
+        for sid in list(self._sessions.keys()):
+            if sid != target_sid and (sid.startswith("sess-ai-mcp") or (self._sessions[sid].agent_name == name)):
+                self._sessions.pop(sid, None)
+
+        if target_sid in self._sessions:
+            sess = self._sessions[target_sid]
             sess.last_active_at = now
             sess.status = "BLOCKED" if sess.blocked else "ONLINE"
+            if terminal_id and terminal_id not in sess.allowed_terminals:
+                if "*" not in sess.allowed_terminals:
+                    sess.allowed_terminals.append(terminal_id)
             if command:
                 sess.current_command = command[:80]
                 sess.total_commands += 1
         else:
             sess = AIAgentSessionDTO(
-                session_id=sess_id,
+                session_id=target_sid,
                 token=token,
                 agent_name=name,
                 project_id=project_id,
@@ -217,19 +236,24 @@ class AIAgentSessionManager:
                 total_commands=1 if command else 0,
                 blocked=False,
             )
-            self._sessions[sess_id] = sess
-            log.info("New AI Agent session connected: %s (@%s)", sess_id, name)
+            self._sessions[target_sid] = sess
+            log.info("Single AI Agent session connected: %s (@%s)", target_sid, name)
 
         return sess.to_dict()
 
     def list_sessions(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Returns all connected AI agent sessions, newest first."""
+        """Returns connected AI agent sessions, deduplicating by assistant name."""
         results = []
-        for s in self._sessions.values():
-            if project_id and s.project_id != project_id:
+        seen_names = set()
+        # Sort by latest activity
+        sorted_sessions = sorted(self._sessions.values(), key=lambda x: x.last_active_at, reverse=True)
+        for s in sorted_sessions:
+            if project_id and s.project_id != project_id and s.project_id != "default-project":
                 continue
+            if s.agent_name in seen_names:
+                continue
+            seen_names.add(s.agent_name)
             results.append(s.to_dict())
-        results.sort(key=lambda x: x["last_active_at"], reverse=True)
         return results
 
     def update_session_permissions(

@@ -752,6 +752,8 @@ class Terminal:
             # The block and its line in the machine's log (0.1.20) go in
             # together: a line is never without its block while the block
             # is kept, nor a block without its line.
+            author_data = getattr(block, "author", None)
+            author_val = json.dumps(author_data) if author_data else None
             async with self.pool.acquire() as conn, conn.transaction():
                 await conn.execute(
                     """
@@ -759,18 +761,18 @@ class Terminal:
                                         command, started_by, started_at,
                                         finished_at, exit_code, cwd, branch,
                                         output, output_cut, cols, expires_at,
-                                        output_text)
+                                        output_text, author)
                     VALUES ($1, 'command', $2, $3, $4, $5, $6, $7, $8, $9, $10,
                             $11, $12, $14,
                             now() + make_interval(days => (
                                 SELECT output_days FROM projects WHERE id = $13)),
-                            $15)
+                            $15, $16::jsonb)
                     """,
                     self.id, block.seq_start, seq_end, block.command,
                     self.owner.id, block.started_at, finished_at, exit_code,
                     block.cwd or None, block.branch or None,
                     zlib.compress(output, 6), cut, self.machine.project_id,
-                    block.cols, text)
+                    block.cols, text, author_val)
                 await logs.command_ran(
                     conn, project_id=self.machine.project_id,
                     user_id=self.owner.id, machine_id=self.machine.id,
@@ -1113,6 +1115,14 @@ def _block_json(row: asyncpg.Record) -> dict:
         modes.feed(output[:at])
         tail = modes.restore() + output[at:]
         partial = True
+    raw_author = dict(row).get("author") if "author" in row else None
+    if isinstance(raw_author, str):
+        try:
+            author = json.loads(raw_author)
+        except Exception:
+            author = {"name": raw_author, "kind": "user"}
+    else:
+        author = raw_author
     return {
         "id": row["id"],
         "seqStart": row["seq_start"],
@@ -1127,7 +1137,7 @@ def _block_json(row: asyncpg.Record) -> dict:
         "cut": row["output_cut"],
         "partial": partial,
         "size": size,
-        "author": dict(row)["author"] if "author" in row else None,
+        "author": author,
         "output": base64.b64encode(tail).decode("ascii"),
     }
 
@@ -1402,7 +1412,7 @@ class Terminals:
         rows = await self.pool.fetch(
             """
             SELECT id, seq_start, seq_end, command, cwd, branch, started_at,
-                   finished_at, exit_code, output, output_cut, cols
+                   finished_at, exit_code, output, output_cut, cols, author
             FROM blocks
             WHERE terminal_id = $1 AND kind = 'command' AND expires_at > now()
               AND ($2::bigint IS NULL OR seq_start < $2)
