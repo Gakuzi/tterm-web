@@ -15,9 +15,9 @@ import {
 } from "react";
 import {
   askCode, authState, checkTelegramAuthSession, configureTelegramBot, createTelegramAuthSession,
-  quickSignIn, Refused, requestTelegramCode, setQuickCode, signUp, telegramAuthStatus,
-  verifyCode, verifyTelegramCode, type KnownDevice, type Legal, type SignedInNow,
-  type TelegramAuthStatus,
+  loginWithTelegramWidget, quickSignIn, Refused, requestTelegramCode, setQuickCode, signUp,
+  telegramAuthStatus, verifyCode, verifyTelegramCode, type KnownDevice, type Legal,
+  type SignedInNow, type TelegramAuthStatus, type TelegramWidgetUser,
 } from "./api";
 import { useT, type Translate } from "./i18n";
 import { Logo } from "./icons";
@@ -271,6 +271,50 @@ function Slots(props: {
   );
 }
 
+/**
+ * Official Telegram Login Widget button.
+ * https://core.telegram.org/widgets/login
+ * Requires domain configured in @BotFather via /setdomain for the widget iframe to render.
+ */
+function TelegramLoginWidget(props: {
+  botUsername: string;
+  onIn: (result: SignedInNow) => void;
+  onError: (msg: string) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    (window as any).onTelegramAuth = async (user: TelegramWidgetUser) => {
+      try {
+        const result = await loginWithTelegramWidget(user);
+        props.onIn(result);
+      } catch (err) {
+        props.onError(err instanceof Error ? err.message : "Ошибка проверки Telegram Widget"); // i18n-ignore
+      }
+    };
+
+    if (!containerRef.current) return;
+    containerRef.current.innerHTML = "";
+
+    const script = document.createElement("script");
+    script.src = "https://telegram.org/js/telegram-widget.js?22";
+    script.setAttribute("data-telegram-login", props.botUsername);
+    script.setAttribute("data-size", "large");
+    script.setAttribute("data-radius", "8");
+    script.setAttribute("data-onauth", "onTelegramAuth(user)");
+    script.setAttribute("data-request-access", "write");
+    script.async = true;
+
+    containerRef.current.appendChild(script);
+
+    return () => {
+      delete (window as any).onTelegramAuth;
+    };
+  }, [props.botUsername]);
+
+  return <div ref={containerRef} style={{ display: "flex", justifyContent: "center", minHeight: 40, margin: "8px 0" }} />;
+}
+
 function EmailStep(props: {
   email: string;
   setEmail: (email: string) => void;
@@ -418,6 +462,25 @@ function EmailStep(props: {
         <>
           {tgStatus?.bot_configured ? (
             <>
+              {/* Official Telegram Login Widget */}
+              <div style={{ marginBottom: 12, textAlign: "center" }}>
+                <p className="signin-small" style={{ marginBottom: 6, color: "var(--dim)" }}>
+                  {/* i18n-ignore */}
+                  <span>Официальный виджет Telegram:</span>
+                </p>
+                <TelegramLoginWidget
+                  botUsername={tgStatus.bot_username}
+                  onIn={props.onIn}
+                  onError={(err) => setProblem(err)}
+                />
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0" }}>
+                <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+                <span style={{ fontSize: 12, color: "var(--dim)" }}>{/* i18n-ignore */}или прямой переход</span>
+                <div style={{ flex: 1, height: 1, background: "var(--line)" }} />
+              </div>
+
               <div style={{ marginBottom: 16 }}>
                 <button
                   type="button"

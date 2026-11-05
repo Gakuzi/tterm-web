@@ -585,6 +585,20 @@ export function verifyTelegramCode(telegramId: string, code: string): Promise<Si
   return auth("/api/auth/telegram/verify-code", { telegram_id: telegramId, code });
 }
 
+export interface TelegramWidgetUser {
+  id: number;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number;
+  hash: string;
+}
+
+export function loginWithTelegramWidget(user: TelegramWidgetUser): Promise<SignedInNow> {
+  return auth("/api/auth/telegram/login-widget", user);
+}
+
 export function configureTelegramBot(botToken: string, botUsername?: string, chatId?: string): Promise<{ ok: boolean; bot_username?: string; bot_link?: string; message?: string }> {
   return fetch("/api/auth/telegram/configure", {
     method: "POST",

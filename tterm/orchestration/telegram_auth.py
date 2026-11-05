@@ -14,11 +14,17 @@ import json
 import logging
 import os
 import random
+import ssl
 import time
 import urllib.error
 import urllib.request
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
+
+try:
+    import certifi
+except ImportError:
+    certifi = None
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
@@ -27,7 +33,6 @@ from ..core import auth
 from ..core.auth import SESSION_COOKIE, _account, _make_account, _new_session
 from .encrypted_vault import encrypted_vault
 from .notifications_bot import (
-    async_send_telegram_alert,
     get_user_telegram_config,
     save_user_telegram_config,
 )
@@ -104,6 +109,41 @@ def _get_bot_username(token: Optional[str] = None) -> str:
         log.warning("Could not resolve bot username via getMe: %s", e)
 
     return "tTermAuthBot"
+
+
+def _send_telegram_raw(token: str, chat_id: str, text: str, parse_mode: str = "HTML") -> bool:
+    """Directly sends a message via Telegram Bot API sendMessage."""
+    if not token or not chat_id:
+        return False
+    try:
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {
+            "chat_id": str(chat_id),
+            "text": text,
+            "parse_mode": parse_mode,
+            "disable_web_page_preview": True,
+        }
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json", "User-Agent": "tTerm-Auth/1.0"},
+        )
+        ctx = ssl.create_default_context()
+        if certifi:
+            ctx.load_verify_locations(cafile=certifi.where())
+        with urllib.request.urlopen(req, timeout=10, context=ctx) as resp:
+            res_data = json.loads(resp.read().decode("utf-8"))
+            return res_data.get("ok", False)
+    except Exception as exc:
+        log.warning("Telegram sendMessage error to %s: %s", chat_id, exc)
+        return False
+
+
+async def _async_send_telegram(token: str, chat_id: str, text: str, parse_mode: str = "HTML") -> bool:
+    """Async wrapper for direct Telegram sendMessage."""
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, lambda: _send_telegram_raw(token, chat_id, text, parse_mode))
 
 
 async def _telegram_polling_worker(token: str):
@@ -206,8 +246,8 @@ async def _telegram_polling_worker(token: str):
                             f"⏳ <i>Код действителен 10 минут. Введите его на сайте для входа.</i>"
                         )
 
-                    await async_send_telegram_alert(token, chat_id, reply, markdown=False)
-                    log.info("Telegram Bot dispatched code %s to %s (@%s)", code, chat_id, username)
+                    sent_ok = await _async_send_telegram(token, chat_id, reply, parse_mode="HTML")
+                    log.info("Telegram Bot dispatched code %s to %s (@%s), ok=%s", code, chat_id, username, sent_ok)
 
         except asyncio.CancelledError:
             log.info("Telegram polling worker stopped.")
@@ -408,7 +448,7 @@ async def request_telegram_code(data: TelegramCodeRequest, request: Request):
 
     if token and target_chat:
         try:
-            delivered = await async_send_telegram_alert(token, target_chat, msg, markdown=False)
+            delivered = await _async_send_telegram(token, target_chat, msg, parse_mode="HTML")
         except Exception as e:
             log.warning("Could not send Telegram auth code via bot: %s", e)
 
