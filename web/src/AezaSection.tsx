@@ -22,6 +22,7 @@ import {
   Check,
   Copy,
   Key,
+  Link,
   Lock,
   Plus,
   Restart,
@@ -447,6 +448,19 @@ export function AezaSection(props: Props) {
                       </div>
 
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        {s.id && (
+                          <a
+                            href={`https://my.aeza.net/services/${s.id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="button-plain small"
+                            style={{ display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "none", color: "var(--ink, #EDEFF3)", height: 28, padding: "0 8px" }}
+                            title="Открыть настройки сервера в панели Aeza (посмотреть пароль root)" /* i18n-ignore */
+                          >
+                            <Link size={12} />
+                            Панель Aeza (пароль root) {/* i18n-ignore */}
+                          </a>
+                        )}
                         <button
                           type="button"
                           className="button-accent small"
@@ -574,6 +588,16 @@ export function AezaSection(props: Props) {
                     ✅ Сервер успешно заказан! {/* i18n-ignore */}
                   </strong>
                   <span>Инициализация занимает 1-2 минуты. Он появится в списке серверов выше. {/* i18n-ignore */}</span>
+                  <div style={{ marginTop: 6 }}>
+                    <a
+                      href="https://my.aeza.net/services"
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: "#60a5fa", textDecoration: "underline", fontWeight: 600 }}
+                    >
+                      → Перейти в панель управления Aeza (посмотреть пароль root) {/* i18n-ignore */}
+                    </a>
+                  </div>
                 </div>
               )}
             </div>

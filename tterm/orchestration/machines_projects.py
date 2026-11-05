@@ -16,7 +16,13 @@ from typing import Any, Dict, List, Optional, Set
 
 log = logging.getLogger("tterm.orchestration.machines_projects")
 
-CONFIG_PATH = Path.home() / ".tterm-web" / "machine_project_bindings.json"
+def _get_bindings_path() -> Path:
+    docker_vol = Path("/app/data/signer/machine_project_bindings.json")
+    if docker_vol.parent.exists():
+        return docker_vol
+    return Path.home() / ".tterm-web" / "machine_project_bindings.json"
+
+CONFIG_PATH = _get_bindings_path()
 
 
 class MachineProjectManager:

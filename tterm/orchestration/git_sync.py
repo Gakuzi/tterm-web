@@ -16,7 +16,17 @@ from .models import BaseModel, Field
 
 log = logging.getLogger("tterm.orchestration.git_sync")
 
-DEFAULT_CONFIG_FILE = Path(os.getenv("GIT_CONFIGS_FILE", Path.home() / ".tterm-web" / "project_git_configs.json"))
+def _get_default_config_path() -> Path:
+    env_p = os.getenv("GIT_CONFIGS_FILE")
+    if env_p:
+        return Path(env_p)
+    # If persistent docker volume data/signer is present, persist configs there
+    docker_vol = Path("/app/data/signer/project_git_configs.json")
+    if docker_vol.parent.exists():
+        return docker_vol
+    return Path.home() / ".tterm-web" / "project_git_configs.json"
+
+DEFAULT_CONFIG_FILE = _get_default_config_path()
 
 
 
@@ -88,6 +98,13 @@ class GitSyncManager:
         return self._configs[project_id]
 
     def set_config(self, config: ProjectGitConfigDTO) -> ProjectGitConfigDTO:
+        target_norm = config.repo_url.lower().rstrip("/").removesuffix(".git")
+        if target_norm:
+            for pid, existing in list(self._configs.items()):
+                if pid != config.project_id:
+                    existing_norm = existing.repo_url.lower().rstrip("/").removesuffix(".git")
+                    if existing_norm == target_norm:
+                        existing.repo_url = ""
         self._configs[config.project_id] = config
         self._save_to_disk()
         log.info("Project '%s' git repo bound to %s (auto_branch=%s, saved_to_disk=%s)",

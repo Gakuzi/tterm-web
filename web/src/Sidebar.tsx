@@ -187,7 +187,11 @@ export function Sidebar(props: Props) {
   const machineRows = (m: Machine, project?: Project) => {
     const key = `m:${m.id}`;
     const open = !folded.has(key);
-    const mine = terminals.filter((x) => x.machineId === m.id && (!x.projectId || !project || x.projectId === project.id));
+    const mine = terminals.filter((x) => {
+      if (x.machineId !== m.id) return false;
+      if (x.projectId) return project ? x.projectId === project.id : true;
+      return project ? (m.projectId ? m.projectId === project.id : true) : true;
+    });
     const computer = m.kind === "computer";
     const here = !!m.here;
     // In the app without the connection the cloud's machines wait for it;

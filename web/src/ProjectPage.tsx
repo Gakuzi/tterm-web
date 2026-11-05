@@ -24,7 +24,7 @@ import { Face } from "./Face";
 import { colorClass, terminalName } from "./colors";
 import { useT } from "./i18n";
 import {
-  Close, Computer, Doc, Folder as FolderIcon, FolderPlus, Layers, ListCheck, Lock, Pencil,
+  Branch, Close, Computer, Doc, Folder as FolderIcon, FolderPlus, Layers, ListCheck, Lock, Pencil, People,
   Plus, Server, Trash,
 } from "./icons";
 import { FolderMenuItems, MenuButton, NoteMenuItems } from "./Menus";
@@ -578,6 +578,7 @@ export function ProjectPage(props: Props) {
   const { project, me } = props;
   const t = useT();
   const [, setTick] = useState(0);
+  const [activeTab, setActiveTab] = useState<"overview" | "git_notes" | "team_ai" | "containers">("overview");
   const [managingProjectsMachine, setManagingProjectsMachine] = useState<Machine | null>(null);
   const [attachExistingOpen, setAttachExistingOpen] = useState(false);
 
@@ -636,7 +637,55 @@ export function ProjectPage(props: Props) {
         <p>{line}</p>
       </div>
 
-      <ClientInstallerBanner />
+      <div className="pp-tabs-nav" style={{
+        display: "flex",
+        gap: 8,
+        borderBottom: "1px solid var(--sep, #2d3139)",
+        marginBottom: 20,
+        paddingBottom: 8,
+        flexWrap: "wrap",
+      }}>
+        <button
+          type="button"
+          className={activeTab === "overview" ? "button-accent small" : "button-ghost small"}
+          onClick={() => setActiveTab("overview")}
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
+        >
+          <Server size={14} />
+          <span>Обзор (Машины и Заметки) {/* i18n-ignore */}</span>
+        </button>
+        <button
+          type="button"
+          className={activeTab === "git_notes" ? "button-accent small" : "button-ghost small"}
+          onClick={() => setActiveTab("git_notes")}
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
+        >
+          <Branch size={14} />
+          <span>Git & Заметки GitHub {/* i18n-ignore */}</span>
+        </button>
+        <button
+          type="button"
+          className={activeTab === "team_ai" ? "button-accent small" : "button-ghost small"}
+          onClick={() => setActiveTab("team_ai")}
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
+        >
+          <People size={14} />
+          <span>Команда и Доступ ИИ {/* i18n-ignore */}</span>
+        </button>
+        <button
+          type="button"
+          className={activeTab === "containers" ? "button-accent small" : "button-ghost small"}
+          onClick={() => setActiveTab("containers")}
+          style={{ display: "flex", alignItems: "center", gap: 6 }}
+        >
+          <Layers size={14} />
+          <span>Контейнеры & Порты {/* i18n-ignore */}</span>
+        </button>
+      </div>
+
+      {activeTab === "overview" && (
+        <>
+          <ClientInstallerBanner />
 
       <section className="pp-section" aria-labelledby="pp-machines">
         <div className="pp-section-head">
@@ -811,8 +860,6 @@ export function ProjectPage(props: Props) {
         )}
       </section>
 
-      <ProjectCollaboration project={project} terminals={running} me={me} />
-
       {project.own && !project.personal && (
         <section className="pp-section" aria-labelledby="pp-delete">
           <div className="pp-wide pp-danger">
@@ -828,6 +875,18 @@ export function ProjectPage(props: Props) {
             </button>
           </div>
         </section>
+      )}
+      </>
+      )}
+
+      {activeTab !== "overview" && (
+        <ProjectCollaboration
+          project={project}
+          terminals={running}
+          me={me}
+          activeSection={activeTab}
+          onRefresh={props.onRefresh}
+        />
       )}
 
       <MachineProjectsModal

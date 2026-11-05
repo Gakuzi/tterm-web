@@ -218,6 +218,7 @@ func installAndLaunchDaemon(cfg *Config, appDir string) {
 	myPID := os.Getpid()
 	psKillOthers := fmt.Sprintf(`Get-Process -Name "tterm-agent" -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne %d } | Stop-Process -Force -ErrorAction SilentlyContinue`, myPID)
 	_ = exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psKillOthers).Run()
+	_ = os.Remove(filepath.Join(appDir, "daemon.pid"))
 
 	currentExe, err := os.Executable()
 	if err == nil && filepath.Clean(currentExe) != filepath.Clean(targetExe) {

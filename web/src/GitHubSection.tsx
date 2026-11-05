@@ -131,7 +131,7 @@ export function GitHubSection(props: Props) {
           const map: Record<string, string> = {};
           for (const [pid, cfg] of Object.entries(data.configs)) {
             if ((cfg as any).repo_url) {
-              const cleanUrl = (cfg as any).repo_url.toLowerCase().replace(/\.git$/, "");
+              const cleanUrl = (cfg as any).repo_url.toLowerCase().replace(/\/+$/, "").replace(/\.git$/, "");
               map[cleanUrl] = pid;
             }
           }
@@ -180,7 +180,10 @@ export function GitHubSection(props: Props) {
 
       if (res.ok) {
         notify(`Репозиторий ${repo.name} успешно привязан к проекту "${projName}"!`); // i18n-ignore
-        void loadGitConfigs();
+        const cleanUrl = repo.html_url.toLowerCase().replace(/\/+$/, "").replace(/\.git$/, "");
+        setProjectBindings((prev) => ({ ...prev, [cleanUrl]: projectId }));
+        setSelectedProjectForRepo((prev) => ({ ...prev, [repo.name]: projectId }));
+        await loadGitConfigs();
       } else {
         notify("Ошибка при сохранении привязки репозитория"); // i18n-ignore
       }
@@ -583,10 +586,10 @@ export function GitHubSection(props: Props) {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   {repos.slice(0, 15).map((r) => {
-                    const cleanUrl = r.html_url.toLowerCase().replace(/\.git$/, "");
+                    const cleanUrl = r.html_url.toLowerCase().replace(/\/+$/, "").replace(/\.git$/, "");
                     const boundProjectId = projectBindings[cleanUrl];
                     const boundProject = boundProjectId && props.projects ? props.projects.find((p) => p.id === boundProjectId) : null;
-                    const chosenProjectId = selectedProjectForRepo[r.name] || boundProjectId || (props.projects?.[0]?.id || "");
+                    const chosenProjectId = selectedProjectForRepo[r.name] ?? boundProjectId ?? "";
 
                     return (
                       <div

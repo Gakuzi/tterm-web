@@ -714,7 +714,7 @@ export function App() {
       ? stateNow.current?.projects.find((p) => p.id === projectId)
       : stateNow.current?.projects.find((p) => p.machines.some((m) => m.id === machineId));
     if (project) unfold(`p:${project.id}`, `m:${machineId}`);
-    openTerminal(machineId, cols, rows, cwd, projectId)
+    openTerminal(machineId, cols, rows, cwd, projectId || project?.id)
       .then((terminal) => {
         setStatuses((all) => {
           const next = { ...all, [terminal.id]: {
@@ -1551,7 +1551,7 @@ export function App() {
           icon: m.kind === "server" ? <Server size={15} /> : <Computer size={15} />,
           muted: offline || waits,
           words: [m.name, m.host, m.os, m.kind].filter(Boolean).join(" "),
-          run: () => newTerminal(m),
+          run: () => newTerminal(m, p.id),
         };
       }),
     }));
@@ -1621,7 +1621,7 @@ export function App() {
           [t("app.search.row_address"), m.host ?? ""], [t("app.search.row_status"), status],
           [t("app.search.row_terminals"), open ? t("app.search.open_count", { n: open }) : ""]] as
           [string, string][]).filter((r) => r[1]),
-        run: () => newTerminal(m), act: t("sidebar.new_terminal"), machineId: m.id,
+        run: () => newTerminal(m, p.id), act: t("sidebar.new_terminal"), machineId: m.id,
         muted: offline || waits,
       };
     }));
@@ -2056,7 +2056,7 @@ export function App() {
           logClosed={isLogClosed}
           onOpenProject={(projectId) => away(() => openTab(projectTab(projectId)))()}
           onAddMachine={(projectId) => startAdding(projectId)}
-          onNewTerminal={(machine) => away(() => newTerminal(machine))()}
+          onNewTerminal={(machine, projId) => away(() => newTerminal(machine, projId))()}
           onGoTo={(id) => {
             goTo(id);
             // It slides away a moment later: a second click names the

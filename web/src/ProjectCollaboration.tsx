@@ -15,6 +15,8 @@ interface Props {
   terminals: TerminalInfo[];
   me: Me;
   notify?: (msg: string) => void;
+  activeSection?: "all" | "git_notes" | "team_ai" | "containers";
+  onRefresh?: () => void;
 }
 
 interface TeamMember {
@@ -194,7 +196,7 @@ interface AIAgentSession {
   blocked: boolean;
 }
 
-export function ProjectCollaboration({ project, terminals, me, notify }: Props) {
+export function ProjectCollaboration({ project, terminals, me, notify, activeSection = "all", onRefresh }: Props) {
   const [members, setMembers] = useState<TeamMember[]>([
     {
       id: me.id,
@@ -618,6 +620,7 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
       if (res.ok) {
         const data = await res.json();
         if (notify) notify(data.message || `Синхронизировано ${data.synced_notes_count} заметок из GitHub!`); // i18n-ignore
+        if (onRefresh) onRefresh();
       } else {
         if (notify) notify("Ошибка синхронизации заметок из GitHub"); // i18n-ignore
       }
@@ -1130,6 +1133,7 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
   return (
     <div className="project-collaboration-hub" style={{ marginTop: 24 }}>
       {/* 1. Команда и доступ ИИ */}
+      {(activeSection === "all" || activeSection === "team_ai") && (
       <section className="pp-section" style={{ marginBottom: 28 }}>
         <div className="pp-section-head">
           <div className="pp-section-title">
@@ -1410,8 +1414,10 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
           ))}
         </div>
       </section>
+      )}
 
       {/* 2. Git Интеграция */}
+      {(activeSection === "all" || activeSection === "git_notes") && (
       <section className="pp-section" style={{ marginBottom: 28 }}>
         <div className="pp-section-head">
           <div className="pp-section-title">
@@ -1832,8 +1838,10 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
           </div>
         </div>
       </section>
+      )}
 
       {/* 3. Контейнерная Оркестрация, Ноды и Порты */}
+      {(activeSection === "all" || activeSection === "containers") && (
       <section className="pp-section">
         {/* Очередь подтверждения опасных команд от нижестоящих звеньев */}
         {approvals.length > 0 && (
@@ -2211,6 +2219,7 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
           );
         })()}
       </section>
+      )}
 
       {/* Модальное окно деструктивного действия с оценкой влияния */}
       {disruptiveModal.isOpen && (

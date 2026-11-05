@@ -198,7 +198,8 @@ class MoveBody(BaseModel):
 
 
 class TerminalPatch(BaseModel):
-    name: str
+    name: str | None = None
+    projectId: uuid.UUID | None = None
 
 
 #: A line the input line may ask Tab about, at most.
@@ -866,6 +867,26 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         # their text: the sidebar and the project's page (0.1.0).
         folders = await notes.folders_of(
             pool, [uuid.UUID(p["id"]) for p in listed])
+
+        all_machines = {}
+        for p in listed:
+            for m in p["machines"]:
+                all_machines[m["id"]] = m
+
+        try:
+            from ..orchestration.machines_projects import machine_project_manager
+            for project in listed:
+                p_id = str(project["id"])
+                existing_machine_ids = {m["id"] for m in project["machines"]}
+                delegated_ids = machine_project_manager.get_machines_for_project(p_id)
+                for d_id in delegated_ids:
+                    if d_id not in existing_machine_ids and d_id in all_machines:
+                        shared_m = dict(all_machines[d_id])
+                        shared_m["shared"] = True
+                        project["machines"].append(shared_m)
+        except Exception as exc:
+            log.debug("could not augment project machines with delegated: %s", exc)
+
         for project in listed:
             project["machines"] = [with_agents(m) for m in project["machines"]]
             project["folders"] = folders.get(project["id"], [])
@@ -1194,8 +1215,24 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         if (closed := await closed_terminal(terminal_id, session)) is not None:
             return closed
         try:
-            terminal = await terminals.rename(terminal_id, session.person.id,
-                                              body.name)
+            if body.name is not None:
+                terminal = await terminals.rename(terminal_id, session.person.id,
+                                                  body.name)
+            else:
+                terminal = terminals.get(terminal_id, session.person.id)
+                if terminal is None:
+                    return _json({"error": "no such terminal"}, 404)
+            if body.projectId is not None:
+                terminal.project_id = body.projectId
+                try:
+                    from ..orchestration.machines_projects import machine_project_manager
+                    machine_project_manager.set_terminal_project(
+                        terminal_id=str(terminal.id),
+                        project_id=str(terminal.project_id),
+                        machine_id=str(terminal.machine.id),
+                    )
+                except Exception as exc:
+                    log.debug("machine_project_manager.set_terminal_project failed: %s", exc)
         except LookupError:
             return _json({"error": "no such terminal"}, 404)
         except NotOpen as exc:

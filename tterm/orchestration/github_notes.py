@@ -248,10 +248,10 @@ class GitHubNotesManager:
         )
         return folder_id
 
-    def discover_local_markdown_files(self, search_paths: List[Path]) -> List[Tuple[str, str, str]]:
+    def discover_local_markdown_files(self, search_paths: List[Path]) -> List[Tuple[str, str, str, str]]:
         """
         Scans given directories for Markdown files.
-        Returns list of tuples: (relative_folder, file_title, file_content)
+        Returns list of tuples: (relative_folder, file_title, file_content, relative_path)
         """
         found = []
         for base in search_paths:
@@ -259,18 +259,32 @@ class GitHubNotesManager:
                 continue
             for root, dirs, files in os.walk(base):
                 # Skip hidden, git, and node_modules
-                dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", ".venv", "venv", "__pycache__")]
+                dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", ".venv", "venv", "__pycache__", "dist", "build")]
                 for f in files:
                     if f.endswith(".md"):
                         full_path = Path(root) / f
                         try:
                             rel = full_path.relative_to(base)
-                            folder_name = "Документация репозитория" if len(rel.parts) == 1 else f"docs/{rel.parts[0]}"
-                            title = rel.stem.replace("_", " ").replace("-", " ").title()
-                            if f == "README.md":
-                                title = "README"
+                            if len(rel.parts) == 1:
+                                folder_name = "Документация репозитория"
+                            else:
+                                folder_name = "/".join(rel.parts[:-1])
+                            
                             content = full_path.read_text(encoding="utf-8", errors="replace")
-                            found.append((folder_name, title, content))
+                            
+                            # Extract title from first # heading if present
+                            title = ""
+                            for line in content.splitlines():
+                                line_str = line.strip()
+                                if line_str.startswith("# "):
+                                    title = line_str[2:].strip()
+                                    break
+                            if not title:
+                                title = rel.stem.replace("_", " ").replace("-", " ").title()
+                            if f == "README.md":
+                                title = f"README ({rel.parts[0]})" if len(rel.parts) > 1 else "README"
+
+                            found.append((folder_name, title, content, str(rel)))
                         except Exception:
                             continue
         return found
@@ -337,12 +351,26 @@ class GitHubNotesManager:
 
         # Default paths to look for git repository
         if not repo_paths:
-            repo_paths = [
+            repo_paths = []
+            if cfg.repo_url:
+                repo_dir = Path.home() / ".tterm-web" / "repos" / project_id_str
+                try:
+                    repo_dir.parent.mkdir(parents=True, exist_ok=True)
+                    if (repo_dir / ".git").exists():
+                        subprocess.run(["git", "pull", "--ff-only"], cwd=repo_dir, capture_output=True, timeout=15)
+                    else:
+                        subprocess.run(["git", "clone", "--depth", "50", cfg.repo_url, str(repo_dir)], capture_output=True, timeout=30)
+                    if (repo_dir / ".git").exists():
+                        repo_paths.append(repo_dir)
+                except Exception as exc:
+                    log.warning("Could not clone/pull git repo %s: %s", cfg.repo_url, exc)
+
+            repo_paths.extend([
                 Path("/app"),
                 Path.cwd(),
                 Path.home() / "tterm-server",
                 Path(__file__).resolve().parent.parent.parent,
-            ]
+            ])
 
         # 1. Discover local Markdown files
         md_files = self.discover_local_markdown_files(repo_paths)
@@ -360,7 +388,7 @@ class GitHubNotesManager:
 
         async with pool.acquire() as conn, conn.transaction():
             # A. Sync Markdown files
-            for folder_name, title, content in md_files:
+            for folder_name, title, content, rel_path in md_files:
                 f_id = await self.get_or_create_folder(
                     conn, project_id, folder_name, user_id, is_github=True, github_dir=folder_name
                 )
@@ -381,16 +409,16 @@ class GitHubNotesManager:
                 if existing_id:
                     await conn.execute("""
                         UPDATE notes SET body = $2::jsonb, todo_total = $3, todo_done = $4,
-                                         excerpt = $5, edited_at = now()
+                                         excerpt = $5, edited_at = now(), github_path = $6
                         WHERE id = $1
-                    """, existing_id, body, total, done, excerpt)
+                    """, existing_id, body, total, done, excerpt, rel_path)
                     note_id = existing_id
                 else:
                     note_id = await conn.fetchval("""
                         INSERT INTO notes (folder_id, title, body, todo_total, todo_done, excerpt, created_by, edited_by, is_personal, github_path)
                         VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $7, false, $8)
                         RETURNING id
-                    """, f_id, title, body, total, done, excerpt, user_id, f"{folder_name}/{title}.md")
+                    """, f_id, title, body, total, done, excerpt, user_id, rel_path)
                     await conn.execute("""
                         INSERT INTO note_versions (note_id, version, title, body)
                         VALUES ($1, 1, $2, $3::jsonb) ON CONFLICT DO NOTHING
@@ -403,7 +431,7 @@ class GitHubNotesManager:
                     title=title,
                     is_personal=False,
                     is_github_synced=True,
-                    github_path=f"{folder_name}/{title}.md",
+                    github_path=rel_path,
                     updated_at=time.strftime("%Y-%m-%d %H:%M:%S")
                 ))
 
@@ -506,10 +534,14 @@ class GitHubNotesManager:
         md_content = blocks_to_markdown(title, blocks)
 
         if not repo_dir:
-            for p in (Path("/app"), Path.cwd(), Path.home() / "tterm-server"):
-                if (p / ".git").exists():
-                    repo_dir = p
-                    break
+            proj_repo = Path.home() / ".tterm-web" / "repos" / project_id_str
+            if (proj_repo / ".git").exists():
+                repo_dir = proj_repo
+            else:
+                for p in (Path("/app"), Path.cwd(), Path.home() / "tterm-server"):
+                    if (p / ".git").exists():
+                        repo_dir = p
+                        break
 
         if not repo_dir or not (repo_dir / ".git").exists():
             return {"ok": True, "note_id": note_id_str, "status": "saved_locally_no_git_worktree"}
@@ -524,6 +556,8 @@ class GitHubNotesManager:
             subprocess.run(["git", "add", str(target_file)], cwd=repo_dir, check=True, capture_output=True)
             msg = f"docs(notes): обновить заметку '{title}' [автор: {author_name}]"
             subprocess.run(["git", "commit", "-m", msg], cwd=repo_dir, capture_output=True)
+            # Push changes to remote if upstream is available
+            subprocess.run(["git", "push"], cwd=repo_dir, capture_output=True, timeout=10)
             log.info("Committed shared note %s to %s", title, target_file)
             return {"ok": True, "file": str(github_path), "commit_message": msg}
         except Exception as exc:

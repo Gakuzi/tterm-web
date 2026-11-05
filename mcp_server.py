@@ -150,11 +150,13 @@ def list_terminals() -> str:
     return json.dumps(summary, ensure_ascii=False, indent=2)
 
 
-def open_terminal(machine_id: str, cwd: str = "") -> str:
-    """Opens a new terminal on a machine."""
+def open_terminal(machine_id: str, cwd: str = "", project_id: str = "") -> str:
+    """Opens a new terminal on a machine, optionally scoped to a project."""
     payload: dict[str, Any] = {"machineId": machine_id, "cols": 80, "rows": 24}
     if cwd:
         payload["cwd"] = cwd
+    if project_id:
+        payload["projectId"] = project_id
     res = _request("POST", "/api/terminals", payload)
     return json.dumps(res, ensure_ascii=False, indent=2)
 
@@ -529,7 +531,7 @@ def handle_request(req: dict[str, Any]) -> dict[str, Any] | None:
             elif name == "tterm_list_terminals":
                 content = list_terminals()
             elif name == "tterm_open_terminal":
-                content = open_terminal(args["machine_id"], args.get("cwd", ""))
+                content = open_terminal(args["machine_id"], args.get("cwd", ""), args.get("project_id", ""))
             elif name == "tterm_run_command":
                 content = run_command(args["terminal_id"], args["command"], args.get("timeout", 30.0))
             elif name == "tterm_read_terminal":
