@@ -2,6 +2,8 @@
 """
 Unit and Integration Tests for Hierarchical RBAC and Container Orchestration Engine.
 """
+import os
+from pathlib import Path
 import unittest
 import uuid
 
@@ -137,6 +139,240 @@ tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*
         renamed = self.scanner.rename_entity(self.node_id, "container", "7045c1f0de1b", "Главная БД PostgreSQL")
         self.assertTrue(renamed)
         self.assertEqual(pg.custom_name, "Главная БД PostgreSQL")
+
+    def test_scan_connected_machine_with_mock_client(self):
+        """Verifies remote machine discovery via client session executing remote probe commands."""
+        import asyncio
+
+        class MockSSHClient:
+            async def run(self, cmd):
+                return type("SSHResult", (), {
+                    "stdout": """===DOCKER_BEGIN===
+a1b2c3d4e5f6|web-app|my-org/web:v2.1|Up 3 hours|0.0.0.0:3000->3000/tcp, 0.0.0.0:80->80/tcp
+f6e5d4c3b2a1|redis-cache|redis:7-alpine|Up 5 days|6379/tcp
+===DOCKER_END===
+===PORTS_BEGIN===
+tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:* users:(("sshd",pid=712,fd=3))
+tcp LISTEN 0 512 0.0.0.0:3000 0.0.0.0:* users:(("node",pid=1420,fd=19))
+tcp LISTEN 0 128 0.0.0.0:80 0.0.0.0:*
+===PORTS_END===
+===SYSTEM_BEGIN===
+Linux production-vps-01 6.8.0-31-generic #31-Ubuntu SMP x86_64 GNU/Linux
+198.51.100.42 10.0.0.12
+===SYSTEM_END===
+"""
+                })()
+
+        async def _run():
+            res = await self.scanner.scan_connected_machine(
+                "vps-remote-1",
+                host="198.51.100.42",
+                login="ubuntu",
+                client=MockSSHClient(),
+            )
+            self.assertTrue(res["ok"])
+            self.assertEqual(res["node_id"], "vps-remote-1")
+            self.assertEqual(res["method"], "client_session")
+
+            node = res["node"]
+            self.assertEqual(node["ip_address"], "198.51.100.42")
+            self.assertIn("Linux", node["os_name"])
+            self.assertEqual(len(node["containers"]), 2)
+
+            # Check web container and services
+            web_c = next(c for c in node["containers"] if c["name"] == "web-app")
+            self.assertEqual(len(web_c["services"]), 2)
+            svc0 = web_c["services"][0]
+            svc0_port = svc0.port if hasattr(svc0, "port") else svc0["port"]
+            self.assertEqual(svc0_port, 3000)
+
+            # Check ports
+            ports = node["ports"]
+            self.assertEqual(len(ports), 3)
+            port_nums = [p["port"] for p in ports]
+            self.assertIn(22, port_nums)
+            self.assertIn(3000, port_nums)
+            self.assertIn(80, port_nums)
+
+        asyncio.run(_run())
+
+    def test_scan_connected_machine_cached_fallback(self):
+        """Verifies graceful fallback to cached passport when a remote machine is offline/unreachable."""
+        import asyncio
+
+        node_id = "offline-machine-99"
+        cached_passport = {
+            "os": "Ubuntu 22.04 LTS (Jammy Jellyfish)",
+            "docker_containers": [
+                {
+                    "id": "c11223344",
+                    "name": "api-gateway",
+                    "image": "traefik:v2.10",
+                    "status": "Up 2 weeks",
+                    "ports": ["0.0.0.0:443->443/tcp"],
+                }
+            ],
+            "listening_ports": [
+                "tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*",
+                "tcp LISTEN 0 4096 0.0.0.0:443 0.0.0.0:*",
+            ],
+        }
+
+        # Pre-seed node with cached passport
+        from tterm.orchestration.discovery import DiscoveredNodeDTO
+        self.scanner._nodes[node_id] = DiscoveredNodeDTO(
+            id=node_id,
+            name="Offline Cloud Node",
+            kind="server",
+            os_name="Ubuntu 22.04 LTS",
+            ip_address="127.0.0.1",
+            status="ONLINE",
+            host="127.0.0.1",
+            ssh_port=59999,
+            login="root",
+            cached_passport=cached_passport,
+        )
+
+        async def _run():
+            # Scan with unreachable port
+            res = await self.scanner.scan_connected_machine(node_id, host="127.0.0.1", port=59999)
+            self.assertTrue(res["ok"])
+            self.assertEqual(res["node_id"], node_id)
+            self.assertEqual(res["method"], "cached_fallback")
+
+            node = res["node"]
+            self.assertEqual(len(node["containers"]), 1)
+            self.assertEqual(node["containers"][0]["name"], "api-gateway")
+            self.assertEqual(len(node["ports"]), 2)
+
+        asyncio.run(_run())
+
+    def test_get_node_services_and_ports(self):
+        """Verifies extracting flattened services and open listening ports for a node."""
+        services, ports = self.scanner.get_node_services("klim")
+        self.assertGreater(len(services), 0)
+        self.assertGreater(len(ports), 0)
+
+        # Ensure services have container_name and node_id attached
+        for srv in services:
+            self.assertIn("container_name", srv)
+            self.assertEqual(srv["node_id"], "klim")
+            self.assertIn("port", srv)
+
+    def test_live_or_cached_klim_scan(self):
+        """Verifies scanning the klim connected node produces real containers and ports."""
+        import asyncio
+
+        async def _run():
+            res = await self.scanner.scan_connected_machine("klim")
+            self.assertTrue(res["ok"])
+            self.assertEqual(res["node_id"], "klim")
+            self.assertIn(res["method"], ["remote_ssh", "cached_fallback"])
+            self.assertGreaterEqual(len(res["containers"]), 5)
+            self.assertGreaterEqual(len(res["ports"]), 5)
+            self.assertEqual(res["node"]["ip_address"], "192.168.0.6")
+
+        asyncio.run(_run())
+
+    def test_remote_scan_api_endpoints(self):
+        """Verifies FastAPI orchestration endpoints for remote node scanning and service retrieval."""
+        import asyncio
+        from tterm.orchestration.api import (
+            scan_remote_connected_node,
+            get_node_services_endpoint,
+            scan_all_connected_nodes,
+            get_single_node,
+            ScanRemoteDTO,
+        )
+
+        async def _run():
+            # 1. GET /api/orchestration/nodes/{node_id}
+            single_res = await get_single_node("klim")
+            self.assertTrue(single_res["ok"])
+            self.assertEqual(single_res["node"]["id"], "klim")
+
+            # 2. GET /api/orchestration/nodes/{node_id}/services
+            srv_res = await get_node_services_endpoint("klim")
+            self.assertTrue(srv_res["ok"])
+            self.assertEqual(srv_res["node_id"], "klim")
+            self.assertGreater(srv_res["total_services"], 0)
+            self.assertGreater(srv_res["total_ports"], 0)
+
+            # 3. POST /api/orchestration/nodes/{node_id}/scan-remote with raw output
+            test_raw = """===DOCKER_BEGIN===
+99aabbcc1122|test-worker|worker:latest|Up 1 hour|0.0.0.0:9090->9090/tcp
+===DOCKER_END===
+===PORTS_BEGIN===
+tcp LISTEN 0 128 0.0.0.0:9090 0.0.0.0:*
+===PORTS_END===
+===SYSTEM_BEGIN===
+Linux worker-node 6.5.0-generic
+10.20.30.40
+===SYSTEM_END==="""
+            scan_res = await scan_remote_connected_node(
+                "worker-node-1",
+                ScanRemoteDTO(raw_output=test_raw),
+            )
+            self.assertTrue(scan_res["ok"])
+            self.assertEqual(scan_res["node_id"], "worker-node-1")
+            self.assertEqual(len(scan_res["containers"]), 1)
+            self.assertEqual(scan_res["containers"][0]["name"], "test-worker")
+
+            # 4. POST /api/orchestration/nodes/scan-all
+            all_res = await scan_all_connected_nodes()
+            self.assertTrue(all_res["ok"])
+            self.assertGreaterEqual(all_res["scanned_count"], 2)
+
+        asyncio.run(_run())
+
+    def test_sync_from_machines_db(self):
+        """Verifies synchronization of machine records from PostgreSQL into the discovery scanner."""
+        import asyncio
+
+        class MockRecord(dict):
+            def __getitem__(self, key):
+                return super().__getitem__(key)
+
+        class MockPool:
+            async def fetch(self, query):
+                return [
+                    MockRecord({
+                        "id": uuid.UUID("33333333-3333-3333-3333-333333333333"),
+                        "name": "Cloud DB Replica",
+                        "kind": "server",
+                        "host": "198.51.100.99",
+                        "port": 2222,
+                        "passport": {
+                            "os": "Debian 12 Bookworm",
+                            "docker_containers": [
+                                {
+                                    "id": "db00112233",
+                                    "name": "postgres-replica",
+                                    "image": "postgres:16",
+                                    "status": "Up 4 days",
+                                    "ports": ["5432/tcp"],
+                                }
+                            ],
+                            "listening_ports": ["tcp LISTEN 0 128 0.0.0.0:5432 0.0.0.0:*"],
+                        },
+                        "last_seen_at": "2026-11-05T10:00:00Z",
+                    })
+                ]
+
+        async def _run():
+            synced = await self.scanner.sync_from_machines_db(MockPool())
+            synced_ids = [n.id for n in synced]
+            self.assertIn("33333333-3333-3333-3333-333333333333", synced_ids)
+
+            node = self.scanner.get_node("33333333-3333-3333-3333-333333333333")
+            self.assertIsNotNone(node)
+            self.assertEqual(node.name, "Cloud DB Replica")
+            self.assertEqual(node.host, "198.51.100.99")
+            self.assertEqual(node.ssh_port, 2222)
+            self.assertEqual(len(node.containers), 1)
+            self.assertEqual(node.containers[0].name, "postgres-replica")
+
+        asyncio.run(_run())
 
 
 class TestHierarchicalDrainLocks(unittest.TestCase):
@@ -316,6 +552,516 @@ class TestGitSyncAndTerminalBranches(unittest.TestCase):
         # Record commit
         updated = self.mgr.record_commit("term-xyz-123", "npm install")
         self.assertEqual(updated.commits_count, 1)
+
+    def test_git_create(self):
+        res = self.mgr.create_repository("proj-99", "alpha-service", "private", "project")
+        self.assertTrue(res["ok"])
+        self.assertIn("alpha-service", res["repo_url"])
+        self.assertIn("Gakuzi", res["repo_url"])
+        self.assertEqual(res["repo_name"], "alpha-service")
+        self.assertEqual(res["scope"], "project")
+
+        # Test with terminal binding
+        term_res = self.mgr.create_repository("proj-99", "feature-x", "public", "terminal", terminal_id="term-feat-1")
+        self.assertTrue(term_res["ok"])
+        self.assertIsNotNone(term_res["branch"])
+        self.assertIn("term/featurex", term_res["branch"].branch_name)
+
+
+class TestMultiNodeAndApprovals(unittest.TestCase):
+    def test_multi_node_discovery_and_permissions(self):
+        from tterm.orchestration.discovery import discovery_scanner
+        nodes = discovery_scanner.get_all_nodes()
+        self.assertGreaterEqual(len(nodes), 2)
+        node_ids = [n["id"] for n in nodes]
+        self.assertIn("klim", node_ids)
+        self.assertIn("macbook-air", node_ids)
+
+        # Check containers on klim
+        klim = next(n for n in nodes if n["id"] == "klim")
+        self.assertGreaterEqual(len(klim["containers"]), 6)
+        self.assertGreaterEqual(len(klim["ports"]), 5)
+
+        # Set permissions for node
+        discovery_scanner.set_node_permissions("macbook-air", ["dev-1", "admin"])
+        filtered = discovery_scanner.get_all_nodes(member_id="guest-99")
+        self.assertFalse(any(n["id"] == "macbook-air" for n in filtered))
+
+    def test_dangerous_command_interception_and_approval(self):
+        from tterm.orchestration.approvals import approval_manager
+
+        # 1. Safe command by subordinate -> allowed immediately
+        safe_res = approval_manager.evaluate_command(
+            project_id="proj-1",
+            terminal_id="term-1",
+            terminal_label="Web Shell",
+            node_id="klim",
+            requester_id="dev-1",
+            requester_name="Алексей",
+            requester_role="Разработчик",
+            command="ls -la /app",
+        )
+        self.assertTrue(safe_res["allowed"])
+        self.assertFalse(safe_res["requires_approval"])
+
+        # 2. Dangerous command by subordinate -> intercepted, requires approval
+        danger_res = approval_manager.evaluate_command(
+            project_id="proj-1",
+            terminal_id="term-1",
+            terminal_label="Web Shell",
+            node_id="klim",
+            requester_id="dev-1",
+            requester_name="Алексей",
+            requester_role="Разработчик",
+            command="rm -rf /var/data",
+        )
+        self.assertFalse(danger_res["allowed"])
+        self.assertTrue(danger_res["requires_approval"])
+        self.assertEqual(danger_res["risk_level"], "CRITICAL")
+        req_id = danger_res["request_id"]
+
+        # Check pending list
+        pending = approval_manager.list_requests("proj-1", status="pending")
+        self.assertTrue(any(r["id"] == req_id for r in pending))
+
+        # 3. Manager approves
+        res = approval_manager.resolve_request(req_id, "me", "Руководитель", approved=True, comment="Согласовано")
+        self.assertEqual(res["status"], "approved")
+        self.assertEqual(res["reviewed_by"], "Руководитель")
+
+        # 4. Dangerous command executed by manager directly -> allowed immediately
+        admin_res = approval_manager.evaluate_command(
+            project_id="proj-1",
+            terminal_id="term-1",
+            terminal_label="Admin Shell",
+            node_id="klim",
+            requester_id="me",
+            requester_name="Руководитель",
+            requester_role="Руководитель проекта",
+            command="docker compose down",
+        )
+        self.assertTrue(admin_res["allowed"])
+        self.assertFalse(admin_res["requires_approval"])
+
+    def test_aeza_client_plans_and_pricing(self):
+        from tterm.orchestration.aeza_cloud import aeza_client
+        acc = aeza_client.get_account_info()
+        self.assertIn("email", acc)
+        self.assertEqual(acc["currency"], "RUB")
+        self.assertGreater(acc["balance_rub"], 0)
+
+        # Check SSH keys
+        keys = aeza_client.list_ssh_keys()
+        self.assertGreaterEqual(len(keys), 2)
+        key_names = [k.get("name") for k in keys]
+        self.assertTrue(any("MacBook" in str(n) for n in key_names))
+
+        # Check hourly plans
+        plans = aeza_client.list_vps_plans(hourly_only=True)
+        self.assertGreater(len(plans), 0)
+        cheapest = plans[0]
+        self.assertIsNotNone(cheapest["hour_price_rub"])
+        self.assertLessEqual(cheapest["hour_price_rub"], 5.0)
+
+    def test_github_app_auth_and_management(self):
+        from tterm.orchestration.github_app import github_manager
+        # Initially not authenticated
+        github_manager.disconnect()
+        status = github_manager.get_auth_status()
+        self.assertFalse(status["is_authenticated"])
+
+        # Configure OAuth App
+        github_manager.configure_oauth_app("test_client_id_123", "test_secret_456")
+        url = github_manager.get_auth_url("http://192.168.0.6:8290/oauth/callback")
+        self.assertIn("client_id=test_client_id_123", url)
+        self.assertIn("scope=repo", url)
+
+        # Connect with mock token / session
+        github_manager._auth = {
+            "is_authenticated": True,
+            "auth_type": "oauth_token",
+            "username": "EvgenyKlimov",
+            "name": "Евгений Климов",
+            "email": "eklimov84@gmail.com",
+            "avatar_url": "https://avatars.githubusercontent.com/u/12345",
+            "html_url": "https://github.com/EvgenyKlimov",
+            "public_repos": 14,
+            "scopes": ["repo", "user", "workflow"],
+            "access_token": "ghp_MockSecretTokenForTesting1234567890",
+            "connected_at": "2026-11-05T09:00:00Z",
+        }
+        st = github_manager.get_auth_status()
+        self.assertTrue(st["is_authenticated"])
+        self.assertEqual(st["username"], "EvgenyKlimov")
+        self.assertEqual(st["masked_token"], "ghp_...7890")
+
+        # Test terminal git setup script generation
+        setup_script = github_manager.get_terminal_git_setup()
+        self.assertIn("user.name \"Евгений Климов\"", setup_script)
+        self.assertIn("user.email \"eklimov84@gmail.com\"", setup_script)
+        self.assertIn("EvgenyKlimov", setup_script)
+
+        # Test GitSyncManager auto-identity
+        from tterm.orchestration.git_sync import git_sync_manager
+        commit_cmd = git_sync_manager.build_action_commit_command("cargo build --release")
+        self.assertIn("Евгений Климов", commit_cmd)
+
+        user_repo_res = git_sync_manager.create_repository("proj-user", "my-service", "private", "project")
+        self.assertIn("EvgenyKlimov/my-service.git", user_repo_res["repo_url"])
+
+        # Disconnect and verify clean state
+        github_manager.disconnect()
+        self.assertFalse(github_manager.is_authenticated())
+
+    def test_ai_agent_sessions_and_scoped_keys(self):
+        from tterm.orchestration.ai_sessions import ai_agent_manager
+
+        # 1. Generate Key for AI Agent restricted to 1 terminal
+        key_res = ai_agent_manager.generate_agent_key(
+            project_id="default-project",
+            allowed_terminals=["c56de979-35aa-4828-9056-3dbaab629e0d"],
+            agent_name="Antigravity Test Agent",
+            role="container_developer",
+            ai_mode="guard",
+        )
+        self.assertTrue(key_res["ok"])
+        token = key_res["key"]["token"]
+        self.assertTrue(token.startswith("tt_ai_"))
+        self.assertEqual(key_res["connection_json"]["allowed_terminal"], "c56de979-35aa-4828-9056-3dbaab629e0d")
+        self.assertIn("mcpServers", key_res["mcp_config"])
+
+        # 2. Agent connects via MCP and registers session
+        sess = ai_agent_manager.register_or_ping(
+            token=token,
+            session_id="sess-test-ai-1",
+            agent_name="Antigravity Test Agent",
+            terminal_id="c56de979-35aa-4828-9056-3dbaab629e0d",
+            command="ls -la",
+        )
+        self.assertEqual(sess["status"], "ONLINE")
+        self.assertEqual(sess["current_command"], "ls -la")
+
+        # 3. Validate access to allowed terminal -> OK
+        ok, err = ai_agent_manager.validate_action(token, "sess-test-ai-1", "c56de979-35aa-4828-9056-3dbaab629e0d", "git status")
+        self.assertTrue(ok)
+
+        # 4. Validate access to forbidden terminal -> DENIED
+        ok_bad, err_bad = ai_agent_manager.validate_action(token, "sess-test-ai-1", "forbidden-term-999", "git status")
+        self.assertFalse(ok_bad)
+        self.assertIn("c56de979-35aa-4828-9056-3dbaab629e0d", err_bad)
+
+        # 5. Dangerous command in guard mode -> INTERCEPTED
+        ok_danger, err_danger = ai_agent_manager.validate_action(token, "sess-test-ai-1", "c56de979-35aa-4828-9056-3dbaab629e0d", "rm -rf /")
+        self.assertFalse(ok_danger)
+        self.assertIn("Опасная команда", err_danger)
+
+        # 6. Admin blocks agent session dynamically
+        upd = ai_agent_manager.update_session_permissions("sess-test-ai-1", blocked=True)
+        self.assertTrue(upd["blocked"])
+        ok_block, err_block = ai_agent_manager.validate_action(token, "sess-test-ai-1", "c56de979-35aa-4828-9056-3dbaab629e0d", "uptime")
+        self.assertFalse(ok_block)
+        self.assertIn("заблокирован", err_block)
+
+
+class TestFileUploadAndSFTP(unittest.TestCase):
+    def setUp(self):
+        from tterm.orchestration.file_upload import FileUploadGateway
+        import tempfile
+        self.temp_root = tempfile.mkdtemp()
+        self.gateway = FileUploadGateway(default_upload_root=self.temp_root)
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.temp_root, ignore_errors=True)
+
+    def test_save_uploaded_file_default_path(self):
+        res = self.gateway.save_uploaded_file(
+            terminal_id="term-123",
+            filename="test_script.sh",
+            content_bytes=b"echo hello world\n",
+        )
+        self.assertEqual(res["filename"], "test_script.sh")
+        self.assertEqual(res["size"], 17)
+        self.assertTrue(os.path.exists(res["path"]))
+        with open(res["path"], "rb") as f:
+            self.assertEqual(f.read(), b"echo hello world\n")
+
+    def test_save_uploaded_file_custom_dir(self):
+        import tempfile
+        custom_dir = tempfile.mkdtemp()
+        try:
+            res = self.gateway.save_uploaded_file(
+                terminal_id="term-123",
+                filename="../malicious/../../config.json",
+                content_bytes=b'{"key": 42}',
+                target_dir=custom_dir,
+            )
+            # Path traversal must be stripped to basename
+            self.assertEqual(res["filename"], "config.json")
+            self.assertEqual(res["target_dir"], str(Path(custom_dir).resolve()))
+            self.assertTrue(os.path.exists(res["path"]))
+        finally:
+            import shutil
+            shutil.rmtree(custom_dir, ignore_errors=True)
+
+    def test_get_sftp_credentials(self):
+        creds = self.gateway.get_sftp_credentials("term-456", "node-pi-1")
+        self.assertEqual(creds["host"], "192.168.0.6")
+        self.assertEqual(creds["port"], 22)
+        self.assertEqual(creds["sftp_url"], "sftp://pi@192.168.0.6:22")
+        self.assertEqual(creds["default_dir"], "/home/pi/tterm-server")
+        self.assertIn("web_dav_hint", creds)
+
+
+class TestNotificationsBot(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        from tterm.orchestration.notifications_bot import NotificationsBot
+        self.bot = NotificationsBot()
+
+    async def test_device_registration_and_list(self):
+        dev1 = self.bot.register_device("dev-mac-1", "MacBook Pro", "user_1")
+        dev2 = self.bot.register_device("dev-iphone-1", "iPhone 15 Safari", "user_1")
+        self.assertEqual(dev1.device_id, "dev-mac-1")
+        self.assertEqual(dev2.name, "iPhone 15 Safari")
+
+        devices = self.bot.list_devices("user_1")
+        self.assertEqual(len(devices), 2)
+        dev_ids = {d.device_id for d in devices}
+        self.assertIn("dev-mac-1", dev_ids)
+        self.assertIn("dev-iphone-1", dev_ids)
+
+    async def test_watch_process_and_completion_broadcast(self):
+        # Subscribe an SSE client queue (simulating mobile client)
+        sse_queue = self.bot.subscribe()
+
+        # Watch a process
+        watch = self.bot.watch_process(
+            terminal_id="term-101",
+            command="docker build -t app:latest .",
+            user_id="user_1",
+            block_id="s105",
+            initiator_device_id="dev-mac-1",
+        )
+        self.assertEqual(watch.terminal_id, "term-101")
+        self.assertEqual(watch.block_id, "s105")
+        self.assertEqual(watch.status, "running")
+
+        # Active watches check
+        active = self.bot.get_active_watches("user_1")
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0].id, watch.id)
+
+        # Broadcast completion
+        resolved = await self.bot.broadcast_command_completed(
+            terminal_id="term-101",
+            command="docker build -t app:latest .",
+            exit_code=0,
+            duration_sec=42.5,
+            block_id="s105",
+            user_id="user_1",
+            initiator_device_id="dev-mac-1",
+        )
+        self.assertEqual(len(resolved), 1)
+        self.assertEqual(resolved[0].status, "completed")
+        self.assertEqual(resolved[0].duration_sec, 42.5)
+
+        # Active watches should now be empty
+        active_after = self.bot.get_active_watches("user_1")
+        self.assertEqual(len(active_after), 0)
+
+        # The SSE subscriber queue should have received both watch_started and command_completed
+        events = []
+        while not sse_queue.empty():
+            events.append(sse_queue.get_nowait())
+        self.assertGreaterEqual(len(events), 2)
+        event_types = [e["type"] for e in events]
+        self.assertIn("watch_started", event_types)
+        self.assertIn("command_completed", event_types)
+
+        completion_ev = next(e for e in events if e["type"] == "command_completed")
+        self.assertEqual(completion_ev["data"]["terminal_id"], "term-101")
+        self.assertEqual(completion_ev["data"]["command"], "docker build -t app:latest .")
+        self.assertEqual(completion_ev["data"]["duration_sec"], 42.5)
+        self.assertEqual(completion_ev["data"]["exit_code"], 0)
+
+        # Cleanup
+        self.bot.unsubscribe(sse_queue)
+
+
+
+
+class TestMachineProjectsAndTerminalEnvironments(unittest.TestCase):
+    def setUp(self):
+        from tterm.orchestration.machines_projects import MachineProjectManager
+        self.mgr = MachineProjectManager()
+
+    def test_preload_defaults(self):
+        """Verifies klim and macbook-air are preloaded and bound to default-project."""
+        klim_projects = self.mgr.get_projects_for_machine("klim")
+        self.assertGreaterEqual(len(klim_projects), 1)
+        self.assertTrue(any(p["project_id"] == "default-project" for p in klim_projects))
+
+        mac_projects = self.mgr.get_projects_for_machine("macbook-air")
+        self.assertGreaterEqual(len(mac_projects), 1)
+        self.assertTrue(any(p["project_id"] == "default-project" for p in mac_projects))
+
+        default_machines = self.mgr.get_machines_for_project("default-project")
+        self.assertIn("klim", default_machines)
+        self.assertIn("macbook-air", default_machines)
+
+    def test_bind_machine_to_multiple_projects(self):
+        """Verifies a single machine (klim) can be bound to multiple projects (Many-to-Many)."""
+        # Bind klim to project-alpha and project-beta
+        self.mgr.bind_machine_to_project("klim", "project-alpha", "Alpha Backend")
+        self.mgr.bind_machine_to_project("klim", "project-beta", "Beta Frontend")
+
+        projects = self.mgr.get_projects_for_machine("klim")
+        project_ids = [p["project_id"] for p in projects]
+        self.assertIn("project-alpha", project_ids)
+        self.assertIn("project-beta", project_ids)
+        self.assertIn("default-project", project_ids)
+
+        alpha_machines = self.mgr.get_machines_for_project("project-alpha")
+        self.assertIn("klim", alpha_machines)
+
+        beta_machines = self.mgr.get_machines_for_project("project-beta")
+        self.assertIn("klim", beta_machines)
+
+        # Unbind klim from default-project
+        removed = self.mgr.unbind_machine_from_project("klim", "default-project")
+        self.assertTrue(removed)
+        remaining = [p["project_id"] for p in self.mgr.get_projects_for_machine("klim")]
+        self.assertNotIn("default-project", remaining)
+        self.assertIn("project-alpha", remaining)
+        self.assertIn("project-beta", remaining)
+
+    def test_terminal_isolation_and_branches(self):
+        """
+        Verifies terminal isolation:
+        Terminal 1 is bound to project-alpha with branch feat/alpha-term1.
+        Terminal 2 is bound to project-beta with branch feat/beta-term2.
+        """
+        # Ensure machine klim is bound to both projects
+        self.mgr.bind_machine_to_project("klim", "project-alpha", "Project Alpha")
+        self.mgr.bind_machine_to_project("klim", "project-beta", "Project Beta")
+
+        # 1. Bind Terminal 1 to project-alpha
+        ctx1 = self.mgr.set_terminal_project(
+            terminal_id="term-alpha-1",
+            project_id="project-alpha",
+            branch_name="feat/alpha-term1",
+            machine_id="klim",
+        )
+        self.assertEqual(ctx1["project_id"], "project-alpha")
+        self.assertEqual(ctx1["branch_name"], "feat/alpha-term1")
+        self.assertEqual(ctx1["machine_id"], "klim")
+        self.assertTrue(ctx1["auto_commit"])
+        self.assertIn("sftp://klim:22/projects/project-alpha", ctx1["ftp_sftp_endpoint"])
+
+        # 2. Bind Terminal 2 to project-beta
+        ctx2 = self.mgr.set_terminal_project(
+            terminal_id="term-beta-2",
+            project_id="project-beta",
+            branch_name="feat/beta-term2",
+            machine_id="klim",
+        )
+        self.assertEqual(ctx2["project_id"], "project-beta")
+        self.assertEqual(ctx2["branch_name"], "feat/beta-term2")
+        self.assertEqual(ctx2["machine_id"], "klim")
+        self.assertTrue(ctx2["auto_commit"])
+        self.assertIn("sftp://klim:22/projects/project-beta", ctx2["ftp_sftp_endpoint"])
+
+        # 3. Retrieve terminal project context via getter
+        read_ctx1 = self.mgr.get_terminal_project_context("term-alpha-1")
+        self.assertEqual(read_ctx1["project_id"], "project-alpha")
+        self.assertEqual(read_ctx1["branch_name"], "feat/alpha-term1")
+        self.assertEqual(read_ctx1["machine_id"], "klim")
+        self.assertTrue(read_ctx1["auto_commit"])
+
+        read_ctx2 = self.mgr.get_terminal_project_context("term-beta-2")
+        self.assertEqual(read_ctx2["project_id"], "project-beta")
+        self.assertEqual(read_ctx2["branch_name"], "feat/beta-term2")
+        self.assertEqual(read_ctx2["machine_id"], "klim")
+        self.assertTrue(read_ctx2["auto_commit"])
+
+        # 4. Strict isolation: list_terminals_by_project must not cross-contaminate
+        alpha_terminals = self.mgr.list_terminals_by_project("project-alpha")
+        alpha_ids = [t["terminal_id"] for t in alpha_terminals]
+        self.assertIn("term-alpha-1", alpha_ids)
+        self.assertNotIn("term-beta-2", alpha_ids)
+
+        beta_terminals = self.mgr.list_terminals_by_project("project-beta")
+        beta_ids = [t["terminal_id"] for t in beta_terminals]
+        self.assertIn("term-beta-2", beta_ids)
+        self.assertNotIn("term-alpha-1", beta_ids)
+
+    def test_default_branch_generation(self):
+        """Verifies default branch name generation when branch_name is not provided."""
+        ctx = self.mgr.set_terminal_project("c56de979-35aa-4828-9056-3dbaab629e0d", "project-alpha")
+        self.assertTrue(ctx["branch_name"].startswith("terminal/"))
+        self.assertIn(ctx["branch_name"], ["terminal/c56de979", "terminal/c56de979-"])
+
+    def test_api_routes_integration(self):
+        """Verifies FastAPI route handlers for machines and terminals."""
+        import asyncio
+        from tterm.orchestration.api import (
+            get_machine_projects,
+            bind_machine_to_project_endpoint,
+            unbind_machine_from_project_endpoint,
+            get_terminal_project_context_endpoint,
+            set_terminal_project_context_endpoint,
+            get_project_terminal_branches_endpoint,
+            MachineProjectBindDTO,
+            TerminalProjectContextDTO,
+        )
+        from tterm.orchestration.machines_projects import machine_project_manager
+
+        async def _run():
+            machine_project_manager.reset()
+
+            # 1. GET /api/orchestration/machines/{machine_id}/projects
+            res1 = await get_machine_projects("klim")
+            self.assertTrue(res1["ok"])
+            self.assertTrue(any(p["project_id"] == "default-project" for p in res1["projects"]))
+
+            # 2. POST /api/orchestration/machines/{machine_id}/projects
+            bind_res = await bind_machine_to_project_endpoint(
+                "klim",
+                MachineProjectBindDTO(project_id="project-alpha", project_name="Alpha Service"),
+            )
+            self.assertTrue(bind_res["ok"])
+            p_ids = [p["project_id"] for p in bind_res["projects"]]
+            self.assertIn("project-alpha", p_ids)
+
+            # 3. POST /api/orchestration/terminals/{terminal_id}/project-context
+            set_ctx = await set_terminal_project_context_endpoint(
+                "term-api-101",
+                TerminalProjectContextDTO(project_id="project-alpha", branch_name="feat/alpha-api"),
+            )
+            self.assertTrue(set_ctx["ok"])
+            self.assertEqual(set_ctx["branch_name"], "feat/alpha-api")
+            self.assertEqual(set_ctx["project_id"], "project-alpha")
+
+            # 4. GET /api/orchestration/terminals/{terminal_id}/project-context
+            get_ctx = await get_terminal_project_context_endpoint("term-api-101")
+            self.assertTrue(get_ctx["ok"])
+            self.assertEqual(get_ctx["branch_name"], "feat/alpha-api")
+            self.assertEqual(get_ctx["project_id"], "project-alpha")
+            self.assertEqual(get_ctx["machine_id"], "klim")
+            self.assertTrue(get_ctx["auto_commit"])
+
+            # 5. GET /api/orchestration/projects/{project_id}/terminal-branches
+            branches_res = await get_project_terminal_branches_endpoint("project-alpha")
+            self.assertTrue(branches_res["ok"])
+            self.assertEqual(branches_res["project_id"], "project-alpha")
+            self.assertTrue(any(t["terminal_id"] == "term-api-101" for t in branches_res["terminals"]))
+
+            # 6. DELETE /api/orchestration/machines/{machine_id}/projects/{project_id}
+            del_res = await unbind_machine_from_project_endpoint("klim", "project-alpha")
+            self.assertTrue(del_res["ok"])
+            self.assertTrue(del_res["removed"])
+
+        asyncio.run(_run())
 
 
 if __name__ == "__main__":
