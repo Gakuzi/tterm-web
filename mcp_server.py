@@ -49,7 +49,24 @@ if os.path.exists(TTERM_CONFIG_PATH):
 
 TTERM_URL = os.environ.get("TTERM_URL", _config.get("url", "http://192.168.0.6:8290")).rstrip("/")
 TTERM_SESSION = os.environ.get("TTERM_SESSION", _config.get("session", "6COlOhrpS0FnUDpebkqrHXjTFMauwDYS4xQp17bgKbc"))
+TTERM_AI_TOKEN = os.environ.get("TTERM_AI_TOKEN", _config.get("token", _config.get("agent_token", "tt_ai_default_antigravity_mcp_key_2026")))
 ALLOWED_TERMINAL = os.environ.get("ALLOWED_TERMINAL", _config.get("allowed_terminal", ""))
+MCP_SESSION_ID = os.environ.get("MCP_SESSION_ID", f"sess-ai-mcp-{time.strftime('%H%M%S')}")
+
+
+def _ping_session(terminal_id: str = "", command: str = "") -> dict[str, Any]:
+    """Reports MCP activity and heartbeats the AI agent session in tTerm."""
+    try:
+        payload = {
+            "token": TTERM_AI_TOKEN,
+            "session_id": MCP_SESSION_ID,
+            "agent_name": "Antigravity AI (MCP)",
+            "terminal_id": terminal_id or ALLOWED_TERMINAL,
+            "command": command,
+        }
+        return _request("POST", "/api/orchestration/ai-sessions/ping", payload)
+    except Exception:
+        return {}
 
 
 def _request(method: str, path: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -59,6 +76,8 @@ def _request(method: str, path: str, data: dict[str, Any] | None = None) -> dict
         "Accept": "application/json",
         "Origin": TTERM_URL,
         "Referer": f"{TTERM_URL}/",
+        "X-AI-Token": TTERM_AI_TOKEN,
+        "X-AI-Session": MCP_SESSION_ID,
     }
     if TTERM_SESSION:
         headers["Cookie"] = f"__Host-tterm-session={TTERM_SESSION}; tterm-session={TTERM_SESSION}"
@@ -162,6 +181,8 @@ def read_terminal(terminal_id: str) -> str:
 async def _run_command_ws(terminal_id: str, command: str, timeout: float = 30.0, author: dict[str, Any] | None = None) -> dict[str, Any]:
     if ALLOWED_TERMINAL and terminal_id != ALLOWED_TERMINAL:
         raise PermissionError(f"Access denied: AI Agent is restricted to terminal {ALLOWED_TERMINAL}")
+
+    _ping_session(terminal_id, command)
 
     ws_scheme = "wss" if TTERM_URL.startswith("https") else "ws"
     ws_host = TTERM_URL.split("://", 1)[1]

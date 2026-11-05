@@ -3,6 +3,7 @@ Hierarchical Container Orchestration and RBAC Access Management package.
 """
 from .discovery import discovery_scanner
 from .locks import lock_manager
+from .machines_projects import MachineProjectManager, machine_project_manager
 from .models import (
     ActionEnum, ActiveProcessDTO, AppealDTO, Container, ContainerCreateDTO,
     ContainerStatusEnum, DiscoveredContainerDTO, DiscoveredServiceDTO,
@@ -32,6 +33,8 @@ __all__ = [
     "RoleEnum",
     "Service",
     "User",
+    "MachineProjectManager",
+    "machine_project_manager",
     "discovery_scanner",
     "lock_manager",
     "notification_hub",

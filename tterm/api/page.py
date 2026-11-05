@@ -795,6 +795,19 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         return _json({"ok": True, "service": "tterm-web page",
                       "version": __version__})
 
+    @app.get("/install.sh")
+    @app.get("/install_computer.sh")
+    async def page_universal_installer(request: Request) -> Response:
+        """Universal onboarding script for connecting computers (macOS, Linux)."""
+        token = await machines.get_or_create_quick_computer_token(pool)
+        host = request.headers.get("host", "192.168.0.6:8290").split(":")[0]
+        script = machines.render_universal_installer(
+            token=token,
+            connect_url=connect_url,
+            web_url=f"http://{host}:8290",
+        )
+        return PlainTextResponse(script, headers={"content-type": "text/x-shellscript; charset=utf-8", "cache-control": "no-store"})
+
     # ------------------------------------------------- within a session
 
     @app.get("/api/state")

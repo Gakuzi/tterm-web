@@ -40,6 +40,7 @@ import { terminalName } from "./colors";
 import { gap, useT } from "./i18n";
 import { ModeToggle } from "./InputLine";
 import { TerminalHeader } from "./TerminalHeader";
+import { TerminalFileUpload, type TerminalFileUploadHandle } from "./TerminalFileUpload";
 import { whatsNew } from "./links";
 import { reasonText, updatedTo } from "./reasons";
 import type { Shown } from "./theme";
@@ -118,6 +119,8 @@ export function TerminalView(props: Props) {
   const [lockedHere, setLockedHere] = useState(false);
   const [mode, setMode] = useState<Mode>(rememberedMode);
   const [, setTick] = useState(0);
+  const terminalAreaRef = useRef<HTMLDivElement>(null);
+  const fileUploadRef = useRef<TerminalFileUploadHandle>(null);
   const changed = useRef(props.onChanged);
   changed.current = props.onChanged;
   // A command that ended is a line of its machine's log (0.1.20): the
@@ -235,8 +238,11 @@ export function TerminalView(props: Props) {
   return (
     <div className={active ? "terminal-view" : "terminal-view behind"}
       inert={!active}>
-      <div className={`terminal-area ${shownMode === "line" ? "feed-mode"
-        : "classic-mode"}${isEnded ? " ended" : ""}`}>
+      <div
+        ref={terminalAreaRef}
+        className={`terminal-area ${shownMode === "line" ? "feed-mode"
+          : "classic-mode"}${isEnded ? " ended" : ""}`}
+      >
         <TerminalHeader
           terminalId={terminalId}
           info={info}
@@ -251,6 +257,19 @@ export function TerminalView(props: Props) {
           me={props.me}
           onChooseMode={choose}
           notify={props.notify}
+          onUploadClick={() => fileUploadRef.current?.openFileDialog()}
+          onSftpClick={() => fileUploadRef.current?.openSftpModal()}
+        />
+
+        <TerminalFileUpload
+          ref={fileUploadRef}
+          terminalId={terminalId}
+          machineName={machine}
+          terminalLabel={info?.label ?? t("terminal_view.terminal")}
+          cwd={info?.cwd}
+          notify={props.notify}
+          isEnded={isEnded}
+          containerRef={terminalAreaRef}
         />
         {shownMode === "classic" ? (
           <>

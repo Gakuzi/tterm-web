@@ -2,6 +2,7 @@ import { useState } from "react";
 import { detectClientOS, type ClientOS } from "./platform";
 import { Check, Close, Computer, Copy, Download } from "./icons";
 import { useBriefly } from "./briefly";
+import { copyToClipboard } from "./clipboard";
 
 export function ClientInstallerBanner() {
   const [detectedOs] = useState<ClientOS>(() => detectClientOS());
@@ -11,9 +12,9 @@ export function ClientInstallerBanner() {
 
   if (dismissed) return null;
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    showCopied(true);
+  const handleCopy = async (text: string) => {
+    const ok = await copyToClipboard(text);
+    if (ok) showCopied(true);
   };
 
   // i18n-ignore
@@ -119,7 +120,7 @@ export function ClientInstallerBanner() {
             <button
               type="button"
               className="button-plain small"
-              onClick={() => copyToClipboard(windowsPsCmd)}
+              onClick={() => handleCopy(windowsPsCmd)}
               style={{ marginLeft: 10 }}
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
@@ -150,7 +151,7 @@ export function ClientInstallerBanner() {
             <button
               type="button"
               className="button-plain small"
-              onClick={() => copyToClipboard(linuxCmd)}
+              onClick={() => handleCopy(linuxCmd)}
               style={{ marginLeft: 10 }}
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
@@ -181,7 +182,7 @@ export function ClientInstallerBanner() {
             <button
               type="button"
               className="button-plain small"
-              onClick={() => copyToClipboard(linuxCmd)}
+              onClick={() => handleCopy(linuxCmd)}
               style={{ marginLeft: 10 }}
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}

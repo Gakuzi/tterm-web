@@ -1158,7 +1158,8 @@ export function FeedTerminal(props: Props) {
               }}
               onShowAll={(x) => void showAll(x)}
               onStop={() => chan.current?.input("\x03")}
-              me={props.me} onNote={writeNote} />
+              me={props.me} onNote={writeNote}
+              notify={props.notify} />
             {b.state === "done" && props.after?.(b, shown)}
             </Fragment>
           ))}

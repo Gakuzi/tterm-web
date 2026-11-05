@@ -57,6 +57,8 @@ COMPUTER_TEMPLATE = (Path(__file__).resolve().parent.parent / "templates"
                      / "install_computer.sh")
 COMPUTER_TEMPLATE_PS1 = (Path(__file__).resolve().parent.parent / "templates"
                          / "install_computer.ps1")
+UNIVERSAL_TEMPLATE = (Path(__file__).resolve().parent.parent / "templates"
+                      / "universal_install.sh")
 #: Where a computer's installer takes the agent from, unless TTERM_SRC says
 #: otherwise when it runs: the released one, as the bot's installer does.
 AGENT_SOURCE = "https://raw.githubusercontent.com/tterm-net/tterm-agent/main/agent.py"
@@ -199,6 +201,34 @@ def render_computer_installer_bat(*, token: str, connect_url: str) -> str:
         "echo Готово! Окно закроется через 5 секунд...\r\n"
         "timeout /t 5 >nul\r\n"
     )
+
+
+def render_universal_installer(*, token: str, connect_url: str, web_url: str = "") -> str:
+    """Renders the universal onboarding script supporting multi-hub dual connections and discovery."""
+    if not TOKEN_RE.match(token):
+        raise ValueError("bad token")
+    return (UNIVERSAL_TEMPLATE.read_text(encoding="utf-8")
+            .replace("{{HUB}}", hub_url(connect_url))
+            .replace("{{WEB_URL}}", web_url or connect_url)
+            .replace("{{TOKEN}}", token))
+
+
+async def get_or_create_quick_computer_token(pool: asyncpg.Pool) -> str:
+    """Finds an existing non-expired computer token or creates one for universal installation."""
+    token = new_token("computer")
+    try:
+        async with pool.acquire() as conn:
+            project_id = await conn.fetchval("SELECT id FROM projects ORDER BY created_at ASC LIMIT 1")
+            user_id = await conn.fetchval("SELECT id FROM users ORDER BY created_at ASC LIMIT 1")
+            if project_id and user_id:
+                await conn.execute(
+                    "INSERT INTO install_tokens (project_id, kind, token_hash, created_by, expires_at) "
+                    "VALUES ($1, 'computer', $2, $3, now() + interval '24 hours')",
+                    project_id, token_hash(token), user_id
+                )
+    except Exception as exc:
+        logging.getLogger("tterm.machines").warning("Could not persist auto token: %s", exc)
+    return token
 
 
 def server_cleanup(principal: str | None, ca_id: str | None = None,

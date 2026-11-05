@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import type { Project, TerminalInfo, Me } from "./api";
 import {
-  Branch, Check, Close, Copy, Key, Layers,
-  Link as LinkIcon, Lock, Pencil, People, Person, Restart, Search, Server, Spark
+  Branch, Check, Close, Computer, Copy, Key, Layers,
+  Link as LinkIcon, Lock, Pencil, People, Person, Plus, Restart, Search, Server, Spark, Trash, Warning
 } from "./icons";
 import { useBriefly } from "./briefly";
+import { copyToClipboard } from "./clipboard";
 import { DisruptiveActionModal, type ActiveProcess } from "./DisruptiveActionModal";
 
 interface Props {
@@ -23,6 +24,7 @@ interface TeamMember {
   terminalsAllowed: string[]; // IDs of terminals allowed, or ["*"]
   aiMode?: "execute" | "guard" | "readonly";
   scopeEntityName?: string;
+  blocked?: boolean;
 }
 
 function normalizeMember(m: any): TeamMember {
@@ -40,6 +42,7 @@ function normalizeMember(m: any): TeamMember {
     terminalsAllowed: allowed,
     aiMode: m.ai_mode || m.aiMode || "guard",
     scopeEntityName: m.scopeEntityName || m.scope_entity_name,
+    blocked: Boolean(m.blocked),
   };
 }
 
@@ -52,6 +55,60 @@ interface DiscoveredContainer {
   ports: string[];
 }
 
+interface DiscoveredPort {
+  port: number;
+  protocol: string;
+  process: string;
+  listen_address: string;
+  service_hint: string;
+}
+
+interface DiscoveredNode {
+  id: string;
+  name: string;
+  kind: string;
+  os_name: string;
+  ip_address: string;
+  status: string;
+  containers: DiscoveredContainer[];
+  ports: DiscoveredPort[];
+  allowed_members: string[];
+  last_scanned: string;
+}
+
+interface ApprovalRequest {
+  id: string;
+  project_id: string;
+  terminal_id: string;
+  terminal_label: string;
+  node_id: string;
+  requester_id: string;
+  requester_name: string;
+  requester_role: string;
+  command: string;
+  risk_level: string;
+  reason: string;
+  status: string;
+  created_at: string;
+}
+
+interface AIAgentSession {
+  session_id: string;
+  token: string;
+  agent_name: string;
+  project_id: string;
+  allowed_terminals: string[];
+  allowed_nodes: string[];
+  role: string;
+  ai_mode: "guard" | "execute" | "readonly";
+  status: string;
+  connected_at: string;
+  last_active_at: string;
+  current_command?: string;
+  total_commands: number;
+  blocked: boolean;
+}
+
 export function ProjectCollaboration({ project, terminals, me, notify }: Props) {
   const [members, setMembers] = useState<TeamMember[]>([
     {
@@ -61,6 +118,7 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
       role: "project_admin",
       isAi: false,
       terminalsAllowed: ["*"],
+      blocked: false,
     },
     {
       id: "ai-agent-antigravity",
@@ -70,80 +128,151 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
       isAi: true,
       terminalsAllowed: terminals.length ? [terminals[0].id] : ["*"],
       aiMode: "guard",
-    },
-    {
-      id: "dlg-author",
-      name: "Денис Герасименко (Автор tTerm)", // i18n-ignore
-      email: "denis@tterm.net",
-      role: "node_admin",
-      isAi: false,
-      terminalsAllowed: ["*"],
+      blocked: false,
     },
   ]);
 
   const [gitRepo, setGitRepo] = useState("https://github.com/DLGerasimenko/tterm-web.git");
   const [gitBranch, setGitBranch] = useState("main");
+  const [gitMode, setGitMode] = useState<"bind" | "create">("bind");
+  const [newRepoName, setNewRepoName] = useState("");
+  const [newRepoVisibility, setNewRepoVisibility] = useState<"public" | "private">("public");
+  const [newRepoScope, setNewRepoScope] = useState<string>("project");
+  const [isCreatingRepo, setIsCreatingRepo] = useState(false);
   const [autoBranchPerTerminal, setAutoBranchPerTerminal] = useState(true);
   const [autoCommitActions, setAutoCommitActions] = useState(true);
   const [isSavingGit, setIsSavingGit] = useState(false);
   const [terminalBranches, setTerminalBranches] = useState<Record<string, { branch_name: string; auto_commit: boolean; commits_count: number }>>({});
   const [copiedBranchScript, showCopiedBranchScript] = useBriefly<string>();
-  const [showTermiusModal, setShowTermiusModal] = useState(false);
+  const [showTermiusDrawer, setShowTermiusDrawer] = useState(false);
+  const [termiusTab, setTermiusTab] = useState<"termius" | "ssh_config" | "ssh_cmd">("termius");
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [showPrModal, setShowPrModal] = useState(false);
 
-  const [containers, setContainers] = useState<DiscoveredContainer[]>([
+  // GitHub OAuth & PAT Integration state
+  const [githubStatus, setGithubStatus] = useState<{
+    is_authenticated: boolean;
+    username?: string;
+    name?: string;
+    avatar_url?: string;
+    public_repos?: number;
+    masked_token?: string;
+    oauth_configured?: boolean;
+    client_id?: string;
+  }>({ is_authenticated: false });
+  const [showGithubModal, setShowGithubModal] = useState(false);
+  const [githubTokenInput, setGithubTokenInput] = useState("");
+  const [isConnectingGithub, setIsConnectingGithub] = useState(false);
+  const [userGithubRepos, setUserGithubRepos] = useState<Array<{ name: string; full_name: string; html_url: string; private: boolean }>>([]);
+
+  // Multi-Node Topology & Ports state
+  const [nodes, setNodes] = useState<DiscoveredNode[]>([
     {
-      id: "0e64525d5026",
-      name: "tterm-server-tterm-1",
-      custom_name: "tTerm Core Web API", // i18n-ignore
-      image: "tterm-server-tterm",
-      status: "Up 25 minutes", // i18n-ignore
-      ports: ["8290", "8291"],
+      id: "klim",
+      name: "klim (Raspberry Pi 4)", // i18n-ignore
+      kind: "server",
+      os_name: "Raspberry Pi 4 / Debian Linux 12", // i18n-ignore
+      ip_address: "192.168.0.6",
+      status: "ONLINE",
+      allowed_members: ["all"],
+      last_scanned: new Date().toISOString(),
+      ports: [
+        { port: 8290, protocol: "tcp", process: "python", listen_address: "0.0.0.0", service_hint: "tTerm Core Web UI" }, // i18n-ignore
+        { port: 8291, protocol: "tcp", process: "python", listen_address: "0.0.0.0", service_hint: "tTerm Connect Gateway" }, // i18n-ignore
+        { port: 8123, protocol: "tcp", process: "homeassistant", listen_address: "0.0.0.0", service_hint: "Home Assistant IoT" }, // i18n-ignore
+        { port: 5432, protocol: "tcp", process: "postgres", listen_address: "0.0.0.0", service_hint: "PostgreSQL Главная БД" }, // i18n-ignore
+        { port: 8080, protocol: "tcp", process: "qbittorrent", listen_address: "0.0.0.0", service_hint: "qBittorrent Web UI" }, // i18n-ignore
+        { port: 8090, protocol: "tcp", process: "torrserver", listen_address: "0.0.0.0", service_hint: "TorrServer Web UI" }, // i18n-ignore
+        { port: 1883, protocol: "tcp", process: "mosquitto", listen_address: "0.0.0.0", service_hint: "MQTT Брокер Сообщений" }, // i18n-ignore
+        { port: 22, protocol: "tcp", process: "sshd", listen_address: "0.0.0.0", service_hint: "OpenSSH Сервер" }, // i18n-ignore
+      ],
+      containers: [
+        { id: "0e64525d5026", name: "tterm-server-tterm-1", custom_name: "tTerm Core Web API", image: "tterm-server-tterm", status: "Up 25 minutes", ports: ["8290", "8291"] }, // i18n-ignore
+        { id: "7045c1f0de1b", name: "tterm-server-db-1", custom_name: "PostgreSQL Главная БД", image: "postgres:16-alpine", status: "Up 2 hours", ports: ["5432"] }, // i18n-ignore
+        { id: "0a70b3d94337", name: "homeassistant", custom_name: "Умный Дом Home Assistant", image: "ghcr.io/home-assistant/home-assistant:stable", status: "Up 25 minutes", ports: ["8123"] }, // i18n-ignore
+        { id: "403500e0bf72", name: "torrserver", custom_name: "Медиа-сервер TorrServer", image: "yourok/torrserver:latest", status: "Up 26 hours", ports: ["8090"] }, // i18n-ignore
+        { id: "bd245888b3c1", name: "qbittorrent", custom_name: "Фоновый Торрент-Клиент", image: "linuxserver/qbittorrent:latest", status: "Up 26 hours", ports: ["8080", "6881"] }, // i18n-ignore
+        { id: "124480d9331d", name: "mosquitto", custom_name: "MQTT Брокер Сообщений", image: "eclipse-mosquitto:latest", status: "Up 26 hours", ports: ["1883"] }, // i18n-ignore
+      ],
     },
     {
-      id: "7045c1f0de1b",
-      name: "tterm-server-db-1",
-      custom_name: "PostgreSQL Главная БД", // i18n-ignore
-      image: "postgres:16-alpine",
-      status: "Up 2 hours", // i18n-ignore
-      ports: ["5432"],
-    },
-    {
-      id: "0a70b3d94337",
-      name: "homeassistant",
-      custom_name: "Умный Дом Home Assistant", // i18n-ignore
-      image: "ghcr.io/home-assistant/home-assistant:stable",
-      status: "Up 25 minutes", // i18n-ignore
-      ports: ["8123"],
-    },
-    {
-      id: "403500e0bf72",
-      name: "torrserver",
-      custom_name: "Медиа-сервер TorrServer", // i18n-ignore
-      image: "yourok/torrserver:latest",
-      status: "Up 26 hours", // i18n-ignore
-      ports: ["8090"],
-    },
-    {
-      id: "bd245888b3c1",
-      name: "qbittorrent",
-      custom_name: "Фоновый Торрент-Клиент", // i18n-ignore
-      image: "linuxserver/qbittorrent:latest",
-      status: "Up 26 hours", // i18n-ignore
-      ports: ["8080", "6881"],
-    },
-    {
-      id: "124480d9331d",
-      name: "mosquitto",
-      custom_name: "MQTT Брокер Сообщений", // i18n-ignore
-      image: "eclipse-mosquitto:latest",
-      status: "Up 26 hours", // i18n-ignore
-      ports: ["1883"],
+      id: "macbook-air",
+      name: "MacBook Air (Рабочая станция)", // i18n-ignore
+      kind: "computer",
+      os_name: "macOS Sonoma (Darwin arm64)", // i18n-ignore
+      ip_address: "192.168.0.7",
+      status: "ONLINE",
+      allowed_members: ["all"],
+      last_scanned: new Date().toISOString(),
+      ports: [
+        { port: 22, protocol: "tcp", process: "sshd", listen_address: "0.0.0.0", service_hint: "OpenSSH Сервер" }, // i18n-ignore
+        { port: 5173, protocol: "tcp", process: "node (vite)", listen_address: "127.0.0.1", service_hint: "Vite Dev Server" }, // i18n-ignore
+        { port: 3000, protocol: "tcp", process: "node", listen_address: "127.0.0.1", service_hint: "React / Node Server" }, // i18n-ignore
+      ],
+      containers: [],
     },
   ]);
-
+  const [selectedNodeId, setSelectedNodeId] = useState("klim");
   const [scanLoading, setScanLoading] = useState(false);
+
+  // Dangerous Command Approvals state
+  const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
+
+  // AI Sessions & Scoped Key Generator state
+  const [aiSessions, setAiSessions] = useState<AIAgentSession[]>([
+    {
+      session_id: "sess-ai-antigravity-1",
+      token: "tt_ai_default_antigravity_mcp_key_2026",
+      agent_name: "Antigravity (MCP Сессия 1)", /* i18n-ignore */
+      project_id: "default-project",
+      allowed_terminals: ["c56de979-35aa-4828-9056-3dbaab629e0d"],
+      allowed_nodes: ["klim"],
+      role: "container_developer",
+      ai_mode: "guard",
+      status: "ONLINE",
+      connected_at: new Date().toISOString(),
+      last_active_at: new Date().toISOString(),
+      current_command: "git status", /* i18n-ignore */
+      total_commands: 12,
+      blocked: false,
+    },
+  ]);
+  const [showAiKeyModal, setShowAiKeyModal] = useState(false);
+  const [selectedTerminalForAi, setSelectedTerminalForAi] = useState<string>(
+    terminals.find((t) => t.id === "c56de979-35aa-4828-9056-3dbaab629e0d")?.id || terminals[0]?.id || "c56de979-35aa-4828-9056-3dbaab629e0d"
+  );
+  const [aiAgentName, setAiAgentName] = useState("Antigravity AI Agent"); /* i18n-ignore */
+  const [aiRole, setAiRole] = useState("container_developer");
+  const [aiMode, setAiMode] = useState<"guard" | "execute" | "readonly">("guard");
+  const [generatedAiKeyResult, setGeneratedAiKeyResult] = useState<{
+    connection_json: any;
+    mcp_config: any;
+    key: any;
+  } | null>(null);
+  const [isGeneratingAiKey, setIsGeneratingAiKey] = useState(false);
+
+  // Aeza Cloud VPS state
+  const [showAezaDrawer, setShowAezaDrawer] = useState(false);
+  const [aezaAccount, setAezaAccount] = useState<any>(null);
+  const [aezaPlans, setAezaPlans] = useState<any[]>([]);
+  const [isOrderingAeza, setIsOrderingAeza] = useState(false);
+  const [aezaOrderResult, setAezaOrderResult] = useState<any>(null);
+
+  // Scoped Entity Permission Modal state
+  const [permissionModal, setPermissionModal] = useState<{
+    isOpen: boolean;
+    type: "node" | "container";
+    nodeId: string;
+    containerId?: string;
+    entityName: string;
+    allowedMembers: string[];
+  }>({
+    isOpen: false,
+    type: "node",
+    nodeId: "",
+    entityName: "",
+    allowedMembers: ["all"],
+  });
+
   const [editingContainerId, setEditingContainerId] = useState<string | null>(null);
   const [containerRenameText, setContainerRenameText] = useState("");
 
@@ -168,16 +297,65 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
   const [copiedSshConfig, showCopiedSshConfig] = useBriefly<boolean>();
   const [copiedSshCmd, showCopiedSshCmd] = useBriefly<boolean>();
 
-  // Auto-fetch discovered containers and members on mount
+  // Auto-fetch discovered nodes, approvals, github, and members on mount
   useEffect(() => {
     let live = true;
-    fetch("/api/orchestration/discovery/klim", {
+
+    // 1. Fetch Multi-Node Topology & Ports
+    fetch("/api/orchestration/nodes", {
       headers: { "x-tterm": "1" },
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (live && data?.containers?.length) {
-          setContainers(data.containers);
+        if (live && data?.nodes?.length) {
+          setNodes(data.nodes);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Fetch Dangerous Command Approvals
+    fetch(`/api/orchestration/approvals?project_id=${project.id}`, {
+      headers: { "x-tterm": "1" },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (live && data?.requests) {
+          setApprovals(data.requests);
+        }
+      })
+      .catch(() => {});
+
+    // 3. Fetch GitHub Auth Status
+    fetch("/api/orchestration/github/status", {
+      headers: { "x-tterm": "1" },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (live && data?.ok) {
+          setGithubStatus(data);
+        }
+      })
+      .catch(() => {});
+
+    // 4. Fetch Aeza Cloud Status
+    fetch("/api/orchestration/aeza/account", {
+      headers: { "x-tterm": "1" },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (live && data?.account) {
+          setAezaAccount(data.account);
+        }
+      })
+      .catch(() => {});
+
+    fetch("/api/orchestration/aeza/plans", {
+      headers: { "x-tterm": "1" },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (live && data?.plans) {
+          setAezaPlans(data.plans);
         }
       })
       .catch(() => {});
@@ -229,8 +407,25 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
         .catch(() => {});
     });
 
+    const fetchAiSessions = () => {
+      fetch("/api/orchestration/ai-sessions", {
+        headers: { "x-tterm": "1" },
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (live && data?.sessions) {
+            setAiSessions(data.sessions);
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchAiSessions();
+    const aiTimer = setInterval(fetchAiSessions, 4000);
+
     return () => {
       live = false;
+      clearInterval(aiTimer);
     };
   }, [project.id]);
 
@@ -257,10 +452,14 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
   // i18n-ignore
   const sshCmd = `ssh -p 2222 developer@${window.location.hostname || "192.168.0.6"}`;
 
-  const copyText = (text: string, triggerBriefly: (v: boolean) => void) => {
-    navigator.clipboard.writeText(text);
-    triggerBriefly(true);
-    if (notify) notify("Скопировано в буфер обмена"); // i18n-ignore
+  const copyText = async (text: string, triggerBriefly: (v: boolean) => void) => {
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      triggerBriefly(true);
+      if (notify) notify("Скопировано в буфер обмена"); // i18n-ignore
+    } else {
+      if (notify) notify("Не удалось скопировать в буфер обмена"); // i18n-ignore
+    }
   };
 
   const handleSaveGitConfig = async () => {
@@ -290,25 +489,288 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
     }
   };
 
-  const handleScanNode = async () => {
+  const handleCreateRepo = async () => {
+    if (!newRepoName.trim()) {
+      if (notify) notify("Укажите имя для нового репозитория"); // i18n-ignore
+      return;
+    }
+    setIsCreatingRepo(true);
+    try {
+      const res = await fetch(`/api/orchestration/projects/${project.id}/git-create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify({
+          project_id: project.id,
+          repo_name: newRepoName.trim(),
+          visibility: newRepoVisibility,
+          scope: newRepoScope,
+          terminal_id: newRepoScope !== "project" ? newRepoScope : undefined,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGitRepo(data.repo_url);
+        setGitMode("bind");
+        setNewRepoName("");
+        if (data.branch) {
+          setTerminalBranches((prev) => ({
+            ...prev,
+            [data.branch.terminal_id]: data.branch,
+          }));
+        }
+        if (notify) notify(`Репозиторий ${data.repo_name} создан и привязан!`); // i18n-ignore
+      } else {
+        if (notify) notify("Ошибка при создании репозитория"); // i18n-ignore
+      }
+    } catch {
+      if (notify) notify("Ошибка соединения при создании репозитория"); // i18n-ignore
+    } finally {
+      setIsCreatingRepo(false);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    setMembers((prev) => prev.filter((m) => m.id !== memberId));
+    try {
+      await fetch(`/api/orchestration/projects/${project.id}/members/${memberId}`, {
+        method: "DELETE",
+        headers: { "x-tterm": "1" },
+      });
+      if (notify) notify("Участник удален из проекта"); // i18n-ignore
+    } catch {
+      if (notify) notify("Ошибка при удалении участника"); // i18n-ignore
+    }
+  };
+
+  const handleToggleBlockMember = async (memberId: string, currentBlocked: boolean) => {
+    const nextBlocked = !currentBlocked;
+    setMembers((prev) =>
+      prev.map((m) => (m.id === memberId ? { ...m, blocked: nextBlocked } : m))
+    );
+    try {
+      await fetch(`/api/orchestration/projects/${project.id}/members/${memberId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify({ blocked: nextBlocked }),
+      });
+      if (notify) notify(nextBlocked ? "Доступ участнику заблокирован" : "Доступ участнику разблокирован"); // i18n-ignore
+    } catch {
+      if (notify) notify("Ошибка обновления доступа"); // i18n-ignore
+    }
+  };
+
+  const handleChangeMemberRole = async (memberId: string, role: TeamMember["role"]) => {
+    setMembers((prev) =>
+      prev.map((m) => (m.id === memberId ? { ...m, role } : m))
+    );
+    try {
+      await fetch(`/api/orchestration/projects/${project.id}/members/${memberId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify({ role }),
+      });
+      if (notify) notify("Роль участника обновлена"); // i18n-ignore
+    } catch {
+      if (notify) notify("Ошибка обновления роли"); // i18n-ignore
+    }
+  };
+
+  const handleScanAllNodes = async () => {
     setScanLoading(true);
     try {
-      const res = await fetch("/api/orchestration/discovery/scan/klim", {
+      const res = await fetch("/api/orchestration/nodes/scan-all", {
+        method: "POST",
+        headers: { "x-tterm": "1" },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.nodes) setNodes(data.nodes);
+        if (notify) notify(`Автосканирование выполнено: проверено ${data.scanned_count || data.nodes?.length} подключенных машин и открытых портов`); // i18n-ignore
+      }
+    } catch {
+      if (notify) notify("Автосканирование всех нод завершено"); // i18n-ignore
+    } finally {
+      setScanLoading(false);
+    }
+  };
+
+  const handleScanNode = async (nodeId: string = "klim") => {
+    setScanLoading(true);
+    try {
+      const res = await fetch(`/api/orchestration/discovery/scan/${nodeId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-tterm": "1" },
         body: JSON.stringify({ raw_output: "" }),
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.containers && data.containers.length > 0) {
-          setContainers(data.containers);
-        }
-        if (notify) notify("Обнаружено контейнеров и служб: " + (data.containers?.length || 0)); // i18n-ignore
+        setNodes((prev) =>
+          prev.map((n) => (n.id === nodeId ? { ...n, containers: data.containers || n.containers } : n))
+        );
+        if (notify) notify(`Нода ${nodeId}: обнаружено контейнеров: ${data.containers?.length || 0}`); // i18n-ignore
       }
     } catch {
-      if (notify) notify("Автоопределение инфраструктуры ноды выполнено"); // i18n-ignore
+      if (notify) notify(`Сканирование ноды ${nodeId} выполнено`); // i18n-ignore
     } finally {
       setScanLoading(false);
+    }
+  };
+
+  const handleResolveApproval = async (requestId: string, approved: boolean) => {
+    try {
+      const res = await fetch(`/api/orchestration/approvals/${requestId}/resolve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify({
+          reviewer_id: me.id,
+          reviewer_name: me.name || "Руководитель", // i18n-ignore
+          approved,
+          comment: approved ? "Разрешено руководителем проекта" : "Отклонено руководителем проекта", // i18n-ignore
+        }),
+      });
+      if (res.ok) {
+        setApprovals((prev) => prev.filter((r) => r.id !== requestId));
+        if (notify) notify(approved ? "Опасная команда разрешена к исполнению!" : "Выполнение опасной команды отклонено"); // i18n-ignore
+      }
+    } catch {
+      if (notify) notify("Ошибка при отправке решения по команде"); // i18n-ignore
+    }
+  };
+
+  const handleSimulateDangerousCommand = async () => {
+    try {
+      const res = await fetch("/api/orchestration/approvals/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify({
+          project_id: project.id,
+          terminal_id: terminals.length ? terminals[0].id : "term-1",
+          terminal_label: terminals.length ? (terminals[0].name || "Терминал Разработки") : "Терминал Разработки", // i18n-ignore
+          node_id: selectedNodeId,
+          requester_id: "dev-subordinate-1",
+          requester_name: "Алексей Смирнов", // i18n-ignore
+          requester_role: "Разработчик (Developer)", // i18n-ignore
+          command: "docker compose down -v && rm -rf /var/data",
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.request) {
+          setApprovals((prev) => [data.request, ...prev.filter((r) => r.id !== data.request.id)]);
+          if (notify) notify("⚠️ Перехвачена опасная команда от разработчика! Требуется подтверждение."); // i18n-ignore
+        }
+      }
+    } catch {
+      if (notify) notify("Симуляция опасной команды выполнена"); // i18n-ignore
+    }
+  };
+
+  const handleConnectGitHubToken = async () => {
+    if (!githubTokenInput.trim()) return;
+    setIsConnectingGithub(true);
+    try {
+      const res = await fetch("/api/orchestration/github/connect-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify({ token: githubTokenInput.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGithubStatus(data);
+        setShowGithubModal(false);
+        setGithubTokenInput("");
+        if (notify) notify(`GitHub успешно подключен! Пользователь @${data.username}`); // i18n-ignore
+      } else {
+        const err = await res.json();
+        if (notify) notify(`Ошибка авторизации GitHub: ${err.detail || "Неверный токен"}`); // i18n-ignore
+      }
+    } catch {
+      if (notify) notify("Ошибка соединения с GitHub"); // i18n-ignore
+    } finally {
+      setIsConnectingGithub(false);
+    }
+  };
+
+  const handleDisconnectGitHub = async () => {
+    try {
+      await fetch("/api/orchestration/github/disconnect", {
+        method: "POST",
+        headers: { "x-tterm": "1" },
+      });
+      setGithubStatus({ is_authenticated: false });
+      setUserGithubRepos([]);
+      if (notify) notify("GitHub аккаунт отключен"); // i18n-ignore
+    } catch {
+      if (notify) notify("Ошибка при отключении GitHub"); // i18n-ignore
+    }
+  };
+
+  const handleLoadGitHubRepos = async () => {
+    try {
+      const res = await fetch("/api/orchestration/github/repos", {
+        headers: { "x-tterm": "1" },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserGithubRepos(data.repos || []);
+        if (notify) notify(`Загружено репозиториев: ${data.repos?.length || 0}`); // i18n-ignore
+      }
+    } catch {
+      if (notify) notify("Не удалось загрузить список репозиториев GitHub"); // i18n-ignore
+    }
+  };
+
+  const handleOrderAezaVps = async () => {
+    setIsOrderingAeza(true);
+    try {
+      const res = await fetch("/api/orchestration/aeza/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify({
+          name: `tterm-${project.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}`,
+          product_id: 52, // MSKs-1 (1.40 RUB/hr)
+          hours: 5,
+          os_id: 1, // Ubuntu 24.04
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAezaOrderResult(data.order);
+        if (notify) notify("VPS на Aeza успешно заказан! Инициализация окружения..."); // i18n-ignore
+      } else {
+        const err = await res.json();
+        if (notify) notify(`Ошибка заказа VPS: ${err.error || "Недостаточно средств"}`); // i18n-ignore
+      }
+    } catch {
+      if (notify) notify("Ошибка соединения с Aeza API"); // i18n-ignore
+    } finally {
+      setIsOrderingAeza(false);
+    }
+  };
+
+  const handleSavePermissions = async () => {
+    const { type, nodeId, containerId, allowedMembers } = permissionModal;
+    try {
+      if (type === "node") {
+        await fetch(`/api/orchestration/nodes/${nodeId}/permissions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-tterm": "1" },
+          body: JSON.stringify({ allowed_members: allowedMembers }),
+        });
+        setNodes((prev) =>
+          prev.map((n) => (n.id === nodeId ? { ...n, allowed_members: allowedMembers } : n))
+        );
+      } else if (containerId) {
+        await fetch(`/api/orchestration/containers/${nodeId}/${containerId}/permissions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-tterm": "1" },
+          body: JSON.stringify({ allowed_members: allowedMembers }),
+        });
+      }
+      setPermissionModal((prev) => ({ ...prev, isOpen: false }));
+      if (notify) notify("Права доступа успешно обновлены"); // i18n-ignore
+    } catch {
+      if (notify) notify("Ошибка при сохранении прав доступа"); // i18n-ignore
     }
   };
 
@@ -318,15 +780,18 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
       return;
     }
     const newName = containerRenameText.trim();
-    setContainers((prev) =>
-      prev.map((c) => (c.id === cid ? { ...c, custom_name: newName } : c))
+    setNodes((prev) =>
+      prev.map((n) => ({
+        ...n,
+        containers: n.containers.map((c) => (c.id === cid ? { ...c, custom_name: newName } : c)),
+      }))
     );
     try {
       await fetch("/api/orchestration/discovery/rename", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "x-tterm": "1" },
         body: JSON.stringify({
-          node_id: "klim",
+          node_id: selectedNodeId,
           entity_type: "container",
           entity_id: cid,
           custom_name: newName,
@@ -443,6 +908,92 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
     );
   };
 
+  const availableTerminalOptions = [
+    ...terminals.map((t) => ({ id: t.id, label: `${t.name || "terminal"} (${t.machine}) [${t.id.slice(0, 8)}...]` })),
+    ...(!terminals.some((t) => t.id === "c56de979-35aa-4828-9056-3dbaab629e0d")
+      ? [{ id: "c56de979-35aa-4828-9056-3dbaab629e0d", label: "c56de979-35aa-4828-9056-3dbaab629e0d (Целевой терминал проекта)" /* i18n-ignore */ }]
+      : []),
+  ];
+
+  const handleUpdateSessionPermissions = async (sessionId: string, updates: Record<string, any>) => {
+    try {
+      const res = await fetch(`/api/orchestration/ai-sessions/${sessionId}/permissions`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) {
+        setAiSessions((prev) =>
+          prev.map((s) => (s.session_id === sessionId ? { ...s, ...updates } : s))
+        );
+        if (notify) notify("Права сессии ИИ-агента обновлены"); /* i18n-ignore */
+      }
+    } catch {
+      if (notify) notify("Ошибка обновления прав ИИ-сессии"); /* i18n-ignore */
+    }
+  };
+
+  const handleToggleBlockAiSession = async (sessionId: string, currentBlocked: boolean) => {
+    const nextBlocked = !currentBlocked;
+    try {
+      const res = await fetch(`/api/orchestration/ai-sessions/${sessionId}/permissions`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify({ blocked: nextBlocked }),
+      });
+      if (res.ok) {
+        setAiSessions((prev) =>
+          prev.map((s) => (s.session_id === sessionId ? { ...s, blocked: nextBlocked, status: nextBlocked ? "BLOCKED" /* i18n-ignore */ : "ONLINE" /* i18n-ignore */ } : s))
+        );
+        if (notify) notify(nextBlocked ? "ИИ-агент заблокирован" /* i18n-ignore */ : "ИИ-агент разблокирован" /* i18n-ignore */);
+      }
+    } catch {
+      if (notify) notify("Ошибка переключения блокировки ИИ"); /* i18n-ignore */
+    }
+  };
+
+  const handleRevokeAiSession = async (sessionId: string) => {
+    try {
+      const res = await fetch(`/api/orchestration/ai-sessions/${sessionId}`, {
+        method: "DELETE",
+        headers: { "x-tterm": "1" },
+      });
+      if (res.ok) {
+        setAiSessions((prev) => prev.filter((s) => s.session_id !== sessionId));
+        if (notify) notify("Сессия ИИ-агента отозвана"); /* i18n-ignore */
+      }
+    } catch {
+      if (notify) notify("Ошибка отзыва сессии ИИ"); /* i18n-ignore */
+    }
+  };
+
+  const handleGenerateAiKey = async () => {
+    setIsGeneratingAiKey(true);
+    try {
+      const res = await fetch("/api/orchestration/ai-keys/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify({
+          project_id: project.id || "default-project",
+          allowed_terminals: [selectedTerminalForAi],
+          allowed_nodes: [selectedNodeId || "klim"],
+          agent_name: aiAgentName,
+          role: aiRole,
+          ai_mode: aiMode,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGeneratedAiKeyResult(data);
+        if (notify) notify("Ключ доступа ИИ успешно сгенерирован!"); /* i18n-ignore */
+      }
+    } catch {
+      if (notify) notify("Ошибка при создании ключа ИИ"); /* i18n-ignore */
+    } finally {
+      setIsGeneratingAiKey(false);
+    }
+  };
+
   return (
     <div className="project-collaboration-hub" style={{ marginTop: 24 }}>
       {/* 1. Команда и доступ ИИ */}
@@ -458,6 +1009,18 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
             </span>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              className="button-accent small"
+              style={{ background: "#8b5cf6", borderColor: "#8b5cf6" }}
+              onClick={() => {
+                setShowAiKeyModal(true);
+                setGeneratedAiKeyResult(null);
+              }}
+            >
+              <Spark size={13} />
+              <span>🤖 Выдать ключ ИИ (MCP)</span> {/* i18n-ignore */}
+            </button>
             <button
               type="button"
               className="button-danger-line small"
@@ -478,6 +1041,123 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
           </div>
         </div>
 
+        {/* Блок: Активные сессии ИИ-агентов (MCP) */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <h3 style={{ display: "flex", alignItems: "center", gap: 8, margin: 0, fontSize: 14, color: "#c084fc" }}>
+              <Spark size={16} />
+              <span>Активные сессии ИИ-агентов (MCP) ({aiSessions.length})</span> {/* i18n-ignore */}
+            </h3>
+            <span style={{ fontSize: 12, color: "var(--color-text-secondary, #888)" }}>
+              1 сессия = 1 подключенный агент ИИ. Управление правами на лету. {/* i18n-ignore */}
+            </span>
+          </div>
+
+          {aiSessions.length === 0 ? (
+            <div style={{ padding: "14px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.1)", textAlign: "center", fontSize: 13, color: "var(--color-text-dim, #777)" }}>
+              Нет активных сессий ИИ. Выдайте ключ доступа по кнопке «Выдать ключ ИИ (MCP)». {/* i18n-ignore */}
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 12 }}>
+              {aiSessions.map((sess) => (
+                <div key={sess.session_id} className="ai-session-card">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span className={`ai-pulse-dot ${sess.blocked ? "blocked" : ""}`} />
+                        <strong style={{ fontSize: 14 }}>{sess.agent_name}</strong>
+                      </div>
+                      <span className="pp-mono" style={{ fontSize: 11, color: "var(--color-text-dim, #777)" }}>
+                        {"ID: "} {sess.session_id} {/* i18n-ignore */}
+                      </span>
+                    </div>
+                    <span style={{
+                      fontSize: 10,
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                      background: sess.blocked ? "rgba(239,68,68,0.2)" : "rgba(16,185,129,0.2)",
+                      color: sess.blocked ? "#ef4444" : "#10b981",
+                      fontWeight: 600,
+                    }}>
+                      {sess.blocked ? "BLOCKED" /* i18n-ignore */ : sess.status}
+                    </span>
+                  </div>
+
+                  {/* Scoped Terminal Selector */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{ fontSize: 11, color: "var(--color-text-secondary, #888)" }}>
+                      Разрешенный терминал (изоляция): {/* i18n-ignore */}
+                    </span>
+                    <select
+                      className="input-select"
+                      style={{ fontSize: 12, padding: "3px 6px" }}
+                      value={sess.allowed_terminals[0] || ""}
+                      onChange={(e) => handleUpdateSessionPermissions(sess.session_id, { allowed_terminals: [e.target.value] })}
+                    >
+                      {availableTerminalOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Security Mode Selector */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 11, color: "var(--color-text-secondary, #888)" }}>
+                      Режим безопасности: {/* i18n-ignore */}
+                    </span>
+                    <select
+                      className="input-select"
+                      style={{ fontSize: 11, padding: "2px 6px" }}
+                      value={sess.ai_mode}
+                      onChange={(e) => handleUpdateSessionPermissions(sess.session_id, { ai_mode: e.target.value })}
+                    >
+                      <option value="guard">🛡️ Guard (С подтверждением) {/* i18n-ignore */}</option>
+                      <option value="execute">⚡ Execute (Автономно) {/* i18n-ignore */}</option>
+                      <option value="readonly">👁️ Read-Only (Только чтение) {/* i18n-ignore */}</option>
+                    </select>
+                  </div>
+
+                  {/* Current command box */}
+                  <div>
+                    <span style={{ fontSize: 10, color: "var(--color-text-dim, #777)", display: "block", marginBottom: 2 }}>
+                      Текущая / последняя команда: {/* i18n-ignore */}
+                    </span>
+                    <div style={{ fontSize: 12, fontFamily: "monospace", padding: "4px 8px", background: "rgba(0,0,0,0.3)", borderRadius: 4, color: "#e2e8f0", wordBreak: "break-all" }}>
+                      {"$ "} {sess.current_command || "Ожидание команды..."} {/* i18n-ignore */}
+                    </div>
+                  </div>
+
+                  {/* Session footer actions */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <span style={{ fontSize: 11, color: "var(--color-text-dim, #777)" }}>
+                      {"Команд: "} {sess.total_commands} {/* i18n-ignore */}
+                    </span>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        type="button"
+                        className="button-ghost small"
+                        style={{ fontSize: 11, padding: "2px 8px" }}
+                        onClick={() => handleToggleBlockAiSession(sess.session_id, sess.blocked)}
+                      >
+                        {sess.blocked ? "✅ Разблокировать" : "🚫 Блокировать"} {/* i18n-ignore */}
+                      </button>
+                      <button
+                        type="button"
+                        className="button-ghost small"
+                        style={{ color: "#ef4444", fontSize: 11, padding: "2px 6px" }}
+                        onClick={() => handleRevokeAiSession(sess.session_id)}
+                        title="Отозвать сессию" /* i18n-ignore */
+                      >
+                        <Trash size={12} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="pp-cards" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
           {members.map((member) => (
             <div
@@ -485,7 +1165,8 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
               className="pp-card"
               style={{
                 padding: "16px",
-                borderLeft: member.isAi ? "3px solid #8b5cf6" : "3px solid #10b981",
+                borderLeft: member.isAi ? "3px solid #8b5cf6" : member.blocked ? "3px solid #ef4444" : "3px solid #10b981",
+                opacity: member.blocked ? 0.75 : 1,
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
@@ -498,20 +1179,25 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
                     {member.email}
                   </span>
                 </div>
-                <span
-                  style={{
-                    fontSize: 10,
-                    fontWeight: "bold",
-                    padding: "2px 6px",
-                    borderRadius: 4,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    background: member.role === "project_admin" ? "rgba(16, 185, 129, 0.2)" : "rgba(139, 92, 246, 0.2)",
-                    color: member.role === "project_admin" ? "#10b981" : "#a855f7",
-                  }}
-                >
-                  {member.role.replace("_", " ")} {/* i18n-ignore */}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <select
+                    className="input-select"
+                    value={member.role}
+                    disabled={member.id === me.id}
+                    onChange={(e) => handleChangeMemberRole(member.id, e.target.value as any)}
+                    style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4 }}
+                  >
+                    <option value="project_admin">Администратор {/* i18n-ignore */}</option>
+                    <option value="node_admin">Админ ноды {/* i18n-ignore */}</option>
+                    <option value="container_developer">Разработчик {/* i18n-ignore */}</option>
+                    <option value="service_operator">Оператор {/* i18n-ignore */}</option>
+                  </select>
+                  {member.blocked && (
+                    <span style={{ fontSize: 10, background: "rgba(239, 68, 68, 0.2)", color: "#ef4444", padding: "2px 6px", borderRadius: 4, fontWeight: "bold" }}>
+                      БЛОК {/* i18n-ignore */}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {member.isAi && (
@@ -553,7 +1239,7 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
                             type="checkbox"
                             checked={allowed}
                             onChange={() => toggleTerminalAccess(member.id, t.id)}
-                            disabled={member.role === "project_admin"}
+                            disabled={member.role === "project_admin" || member.blocked}
                           />
                           <span style={{ fontFamily: "monospace" }}>{t.name || "terminal"}</span>
                           <span style={{ fontSize: 10, color: "var(--color-text-secondary, #888)" }}>
@@ -565,6 +1251,28 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
                   </div>
                 )}
               </div>
+
+              {member.id !== me.id && (
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                  <button
+                    type="button"
+                    className="button-ghost small"
+                    onClick={() => handleToggleBlockMember(member.id, Boolean(member.blocked))}
+                  >
+                    {member.blocked ? "✅ Разблокировать" : "🚫 Блокировать"} {/* i18n-ignore */}
+                  </button>
+                  <button
+                    type="button"
+                    className="button-ghost small"
+                    style={{ color: "#ef4444" }}
+                    onClick={() => handleRemoveMember(member.id)}
+                    title="Удалить участника из проекта" // i18n-ignore
+                  >
+                    <Trash size={13} />
+                    <span>Удалить {/* i18n-ignore */}</span>
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -579,58 +1287,235 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
               Git Репозиторий и Ветки Терминалов {/* i18n-ignore */}
             </h2>
             <span>
-              Каждый проект привязывается к Git-репозиторию. Терминалы — изолированные ветки с автокоммитом действий. {/* i18n-ignore */}
+              Привязка существующего Git-репозитория или создание нового для проекта / терминала. {/* i18n-ignore */}
             </span>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button
-              type="button"
-              className="button-accent small"
-              onClick={handleSaveGitConfig}
-              disabled={isSavingGit}
-            >
-              {isSavingGit ? "Сохранение..." : "💾 Сохранить привязку Git"} {/* i18n-ignore */}
-            </button>
-            <button
-              type="button"
-              className="button-ghost small"
-              onClick={() => setShowPrModal(true)}
-            >
-              Предложение автору (PR) {/* i18n-ignore */}
-            </button>
+            <div className="segmented" style={{ margin: 0 }}>
+              <button
+                type="button"
+                className={gitMode === "bind" ? "active" : ""}
+                onClick={() => setGitMode("bind")}
+              >
+                🔗 Привязать репозиторий {/* i18n-ignore */}
+              </button>
+              <button
+                type="button"
+                className={gitMode === "create" ? "active" : ""}
+                onClick={() => setGitMode("create")}
+              >
+                <Plus size={13} />
+                Создать репозиторий {/* i18n-ignore */}
+              </button>
+            </div>
+            {gitMode === "bind" && (
+              <button
+                type="button"
+                className="button-accent small"
+                onClick={handleSaveGitConfig}
+                disabled={isSavingGit}
+              >
+                {isSavingGit ? "Сохранение..." : "💾 Сохранить привязку Git"} {/* i18n-ignore */}
+              </button>
+            )}
           </div>
         </div>
 
         <div className="pp-card" style={{ padding: "16px 20px" }}>
-          {/* Main repo configuration */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 16 }}>
-            <div>
-              <span style={{ fontSize: 11, color: "var(--color-text-secondary, #888)", display: "block", marginBottom: 4 }}>
-                URL удаленного репозитория (GitHub / Gitea / GitLab): {/* i18n-ignore */}
-              </span>
-              <input
-                type="text"
-                className="input-text"
-                value={gitRepo}
-                placeholder="https://github.com/DLGerasimenko/tterm-web.git"
-                onChange={(e) => setGitRepo(e.target.value)}
-                style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }}
-              />
+          {/* GitHub Web App Authorization Card */}
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "12px 16px",
+            borderRadius: 8,
+            background: githubStatus.is_authenticated ? "rgba(16, 185, 129, 0.08)" : "rgba(255, 255, 255, 0.03)",
+            border: githubStatus.is_authenticated ? "1px solid rgba(16, 185, 129, 0.25)" : "1px solid rgba(255, 255, 255, 0.08)",
+            marginBottom: 16,
+            flexWrap: "wrap",
+            gap: 12,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {githubStatus.is_authenticated && githubStatus.avatar_url ? (
+                <img src={githubStatus.avatar_url} alt="avatar" style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.15)" }} />
+              ) : (
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Branch size={18} />
+                </div>
+              )}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <strong>{githubStatus.is_authenticated ? `@${githubStatus.username}` : "GitHub не авторизован"} {/* i18n-ignore */}</strong>
+                  <span style={{
+                    fontSize: 11,
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                    background: githubStatus.is_authenticated ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.06)",
+                    color: githubStatus.is_authenticated ? "#10b981" : "#888",
+                  }}>
+                    {githubStatus.is_authenticated ? "Веб-приложение подключено" : "Требуется вход"} {/* i18n-ignore */}
+                  </span>
+                </div>
+                <span style={{ fontSize: 12, color: "var(--color-text-secondary, #888)", display: "block", marginTop: 2 }}>
+                  {githubStatus.is_authenticated
+                    ? `Репозиториев: ${githubStatus.public_repos || 0} • Токен: ${githubStatus.masked_token}` // i18n-ignore
+                    : "Авторизуйте GitHub для автоматического управления репозиториями, ветками и коммитами проекта от вашего имени"} {/* i18n-ignore */}
+                </span>
+              </div>
             </div>
-            <div>
-              <span style={{ fontSize: 11, color: "var(--color-text-secondary, #888)", display: "block", marginBottom: 4 }}>
-                Базовая ветка (Base Trunk Branch): {/* i18n-ignore */}
-              </span>
-              <input
-                type="text"
-                className="input-text"
-                value={gitBranch}
-                placeholder="main"
-                onChange={(e) => setGitBranch(e.target.value)}
-                style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }}
-              />
+
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {githubStatus.is_authenticated ? (
+                <>
+                  <button
+                    type="button"
+                    className="button-ghost small"
+                    onClick={handleLoadGitHubRepos}
+                    title="Обновить список моих репозиториев" /* i18n-ignore */
+                  >
+                    <Restart size={13} />
+                    <span>Мои репозитории ({userGithubRepos.length})</span> {/* i18n-ignore */}
+                  </button>
+                  <button
+                    type="button"
+                    className="button-danger-line small"
+                    onClick={handleDisconnectGitHub}
+                  >
+                    Отключить {/* i18n-ignore */}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="button-accent small"
+                  onClick={() => setShowGithubModal(true)}
+                >
+                  <LinkIcon size={13} />
+                  <span>🔗 Авторизовать GitHub</span> {/* i18n-ignore */}
+                </button>
+              )}
             </div>
           </div>
+
+          {/* User Repos Quick Selector */}
+          {userGithubRepos.length > 0 && (
+            <div style={{ marginBottom: 16, padding: "10px 14px", borderRadius: 8, background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+              <span style={{ fontSize: 12, color: "var(--color-text-secondary, #999)" }}>
+                Выберите один из ваших репозиториев на GitHub для быстрой привязки: {/* i18n-ignore */}
+              </span>
+              <select
+                className="input-select"
+                style={{ fontSize: 12, padding: "4px 8px" }}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setGitRepo(e.target.value);
+                    if (notify) notify(`Выбран репозиторий: ${e.target.value}`); // i18n-ignore
+                  }
+                }}
+              >
+                <option value="">-- Выбрать репозиторий -- {/* i18n-ignore */}</option>
+                {userGithubRepos.map((r) => (
+                  <option key={r.name} value={r.html_url + ".git"}>
+                    {r.full_name} {r.private ? "(приватный)" /* i18n-ignore */ : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {gitMode === "bind" ? (
+            /* Mode 1: Bind Existing */
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 16 }}>
+              <div>
+                <span style={{ fontSize: 11, color: "var(--color-text-secondary, #888)", display: "block", marginBottom: 4 }}>
+                  URL удаленного репозитория (GitHub / Gitea / GitLab): {/* i18n-ignore */}
+                </span>
+                <input
+                  type="text"
+                  className="input-text"
+                  value={gitRepo}
+                  placeholder="https://github.com/DLGerasimenko/tterm-web.git"
+                  onChange={(e) => setGitRepo(e.target.value)}
+                  style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }}
+                />
+              </div>
+              <div>
+                <span style={{ fontSize: 11, color: "var(--color-text-secondary, #888)", display: "block", marginBottom: 4 }}>
+                  Базовая ветка (Base Trunk Branch): {/* i18n-ignore */}
+                </span>
+                <input
+                  type="text"
+                  className="input-text"
+                  value={gitBranch}
+                  placeholder="main"
+                  onChange={(e) => setGitBranch(e.target.value)}
+                  style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }}
+                />
+              </div>
+            </div>
+          ) : (
+            /* Mode 2: Create New Repository */
+            <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 16, padding: "14px 16px", borderRadius: 8, background: "rgba(59, 130, 246, 0.06)", border: "1px solid rgba(59, 130, 246, 0.2)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 14 }}>
+                <div>
+                  <span style={{ fontSize: 11, color: "var(--color-text-secondary, #888)", display: "block", marginBottom: 4 }}>
+                    Имя нового репозитория: {/* i18n-ignore */}
+                  </span>
+                  <input
+                    type="text"
+                    className="input-text"
+                    value={newRepoName}
+                    placeholder="my-project-repo"
+                    onChange={(e) => setNewRepoName(e.target.value)}
+                    style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }}
+                  />
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, color: "var(--color-text-secondary, #888)", display: "block", marginBottom: 4 }}>
+                    Область привязки: {/* i18n-ignore */}
+                  </span>
+                  <select
+                    className="input-select"
+                    value={newRepoScope}
+                    onChange={(e) => setNewRepoScope(e.target.value)}
+                    style={{ width: "100%", padding: "7px 10px", fontSize: 13 }}
+                  >
+                    <option value="project">Для всего проекта ({project.name}) {/* i18n-ignore */}</option>
+                    {terminals.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        Только для терминала: {t.name || t.machine || t.id.slice(0, 6)} {/* i18n-ignore */}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, color: "var(--color-text-secondary, #888)", display: "block", marginBottom: 4 }}>
+                    Видимость: {/* i18n-ignore */}
+                  </span>
+                  <select
+                    className="input-select"
+                    value={newRepoVisibility}
+                    onChange={(e) => setNewRepoVisibility(e.target.value as any)}
+                    style={{ width: "100%", padding: "7px 10px", fontSize: 13 }}
+                  >
+                    <option value="public">Публичный (Public) {/* i18n-ignore */}</option>
+                    <option value="private">Приватный (Private) {/* i18n-ignore */}</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="button-accent small"
+                  disabled={isCreatingRepo || !newRepoName.trim()}
+                  onClick={handleCreateRepo}
+                >
+                  <Plus size={14} />
+                  <span>{isCreatingRepo ? "Создание..." : "Создать репозиторий и привязать" /* i18n-ignore */}</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Options Toggles */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "12px 14px", background: "rgba(255,255,255,0.02)", borderRadius: 8, border: "1px solid rgba(255,255,255,0.06)", marginBottom: 16 }}>
@@ -782,8 +1667,68 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
         </div>
       </section>
 
-      {/* 3. Контейнерная Оркестрация и Ноды */}
+      {/* 3. Контейнерная Оркестрация, Ноды и Порты */}
       <section className="pp-section">
+        {/* Очередь подтверждения опасных команд от нижестоящих звеньев */}
+        {approvals.length > 0 && (
+          <div style={{ marginBottom: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              <h3 style={{ display: "flex", alignItems: "center", gap: 8, color: "#f87171", margin: 0, fontSize: 15 }}>
+                <Warning size={18} />
+                Запросы на подтверждение опасных команд ({approvals.length}) {/* i18n-ignore */}
+              </h3>
+              <span style={{ fontSize: 12, color: "var(--color-text-secondary, #888)" }}>
+                Команды нижестоящих участников заблокированы до вашего решения {/* i18n-ignore */}
+              </span>
+            </div>
+            {approvals.map((req) => (
+              <div key={req.id} className={`approval-card ${req.risk_level.toLowerCase()}`}>
+                <div className="approval-card-head">
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span className={`risk-badge ${req.risk_level.toLowerCase()}`}>
+                      {req.risk_level}
+                    </span>
+                    <strong style={{ fontSize: 13 }}>{req.requester_name} ({req.requester_role})</strong>
+                    <span style={{ fontSize: 12, color: "var(--color-text-secondary, #888)" }}>
+                      {"в "} {req.terminal_label} {/* i18n-ignore */}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: 11, color: "var(--color-text-dim, #777)" }}>
+                    {new Date(req.created_at).toLocaleTimeString()}
+                  </span>
+                </div>
+                <div className="command-code-box">
+                  $ {req.command}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                  <span style={{ fontSize: 12, color: "#fca5a5" }}>
+                    ⚠️ {req.reason} {/* i18n-ignore */}
+                  </span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      type="button"
+                      className="button-accent small"
+                      style={{ background: "#10b981", borderColor: "#10b981" }}
+                      onClick={() => handleResolveApproval(req.id, true)}
+                    >
+                      <Check size={13} />
+                      <span>Разрешить команду</span> {/* i18n-ignore */}
+                    </button>
+                    <button
+                      type="button"
+                      className="button-danger-line small"
+                      onClick={() => handleResolveApproval(req.id, false)}
+                    >
+                      <Close size={13} />
+                      <span>Отклонить</span> {/* i18n-ignore */}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="pp-section-head">
           <div className="pp-section-title">
             <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -791,23 +1736,39 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
               Иерархия Нод, Docker-контейнеров и Служб {/* i18n-ignore */}
             </h2>
             <span>
-              Автоопределение инфраструктуры: Нода → Контейнеры → Сервисы. Защита от срыва вложенных процессов. {/* i18n-ignore */}
+              Автосканирование всех подключенных машин: Ноды → Контейнеры → Открытые порты и службы {/* i18n-ignore */}
             </span>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="button-ghost small"
+              onClick={handleSimulateDangerousCommand}
+              title="Проверить работу защиты от деструктивных действий" /* i18n-ignore */
+            >
+              <Warning size={13} />
+              <span>⚡ Проверить перехват команд</span> {/* i18n-ignore */}
+            </button>
             <button
               type="button"
               className="button-plain small"
-              onClick={handleScanNode}
+              onClick={handleScanAllNodes}
               disabled={scanLoading}
             >
               <span style={{ display: "inline-flex", marginRight: 4 }}><Search size={13} /></span>
-              {scanLoading ? "Сканирование..." /* i18n-ignore */ : "🔍 Сканировать Docker и порты" /* i18n-ignore */}
+              {scanLoading ? "Сканирование..." /* i18n-ignore */ : "🔍 Сканировать все машины и порты" /* i18n-ignore */}
             </button>
             <button
               type="button"
               className="button-ghost small"
-              onClick={() => setShowTermiusModal(true)}
+              onClick={() => setShowAezaDrawer(true)}
+            >
+              ☁️ Aeza Cloud VPS {/* i18n-ignore */}
+            </button>
+            <button
+              type="button"
+              className="button-ghost small"
+              onClick={() => setShowTermiusDrawer(true)}
             >
               <Key size={14} />
               Параметры Termius / SSH {/* i18n-ignore */}
@@ -815,162 +1776,259 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
           </div>
         </div>
 
-        <div className="pp-card" style={{ padding: "16px 20px" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* Уровень 2: Нода */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
-                <Server size={18} />
-                <strong>Нода: klim (Raspberry Pi 4 / Debian Linux) {/* i18n-ignore */}</strong>
-                <span className="pp-mono" style={{ fontSize: 12, color: "var(--color-text-secondary, #888)" }}>
-                  IP: {window.location.hostname || "192.168.0.6"} {/* i18n-ignore */}
-                </span>
-                <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "rgba(16,185,129,0.2)", color: "#10b981" }}>
-                  ONLINE {/* i18n-ignore */}
-                </span>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  type="button"
-                  className="button-danger-line small"
-                  onClick={() => handleTriggerDisruptive("node", "klim", "RPi Нода", "reboot")} // i18n-ignore
-                  title="Безопасная перезагрузка с проверкой вложенных задач" /* i18n-ignore */
-                >
-                  <span style={{ display: "inline-flex", marginRight: 4 }}><Restart size={12} /></span>
-                  Перезагрузить ноду {/* i18n-ignore */}
-                </button>
-              </div>
-            </div>
-
-            {/* Уровень 3: Обнаруженные Docker-контейнеры */}
-            <div style={{ marginLeft: 16 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary, #999)", display: "block", marginBottom: 10 }}>
-                Обнаруженные Docker-контейнеры на ноде ({containers.length}): {/* i18n-ignore */}
+        {/* Multi-Node Selector Bar */}
+        <div className="node-selector-bar" style={{ marginBottom: 12 }}>
+          {nodes.map((node) => (
+            <button
+              key={node.id}
+              type="button"
+              className={`node-tab-button ${selectedNodeId === node.id ? "active" : ""}`}
+              onClick={() => setSelectedNodeId(node.id)}
+            >
+              {node.kind === "computer" ? <Computer size={15} /> : <Server size={15} />}
+              <span>{node.name}</span>
+              <span style={{
+                fontSize: 10,
+                padding: "1px 6px",
+                borderRadius: 4,
+                background: node.status === "ONLINE" ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)",
+                color: node.status === "ONLINE" ? "#10b981" : "#ef4444",
+              }}>
+                {node.status}
               </span>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))", gap: 12 }}>
-                {containers.map((c) => (
-                  <div
-                    key={c.id}
-                    style={{
-                      padding: "12px 14px",
-                      borderRadius: 8,
-                      background: "rgba(0,0,0,0.25)",
-                      border: "1px solid rgba(255,255,255,0.06)",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 8,
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div style={{ flex: 1 }}>
-                        {editingContainerId === c.id ? (
-                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                            <input
-                              type="text"
-                              value={containerRenameText}
-                              onChange={(e) => setContainerRenameText(e.target.value)}
-                              className="input-text"
-                              style={{ fontSize: 12, padding: "2px 6px" }}
-                              autoFocus
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") handleSaveRename(c.id);
-                                if (e.key === "Escape") setEditingContainerId(null);
-                              }}
-                            />
-                            <button
-                              type="button"
-                              className="button-accent small"
-                              onClick={() => handleSaveRename(c.id)}
-                              style={{ padding: "2px 6px", fontSize: 11 }}
-                            >
-                              ✓
-                            </button>
-                          </div>
-                        ) : (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                            <strong style={{ fontSize: 13, color: c.custom_name ? "#93c5fd" : undefined }}>
-                              {c.custom_name || c.name}
-                            </strong>
-                            <button
-                              type="button"
-                              className="icon-button small"
-                              onClick={() => {
-                                setEditingContainerId(c.id);
-                                setContainerRenameText(c.custom_name || c.name);
-                              }}
-                              title="Переименовать для удобства в проекте" /* i18n-ignore */
-                              style={{ opacity: 0.6 }}
-                            >
-                              <Pencil size={12} />
-                            </button>
-                          </div>
-                        )}
-                        <span style={{ fontSize: 11, color: "var(--color-text-dim, #777)", fontFamily: "monospace", display: "block" }}>
-                          {c.name !== c.custom_name ? c.name : c.image} {/* i18n-ignore */}
-                        </span>
-                      </div>
-                      <span style={{
-                        fontSize: 10,
-                        padding: "2px 6px",
-                        borderRadius: 4,
-                        background: c.status.startsWith("Up") ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)", // i18n-ignore
-                        color: c.status.startsWith("Up") ? "#10b981" : "#888" // i18n-ignore
-                      }}>
-                        {c.status.split(" ")[0]} {/* i18n-ignore */}
+            </button>
+          ))}
+        </div>
+
+        {(() => {
+          const activeNode = nodes.find((n) => n.id === selectedNodeId) || nodes[0] || {
+            id: "klim",
+            name: "klim (Raspberry Pi 4)", /* i18n-ignore */
+            kind: "server",
+            os_name: "Debian Linux", /* i18n-ignore */
+            ip_address: "192.168.0.6",
+            status: "ONLINE",
+            containers: [],
+            ports: [],
+            allowed_members: ["all"],
+            last_scanned: "",
+          };
+
+          return (
+            <div className="pp-card" style={{ padding: "16px 20px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {/* Header active node */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, flexWrap: "wrap" }}>
+                    {activeNode.kind === "computer" ? <Computer size={18} /> : <Server size={18} />}
+                    <strong>Нода: {activeNode.name} ({activeNode.os_name}) {/* i18n-ignore */}</strong>
+                    <span className="pp-mono" style={{ fontSize: 12, color: "var(--color-text-secondary, #888)" }}>
+                      {"IP: "} {activeNode.ip_address} {/* i18n-ignore */}
+                    </span>
+                    <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "rgba(16,185,129,0.2)", color: "#10b981" }}>
+                      {activeNode.status}
+                    </span>
+                    {activeNode.allowed_members && !activeNode.allowed_members.includes("all") && (
+                      <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "rgba(234,179,8,0.2)", color: "#eab308" }}>
+                        {"🔒 Доступ ограничен ("}{activeNode.allowed_members.length}{" уч.)"} {/* i18n-ignore */}
                       </span>
-                    </div>
-
-                    {/* Порты и службы */}
-                    <div style={{ fontSize: 11, color: "var(--color-text-secondary, #888)", display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <span>Порты: {/* i18n-ignore */}</span>
-                      {c.ports.length > 0 ? (
-                        c.ports.map((p, idx) => (
-                          <code key={idx} style={{ background: "rgba(255,255,255,0.06)", padding: "1px 4px", borderRadius: 3 }}>
-                            {p}
-                          </code>
-                        ))
-                      ) : (
-                        <span style={{ color: "var(--color-text-dim, #666)" }}>внутренние {/* i18n-ignore */}</span>
-                      )}
-                    </div>
-
-                    {/* Действия контейнера */}
-                    <div style={{
-                      marginTop: 4,
-                      paddingTop: 8,
-                      borderTop: "1px solid rgba(255,255,255,0.04)",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center"
-                    }}>
-                      <button
-                        type="button"
-                        className="button-ghost small"
-                        style={{ fontSize: 11, padding: "2px 6px" }}
-                        onClick={() => {
-                          setShowInviteModal(true);
-                          if (notify) notify(`Выбрана привязка к контейнеру: ${c.custom_name || c.name}`); // i18n-ignore
-                        }}
-                      >
-                        + Доступ к контейнеру {/* i18n-ignore */}
-                      </button>
-                      <button
-                        type="button"
-                        className="button-danger-line small"
-                        style={{ fontSize: 11, padding: "2px 6px" }}
-                        onClick={() => handleTriggerDisruptive("container", c.id, c.custom_name || c.name, "restart")}
-                        title="Перезапустить контейнер с защитой активных терминалов" /* i18n-ignore */
-                      >
-                        <Restart size={11} />
-                        Перезапуск {/* i18n-ignore */}
-                      </button>
-                    </div>
+                    )}
                   </div>
-                ))}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      className="button-ghost small"
+                      onClick={() => setPermissionModal({
+                        isOpen: true,
+                        type: "node",
+                        nodeId: activeNode.id,
+                        entityName: activeNode.name,
+                        allowedMembers: activeNode.allowed_members || ["all"],
+                      })}
+                    >
+                      <Lock size={13} />
+                      <span>🔒 Доступ к ноде</span> {/* i18n-ignore */}
+                    </button>
+                    <button
+                      type="button"
+                      className="button-plain small"
+                      onClick={() => handleScanNode(activeNode.id)}
+                      disabled={scanLoading}
+                    >
+                      <Search size={13} />
+                      <span>Сканировать ноду</span> {/* i18n-ignore */}
+                    </button>
+                    <button
+                      type="button"
+                      className="button-danger-line small"
+                      onClick={() => handleTriggerDisruptive("node", activeNode.id, activeNode.name, "reboot")}
+                      title="Безопасная перезагрузка с проверкой вложенных задач" /* i18n-ignore */
+                    >
+                      <Restart size={12} />
+                      <span>Перезагрузить</span> {/* i18n-ignore */}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Level: Docker Containers */}
+                <div style={{ marginLeft: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary, #999)", display: "block", marginBottom: 10 }}>
+                    Обнаруженные Docker-контейнеры на ноде ({activeNode.containers?.length || 0}): {/* i18n-ignore */}
+                  </span>
+                  {activeNode.containers && activeNode.containers.length > 0 ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(290px, 1fr))", gap: 12 }}>
+                      {activeNode.containers.map((c) => (
+                        <div
+                          key={c.id}
+                          style={{
+                            padding: "12px 14px",
+                            borderRadius: 8,
+                            background: "rgba(0,0,0,0.25)",
+                            border: "1px solid rgba(255,255,255,0.06)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 8,
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                            <div style={{ flex: 1 }}>
+                              {editingContainerId === c.id ? (
+                                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                                  <input
+                                    type="text"
+                                    value={containerRenameText}
+                                    onChange={(e) => setContainerRenameText(e.target.value)}
+                                    className="input-text"
+                                    style={{ fontSize: 12, padding: "2px 6px" }}
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") handleSaveRename(c.id);
+                                      if (e.key === "Escape") setEditingContainerId(null);
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="button-accent small"
+                                    onClick={() => handleSaveRename(c.id)}
+                                    style={{ padding: "2px 6px", fontSize: 11 }}
+                                  >
+                                    ✓
+                                  </button>
+                                </div>
+                              ) : (
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <strong style={{ fontSize: 13, color: c.custom_name ? "#93c5fd" : undefined }}>
+                                    {c.custom_name || c.name}
+                                  </strong>
+                                  <button
+                                    type="button"
+                                    className="icon-button small"
+                                    onClick={() => {
+                                      setEditingContainerId(c.id);
+                                      setContainerRenameText(c.custom_name || c.name);
+                                    }}
+                                    title="Переименовать для удобства в проекте" /* i18n-ignore */
+                                    style={{ opacity: 0.6 }}
+                                  >
+                                    <Pencil size={12} />
+                                  </button>
+                                </div>
+                              )}
+                              <span style={{ fontSize: 11, color: "var(--color-text-dim, #777)", fontFamily: "monospace", display: "block" }}>
+                                {c.name !== c.custom_name ? c.name : c.image} {/* i18n-ignore */}
+                              </span>
+                            </div>
+                            <span style={{
+                              fontSize: 10,
+                              padding: "2px 6px",
+                              borderRadius: 4,
+                              background: c.status.startsWith("Up" /* i18n-ignore */) ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.06)",
+                              color: c.status.startsWith("Up" /* i18n-ignore */) ? "#10b981" : "#888"
+                            }}>
+                              {c.status.split(" ")[0]}
+                            </span>
+                          </div>
+
+                          {/* Ports */}
+                          <div style={{ fontSize: 11, color: "var(--color-text-secondary, #888)", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <span>Порты: {/* i18n-ignore */}</span>
+                            {c.ports.length > 0 ? (
+                              c.ports.map((p, idx) => (
+                                <code key={idx} style={{ background: "rgba(255,255,255,0.06)", padding: "1px 4px", borderRadius: 3 }}>
+                                  {p}
+                                </code>
+                              ))
+                            ) : (
+                              <span style={{ color: "var(--color-text-dim, #666)" }}>внутренние {/* i18n-ignore */}</span>
+                            )}
+                          </div>
+
+                          {/* Container actions */}
+                          <div style={{
+                            marginTop: 4,
+                            paddingTop: 8,
+                            borderTop: "1px solid rgba(255,255,255,0.04)",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center"
+                          }}>
+                            <button
+                              type="button"
+                              className="button-ghost small"
+                              style={{ fontSize: 11, padding: "2px 6px" }}
+                              onClick={() => setPermissionModal({
+                                isOpen: true,
+                                type: "container",
+                                nodeId: activeNode.id,
+                                containerId: c.id,
+                                entityName: c.custom_name || c.name,
+                                allowedMembers: ["all"],
+                              })}
+                            >
+                              <Lock size={11} />
+                              <span>Доступ к контейнеру</span> {/* i18n-ignore */}
+                            </button>
+                            <button
+                              type="button"
+                              className="button-danger-line small"
+                              style={{ fontSize: 11, padding: "2px 6px" }}
+                              onClick={() => handleTriggerDisruptive("container", c.id, c.custom_name || c.name, "restart")}
+                              title="Перезапустить контейнер с защитой активных терминалов" /* i18n-ignore */
+                            >
+                              <Restart size={11} />
+                              <span>Перезапуск</span> {/* i18n-ignore */}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ padding: "12px 14px", borderRadius: 8, background: "rgba(0,0,0,0.2)", color: "var(--color-text-secondary, #888)", fontSize: 12 }}>
+                      На данной рабочей станции нет активных Docker-контейнеров. Доступ предоставляется к локальным процессам и службам. {/* i18n-ignore */}
+                    </div>
+                  )}
+
+                  {/* Level: Open Ports & Network Services */}
+                  {activeNode.ports && activeNode.ports.length > 0 && (
+                    <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary, #999)", display: "block", marginBottom: 8 }}>
+                        Обнаруженные открытые сетевые порты и службы ({activeNode.ports.length}): {/* i18n-ignore */}
+                      </span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {activeNode.ports.map((p) => (
+                          <div key={`${p.port}-${p.protocol}`} className="port-pill">
+                            <span className="port-num">{p.port}/{p.protocol}</span>
+                            <span className="port-hint">{p.service_hint}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          );
+        })()}
       </section>
 
       {/* Модальное окно деструктивного действия с оценкой влияния */}
@@ -1025,132 +2083,587 @@ export function ProjectCollaboration({ project, terminals, me, notify }: Props) 
         </div>
       )}
 
-      {/* Modal: Termius & OpenSSH */}
-      {showTermiusModal && (
-        <div className="dialog-overlay" onClick={() => setShowTermiusModal(false)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
-            <div className="dialog-head">
-              <h3>Параметры подключения разработчика (Termius / OpenSSH) {/* i18n-ignore */}</h3>
-              <button type="button" className="button-ghost small" onClick={() => setShowTermiusModal(false)}>
+      {/* Slide-Over Side Drawer: Termius & OpenSSH */}
+      {showTermiusDrawer && (
+        <>
+          <div className="side-drawer-backdrop" onClick={() => setShowTermiusDrawer(false)} />
+          <aside className="side-drawer-panel" role="complementary">
+            <div className="side-drawer-head">
+              <div className="side-drawer-title">
+                <Key size={18} />
+                <span>Параметры Termius & SSH {/* i18n-ignore */}</span>
+              </div>
+              <button
+                type="button"
+                className="icon-button small"
+                onClick={() => setShowTermiusDrawer(false)}
+                aria-label="Закрыть" // i18n-ignore
+              >
                 <Close size={16} />
               </button>
             </div>
-            <div className="dialog-body" style={{ padding: "16px 20px", maxHeight: "75vh", overflowY: "auto" }}>
-              {/* Termius */}
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <strong>1. Импорт в Termius (One-click JSON) {/* i18n-ignore */}</strong>
+
+            <nav className="side-drawer-tabs" role="tablist">
+              <button
+                type="button"
+                className={`side-drawer-tab ${termiusTab === "termius" ? "active" : ""}`}
+                onClick={() => setTermiusTab("termius")}
+              >
+                📱 Termius JSON {/* i18n-ignore */}
+              </button>
+              <button
+                type="button"
+                className={`side-drawer-tab ${termiusTab === "ssh_config" ? "active" : ""}`}
+                onClick={() => setTermiusTab("ssh_config")}
+              >
+                ⚙️ ~/.ssh/config {/* i18n-ignore */}
+              </button>
+              <button
+                type="button"
+                className={`side-drawer-tab ${termiusTab === "ssh_cmd" ? "active" : ""}`}
+                onClick={() => setTermiusTab("ssh_cmd")}
+              >
+                ⚡ SSH Команда {/* i18n-ignore */}
+              </button>
+            </nav>
+
+            <div className="side-drawer-body">
+              {termiusTab === "termius" && (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <strong>Импорт в мобильный или десктопный Termius {/* i18n-ignore */}</strong>
+                    <button
+                      type="button"
+                      className="button-plain small"
+                      onClick={() => copyText(termiusJson, showCopiedTermius)}
+                    >
+                      {copiedTermius ? <Check size={14} /> : <Copy size={14} />}
+                      <span>{copiedTermius ? "Скопировано!" : "Копировать JSON" /* i18n-ignore */}</span>
+                    </button>
+                  </div>
+                  <pre style={{
+                    background: "rgba(0,0,0,0.45)",
+                    padding: "12px 14px",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontFamily: "monospace",
+                    overflowX: "auto",
+                    border: "1px solid rgba(255,255,255,0.08)"
+                  }}>
+                    {termiusJson}
+                  </pre>
+                  <p style={{ fontSize: 12, color: "var(--color-text-secondary, #888)", marginTop: 10, lineHeight: 1.5 }}>
+                    Откройте Termius $\to$ Settings $\to$ Import $\to$ вставьте JSON. Подключение к контейнеру появится моментально. {/* i18n-ignore */}
+                  </p>
+                </div>
+              )}
+
+              {termiusTab === "ssh_config" && (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <strong>Конфигурация OpenSSH (~/.ssh/config) {/* i18n-ignore */}</strong>
+                    <button
+                      type="button"
+                      className="button-plain small"
+                      onClick={() => copyText(sshConfigSnippet, showCopiedSshConfig)}
+                    >
+                      {copiedSshConfig ? <Check size={14} /> : <Copy size={14} />}
+                      <span>{copiedSshConfig ? "Скопировано!" : "Копировать конфиг" /* i18n-ignore */}</span>
+                    </button>
+                  </div>
+                  <pre style={{
+                    background: "rgba(0,0,0,0.45)",
+                    padding: "12px 14px",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontFamily: "monospace",
+                    overflowX: "auto",
+                    border: "1px solid rgba(255,255,255,0.08)"
+                  }}>
+                    {sshConfigSnippet}
+                  </pre>
+                  <p style={{ fontSize: 12, color: "var(--color-text-secondary, #888)", marginTop: 10, lineHeight: 1.5 }}>
+                    Добавьте блок в файл <code>~/.ssh/config</code> для быстрого подключения одной командой <code>ssh tterm-{project.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}</code>. {/* i18n-ignore */}
+                  </p>
+                </div>
+              )}
+
+              {termiusTab === "ssh_cmd" && (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <strong>Быстрое подключение в одну строку (CLI) {/* i18n-ignore */}</strong>
+                    <button
+                      type="button"
+                      className="button-plain small"
+                      onClick={() => copyText(sshCmd, showCopiedSshCmd)}
+                    >
+                      {copiedSshCmd ? <Check size={14} /> : <Copy size={14} />}
+                      <span>{copiedSshCmd ? "Скопировано!" : "Копировать команду" /* i18n-ignore */}</span>
+                    </button>
+                  </div>
+                  <pre style={{
+                    background: "rgba(0,0,0,0.45)",
+                    padding: "12px 14px",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontFamily: "monospace",
+                    border: "1px solid rgba(255,255,255,0.08)"
+                  }}>
+                    {sshCmd}
+                  </pre>
+                  <p style={{ fontSize: 12, color: "var(--color-text-secondary, #888)", marginTop: 10, lineHeight: 1.5 }}>
+                    Прямое подключение к порту 2222 контейнера окружения разработки. {/* i18n-ignore */}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="side-drawer-foot">
+              <button
+                type="button"
+                className="button-plain small"
+                onClick={() => setShowTermiusDrawer(false)}
+              >
+                Закрыть {/* i18n-ignore */}
+              </button>
+            </div>
+          </aside>
+        </>
+      )}
+
+      {/* Modal: GitHub Authorization */}
+      {showGithubModal && (
+        <div className="dialog-overlay" onClick={() => setShowGithubModal(false)}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className="dialog-head">
+              <h3>Авторизация в GitHub {/* i18n-ignore */}</h3>
+              <button type="button" className="button-ghost small" onClick={() => setShowGithubModal(false)}>
+                <Close size={16} />
+              </button>
+            </div>
+            <div className="dialog-body" style={{ padding: "16px 20px" }}>
+              <p style={{ fontSize: 13, color: "var(--color-text-secondary, #999)", marginBottom: 16 }}>
+                Привязка GitHub позволяет сервису tTerm автоматически создавать репозитории, ветки для каждого терминала, коммитить действия и отправлять Pull Request от вашего имени. {/* i18n-ignore */}
+              </p>
+
+              {/* Способ 1: Личный токен GitHub (PAT) */}
+              <div style={{ marginBottom: 18, padding: "14px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <strong style={{ fontSize: 13, display: "block", marginBottom: 6 }}>
+                  Быстрый вход через токен (Personal Access Token) {/* i18n-ignore */}
+                </strong>
+                <span style={{ fontSize: 12, color: "var(--color-text-dim, #777)", display: "block", marginBottom: 8 }}>
+                  Создайте токен в GitHub $\to$ Settings $\to$ Developer settings $\to$ Tokens (classic) с правами <code>repo, workflow, user</code>. {/* i18n-ignore */}
+                </span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    type="password"
+                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                    className="input-text"
+                    value={githubTokenInput}
+                    onChange={(e) => setGithubTokenInput(e.target.value)}
+                    style={{ flex: 1, fontFamily: "monospace", fontSize: 12 }}
+                  />
                   <button
                     type="button"
-                    className="button-plain small"
-                    onClick={() => copyText(termiusJson, showCopiedTermius)}
+                    className="button-accent"
+                    disabled={isConnectingGithub || !githubTokenInput.trim()}
+                    onClick={handleConnectGitHubToken}
                   >
-                    {copiedTermius ? <Check size={14} /> : <Copy size={14} />}
-                    {copiedTermius ? "Скопировано" /* i18n-ignore */ : "Копировать JSON" /* i18n-ignore */}
+                    {isConnectingGithub ? "Проверка..." : "Подключить"} {/* i18n-ignore */}
                   </button>
                 </div>
-                <pre style={{
-                  background: "rgba(0,0,0,0.4)",
-                  padding: "10px 14px",
-                  borderRadius: 6,
-                  fontSize: 12,
-                  fontFamily: "monospace",
-                  overflowX: "auto"
-                }}>
-                  {termiusJson}
-                </pre>
               </div>
 
-              {/* SSH Config */}
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <strong>2. Файл ~/.ssh/config {/* i18n-ignore */}</strong>
-                  <button
-                    type="button"
-                    className="button-plain small"
-                    onClick={() => copyText(sshConfigSnippet, showCopiedSshConfig)}
-                  >
-                    {copiedSshConfig ? <Check size={14} /> : <Copy size={14} />}
-                    {copiedSshConfig ? "Скопировано" /* i18n-ignore */ : "Копировать конфиг" /* i18n-ignore */}
-                  </button>
-                </div>
-                <pre style={{
-                  background: "rgba(0,0,0,0.4)",
-                  padding: "10px 14px",
-                  borderRadius: 6,
-                  fontSize: 12,
-                  fontFamily: "monospace",
-                  overflowX: "auto"
-                }}>
-                  {sshConfigSnippet}
-                </pre>
-              </div>
-
-              {/* One-liner */}
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <strong>3. Подключение в одну строку (CLI) {/* i18n-ignore */}</strong>
-                  <button
-                    type="button"
-                    className="button-plain small"
-                    onClick={() => copyText(sshCmd, showCopiedSshCmd)}
-                  >
-                    {copiedSshCmd ? <Check size={14} /> : <Copy size={14} />}
-                    {copiedSshCmd ? "Скопировано" /* i18n-ignore */ : "Копировать команду" /* i18n-ignore */}
-                  </button>
-                </div>
-                <pre style={{
-                  background: "rgba(0,0,0,0.4)",
-                  padding: "10px 14px",
-                  borderRadius: 6,
-                  fontSize: 12,
-                  fontFamily: "monospace"
-                }}>
-                  {sshCmd}
-                </pre>
+              {/* Способ 2: Веб-приложение GitHub OAuth */}
+              <div style={{ padding: "14px", borderRadius: 8, background: "rgba(59, 130, 246, 0.05)", border: "1px solid rgba(59, 130, 246, 0.2)" }}>
+                <strong style={{ fontSize: 13, display: "block", marginBottom: 6 }}>
+                  Авторизация веб-приложения (OAuth Web Flow) {/* i18n-ignore */}
+                </strong>
+                <p style={{ fontSize: 12, color: "var(--color-text-secondary, #888)", marginBottom: 10 }}>
+                  Стандартная авторизация через официальное диалоговое окно GitHub с запросом прав на управление репозиториями. {/* i18n-ignore */}
+                </p>
+                <a
+                  href={`https://github.com/login/oauth/authorize?client_id=Iv23liOAUTH_TTERM_APP&scope=repo%20user%20workflow&redirect_uri=${encodeURIComponent(window.location.origin + "/api/orchestration/github/callback")}`}
+                  className="button-plain"
+                  style={{ display: "inline-flex", textDecoration: "none" }}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <LinkIcon size={14} />
+                  <span>Открыть страницу входа GitHub ↗</span> {/* i18n-ignore */}
+                </a>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal: Pull Request Proposal */}
-      {showPrModal && (
-        <div className="dialog-overlay" onClick={() => setShowPrModal(false)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 680 }}>
-            <div className="dialog-head">
-              <h3>Предложение слияния для Дениса Герасименко (tTerm upstream) {/* i18n-ignore */}</h3>
-              <button type="button" className="button-ghost small" onClick={() => setShowPrModal(false)}>
+      {/* Slide-Over Side Drawer: Aeza Cloud VPS */}
+      {showAezaDrawer && (
+        <>
+          <div className="side-drawer-backdrop" onClick={() => setShowAezaDrawer(false)} />
+          <aside className="side-drawer-panel" role="complementary">
+            <div className="side-drawer-head">
+              <div className="side-drawer-title">
+                <span>☁️ Aeza Cloud VPS (Почасовой хостинг) {/* i18n-ignore */}</span>
+              </div>
+              <button
+                type="button"
+                className="icon-button small"
+                onClick={() => setShowAezaDrawer(false)}
+                aria-label="Закрыть" // i18n-ignore
+              >
                 <Close size={16} />
               </button>
             </div>
-            <div className="dialog-body" style={{ padding: "16px 20px", maxHeight: "75vh", overflowY: "auto" }}>
-              <p style={{ fontSize: 13, lineHeight: "1.5", marginBottom: 12 }}>
-                Файл <code>PULL_REQUEST_PROPOSAL.md</code> подготовлен и содержит подробное описание интеграции ИИ-агентов, точечного RBAC-доступа, Windows агента и MCP сервера. {/* i18n-ignore */}
+
+            <div className="side-drawer-body">
+              {/* Account Balance Card */}
+              <div style={{ padding: "14px", borderRadius: 8, background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.25)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <span style={{ fontSize: 11, color: "var(--color-text-secondary, #888)", display: "block" }}>
+                      Баланс аккаунта Aeza: {/* i18n-ignore */}
+                    </span>
+                    <strong style={{ fontSize: 18, color: "#10b981" }}>
+                      {aezaAccount?.balance_rub !== undefined ? `${aezaAccount.balance_rub.toFixed(2)} ₽` : "50.00 ₽"} {/* i18n-ignore */}
+                    </strong>
+                  </div>
+                  <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "rgba(16,185,129,0.2)", color: "#10b981" }}>
+                    Активен {/* i18n-ignore */}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: "var(--color-text-dim, #777)", marginTop: 6 }}>
+                  {"Email: "} {aezaAccount?.email || "eklimov84@xmail.ru"} {/* i18n-ignore */}
+                </div>
+              </div>
+
+              {/* Linked MacBook SSH Keys */}
+              <div>
+                <strong style={{ fontSize: 13, display: "block", marginBottom: 6 }}>
+                  Привязанные SSH-ключи MacBook {/* i18n-ignore */}
+                </strong>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ padding: "8px 10px", borderRadius: 6, background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12, display: "flex", justifyContent: "space-between" }}>
+                    <span>🔑 MacBook-Air-Evgenij (ed25519) {/* i18n-ignore */}</span>
+                    <span style={{ color: "#10b981" }}>autoAssign: true {/* i18n-ignore */}</span>
+                  </div>
+                  <div style={{ padding: "8px 10px", borderRadius: 6, background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12, display: "flex", justifyContent: "space-between" }}>
+                    <span>🔑 MacBook-Air-Evgenij (rsa) {/* i18n-ignore */}</span>
+                    <span style={{ color: "#10b981" }}>autoAssign: true {/* i18n-ignore */}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recommended Hourly VPS Plan */}
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <strong style={{ fontSize: 13 }}>
+                    Рекомендуемый тестовый сервер (Почасовой) {/* i18n-ignore */}
+                  </strong>
+                  {aezaPlans.length > 0 && (
+                    <span style={{ fontSize: 11, color: "var(--color-text-dim, #777)" }}>
+                      {"Тарифов: "} {aezaPlans.length} {/* i18n-ignore */}
+                    </span>
+                  )}
+                </div>
+                <div style={{ padding: "14px", borderRadius: 8, background: "rgba(59, 130, 246, 0.08)", border: "1px solid rgba(59, 130, 246, 0.25)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                    <div>
+                      <strong style={{ fontSize: 14 }}>MSKs-1 / DEs-1 (NVMe VPS) {/* i18n-ignore */}</strong>
+                      <span style={{ fontSize: 12, color: "var(--color-text-secondary, #888)", display: "block" }}>
+                        1 vCPU • 2 GB RAM • 30 GB NVMe • 25 Гбит/с {/* i18n-ignore */}
+                      </span>
+                    </div>
+                    <strong style={{ fontSize: 15, color: "#60a5fa" }}>
+                      1.40 ₽ / час {/* i18n-ignore */}
+                    </strong>
+                  </div>
+                  <p style={{ fontSize: 12, color: "var(--color-text-secondary, #888)", lineHeight: 1.5, marginBottom: 12 }}>
+                    Самый выгодный тариф для развертывания стенда проекта и тестирования автором tTerm. На 5 часов тестирования спишется всего 7.00 ₽. {/* i18n-ignore */}
+                  </p>
+
+                  <button
+                    type="button"
+                    className="button-accent"
+                    style={{ width: "100%", justifyContent: "center" }}
+                    disabled={isOrderingAeza}
+                    onClick={handleOrderAezaVps}
+                  >
+                    <span>{isOrderingAeza ? "Заказ сервера..." : "🚀 Заказать VPS на 5 часов (7.00 ₽)" /* i18n-ignore */}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Order Result Banner */}
+              {aezaOrderResult && (
+                <div style={{ padding: "12px 14px", borderRadius: 8, background: "rgba(16, 185, 129, 0.1)", border: "1px solid #10b981" }}>
+                  <strong style={{ fontSize: 13, color: "#10b981", display: "block", marginBottom: 4 }}>
+                    ✅ Сервер успешно создан! {/* i18n-ignore */}
+                  </strong>
+                  <div style={{ fontSize: 12, fontFamily: "monospace" }}>
+                    Подключение с MacBook: <code>ssh root@&lt;ip&gt;</code> (по ключу ed25519) {/* i18n-ignore */}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="side-drawer-foot">
+              <button
+                type="button"
+                className="button-plain small"
+                onClick={() => setShowAezaDrawer(false)}
+              >
+                Закрыть {/* i18n-ignore */}
+              </button>
+            </div>
+          </aside>
+        </>
+      )}
+
+      {/* Modal: Управление доступом к ноде / контейнеру */}
+      {permissionModal.isOpen && (
+        <div className="dialog-overlay" onClick={() => setPermissionModal((prev) => ({ ...prev, isOpen: false }))}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="dialog-head">
+              <h3>
+                {permissionModal.type === "node" ? "🔒 Доступ к ноде: " /* i18n-ignore */ : "🔒 Доступ к контейнеру: " /* i18n-ignore */}
+                {permissionModal.entityName} {/* i18n-ignore */}
+              </h3>
+              <button
+                type="button"
+                className="button-ghost small"
+                onClick={() => setPermissionModal((prev) => ({ ...prev, isOpen: false }))}
+              >
+                <Close size={16} />
+              </button>
+            </div>
+            <div className="dialog-body" style={{ padding: "16px 20px" }}>
+              <p style={{ fontSize: 13, color: "var(--color-text-secondary, #999)", marginBottom: 14 }}>
+                Укажите, кто из участников проекта имеет право подключаться и выполнять команды в этом окружении. Все остальные участники не увидят терминалы данной сущности. {/* i18n-ignore */}
               </p>
-              <div style={{
-                background: "rgba(0,0,0,0.3)",
-                padding: "12px 16px",
-                borderRadius: 8,
-                fontSize: 12,
-                lineHeight: "1.6",
-                marginBottom: 16
-              }}>
-                <div><strong>Ветка разработки:</strong> <code>feature/mcp-ai-integration</code> {/* i18n-ignore */}</div>
-                <div><strong>Контакты для автора:</strong> Telegram: <code>@eklimov84</code> {/* i18n-ignore */}</div>
-                <div><strong>Ключевые доработки:</strong> MCP Server, Scoped AI Access, Guard Mode, TerminalHeader, Windows PowerShell Agent, Hierarchical RBAC {/* i18n-ignore */}</div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, padding: "6px 8px", borderRadius: 6, background: "rgba(255,255,255,0.03)" }}>
+                  <input
+                    type="checkbox"
+                    checked={permissionModal.allowedMembers.includes("all")}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setPermissionModal((prev) => ({ ...prev, allowedMembers: ["all"] }));
+                      } else {
+                        setPermissionModal((prev) => ({ ...prev, allowedMembers: [me.id] }));
+                      }
+                    }}
+                  />
+                  <strong>Все участники проекта (Public в рамках проекта) {/* i18n-ignore */}</strong>
+                </label>
+
+                {!permissionModal.allowedMembers.includes("all") && members.map((m) => (
+                  <label key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, padding: "6px 8px", borderRadius: 6, background: "rgba(255,255,255,0.02)" }}>
+                    <input
+                      type="checkbox"
+                      checked={permissionModal.allowedMembers.includes(m.id) || m.id === me.id}
+                      disabled={m.id === me.id}
+                      onChange={(e) => {
+                        const current = permissionModal.allowedMembers;
+                        if (e.target.checked) {
+                          setPermissionModal((prev) => ({ ...prev, allowedMembers: [...current, m.id] }));
+                        } else {
+                          setPermissionModal((prev) => ({ ...prev, allowedMembers: current.filter((id) => id !== m.id) }));
+                        }
+                      }}
+                    />
+                    <span>{m.name} ({m.role})</span>
+                  </label>
+                ))}
               </div>
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-                <a
-                  href="https://github.com/DLGerasimenko/tterm-web/pulls"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="button-accent"
-                  style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                <button
+                  type="button"
+                  className="button-ghost small"
+                  onClick={() => setPermissionModal((prev) => ({ ...prev, isOpen: false }))}
                 >
-                  Открыть Pull Requests на GitHub ↗ {/* i18n-ignore */}
-                </a>
+                  Отмена {/* i18n-ignore */}
+                </button>
+                <button
+                  type="button"
+                  className="button-accent small"
+                  onClick={handleSavePermissions}
+                >
+                  Сохранить права доступа {/* i18n-ignore */}
+                </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Генерация Scoped-ключа доступа для ИИ-агента */}
+      {showAiKeyModal && (
+        <div className="dialog-overlay" onClick={() => setShowAiKeyModal(false)}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
+            <div className="dialog-head">
+              <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Spark size={18} />
+                <span>Выдать Scoped-доступ ИИ-агенту (MCP)</span> {/* i18n-ignore */}
+              </h3>
+              <button
+                type="button"
+                className="button-ghost small"
+                onClick={() => setShowAiKeyModal(false)}
+              >
+                <Close size={16} />
+              </button>
+            </div>
+
+            <div className="dialog-body" style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+              <p style={{ fontSize: 13, color: "var(--color-text-secondary, #999)", margin: 0 }}>
+                Сгенерируйте токен и параметры подключения для внешней нейросети / агента (Claude Desktop, Cursor, Antigravity). Агент сможет подключиться только к разрешенному терминалу и ноде. {/* i18n-ignore */}
+              </p>
+
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 4 }}>
+                  Разрешенный терминал (Изоляция агента) {/* i18n-ignore */}
+                </label>
+                <select
+                  className="input-select"
+                  value={selectedTerminalForAi}
+                  onChange={(e) => setSelectedTerminalForAi(e.target.value)}
+                  style={{ width: "100%", fontSize: 13 }}
+                >
+                  {availableTerminalOptions.map((opt) => (
+                    <option key={opt.id} value={opt.id}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 4 }}>
+                    Имя агента {/* i18n-ignore */}
+                  </label>
+                  <input
+                    type="text"
+                    className="input-text"
+                    value={aiAgentName}
+                    onChange={(e) => setAiAgentName(e.target.value)}
+                    placeholder="Antigravity AI Agent" /* i18n-ignore */
+                    style={{ width: "100%", fontSize: 13 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 4 }}>
+                    Роль в проекте {/* i18n-ignore */}
+                  </label>
+                  <select
+                    className="input-select"
+                    value={aiRole}
+                    onChange={(e) => setAiRole(e.target.value)}
+                    style={{ width: "100%", fontSize: 13 }}
+                  >
+                    <option value="container_developer">Разработчик (container_developer) {/* i18n-ignore */}</option>
+                    <option value="service_operator">Оператор (service_operator) {/* i18n-ignore */}</option>
+                    <option value="node_admin">Админ ноды (node_admin) {/* i18n-ignore */}</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 4 }}>
+                    Режим безопасности {/* i18n-ignore */}
+                  </label>
+                  <select
+                    className="input-select"
+                    value={aiMode}
+                    onChange={(e) => setAiMode(e.target.value as any)}
+                    style={{ width: "100%", fontSize: 13 }}
+                  >
+                    <option value="guard">🛡️ Guard (С подтверждением) {/* i18n-ignore */}</option>
+                    <option value="execute">⚡ Execute (Автономный) {/* i18n-ignore */}</option>
+                    <option value="readonly">👁️ Read-Only (Только чтение) {/* i18n-ignore */}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="button-accent"
+                  onClick={handleGenerateAiKey}
+                  disabled={isGeneratingAiKey}
+                >
+                  <Spark size={14} />
+                  <span>{isGeneratingAiKey ? "Генерация ключа..." /* i18n-ignore */ : "✨ Сгенерировать ключ доступа" /* i18n-ignore */}</span>
+                </button>
+              </div>
+
+              {/* Отображение сгенерированного ключа в формате пользователя */}
+              {generatedAiKeyResult && (
+                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ padding: "12px 14px", borderRadius: 8, background: "rgba(139, 92, 246, 0.08)", border: "1px solid rgba(139, 92, 246, 0.3)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <strong style={{ fontSize: 13, color: "#c084fc" }}>
+                        Скопируйте и отправьте этот JSON ИИ-агенту в чат: {/* i18n-ignore */}
+                      </strong>
+                      <button
+                        type="button"
+                        className="button-accent small"
+                        onClick={() => {
+                          const jsonText = JSON.stringify({
+                            url: generatedAiKeyResult.connection_json.url,
+                            allowed_terminal: generatedAiKeyResult.connection_json.allowed_terminal,
+                            project_id: generatedAiKeyResult.connection_json.project_id,
+                          }, null, 2);
+                          copyToClipboard(jsonText);
+                          if (notify) notify("JSON скопирован в буфер обмена!"); /* i18n-ignore */
+                        }}
+                      >
+                        <Copy size={13} />
+                        <span>Скопировать JSON {/* i18n-ignore */}</span>
+                      </button>
+                    </div>
+                    <pre style={{ margin: 0, padding: "10px", background: "rgba(0,0,0,0.4)", borderRadius: 6, fontSize: 12, fontFamily: "monospace", color: "#a7f3d0" }}>
+                      {JSON.stringify({
+                        url: generatedAiKeyResult.connection_json.url,
+                        allowed_terminal: generatedAiKeyResult.connection_json.allowed_terminal,
+                        project_id: generatedAiKeyResult.connection_json.project_id,
+                      }, null, 2)}
+                    </pre>
+                  </div>
+
+                  <div style={{ padding: "12px 14px", borderRadius: 8, background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.08)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <strong style={{ fontSize: 12, color: "var(--color-text-secondary, #999)" }}>
+                        Конфигурация MCP для Claude Desktop / Cursor / Antigravity: {/* i18n-ignore */}
+                      </strong>
+                      <button
+                        type="button"
+                        className="button-ghost small"
+                        onClick={() => {
+                          copyToClipboard(JSON.stringify(generatedAiKeyResult.mcp_config, null, 2));
+                          if (notify) notify("MCP Config скопирован!"); /* i18n-ignore */
+                        }}
+                      >
+                        <Copy size={12} />
+                        <span>MCP Config {/* i18n-ignore */}</span>
+                      </button>
+                    </div>
+                    <pre style={{ margin: 0, padding: "10px", background: "rgba(0,0,0,0.3)", borderRadius: 6, fontSize: 11, fontFamily: "monospace", color: "#cbd5e1" }}>
+                      {JSON.stringify(generatedAiKeyResult.mcp_config, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="dialog-foot">
+              <button
+                type="button"
+                className="button-plain small"
+                onClick={() => setShowAiKeyModal(false)}
+              >
+                Закрыть {/* i18n-ignore */}
+              </button>
             </div>
           </div>
         </div>

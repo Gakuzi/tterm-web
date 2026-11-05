@@ -37,6 +37,7 @@ import { FolderDialog } from "./Menus";
 import { NeedAccount, type Need } from "./NeedAccount";
 import { forgetSupportDraft, SupportDialog } from "./SupportDialog";
 import { draftsOf, forgetDrafts, markDeleted } from "./drafts";
+import { initNotificationBot } from "./notifications";
 import { NoteView, primeNote, type SaveState, type Typed } from "./NoteView";
 import { summary, titled, toMarkdown } from "./noteText";
 import {
@@ -639,6 +640,11 @@ export function App() {
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(null), TOAST_MS);
   }, []);
+
+  // Web Bot & Multi-Device Push Broadcast: connects background SSE stream across all devices
+  useEffect(() => {
+    return initNotificationBot(state?.me?.id, notYet);
+  }, [state?.me?.id, notYet]);
 
   /** A tab in front: opened if it was not. */
   const openTab = useCallback((tab: string) => {

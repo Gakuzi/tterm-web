@@ -17,7 +17,10 @@ import {
 import { plainly } from "./logday";
 import { RedactedMark, Thread } from "./LogNotes";
 import { markIn, marked } from "./marks";
-import { requestNotificationPermission, showPushNotification } from "./notifications";
+import {
+  isBlockWatched, notifyCommandCompleted,
+  requestNotificationPermission, setBlockWatched,
+} from "./notifications";
 import type { Rendered } from "./render";
 
 /** Lines of a long output shown before "Show all". */
@@ -83,6 +86,7 @@ interface Props {
   /** A note under the block (0.1.20): whether it was saved. */
   onNote: (block: FeedBlock, text: string) => Promise<boolean>;
   onRunFix?: (command: string) => void;
+  notify?: (text: string) => void;
 }
 
 export function diagnoseError(command: string, exitCode: number | null): { reason: string; fix?: string } {
@@ -201,26 +205,40 @@ export function BlockView(props: Props) {
   const failed = block.state === "done" && block.exitCode !== null &&
     block.exitCode !== 0;
   const [aiHelpOpen, setAiHelpOpen] = useState(false);
-  const [bellActive, setBellActive] = useState(false);
+  const [bellActive, setBellActive] = useState(() => isBlockWatched(block.key));
   const wasRunning = useRef(running);
 
   useEffect(() => {
-    if (wasRunning.current && !running && bellActive) {
-      const exitText = block.exitCode === 0 ? "успешно" : `с ошибкой (код ${block.exitCode})`; // i18n-ignore
-      showPushNotification(
-        "Команда завершена", // i18n-ignore
-        `${block.command || "Команда"} завершена ${exitText}`, // i18n-ignore
-        block.key,
-      );
+    setBellActive(isBlockWatched(block.key));
+  }, [block.key]);
+
+  useEffect(() => {
+    if (wasRunning.current && !running) {
+      const durationSec = block.startedAt && block.finishedAt
+        ? Math.max(0, Math.round((block.finishedAt - block.startedAt) / 1000))
+        : 0;
+      notifyCommandCompleted({
+        command: block.command,
+        exitCode: block.exitCode,
+        durationSec,
+        blockId: block.key,
+        inAppNotify: props.notify,
+      });
+      setBellActive(false);
     }
     wasRunning.current = running;
-  }, [running, bellActive, block.command, block.exitCode, block.key]);
+  }, [running, block.command, block.exitCode, block.key, block.startedAt, block.finishedAt, props.notify]);
 
   const toggleBell = async () => {
-    if (!bellActive) {
+    const next = !bellActive;
+    if (next) {
       await requestNotificationPermission();
     }
-    setBellActive(!bellActive);
+    setBlockWatched(block.key, next, {
+      command: block.command,
+      startedAt: block.startedAt ?? Date.now(),
+    });
+    setBellActive(next);
   };
 
   const lines = block.rendered?.lines ?? [];

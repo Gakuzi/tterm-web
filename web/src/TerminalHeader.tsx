@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Me, TerminalInfo } from "./api";
-import { Branch, Folder, Gear } from "./icons";
+import { Branch, Folder, FolderOpen, Gear, Upload } from "./icons";
 import { ModeToggle } from "./InputLine";
 import { ProjectAccessDialog } from "./ProjectAccessDialog";
 
@@ -18,12 +18,15 @@ interface Props {
   me: Me;
   onChooseMode: (mode: "line" | "classic") => void;
   notify: (text: string) => void;
+  onUploadClick?: () => void;
+  onSftpClick?: () => void;
 }
 
 export function TerminalHeader(props: Props) {
   const {
     terminalId, info, machineName, terminalLabel, where, running, away,
     isEnded, mode, noBlocks, me, onChooseMode, notify,
+    onUploadClick, onSftpClick,
   } = props;
   const [accessDialogOpen, setAccessDialogOpen] = useState(false);
 
@@ -60,6 +63,32 @@ export function TerminalHeader(props: Props) {
         </div>
 
         <div className="strip-right">
+          {!isEnded && onUploadClick && (
+            <button
+              type="button"
+              className="strip-btn-upload"
+              onClick={onUploadClick}
+              title={where ? `Загрузить файлы в ${where}` : "Загрузить файлы в терминал"} // i18n-ignore
+              aria-label="Загрузить файлы" // i18n-ignore
+            >
+              <Upload size={13} />
+              <span className="strip-btn-text">{/* i18n-ignore */}Загрузить</span>
+            </button>
+          )}
+
+          {!isEnded && onSftpClick && (
+            <button
+              type="button"
+              className="strip-btn-sftp"
+              onClick={onSftpClick}
+              title="Параметры SFTP / FTP подключения к окружению терминала" // i18n-ignore
+              aria-label="SFTP / FTP" // i18n-ignore
+            >
+              <FolderOpen size={13} />
+              <span className="strip-btn-text">{/* i18n-ignore */}SFTP/FTP</span>
+            </button>
+          )}
+
           {!isEnded && (
             <div className="strip-mode-toggle">
               <ModeToggle

@@ -15,6 +15,7 @@ import { list, useT, type Translate } from "./i18n";
 import { Close } from "./icons";
 import { PhotoDialog } from "./PhotoDialog";
 import { Group, Row } from "./SettingsRows";
+import { GitHubSection } from "./GitHubSection";
 
 /** What a photo may be when chosen: the page makes the 256-pixel JPEG of it
  * itself. */
@@ -277,6 +278,9 @@ export function AccountPane(props: {
           </Row>
         )}
       </Group>
+
+      {/* GitHub Integration for User Account */}
+      <GitHubSection notify={props.notify} />
 
       <Group title={t("account.delete_title")}>
         <Row label={t("account.delete")} note={t("account.delete_note", { email: support })}>

@@ -5,6 +5,7 @@ import {
 } from "./api";
 import { Check, Close, Copy, Person, Spark } from "./icons";
 import { useBriefly } from "./briefly";
+import { copyToClipboard } from "./clipboard";
 
 interface Props {
   terminalId: string;
@@ -76,12 +77,12 @@ export function TerminalAccessDialog(props: Props) {
     2
   );
 
-  const copyToClipboard = async (text: string, showFn: (v: boolean) => void) => {
-    try {
-      await navigator.clipboard.writeText(text);
+  const handleCopy = async (text: string, showFn: (v: boolean) => void) => {
+    const ok = await copyToClipboard(text);
+    if (ok) {
       showFn(true);
       notify("Скопировано в буфер обмена"); // i18n-ignore
-    } catch {
+    } else {
       showFn(false);
       notify("Не удалось скопировать"); // i18n-ignore
     }
@@ -236,7 +237,7 @@ export function TerminalAccessDialog(props: Props) {
                   <button
                     type="button"
                     className="copy-chip"
-                    onClick={() => void copyToClipboard(cliSnippet, showCopiedCli)}
+                    onClick={() => void handleCopy(cliSnippet, showCopiedCli)}
                   >
                     {copiedCli ? <Check size={12} /> : <Copy size={12} />}
                     <span>{copiedCli ? "Скопировано" : "Копировать"}</span> {/* i18n-ignore */}
@@ -249,7 +250,7 @@ export function TerminalAccessDialog(props: Props) {
                   <button
                     type="button"
                     className="copy-chip"
-                    onClick={() => void copyToClipboard(mcpConfigSnippet, showCopiedConfig)}
+                    onClick={() => void handleCopy(mcpConfigSnippet, showCopiedConfig)}
                   >
                     {copiedConfig ? <Check size={12} /> : <Copy size={12} />}
                     <span>{copiedConfig ? "Скопировано" : "Копировать"}</span> {/* i18n-ignore */}
@@ -274,7 +275,7 @@ export function TerminalAccessDialog(props: Props) {
                   <button
                     type="button"
                     className="button-accent"
-                    onClick={() => void copyToClipboard(shareUrl, showCopiedLink)}
+                    onClick={() => void handleCopy(shareUrl, showCopiedLink)}
                   >
                     {copiedLink ? <Check size={14} /> : <Copy size={14} />}
                     <span>{copiedLink ? "Скопировано" : "Копировать ссылку"}</span> {/* i18n-ignore */}

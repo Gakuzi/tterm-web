@@ -11,6 +11,7 @@
 // what was saved since.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { copyToClipboard } from "./clipboard";
 import {
   loadNote, moveNote, NoteConflict, NoteGone, refused, saveNote, SignedOut,
   tickNote, type Block, type Me, type Note, type Project, type Who,
@@ -691,12 +692,15 @@ export function NoteView(props: Props) {
   // Another project the person writes notes in: the note may go there.
   const elsewhere = props.projects.some((p) => p.id !== project?.id && writes(p));
 
-  const copyMarkdown = () => {
+  const copyMarkdown = async () => {
     const now = docRef.current;
     if (!now) return;
-    navigator.clipboard.writeText(toMarkdown(now.title, meaningful(now.blocks)))
-      .then(() => props.notify(t("note_view.copied_markdown")))
-      .catch(() => props.notify(t("note_view.no_copy")));
+    const ok = await copyToClipboard(toMarkdown(now.title, meaningful(now.blocks)));
+    if (ok) {
+      props.notify(t("note_view.copied_markdown"));
+    } else {
+      props.notify(t("note_view.no_copy"));
+    }
   };
   const move = (to: string) => {
     if (!note) return;

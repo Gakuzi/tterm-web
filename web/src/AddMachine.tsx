@@ -17,6 +17,8 @@ import { Check, Close, Computer, Copy, Download, Server } from "./icons";
 
 const POLL_MS = 1500;
 
+import { copyToClipboard } from "./clipboard";
+
 interface Props {
   projects: Project[];
   projectId: string;
@@ -123,10 +125,10 @@ export function AddMachine(props: Props) {
 
   const copy = async (text: string | null | undefined, done: () => void) => {
     if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
+    const ok = await copyToClipboard(text);
+    if (ok) {
       done();
-    } catch {
+    } else {
       notYet(t("add_machine.copy_failed"));
     }
   };

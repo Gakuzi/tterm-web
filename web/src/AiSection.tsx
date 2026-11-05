@@ -3,6 +3,7 @@
 // and team collaboration safety instructions (RBAC & Guard Rails).
 
 import { useState } from "react";
+import { copyToClipboard } from "./clipboard";
 import { Group, Row } from "./SettingsRows";
 import { Check, Close, Copy, Key, Lock, Spark, Warning } from "./icons";
 
@@ -63,11 +64,15 @@ export function AiSection(props: Props) {
     2
   );
 
-  const copy = (key: string, text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopied(key);
-    props.notify("Скопировано в буфер обмена"); // i18n-ignore
-    setTimeout(() => setCopied(null), 2000);
+  const copy = async (key: string, text: string) => {
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopied(key);
+      props.notify("Скопировано в буфер обмена"); // i18n-ignore
+      setTimeout(() => setCopied(null), 2000);
+    } else {
+      props.notify("Не удалось скопировать в буфер обмена"); // i18n-ignore
+    }
   };
 
   const handleRevoke = () => {

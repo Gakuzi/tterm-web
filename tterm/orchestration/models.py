@@ -443,3 +443,46 @@ class NotificationDTO(BaseModel):
     entity_id: Optional[str] = None
     read: bool = False
     created_at: str = ""
+
+
+class WatchedProcessDTO(BaseModel):
+    id: str
+    terminal_id: str
+    block_id: Optional[str] = None
+    command: str
+    user_id: str
+    initiator_device_id: Optional[str] = None
+    created_at: str = ""
+    status: str = "running"           # "running", "completed", "failed"
+    exit_code: Optional[int] = None
+    duration_sec: Optional[float] = None
+    completed_at: Optional[str] = None
+    webhook_url: Optional[str] = None
+
+
+class DeviceRegistrationDTO(BaseModel):
+    device_id: str
+    name: str
+    user_id: str
+    push_subscription: Optional[Dict[str, Any]] = None
+    last_seen: str = ""
+
+
+class WatchRequestDTO(BaseModel):
+    terminal_id: str
+    block_id: Optional[str] = None
+    command: str = ""
+    user_id: str = "default_user"
+    initiator_device_id: Optional[str] = None
+    webhook_url: Optional[str] = None
+
+
+class CommandCompletedDTO(BaseModel):
+    terminal_id: str
+    command: str
+    exit_code: int = 0
+    duration_sec: float = 0.0
+    block_id: Optional[str] = None
+    user_id: Optional[str] = "default_user"
+    initiator_device_id: Optional[str] = None
+

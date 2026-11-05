@@ -1665,3 +1665,198 @@ export async function moveToCloud(body: { project: string;
   keys: { path: string; passphrase?: string }[] }): Promise<MoveResult[]> {
   return (await (await check(await fetch("/api/app/move", change("POST", body)))).json()).results;
 }
+
+export interface UploadedFileRecord {
+  id: string;
+  terminal_id: string;
+  filename: string;
+  size: number;
+  path: string;
+  target_dir: string;
+  uploaded_at: string;
+}
+
+export interface UploadResponse {
+  ok: boolean;
+  terminal_id: string;
+  count: number;
+  target_dir?: string | null;
+  files: UploadedFileRecord[];
+}
+
+export interface SftpCredentials {
+  host: string;
+  port: number;
+  username: string;
+  sftp_url: string;
+  web_dav_hint: string;
+  default_dir: string;
+  terminal_id: string;
+  machine_id?: string | null;
+  auth_methods: string[];
+  command_hint: string;
+  ftp_command_hint?: string;
+}
+
+export async function getTerminalSftpInfo(terminalId: string, machineId?: string): Promise<SftpCredentials> {
+  const query = machineId ? `?machine_id=${encodeURIComponent(machineId)}` : "";
+  const response = await fetch(`/api/orchestration/terminals/${terminalId}/sftp-info${query}`, { cache: "no-store" });
+  const data = await (await check(response)).json();
+  return data.sftp;
+}
+
+export function uploadFilesToTerminal(
+  terminalId: string,
+  files: File[],
+  targetDir?: string,
+  onProgress?: (percent: number) => void
+): Promise<UploadResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `/api/orchestration/terminals/${terminalId}/upload`);
+    xhr.setRequestHeader("x-tterm", "1");
+
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const percent = Math.round((e.loaded / e.total) * 100);
+          onProgress(percent);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          resolve(data);
+        } catch {
+          reject(new Error("Не удалось обработать ответ сервера")); // i18n-ignore
+        }
+      } else {
+        reject(new Error(`Ошибка загрузки: ${xhr.status} ${xhr.statusText}`)); // i18n-ignore
+      }
+    };
+
+    xhr.onerror = () => {
+      reject(new Error("Сетевая ошибка при загрузке файлов")); // i18n-ignore
+    };
+
+    const formData = new FormData();
+    if (targetDir) {
+      formData.append("target_dir", targetDir);
+    }
+    for (const file of files) {
+      formData.append("files", file, file.name);
+    }
+
+    xhr.send(formData);
+  });
+}
+
+// ---------------------------------------------------------------------- GitHub OAuth & API Orchestration
+
+export interface GitHubStatus {
+  ok: boolean;
+  is_authenticated: boolean;
+  auth_type?: string;
+  username?: string;
+  name?: string;
+  email?: string;
+  avatar_url?: string;
+  html_url?: string;
+  public_repos?: number;
+  total_private_repos?: number;
+  masked_token?: string;
+  scopes?: string[];
+  connected_at?: string;
+  oauth_configured?: boolean;
+  client_id?: string | null;
+}
+
+export interface GitHubRepo {
+  id: number;
+  name: string;
+  full_name: string;
+  html_url: string;
+  clone_url: string;
+  ssh_url: string;
+  private: boolean;
+  default_branch: string;
+  description?: string;
+  updated_at?: string;
+}
+
+export async function getGitHubStatus(): Promise<GitHubStatus> {
+  const response = await fetch("/api/orchestration/github/status", { cache: "no-store" });
+  return (await check(response)).json();
+}
+
+export async function getGitHubAuthUrl(redirectUri: string, state = "tterm-gh-state"): Promise<{ ok: boolean; auth_url: string }> {
+  const query = `?redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
+  const response = await fetch(`/api/orchestration/github/auth-url${query}`, { cache: "no-store" });
+  return (await check(response)).json();
+}
+
+export async function connectGitHubToken(token: string): Promise<GitHubStatus> {
+  const response = await fetch("/api/orchestration/github/connect-token", change("POST", { token }));
+  return (await check(response)).json();
+}
+
+export async function configureGitHubOAuthApp(clientId: string, clientSecret: string): Promise<{ ok: boolean; client_id: string }> {
+  const response = await fetch("/api/orchestration/github/configure-app", change("POST", { client_id: clientId, client_secret: clientSecret }));
+  return (await check(response)).json();
+}
+
+export async function githubOAuthCallback(code: string, redirectUri: string): Promise<GitHubStatus> {
+  const query = `?code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+  const response = await fetch(`/api/orchestration/github/callback${query}`, { cache: "no-store" });
+  return (await check(response)).json();
+}
+
+export async function disconnectGitHub(): Promise<{ ok: boolean }> {
+  const response = await fetch("/api/orchestration/github/disconnect", change("POST", {}));
+  return (await check(response)).json();
+}
+
+export async function listGitHubRepositories(): Promise<GitHubRepo[]> {
+  const response = await fetch("/api/orchestration/github/repos", { cache: "no-store" });
+  const data = await (await check(response)).json();
+  return data.repos || [];
+}
+
+export async function createGitHubRepository(params: {
+  name: string;
+  description?: string;
+  private?: boolean;
+  project_id?: string;
+  terminal_id?: string;
+}): Promise<any> {
+  const response = await fetch("/api/orchestration/github/create-repo", change("POST", params));
+  return (await check(response)).json();
+}
+
+export async function createGitHubPullRequest(params: {
+  owner?: string;
+  repo: string;
+  title: string;
+  body?: string;
+  head_branch: string;
+  base_branch?: string;
+}): Promise<any> {
+  const response = await fetch("/api/orchestration/github/create-pr", change("POST", params));
+  return (await check(response)).json();
+}
+
+export async function getGitHubTerminalSetup(): Promise<{
+  ok: boolean;
+  is_authenticated: boolean;
+  setup_command: string;
+  username?: string;
+  email?: string;
+}> {
+  const response = await fetch("/api/orchestration/github/terminal-setup", { cache: "no-store" });
+  return (await check(response)).json();
+}
+
+

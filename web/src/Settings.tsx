@@ -30,11 +30,16 @@ import { AccountPane, planLine, PlanPane, SUPPORT } from "./Account";
 import { DevicesSection } from "./Devices";
 import { LANGUAGES, useT, type Lang } from "./i18n";
 import {
-  Card, ChevronDown, ChevronLeft, ChevronRight, Close, Computer, Devices, Download, Gear,
-  Key, Monitor, Moon, People, Person, Search, Spark, Sun,
+  Bell, Card, ChevronDown, ChevronLeft, ChevronRight, Close, Computer, Devices, Download, Gear,
+  GitHub, Key, Monitor, Moon, People, Person, Search, Spark, Sun,
 } from "./icons";
+import {
+  getDeviceName, getNotificationSettings, playNotificationChime,
+  requestNotificationPermission, saveNotificationSettings, showPushNotification,
+} from "./notifications";
 import { KeysSection } from "./Keys.tsx";
 import { AiSection } from "./AiSection";
+import { GitHubSection } from "./GitHubSection";
 import { ProjectCollaboration } from "./ProjectCollaboration";
 import { InApp } from "./local";
 import { Group, Row, SearchWords } from "./SettingsRows";
@@ -99,9 +104,31 @@ const TINTS: { value: ProjectTint; label: string }[] = [
   { value: "block", label: "settings.tint_block" },
 ];
 
-/** Settings › General: how tTerm looks, and its language. */
+/** Settings › General: how tTerm looks, its language, and notification bot. */
 function GeneralPane(props: Props) {
   const t = useT();
+  const [notifySettings, setNotifySettings] = useState(getNotificationSettings);
+  const [permission, setPermission] = useState<NotificationPermission>(() =>
+    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default"
+  );
+  const [devicesCount, setDevicesCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    void fetch("/api/orchestration/notifications/devices")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok && Array.isArray(d.devices)) {
+          setDevicesCount(d.devices.length);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const updateNotify = (patch: Partial<ReturnType<typeof getNotificationSettings>>) => {
+    const updated = saveNotificationSettings(patch);
+    setNotifySettings(updated);
+  };
+
   return (
     <>
       <Group title={t("settings.appearance")}
@@ -131,6 +158,104 @@ function GeneralPane(props: Props) {
           </div>
         </Row>
       </Group>
+
+      <Group title={"Уведомления и Веб-Бот" /* i18n-ignore */}
+        note={"Оповещения о процессах терминала на всех устройствах (MacBook, iPhone, Android)" /* i18n-ignore */}>
+        <Row label={"Уведомления" /* i18n-ignore */}
+          note={"Включить push-уведомления и оповещения о длительных командах" /* i18n-ignore */}
+          words={"уведомления push включить выключить" /* i18n-ignore */}>
+          <div className="segmented" role="group" aria-label={"Уведомления" /* i18n-ignore */}>
+            <button type="button" aria-pressed={notifySettings.enabled}
+              onClick={() => updateNotify({ enabled: true })}>
+              <Bell size={14} />
+              {"Включены" /* i18n-ignore */}
+            </button>
+            <button type="button" aria-pressed={!notifySettings.enabled}
+              onClick={() => updateNotify({ enabled: false })}>
+              {"Выключены" /* i18n-ignore */}
+            </button>
+          </div>
+        </Row>
+
+        <Row label={"Звуковой сигнал" /* i18n-ignore */}
+          note={"Воспроизведение гармонического сигнала при завершении команд" /* i18n-ignore */}
+          words={"звук сигнал бип колокольчик" /* i18n-ignore */}>
+          <div className="segmented" role="group" aria-label={"Звуковой сигнал" /* i18n-ignore */}>
+            <button type="button" aria-pressed={notifySettings.sound}
+              onClick={() => {
+                updateNotify({ sound: true });
+                playNotificationChime(true);
+              }}>
+              {"Со звуком 🔔" /* i18n-ignore */}
+            </button>
+            <button type="button" aria-pressed={!notifySettings.sound}
+              onClick={() => updateNotify({ sound: false })}>
+              {"Без звука 🔕" /* i18n-ignore */}
+            </button>
+          </div>
+        </Row>
+
+        <Row label={"Порог длительности" /* i18n-ignore */}
+          note={"Автоматически уведомлять о командах, которые длятся дольше порога" /* i18n-ignore */}
+          words={"порог секунд длительные процессы время таймаут" /* i18n-ignore */}>
+          <div className="segmented" role="group" aria-label={"Порог секунд" /* i18n-ignore */}>
+            {[
+              { val: 5, label: "5 сек" /* i18n-ignore */ },
+              { val: 10, label: "10 сек" /* i18n-ignore */ },
+              { val: 30, label: "30 сек" /* i18n-ignore */ },
+              { val: 60, label: "60 сек" /* i18n-ignore */ },
+            ].map((p) => (
+              <button key={p.val} type="button" aria-pressed={notifySettings.thresholdSec === p.val}
+                onClick={() => updateNotify({ thresholdSec: p.val })}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </Row>
+
+        <Row label={"Системный Push" /* i18n-ignore */}
+          note={permission === "granted"
+            ? "Системные push-уведомления браузера разрешены" /* i18n-ignore */
+            : permission === "denied"
+            ? "Уведомления заблокированы в настройках браузера" /* i18n-ignore */
+            : "Требуется разрешение браузера для отправки системных push" /* i18n-ignore */}
+          words={"браузер push разрешение система" /* i18n-ignore */}>
+          {permission === "granted" ? (
+            <button type="button" className="button-ghost small"
+              onClick={() => showPushNotification(
+                "tTerm: Тестовое уведомление" /* i18n-ignore */,
+                "Уведомления и звуковой сигнал настроены успешно!" /* i18n-ignore */
+              )}>
+              {"Тестовый пуш 🔔" /* i18n-ignore */}
+            </button>
+          ) : (
+            <button type="button" className="button small"
+              onClick={async () => {
+                const ok = await requestNotificationPermission();
+                if (typeof window !== "undefined" && "Notification" in window) {
+                  setPermission(Notification.permission);
+                }
+                if (ok) {
+                  showPushNotification(
+                    "tTerm: Разрешено" /* i18n-ignore */,
+                    "Уведомления успешно активированы!" /* i18n-ignore */
+                  );
+                }
+              }}>
+              {"Запросить разрешение" /* i18n-ignore */}
+            </button>
+          )}
+        </Row>
+
+        <Row label={"Multi-Device Broadcast" /* i18n-ignore */}
+          note={`Текущее устройство: ${getDeviceName()} • Онлайн подключений: ${devicesCount ?? 1}` /* i18n-ignore */}
+          words={"устройства iphone macbook broadcast stream мультидевайс" /* i18n-ignore */}>
+          <span style={{ fontSize: 12, color: "#10b981", fontWeight: 500 }}>
+            {"Синхронизация активна 📡" /* i18n-ignore */}
+          </span>
+        </Row>
+      </Group>
+
       <Group title={t("language.item")}>
         <Row label={t("settings.language")} note={t("settings.language_note")}
           words={LANGUAGES.map((l) => l.name).join(" ")}>
@@ -186,7 +311,8 @@ export function Settings(props: Props) {
       ...THEMES.map((m) => t(m.label)),
       t("settings.tints"), t("settings.tints_note"), ...TINTS.map((m) => t(m.label)),
       t("language.item"), t("settings.language"), t("settings.language_note"),
-      ...LANGUAGES.map((l) => l.name)]);
+      ...LANGUAGES.map((l) => l.name),
+      "уведомления", "звук", "сигнал", "долго", "процессы", "notifications", "sound", "bell", "push", "таймаут"]); // i18n-ignore
     const preferences = local ? [general] : [
       general,
       item("account", <Person size={18} />, t("account.title"), [
@@ -215,6 +341,13 @@ export function Settings(props: Props) {
             t("devices.forget_all"), t("settings.devices_words")]),
           item("ai", <Spark size={18} />, "AI & MCP", [ // i18n-ignore
             "ai", "mcp", "agents", "cursor", "claude", "терминал", "ии"]), // i18n-ignore
+        ],
+      });
+      out.push({
+        title: "Интеграции", // i18n-ignore
+        items: [
+          item("github", <GitHub size={18} />, "GitHub", [ // i18n-ignore
+            "github", "гитхаб", "oauth", "репозиторий", "токен", "pat", "коммиты", "ветки", "pr"]), // i18n-ignore
         ],
       });
     }
@@ -359,6 +492,8 @@ export function Settings(props: Props) {
         );
       case "ai":
         return <AiSection notify={props.notify} />;
+      case "github":
+        return <GitHubSection notify={props.notify} />;
     }
   };
 

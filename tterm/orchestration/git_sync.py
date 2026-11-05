@@ -83,6 +83,14 @@ class GitSyncManager:
         cfg = self.get_config(project_id)
 
         # Build clean branch name: e.g. term/1-evgeniy or term/t-89a1
+        if not user_name:
+            try:
+                from .github_app import github_manager
+                st = github_manager.get_auth_status()
+                if st.get("is_authenticated") and st.get("username"):
+                    user_name = st["username"]
+            except Exception:
+                pass
         clean_user = re.sub(r"[^a-zA-Z0-9]", "", user_name).lower() if user_name else "user"
         clean_label = re.sub(r"[^a-zA-Z0-9]", "", terminal_label).lower() if terminal_label else ""
 
@@ -106,16 +114,33 @@ class GitSyncManager:
         return dto
 
     def build_branch_setup_script(self, branch_name: str, base_branch: str = "main") -> str:
-        """Generates shell commands to ensure worktree switches to this terminal's branch."""
+        """Generates shell commands to ensure worktree switches to this terminal's branch and sets author identity."""
+        git_setup = ""
+        try:
+            from .github_app import github_manager
+            git_setup = github_manager.get_terminal_git_setup()
+        except Exception:
+            pass
+
+        setup_prefix = f"{git_setup} && " if git_setup else ""
         return (
-            f'if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then '
+            f'{setup_prefix}if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then '
             f'  git rev-parse --verify "{branch_name}" >/dev/null 2>&1 && git switch "{branch_name}" || '
             f'  git switch -c "{branch_name}" 2>/dev/null || git checkout -b "{branch_name}" 2>/dev/null; '
             f'fi'
         )
 
-    def build_action_commit_command(self, command: str, author_name: str, exit_code: int = 0) -> str:
-        """Generates a shell command to auto-commit a terminal action."""
+    def build_action_commit_command(self, command: str, author_name: str = "", exit_code: int = 0) -> str:
+        """Generates a shell command to auto-commit a terminal action on behalf of user."""
+        if not author_name:
+            try:
+                from .github_app import github_manager
+                st = github_manager.get_auth_status()
+                if st.get("is_authenticated"):
+                    author_name = st.get("name") or st.get("username") or "user"
+            except Exception:
+                author_name = "user"
+
         # Sanitize command for commit message
         safe_cmd = re.sub(r"[\"'\n\r\\]", " ", command).strip()[:80]
         status = "ok" if exit_code == 0 else f"exit {exit_code}"
@@ -133,6 +158,52 @@ class GitSyncManager:
             dto.last_action = command[:80]
             return dto
         return None
+
+    def create_repository(
+        self,
+        project_id: str,
+        repo_name: str,
+        visibility: str = "public",
+        scope: str = "project",
+        terminal_id: Optional[str] = None,
+        provider: str = "github",
+    ) -> Dict[str, Any]:
+        """Initializes a new repository target and binds it to project or terminal."""
+        clean_name = re.sub(r"[^a-zA-Z0-9_\-\.]", "-", repo_name.strip()).strip("-")
+        if not clean_name:
+            clean_name = f"tterm-repo-{project_id[:6]}"
+
+        owner = "Gakuzi"
+        try:
+            from .github_app import github_manager
+            st = github_manager.get_auth_status()
+            if st.get("is_authenticated") and st.get("username"):
+                owner = st["username"]
+        except Exception:
+            pass
+
+        repo_url = f"https://github.com/{owner}/{clean_name}.git"
+
+        cfg = self.get_config(project_id)
+        cfg.repo_url = repo_url
+        self.set_config(cfg)
+
+        branch_info = None
+        if terminal_id:
+            branch_info = self.get_or_create_terminal_branch(
+                project_id=project_id,
+                terminal_id=terminal_id,
+                terminal_label=clean_name,
+            )
+
+        return {
+            "ok": True,
+            "repo_url": repo_url,
+            "repo_name": clean_name,
+            "scope": scope,
+            "branch": branch_info,
+            "config": cfg,
+        }
 
 
 git_sync_manager = GitSyncManager()

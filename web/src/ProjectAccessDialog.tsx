@@ -8,6 +8,7 @@ import {
   Pencil, People, Plus, Restart, Server, Spark, Trash
 } from "./icons";
 import { useBriefly } from "./briefly";
+import { copyToClipboard } from "./clipboard";
 import { DisruptiveActionModal, type ActiveProcess } from "./DisruptiveActionModal";
 
 export interface ProjectMember {
@@ -100,16 +101,6 @@ export function ProjectAccessDialog(props: Props) {
       terminals_allowed: [terminalId],
       containers_allowed: ["tterm-server-tterm-1"],
       ai_mode: "guard",
-    },
-    {
-      id: "dlg-author",
-      name: "Денис Герасименко (Автор tTerm)", // i18n-ignore
-      email: "denis@tterm.net",
-      role: "node_admin",
-      is_ai: false,
-      terminals_allowed: ["*"],
-      containers_allowed: ["*"],
-      ai_mode: "execute",
     },
   ]);
 
@@ -626,10 +617,14 @@ export function ProjectAccessDialog(props: Props) {
                 <button
                   type="button"
                   className="btn-secondary-sm copy-btn"
-                  onClick={() => {
-                    navigator.clipboard.writeText(inviteLink);
-                    showCopiedInvite(true);
-                    notify("Ссылка скопирована в буфер обмена"); // i18n-ignore
+                  onClick={async () => {
+                    const ok = await copyToClipboard(inviteLink);
+                    if (ok) {
+                      showCopiedInvite(true);
+                      notify("Ссылка скопирована в буфер обмена"); // i18n-ignore
+                    } else {
+                      notify("Не удалось скопировать ссылку"); // i18n-ignore
+                    }
                   }}
                 >
                   {copiedInvite ? <Check size={14} /> : <Copy size={14} />}
@@ -864,10 +859,14 @@ export function ProjectAccessDialog(props: Props) {
                 <button
                   type="button"
                   className="btn-secondary-sm copy-btn"
-                  onClick={() => {
-                    navigator.clipboard.writeText(mcpConfigSnippet);
-                    showCopiedSnippet(true);
-                    notify("Конфигурация скопирована"); // i18n-ignore
+                  onClick={async () => {
+                    const ok = await copyToClipboard(mcpConfigSnippet);
+                    if (ok) {
+                      showCopiedSnippet(true);
+                      notify("Конфигурация скопирована"); // i18n-ignore
+                    } else {
+                      notify("Не удалось скопировать конфигурацию"); // i18n-ignore
+                    }
                   }}
                 >
                   {copiedSnippet ? <Check size={14} /> : <Copy size={14} />}
