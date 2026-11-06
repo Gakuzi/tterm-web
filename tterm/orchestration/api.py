@@ -5,6 +5,9 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import datetime as dt
+import json
+import secrets
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -546,6 +549,44 @@ class ProjectMemberDTO(BaseModel):
     containers_allowed: List[str] = Field(default_factory=lambda: ["*"])
     ai_mode: str = "guard"  # "execute", "guard", "readonly"
 
+
+class CreateProjectInviteDTO(BaseModel):
+    role: str = "member"  # "admin", "member", "observer"
+    expires_hours: int = 168  # 7 days default, 0 for never
+    max_uses: Optional[int] = None
+    allowed_terminals: List[str] = Field(default_factory=lambda: ["*"])
+
+
+def _extract_pool_from_request(request: Request) -> Any:
+    pool = getattr(getattr(request, "app", None), "state", None)
+    pool_obj = getattr(pool, "pool", None) if pool else None
+    if not pool_obj:
+        try:
+            from ..core.accounts import pool as default_pool
+            pool_obj = default_pool
+        except Exception:
+            pass
+    return pool_obj
+
+
+async def _extract_current_user(request: Request, pool: Any = None) -> Any:
+    if not pool:
+        pool = _extract_pool_from_request(request)
+    if not pool:
+        return None
+    try:
+        from ..core import auth
+        token = request.cookies.get(auth.SESSION_COOKIE) if hasattr(request, "cookies") else None
+        if not token and hasattr(request, "headers"):
+            token = request.headers.get("x-session-token")
+        if not token:
+            return None
+        sess = await auth.session(pool, token, touch=False)
+        return sess.person if sess else None
+    except Exception:
+        return None
+
+
 _DEFAULT_MEMBERS = [
     {
         "id": "owner-user",
@@ -574,18 +615,101 @@ _PROJECT_MEMBERS_STORE: Dict[str, List[Dict[str, Any]]] = {}
 
 
 @router.get("/projects/{project_id}/members")
-async def list_project_members(project_id: str):
+async def list_project_members(project_id: str, request: Request = None):
     """Returns members of the project workspace with their assigned roles and scopes."""
-    members = _PROJECT_MEMBERS_STORE.get(project_id)
-    if members is None:
-        members = [dict(m) for m in _DEFAULT_MEMBERS]
-        _PROJECT_MEMBERS_STORE[project_id] = members
+    pool = _extract_pool_from_request(request)
+    members = []
+
+    if pool:
+        try:
+            proj_uuid = uuid.UUID(project_id)
+            rows = await pool.fetch(
+                """
+                SELECT pm.user_id, pm.role, pm.until, pm.created_at, u.name, u.email,
+                       (pm.role = 'owner') AS is_owner
+                FROM project_members pm
+                JOIN users u ON u.id = pm.user_id
+                WHERE pm.project_id = $1
+                  AND (pm.until IS NULL OR pm.until > now())
+                ORDER BY (pm.role = 'owner') DESC, pm.created_at ASC
+                """,
+                proj_uuid
+            )
+            for r in rows:
+                members.append({
+                    "id": str(r["user_id"]),
+                    "name": r["name"] or r["email"],
+                    "email": r["email"],
+                    "role": r["role"],
+                    "is_owner": bool(r["is_owner"]),
+                    "is_ai": False,
+                    "terminals_allowed": ["*"],
+                    "containers_allowed": ["*"],
+                    "ai_mode": "execute",
+                    "blocked": False,
+                    "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+                })
+        except Exception:
+            pass
+
+    # If DB returned nothing or not UUID, check in-memory store
+    if not members:
+        in_mem = _PROJECT_MEMBERS_STORE.get(project_id)
+        if in_mem is None:
+            in_mem = [dict(m) for m in _DEFAULT_MEMBERS]
+            _PROJECT_MEMBERS_STORE[project_id] = in_mem
+        members = [dict(m) for m in in_mem]
+
+    # Append active single AI Assistant for this project
+    from .ai_sessions import ai_agent_manager
+    ai_sess_list = ai_agent_manager.list_sessions(project_id)
+    if ai_sess_list:
+        primary_ai = ai_sess_list[0]
+        members.append({
+            "id": primary_ai["session_id"],
+            "name": primary_ai["agent_name"],
+            "email": "ai@antigravity.internal",
+            "role": primary_ai["role"],
+            "is_owner": False,
+            "is_ai": True,
+            "terminals_allowed": primary_ai["allowed_terminals"],
+            "containers_allowed": ["*"],
+            "ai_mode": primary_ai["ai_mode"],
+            "blocked": primary_ai["blocked"],
+        })
+
     return {"ok": True, "members": members}
 
 
 @router.post("/projects/{project_id}/members")
-async def add_or_update_project_member(project_id: str, data: ProjectMemberDTO):
+async def add_or_update_project_member(project_id: str, data: ProjectMemberDTO, request: Request = None):
     """Adds a new member or updates an existing member in the project."""
+    pool = _extract_pool_from_request(request)
+    if pool:
+        try:
+            proj_uuid = uuid.UUID(project_id)
+            user_uuid = None
+            try:
+                user_uuid = uuid.UUID(data.id)
+            except Exception:
+                if data.email:
+                    user_uuid = await pool.fetchval("SELECT id FROM users WHERE email = $1", data.email)
+            if user_uuid:
+                db_role = data.role
+                if db_role not in ("owner", "admin", "member", "observer"):
+                    db_role = "admin" if "admin" in db_role else "member"
+                await pool.execute(
+                    """
+                    INSERT INTO project_members (project_id, user_id, role, created_at)
+                    VALUES ($1, $2, $3, now())
+                    ON CONFLICT (project_id, user_id)
+                    DO UPDATE SET role = EXCLUDED.role
+                    """,
+                    proj_uuid, user_uuid, db_role
+                )
+        except Exception:
+            pass
+
     members = _PROJECT_MEMBERS_STORE.get(project_id)
     if members is None:
         members = [dict(m) for m in _DEFAULT_MEMBERS]
@@ -604,8 +728,20 @@ async def add_or_update_project_member(project_id: str, data: ProjectMemberDTO):
 
 
 @router.delete("/projects/{project_id}/members/{user_id}")
-async def remove_project_member(project_id: str, user_id: str):
+async def remove_project_member(project_id: str, user_id: str, request: Request = None):
     """Removes a member from the project workspace."""
+    pool = _extract_pool_from_request(request)
+    if pool:
+        try:
+            proj_uuid = uuid.UUID(project_id)
+            user_uuid = uuid.UUID(user_id)
+            await pool.execute(
+                "DELETE FROM project_members WHERE project_id = $1 AND user_id = $2 AND role != 'owner'",
+                proj_uuid, user_uuid
+            )
+        except Exception:
+            pass
+
     members = _PROJECT_MEMBERS_STORE.get(project_id)
     if members is None:
         members = [dict(m) for m in _DEFAULT_MEMBERS]
@@ -615,8 +751,23 @@ async def remove_project_member(project_id: str, user_id: str):
 
 
 @router.patch("/projects/{project_id}/members/{user_id}")
-async def update_member_permissions(project_id: str, user_id: str, payload: Dict[str, Any]):
+async def update_member_permissions(project_id: str, user_id: str, payload: Dict[str, Any], request: Request = None):
     """Updates roles, terminals_allowed or containers_allowed for a member."""
+    pool = _extract_pool_from_request(request)
+    if pool and "role" in payload:
+        try:
+            proj_uuid = uuid.UUID(project_id)
+            user_uuid = uuid.UUID(user_id)
+            db_role = payload["role"]
+            if db_role not in ("owner", "admin", "member", "observer"):
+                db_role = "admin" if "admin" in db_role else "member"
+            await pool.execute(
+                "UPDATE project_members SET role = $3 WHERE project_id = $1 AND user_id = $2 AND role != 'owner'",
+                proj_uuid, user_uuid, db_role
+            )
+        except Exception:
+            pass
+
     members = _PROJECT_MEMBERS_STORE.get(project_id)
     if members is None:
         members = [dict(m) for m in _DEFAULT_MEMBERS]
@@ -638,8 +789,260 @@ async def update_member_permissions(project_id: str, user_id: str, payload: Dict
             updated = m
             break
     if not updated:
-        raise HTTPException(status_code=404, detail="Member not found")
+        updated = {"id": user_id, **payload}
     return {"ok": True, "member": updated}
+
+
+# ---------------------------------------------------------------------- Project Invites System
+@router.post("/projects/{project_id}/invites")
+async def create_project_invite(project_id: str, data: CreateProjectInviteDTO = None, request: Request = None):
+    """Creates a persistent invite link for a project."""
+    pool = _extract_pool_from_request(request)
+    current_user = await _extract_current_user(request, pool)
+    data = data or CreateProjectInviteDTO()
+
+    token = f"tt_inv_{secrets.token_urlsafe(16)}"
+    now = dt.datetime.now(dt.timezone.utc)
+    expires_at = (now + dt.timedelta(hours=data.expires_hours)) if data.expires_hours > 0 else None
+
+    # Base URL from request or fallback
+    base_url = str(request.base_url).rstrip("/") if request else "http://localhost:8290"
+    invite_url = f"{base_url}/#invite={token}"
+
+    db_role = data.role
+    if db_role not in ("admin", "member", "observer"):
+        db_role = "member"
+
+    invite_id = str(uuid.uuid4())
+    if pool and current_user:
+        try:
+            proj_uuid = uuid.UUID(project_id)
+            # Permission check: current user must be owner or admin in this project
+            caller_role = await pool.fetchval(
+                """
+                SELECT role FROM project_members
+                WHERE project_id = $1 AND user_id = $2
+                  AND (until IS NULL OR until > now())
+                """,
+                proj_uuid, current_user.id
+            )
+            if caller_role not in ("owner", "admin"):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Только владелец или администратор может создавать приглашения в проект")
+
+            row = await pool.fetchrow(
+                """
+                INSERT INTO project_invites (
+                    project_id, created_by, token, role, max_uses, uses_count,
+                    expires_at, allowed_terminals, created_at
+                )
+                VALUES ($1, $2, $3, $4, $5, 0, $6, $7::jsonb, now())
+                RETURNING id, project_id, token, role, max_uses, uses_count, expires_at, created_at
+                """,
+                proj_uuid, current_user.id, token, db_role, data.max_uses, expires_at,
+                json.dumps(data.allowed_terminals)
+            )
+            if row:
+                invite_id = str(row["id"])
+        except HTTPException:
+            raise
+        except Exception as exc:
+            pass
+
+    return {
+        "ok": True,
+        "invite": {
+            "id": invite_id,
+            "project_id": project_id,
+            "token": token,
+            "url": invite_url,
+            "role": db_role,
+            "expires_at": expires_at.isoformat() if expires_at else None,
+            "max_uses": data.max_uses,
+            "uses_count": 0,
+            "allowed_terminals": data.allowed_terminals,
+        }
+    }
+
+
+@router.get("/projects/{project_id}/invites")
+async def list_project_invites(project_id: str, request: Request = None):
+    """Lists active invitations for a project."""
+    pool = _extract_pool_from_request(request)
+    invites = []
+    base_url = str(request.base_url).rstrip("/") if request else "http://localhost:8290"
+
+    if pool:
+        try:
+            proj_uuid = uuid.UUID(project_id)
+            rows = await pool.fetch(
+                """
+                SELECT pi.id, pi.project_id, pi.token, pi.role, pi.max_uses, pi.uses_count,
+                       pi.expires_at, pi.allowed_terminals, pi.created_at, u.name AS creator_name
+                FROM project_invites pi
+                JOIN users u ON u.id = pi.created_by
+                WHERE pi.project_id = $1
+                  AND (pi.expires_at IS NULL OR pi.expires_at > now())
+                  AND (pi.max_uses IS NULL OR pi.uses_count < pi.max_uses)
+                ORDER BY pi.created_at DESC
+                """,
+                proj_uuid
+            )
+            for r in rows:
+                invites.append({
+                    "id": str(r["id"]),
+                    "project_id": str(r["project_id"]),
+                    "token": r["token"],
+                    "url": f"{base_url}/#invite={r['token']}",
+                    "role": r["role"],
+                    "max_uses": r["max_uses"],
+                    "uses_count": r["uses_count"],
+                    "expires_at": r["expires_at"].isoformat() if r["expires_at"] else None,
+                    "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+                    "creator_name": r["creator_name"],
+                })
+        except Exception:
+            pass
+
+    return {"ok": True, "invites": invites}
+
+
+@router.delete("/projects/{project_id}/invites/{invite_id}")
+async def revoke_project_invite(project_id: str, invite_id: str, request: Request = None):
+    """Revokes / deletes an invitation."""
+    pool = _extract_pool_from_request(request)
+    if pool:
+        try:
+            proj_uuid = uuid.UUID(project_id)
+            inv_uuid = uuid.UUID(invite_id)
+            await pool.execute(
+                "DELETE FROM project_invites WHERE id = $1 AND project_id = $2",
+                inv_uuid, proj_uuid
+            )
+        except Exception:
+            pass
+
+    return {"ok": True, "revoked_id": invite_id}
+
+
+@router.get("/invites/{token}")
+async def validate_invite_token(token: str, request: Request = None):
+    """Public endpoint to inspect an invite token and retrieve project details."""
+    pool = _extract_pool_from_request(request)
+    if not pool:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="База данных временно недоступна")
+
+    clean_tok = token.strip()
+    row = await pool.fetchrow(
+        """
+        SELECT pi.id, pi.project_id, pi.token, pi.role, pi.max_uses, pi.uses_count,
+               pi.expires_at, pi.allowed_terminals, pi.created_at,
+               p.name AS project_name, p.code AS project_code, p.color AS project_color,
+               u.name AS creator_name, u.email AS creator_email
+        FROM project_invites pi
+        JOIN projects p ON p.id = pi.project_id
+        JOIN users u ON u.id = pi.created_by
+        WHERE pi.token = $1 AND p.deleted_at IS NULL
+        """,
+        clean_tok
+    )
+    if not row:
+        return {"ok": False, "valid": False, "error": "Ссылка приглашения недействительна или была отозвана"}
+
+    now = dt.datetime.now(dt.timezone.utc)
+    if row["expires_at"] and row["expires_at"] < now:
+        return {"ok": False, "valid": False, "error": "Срок действия ссылки-приглашения истек"}
+
+    if row["max_uses"] is not None and row["uses_count"] >= row["max_uses"]:
+        return {"ok": False, "valid": False, "error": "Лимит использований этой ссылки исчерпан"}
+
+    allowed_terms = ["*"]
+    if row["allowed_terminals"]:
+        try:
+            allowed_terms = json.loads(row["allowed_terminals"]) if isinstance(row["allowed_terminals"], str) else row["allowed_terminals"]
+        except Exception:
+            pass
+
+    return {
+        "ok": True,
+        "valid": True,
+        "invite": {
+            "id": str(row["id"]),
+            "token": row["token"],
+            "role": row["role"],
+            "expires_at": row["expires_at"].isoformat() if row["expires_at"] else None,
+            "max_uses": row["max_uses"],
+            "uses_count": row["uses_count"],
+            "allowed_terminals": allowed_terms,
+        },
+        "project": {
+            "id": str(row["project_id"]),
+            "name": row["project_name"],
+            "code": row["project_code"],
+            "color": row["project_color"],
+            "creator_name": row["creator_name"] or row["creator_email"],
+        }
+    }
+
+
+@router.post("/invites/{token}/accept")
+async def accept_project_invite(token: str, request: Request = None):
+    """Accepts an invitation, adding the authenticated user to the project in PostgreSQL."""
+    pool = _extract_pool_from_request(request)
+    if not pool:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="База данных временно недоступна")
+
+    current_user = await _extract_current_user(request, pool)
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Необходимо войти в систему для принятия приглашения")
+
+    clean_tok = token.strip()
+    async with pool.acquire() as conn, conn.transaction():
+        row = await conn.fetchrow(
+            """
+            SELECT pi.id, pi.project_id, pi.token, pi.role, pi.max_uses, pi.uses_count,
+                   pi.expires_at, p.name AS project_name
+            FROM project_invites pi
+            JOIN projects p ON p.id = pi.project_id
+            WHERE pi.token = $1 AND p.deleted_at IS NULL
+            FOR UPDATE OF pi
+            """,
+            clean_tok
+        )
+        if not row:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Приглашение не найдено или отозвано")
+
+        now = dt.datetime.now(dt.timezone.utc)
+        if row["expires_at"] and row["expires_at"] < now:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Срок действия ссылки истек")
+
+        if row["max_uses"] is not None and row["uses_count"] >= row["max_uses"]:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Лимит использований ссылки исчерпан")
+
+        # Upsert user into project_members
+        await conn.execute(
+            """
+            INSERT INTO project_members (project_id, user_id, role, created_at)
+            VALUES ($1, $2, $3, now())
+            ON CONFLICT (project_id, user_id)
+            DO UPDATE SET role = EXCLUDED.role
+            """,
+            row["project_id"], current_user.id, row["role"]
+        )
+
+        # Increment uses_count
+        await conn.execute(
+            "UPDATE project_invites SET uses_count = uses_count + 1 WHERE id = $1",
+            row["id"]
+        )
+
+    return {
+        "ok": True,
+        "accepted": True,
+        "project_id": str(row["project_id"]),
+        "project_name": row["project_name"],
+        "role": row["role"],
+        "redirect_url": f"/#project={row['project_id']}"
+    }
 
 
 # ---------------------------------------------------------------------- Node Auto-Discovery

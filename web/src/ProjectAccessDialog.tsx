@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import {
+  createProjectInvite, fetchProjectInvites,
   getTerminalAccess, updateTerminalAccess, revokeTerminalAi,
   type Me,
 } from "./api";
@@ -364,7 +365,25 @@ export function ProjectAccessDialog(props: Props) {
     }
   };
 
-  const inviteLink = `${window.location.origin}/#invite=${projectId}&token=tt_inv_${projectId.slice(0, 8)}`;
+  const [realInviteUrl, setRealInviteUrl] = useState<string>("");
+
+  useEffect(() => {
+    if (showInviteModal && projectId) {
+      fetchProjectInvites(projectId).then((res) => {
+        if (res.ok && res.invites && res.invites.length > 0) {
+          setRealInviteUrl(res.invites[0].url);
+        } else {
+          createProjectInvite(projectId, { role: "member", expires_hours: 168 }).then((cRes) => {
+            if (cRes.ok && cRes.invite) {
+              setRealInviteUrl(cRes.invite.url);
+            }
+          });
+        }
+      }).catch(() => {});
+    }
+  }, [showInviteModal, projectId]);
+
+  const inviteLink = realInviteUrl || `${window.location.origin}/#invite=${projectId}`;
   const mcpConfigSnippet = JSON.stringify(
     {
       url: window.location.origin,
@@ -854,7 +873,9 @@ export function ProjectAccessDialog(props: Props) {
                     }
                   }}
                 >
-                  {copiedSnippet ? <Check size={14} /> : <Copy size={14} />}
+                  <span key={copiedSnippet ? "snip-chk" : "snip-cp"} style={{ display: "inline-flex", alignItems: "center" }}>
+                    {copiedSnippet ? <Check size={14} /> : <Copy size={14} />}
+                  </span>
                   <span>{copiedSnippet ? "Скопировано" : "Скопировать JSON"}</span> {/* i18n-ignore */}
                 </button>
               </div>
@@ -982,7 +1003,9 @@ export function ProjectAccessDialog(props: Props) {
                   }
                 }}
               >
-                {copiedInvite ? <Check size={14} /> : <Copy size={14} />}
+                <span key={copiedInvite ? "icon-checked" : "icon-copy"} style={{ display: "inline-flex", alignItems: "center" }}>
+                  {copiedInvite ? <Check size={14} /> : <Copy size={14} />}
+                </span>
                 <span>{copiedInvite ? "Скопировано!" : "Копировать"}</span> {/* i18n-ignore */}
               </button>
             </div>

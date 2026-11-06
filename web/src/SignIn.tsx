@@ -16,8 +16,8 @@ import {
 import {
   askCode, authState, checkTelegramAuthSession, configureTelegramBot, createTelegramAuthSession,
   loginWithTelegramWidget, quickSignIn, Refused, requestTelegramCode, setQuickCode, signUp,
-  telegramAuthStatus, verifyCode, verifyTelegramCode, type KnownDevice, type Legal,
-  type SignedInNow, type TelegramAuthStatus, type TelegramWidgetUser,
+  telegramAuthStatus, validateInviteToken, verifyCode, verifyTelegramCode, type InviteValidationResult,
+  type KnownDevice, type Legal, type SignedInNow, type TelegramAuthStatus, type TelegramWidgetUser,
 } from "./api";
 import { useT, type Translate } from "./i18n";
 import { Logo } from "./icons";
@@ -87,6 +87,40 @@ export function SignIn(props: Props) {
   const [email, setEmail] = useState(props.email ?? "");
   const [note, setNote] = useState<string | null>(props.note ?? null);
   const [legal, setLegal] = useState<Legal>(LEGAL);
+  const [inviteInfo, setInviteInfo] = useState<InviteValidationResult | null>(null);
+
+  // Check URL hash/query for project invitations
+  useEffect(() => {
+    let token = "";
+    const hash = window.location.hash || "";
+    const search = window.location.search || "";
+    const query = new URLSearchParams(search);
+
+    if (query.get("invite")) {
+      token = query.get("invite")!;
+    } else if (hash.includes("token=")) {
+      const match = hash.match(/token=([^&]+)/);
+      if (match) token = match[1];
+    } else if (hash.includes("invite=")) {
+      const match = hash.match(/invite=([^&]+)/);
+      if (match) token = match[1];
+    }
+
+    if (!token) {
+      token = sessionStorage.getItem("tterm_pending_invite") || "";
+    }
+
+    if (token) {
+      sessionStorage.setItem("tterm_pending_invite", token);
+      validateInviteToken(token)
+        .then((res) => {
+          if (res.valid) {
+            setInviteInfo(res);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   // Why the session ended may come after this screen is up: Sign out closes
   // the page's socket a moment before its own answer, "You signed out.",
@@ -203,6 +237,29 @@ export function SignIn(props: Props) {
       <div className="signin-middle">
         {body && (
           <section className="signin-card">
+            {inviteInfo && inviteInfo.valid && (
+              <div
+                className="signin-invite-banner"
+                style={{
+                  background: "rgba(59, 130, 246, 0.12)",
+                  border: "1px solid rgba(59, 130, 246, 0.35)",
+                  borderRadius: 10,
+                  padding: "14px 16px",
+                  marginBottom: 16,
+                  textAlign: "left",
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: 14, color: "#60a5fa", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 16 }}>🤝</span> Приглашение в проект
+                </div>
+                <div style={{ fontSize: 13, marginTop: 6, color: "var(--color-text-primary, #f1f5f9)", lineHeight: 1.4 }}>
+                  Вас приглашают в проект <strong>{inviteInfo.project?.name || "Команда"}</strong> ({inviteInfo.project?.creator_name ? `от ${inviteInfo.project.creator_name}` : "tTerm"}) с ролью <strong>{inviteInfo.invite?.role === "admin" ? "Администратор" : inviteInfo.invite?.role === "observer" ? "Наблюдатель" : "Участник"}</strong>.
+                </div>
+                <div style={{ fontSize: 11, color: "var(--color-text-dim, #94a3b8)", marginTop: 6 }}>
+                  Войдите в аккаунт через Telegram или эл. почту для автоматического подключения и доступа к терминалам проекта.
+                </div>
+              </div>
+            )}
             {note && <p className="signin-note" role="status">{note}</p>}
             {body}
           </section>

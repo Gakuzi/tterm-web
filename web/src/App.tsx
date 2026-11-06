@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AddMachine } from "./AddMachine";
 import { AppLinkWindow, AppWelcome } from "./AppSignIn";
 import {
-  CoreError, createFolder, createNote, createProject, deleteFolder, deleteNote,
+  acceptProjectInvite, CoreError, createFolder, createNote, createProject, deleteFolder, deleteNote,
   deleteProject, editProject, endTerminal, loadLogToday, loadNote, loadState, moveMachine,
   moveNote, NoteGone, onSignedOut, openTerminal, removeMachine, renameFolder,
   renameMachine, renameTerminal, saveLanguage, saveProjectTint, saveTheme, SignedOut, signInApp, signOut,
-  welcomeSeen, type Folder, type FoundBlock, type FoundNote,
-  type Machine, type MachineKind, type Note, type NoteSummary, type Project,
+  validateInviteToken, welcomeSeen, type Folder, type FoundBlock, type FoundNote,
+  type InviteValidationResult, type Machine, type MachineKind, type Note, type NoteSummary, type Project,
   type ProjectFields, type ProjectTint, type State, type TerminalInfo,
   type Theme,
 } from "./api";
@@ -343,6 +343,13 @@ export function App() {
   const [supporting, setSupporting] = useState(false);
   const [moving, setMoving] = useState<Machine | null>(null);
   const [deleting, setDeleting] = useState<Project | null>(null);
+
+  // Project Invite Acceptance state for authenticated users
+  const [activeInviteToAccept, setActiveInviteToAccept] = useState<{
+    token: string;
+    info: InviteValidationResult;
+  } | null>(null);
+  const [isAcceptingInvite, setIsAcceptingInvite] = useState(false);
   /** The terminal being named, and where. */
   const [renaming, setRenaming] = useState<Renaming | null>(null);
   const renamingRef = useRef(renaming);
@@ -494,6 +501,18 @@ export function App() {
     setSignedOut(null);
     pruned.current = false;
     load();
+
+    const pending = sessionStorage.getItem("tterm_pending_invite");
+    if (pending) {
+      sessionStorage.removeItem("tterm_pending_invite");
+      acceptProjectInvite(pending)
+        .then((res) => {
+          if (res.accepted) {
+            load();
+          }
+        })
+        .catch(() => {});
+    }
   }, [load]);
 
   /** After a machine connects, a terminal opens or ends, a note or a folder
@@ -530,6 +549,69 @@ export function App() {
       })
       .catch(() => {});
   }, []);
+
+  // Check URL hash/query for project invitations when signed in
+  useEffect(() => {
+    const checkInvite = () => {
+      let token = "";
+      const hash = window.location.hash || "";
+      const search = window.location.search || "";
+      const query = new URLSearchParams(search);
+
+      if (query.get("invite")) {
+        token = query.get("invite")!;
+      } else if (hash.includes("token=")) {
+        const match = hash.match(/token=([^&]+)/);
+        if (match) token = match[1];
+      } else if (hash.includes("invite=")) {
+        const match = hash.match(/invite=([^&]+)/);
+        if (match) token = match[1];
+      }
+
+      if (!token) {
+        token = sessionStorage.getItem("tterm_pending_invite") || "";
+      }
+
+      if (token && state) {
+        validateInviteToken(token)
+          .then((res) => {
+            if (res.valid) {
+              setActiveInviteToAccept({ token, info: res });
+            } else {
+              sessionStorage.removeItem("tterm_pending_invite");
+            }
+          })
+          .catch(() => {});
+      }
+    };
+
+    checkInvite();
+    window.addEventListener("hashchange", checkInvite);
+    return () => window.removeEventListener("hashchange", checkInvite);
+  }, [state]);
+
+  const handleAcceptInvite = async () => {
+    if (!activeInviteToAccept) return;
+    setIsAcceptingInvite(true);
+    try {
+      const res = await acceptProjectInvite(activeInviteToAccept.token);
+      if (res.accepted) {
+        sessionStorage.removeItem("tterm_pending_invite");
+        setActiveInviteToAccept(null);
+        if (window.location.hash.includes("invite") || window.location.hash.includes("token")) {
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+        await refresh();
+        setToast("Вы успешно присоединились к проекту!");
+      } else {
+        alert(res.error || "Не удалось принять приглашение");
+      }
+    } catch {
+      alert("Сетевая ошибка при принятии приглашения");
+    } finally {
+      setIsAcceptingInvite(false);
+    }
+  };
 
   // A computer comes online when its agent starts and goes when it stops,
   // with nothing done on this page; notes change on other devices. Ask now
@@ -2170,6 +2252,90 @@ export function App() {
           version={state.version} appVersion={updates.update?.version ?? null}
           machines={state.projects.reduce((n, p) => n + p.machines.length, 0)}
           onClose={() => setSupporting(false)} />
+      )}
+
+      {activeInviteToAccept && (
+        <div className="scrim" onClick={() => setActiveInviteToAccept(null)}>
+          <section
+            className="dialog"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "480px", maxWidth: "100%", padding: "24px" }}
+          >
+            <div className="dialog-head">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 24 }}>🤝</span>
+                <div className="dialog-title">
+                  <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, color: "var(--ink)" }}>
+                    Приглашение в проект
+                  </h2>
+                  <p style={{ fontSize: 12, color: "var(--dim)", margin: "2px 0 0" }}>
+                    Командный доступ к проекту и его терминалам
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="icon-button small"
+                onClick={() => setActiveInviteToAccept(null)}
+                aria-label="Закрыть"
+              >
+                <Close size={16} />
+              </button>
+            </div>
+
+            <div style={{
+              padding: "16px",
+              borderRadius: 8,
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              margin: "16px 0",
+            }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)", marginBottom: 8 }}>
+                {activeInviteToAccept.info.project?.name || "Проект"}
+              </div>
+              <div style={{ fontSize: 13, color: "var(--dim)", marginBottom: 6 }}>
+                Пригласил: <strong style={{ color: "var(--ink)" }}>{activeInviteToAccept.info.project?.creator_name || "Владелец"}</strong>
+              </div>
+              <div style={{ fontSize: 13, color: "var(--dim)" }}>
+                Предоставляемая роль: <strong style={{
+                  color: activeInviteToAccept.info.invite?.role === "admin" ? "#f87171" : "#60a5fa",
+                  fontWeight: 600,
+                }}>
+                  {activeInviteToAccept.info.invite?.role === "admin"
+                    ? "Администратор (admin)"
+                    : activeInviteToAccept.info.invite?.role === "observer"
+                      ? "Наблюдатель (observer)"
+                      : "Участник (member)"}
+                </strong>
+              </div>
+            </div>
+
+            <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 16px 0" }}>
+              После подключения этот проект появится в вашем списке проектов, и вы сможете работать с его машинами и терминалами.
+            </p>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                type="button"
+                className="button"
+                onClick={() => setActiveInviteToAccept(null)}
+                disabled={isAcceptingInvite}
+              >
+                Отклонить
+              </button>
+              <button
+                type="button"
+                className="button-accent"
+                onClick={handleAcceptInvite}
+                disabled={isAcceptingInvite}
+              >
+                {isAcceptingInvite ? "Подключение..." : "Присоединиться к проекту"}
+              </button>
+            </div>
+          </section>
+        </div>
       )}
 
       {needAccount && (

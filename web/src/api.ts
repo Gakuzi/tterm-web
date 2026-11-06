@@ -2142,6 +2142,80 @@ export async function testTelegramNotification(params: {
   return response.json();
 }
 
+// ------------------------------------------------ Project Invites & Collaboration
+export interface ProjectInviteDTO {
+  id: string;
+  project_id: string;
+  token: string;
+  url: string;
+  role: "admin" | "member" | "observer";
+  max_uses?: number | null;
+  uses_count: number;
+  expires_at?: string | null;
+  created_at?: string | null;
+  creator_name?: string;
+  allowed_terminals?: string[];
+}
+
+export interface InviteValidationResult {
+  ok: boolean;
+  valid: boolean;
+  error?: string;
+  invite?: ProjectInviteDTO;
+  project?: {
+    id: string;
+    name: string;
+    code: string;
+    color: string;
+    creator_name: string;
+  };
+}
+
+export async function fetchProjectInvites(projectId: string): Promise<{ ok: boolean; invites: ProjectInviteDTO[] }> {
+  const res = await fetch(`/api/orchestration/projects/${projectId}/invites`, {
+    headers: { "x-tterm": "1" },
+  });
+  return res.json();
+}
+
+export async function createProjectInvite(
+  projectId: string,
+  params: {
+    role?: string;
+    expires_hours?: number;
+    max_uses?: number | null;
+    allowed_terminals?: string[];
+  }
+): Promise<{ ok: boolean; invite: ProjectInviteDTO }> {
+  const res = await fetch(`/api/orchestration/projects/${projectId}/invites`, change("POST", params));
+  return res.json();
+}
+
+export async function revokeProjectInvite(projectId: string, inviteId: string): Promise<{ ok: boolean }> {
+  const res = await fetch(`/api/orchestration/projects/${projectId}/invites/${inviteId}`, change("DELETE", {}));
+  return res.json();
+}
+
+export async function validateInviteToken(token: string): Promise<InviteValidationResult> {
+  const res = await fetch(`/api/orchestration/invites/${encodeURIComponent(token.trim())}`, {
+    headers: { "x-tterm": "1" },
+  });
+  return res.json();
+}
+
+export async function acceptProjectInvite(token: string): Promise<{
+  ok: boolean;
+  accepted?: boolean;
+  project_id?: string;
+  project_name?: string;
+  role?: string;
+  error?: string;
+}> {
+  const res = await fetch(`/api/orchestration/invites/${encodeURIComponent(token.trim())}/accept`, change("POST", {}));
+  return res.json();
+}
+
+
 
 
 

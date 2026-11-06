@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import type { Project, TerminalInfo, Me, Machine } from "./api";
+import {
+  createProjectInvite, fetchProjectInvites, revokeProjectInvite,
+  type Project, type TerminalInfo, type Me, type Machine, type ProjectInviteDTO
+} from "./api";
 import {
   Branch, Check, Close, Computer, Copy, Folder as FolderIcon, Key, Layers,
   Link as LinkIcon, Lock, Pencil, People, Person, Plus, Restart, Search, Server, Spark, Trash, Warning
@@ -237,6 +240,11 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
   const [showTermiusDrawer, setShowTermiusDrawer] = useState(false);
   const [termiusTab, setTermiusTab] = useState<"termius" | "ssh_config" | "ssh_cmd">("termius");
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [activeInvites, setActiveInvites] = useState<ProjectInviteDTO[]>([]);
+  const [currentInviteUrl, setCurrentInviteUrl] = useState<string>("");
+  const [inviteRole, setInviteRole] = useState<"member" | "admin" | "observer">("member");
+  const [inviteHours, setInviteHours] = useState<number>(168);
+  const [isGeneratingInvite, setIsGeneratingInvite] = useState<boolean>(false);
 
   // GitHub OAuth & PAT Integration state
   const [githubStatus, setGithubStatus] = useState<{
@@ -521,7 +529,58 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
     }
   }, [project?.machines]);
 
-  const inviteLink = `${window.location.origin}/#invite=${project.id}&token=tt_inv_${project.id.slice(0, 8)}`;
+  // Load and auto-create project invitation links
+  useEffect(() => {
+    if (showInviteModal && project?.id) {
+      fetchProjectInvites(project.id)
+        .then((res) => {
+          if (res.ok && res.invites) {
+            setActiveInvites(res.invites);
+            if (res.invites.length > 0) {
+              setCurrentInviteUrl(res.invites[0].url);
+            } else {
+              createProjectInvite(project.id, { role: "member", expires_hours: 168 }).then((cRes) => {
+                if (cRes.ok && cRes.invite) {
+                  setCurrentInviteUrl(cRes.invite.url);
+                  setActiveInvites([cRes.invite]);
+                }
+              });
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [showInviteModal, project?.id]);
+
+  const handleCreateCustomInvite = async () => {
+    setIsGeneratingInvite(true);
+    try {
+      const res = await createProjectInvite(project.id, { role: inviteRole, expires_hours: inviteHours });
+      if (res.ok && res.invite) {
+        setCurrentInviteUrl(res.invite.url);
+        setActiveInvites((prev) => [res.invite, ...prev]);
+        if (notify) notify("Новая ссылка-приглашение создана!");
+      }
+    } catch {
+      if (notify) notify("Ошибка создания приглашения");
+    } finally {
+      setIsGeneratingInvite(false);
+    }
+  };
+
+  const handleRevokeInvite = async (invId: string) => {
+    try {
+      const res = await revokeProjectInvite(project.id, invId);
+      if (res.ok) {
+        setActiveInvites((prev) => prev.filter((i) => i.id !== invId));
+        if (notify) notify("Ссылка приглашения отозвана");
+      }
+    } catch {
+      if (notify) notify("Ошибка отзыва ссылки");
+    }
+  };
+
+  const inviteLink = currentInviteUrl || (activeInvites[0]?.url) || `${window.location.origin}/#invite=${project.id}`;
 
   const termiusJson = JSON.stringify({
     label: `tTerm / ${project.name} (Dev Container)`, /* i18n-ignore */
@@ -2222,7 +2281,7 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
             aria-labelledby="pc-invite-title"
             onClick={(e) => e.stopPropagation()}
             style={{
-              width: "520px",
+              width: "560px",
               maxWidth: "100%",
               padding: "24px",
               display: "flex",
@@ -2252,9 +2311,10 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
             </div>
 
             <p style={{ fontSize: 13, color: "var(--dim)", margin: 0, lineHeight: 1.4 }}>
-              По этой ссылке пользователь или ИИ-агент может присоединиться к проекту и получить доступ к назначенным терминалам и контейнерам. {/* i18n-ignore */}
+              По этой ссылке пользователь может присоединиться к проекту и мгновенно получить доступ к его терминалам и нодам. {/* i18n-ignore */}
             </p>
 
+            {/* Current Active Invite Link Box */}
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input
                 type="text"
@@ -2268,14 +2328,139 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
                 className="button-accent"
                 onClick={() => copyText(inviteLink, showCopiedInvite)}
               >
-                {copiedInvite ? <Check size={14} /> : <Copy size={14} />}
+                <span key={copiedInvite ? "icon-checked" : "icon-copy"} style={{ display: "inline-flex", alignItems: "center" }}>
+                  {copiedInvite ? <Check size={14} /> : <Copy size={14} />}
+                </span>
                 <span>{copiedInvite ? "Скопировано" /* i18n-ignore */ : "Копировать" /* i18n-ignore */}</span>
               </button>
             </div>
 
-            <div style={{ fontSize: 12, color: "var(--faint)" }}>
-              Срок действия ссылки: 24 часа. Назначить роль можно сразу после подключения. {/* i18n-ignore */}
+            {/* Invite Generator Controls */}
+            <div style={{
+              padding: "12px 14px",
+              borderRadius: 8,
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary, #94a3b8)" }}>
+                Параметры новой ссылки: {/* i18n-ignore */}
+              </span>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, alignItems: "center" }}>
+                <div>
+                  <label style={{ fontSize: 11, color: "var(--dim)", display: "block", marginBottom: 3 }}>
+                    Роль участника: {/* i18n-ignore */}
+                  </label>
+                  <select
+                    className="input-select"
+                    style={{ width: "100%", fontSize: 12 }}
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value as any)}
+                  >
+                    <option value="member">Участник (member)</option>
+                    <option value="admin">Администратор (admin)</option>
+                    <option value="observer">Наблюдатель (observer)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: "var(--dim)", display: "block", marginBottom: 3 }}>
+                    Срок действия: {/* i18n-ignore */}
+                  </label>
+                  <select
+                    className="input-select"
+                    style={{ width: "100%", fontSize: 12 }}
+                    value={inviteHours}
+                    onChange={(e) => setInviteHours(Number(e.target.value))}
+                  >
+                    <option value={24}>24 часа</option>
+                    <option value={168}>7 дней</option>
+                    <option value={720}>30 дней</option>
+                    <option value={0}>Бессрочно</option>
+                  </select>
+                </div>
+                <div style={{ alignSelf: "flex-end" }}>
+                  <button
+                    type="button"
+                    className="button"
+                    style={{ fontSize: 12 }}
+                    onClick={handleCreateCustomInvite}
+                    disabled={isGeneratingInvite}
+                  >
+                    {isGeneratingInvite ? "Создание..." : "+ Создать ссылку"}
+                  </button>
+                </div>
+              </div>
             </div>
+
+            {/* List of Existing Project Invites */}
+            {activeInvites.length > 0 && (
+              <div>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--dim)", display: "block", marginBottom: 6 }}>
+                  Активные приглашения проекта ({activeInvites.length}): {/* i18n-ignore */}
+                </span>
+                <div style={{ maxHeight: 140, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+                  {activeInvites.map((inv) => (
+                    <div
+                      key={inv.id}
+                      style={{
+                        padding: "6px 10px",
+                        borderRadius: 6,
+                        background: "rgba(0,0,0,0.25)",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontSize: 12,
+                      }}
+                    >
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2, overflow: "hidden" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{
+                            fontSize: 10,
+                            padding: "1px 5px",
+                            borderRadius: 4,
+                            background: inv.role === "admin" ? "rgba(239,68,68,0.2)" : "rgba(59,130,246,0.2)",
+                            color: inv.role === "admin" ? "#f87171" : "#60a5fa",
+                            fontWeight: 600,
+                          }}>
+                            {inv.role === "admin" ? "admin" : inv.role === "observer" ? "observer" : "member"}
+                          </span>
+                          <span style={{ fontFamily: "monospace", color: "var(--dim)", fontSize: 11 }}>
+                            ...{inv.token.slice(-10)}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: 10, color: "var(--faint)" }}>
+                          {inv.expires_at ? `Истекает: ${new Date(inv.expires_at).toLocaleDateString()}` : "Бессрочная"} · Использований: {inv.uses_count}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <button
+                          type="button"
+                          className="button-plain small"
+                          style={{ padding: "3px 8px", fontSize: 11 }}
+                          onClick={() => {
+                            copyToClipboard(inv.url);
+                            if (notify) notify("Ссылка скопирована!");
+                          }}
+                        >
+                          Копировать
+                        </button>
+                        <button
+                          type="button"
+                          className="button-danger small"
+                          style={{ padding: "3px 8px", fontSize: 11 }}
+                          onClick={() => handleRevokeInvite(inv.id)}
+                        >
+                          Отозвать
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
               <button

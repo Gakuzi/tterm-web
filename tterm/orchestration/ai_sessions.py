@@ -175,11 +175,21 @@ class AIAgentSessionManager:
             name = agent_name or key.agent_name
 
         # Find existing session for this assistant or use canonical ID to prevent duplication
-        target_sid = session_id or "sess-ai-antigravity"
+        # Force canonical session ID for Antigravity MCP assistant
+        norm_name = (agent_name or (key.agent_name if key else "Antigravity (ИИ)")).strip()
+        is_antigravity = "antigravity" in norm_name.lower() or "антигравит" in norm_name.lower() or (session_id and session_id.startswith("sess-ai-mcp"))
+        if is_antigravity or not session_id:
+            target_sid = "sess-ai-antigravity"
+            name = "Антигравитационный ИИ (MCP)"
+        else:
+            target_sid = session_id
+            name = norm_name
 
         # Prune old duplicate sess-ai-mcp-* or legacy sessions
         for sid in list(self._sessions.keys()):
-            if sid != target_sid and (sid.startswith("sess-ai-mcp") or sid == "sess-ai-antigravity-1" or (self._sessions[sid].agent_name == name)):
+            s_item = self._sessions[sid]
+            is_dup_ag = is_antigravity and ("antigravity" in s_item.agent_name.lower() or "антигравит" in s_item.agent_name.lower())
+            if sid != target_sid and (sid.startswith("sess-ai-mcp") or sid == "sess-ai-antigravity-1" or is_dup_ag or s_item.agent_name == name):
                 self._sessions.pop(sid, None)
 
         if target_sid in self._sessions:
@@ -215,10 +225,10 @@ class AIAgentSessionManager:
         return sess.to_dict()
 
     def list_sessions(self, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Returns connected AI agent sessions, deduplicating by assistant name."""
+        """Returns connected AI agent sessions, strictly deduplicating by assistant name."""
         # Prune any stale mock or duplicate sessions
         for sid in list(self._sessions.keys()):
-            if sid.startswith("sess-ai-mcp") or sid == "sess-ai-antigravity-1":
+            if sid != "sess-ai-antigravity" and (sid.startswith("sess-ai-mcp") or sid == "sess-ai-antigravity-1"):
                 self._sessions.pop(sid, None)
 
         results = []
@@ -226,11 +236,12 @@ class AIAgentSessionManager:
         # Sort by latest activity
         sorted_sessions = sorted(self._sessions.values(), key=lambda x: x.last_active_at, reverse=True)
         for s in sorted_sessions:
+            norm = "antigravity" if ("antigravity" in s.agent_name.lower() or "антигравит" in s.agent_name.lower()) else s.agent_name.lower()
+            if norm in seen_names:
+                continue
+            seen_names.add(norm)
             if project_id and s.project_id != project_id and s.project_id != "default-project":
                 continue
-            if s.agent_name in seen_names:
-                continue
-            seen_names.add(s.agent_name)
             results.append(s.to_dict())
         return results
 

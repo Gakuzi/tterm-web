@@ -19,6 +19,7 @@ __pycache__/
 # takes it from there and has no Node; anyone can build it again from web/
 # with npm.
 node_modules/
+web/node_modules/
 
 # macOS
 .DS_Store
