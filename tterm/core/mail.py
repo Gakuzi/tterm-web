@@ -202,10 +202,13 @@ class SmtpMailer(Mailer):
                     s.send_message(msg)
             else:
                 with smtplib.SMTP(self.host, self.port, timeout=15) as s:
-                    try:
+                    if self.port in (2525, 587):
                         s.starttls(context=ctx)
-                    except Exception:
-                        pass
+                    else:
+                        try:
+                            s.starttls(context=ctx)
+                        except Exception:
+                            pass
                     if self.user:
                         s.login(self.user, self.password)
                     s.send_message(msg)
