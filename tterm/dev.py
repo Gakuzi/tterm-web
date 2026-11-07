@@ -32,10 +32,11 @@ def banner(settings: Settings, core: Core) -> str:
     else:
         you = (f"{owner.name}, without an address: put TTERM_OWNER_EMAIL=your "
                "email in .env and start again")
-    if isinstance(core.mailer, BrevoMailer):
+    active_mailer = getattr(core.mailer, "primary", core.mailer)
+    if isinstance(active_mailer, BrevoMailer):
         email = f"through Brevo, from {settings.mail_from}"
-    elif isinstance(core.mailer, SmtpMailer):
-        email = f"through SMTP {core.mailer.host}:{core.mailer.port}, from {core.mailer.sender}"
+    elif isinstance(active_mailer, SmtpMailer):
+        email = f"through SMTP {active_mailer.host}:{active_mailer.port}, from {active_mailer.sender}"
     else:
         email = "into this window: the codes for signing in appear here"
     local = settings.page_host in ("127.0.0.1", "localhost", "::1")
