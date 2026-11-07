@@ -107,6 +107,8 @@ class Settings:
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_ssl: bool = False
+    #: Optional Resend API key (HTTPS)
+    resend_key: str = ""
 
     @classmethod
     def load(cls, environ: Mapping[str, str] | None = None,
@@ -170,4 +172,5 @@ class Settings:
             smtp_user=get("TTERM_SMTP_USER", ""),
             smtp_password=get("TTERM_SMTP_PASSWORD", ""),
             smtp_ssl=get("TTERM_SMTP_SSL", "").lower() in ("true", "1", "yes"),
+            resend_key=get("TTERM_RESEND_KEY", ""),
         )

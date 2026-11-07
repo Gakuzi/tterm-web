@@ -177,8 +177,10 @@ class AIAgentSessionManager:
         # Find existing session for this assistant or use canonical ID to prevent duplication
         # Force canonical session ID for Antigravity MCP assistant
         norm_name = (agent_name or (key.agent_name if key else "Antigravity (ИИ)")).strip()
-        is_antigravity = "antigravity" in norm_name.lower() or "антигравит" in norm_name.lower() or (session_id and session_id.startswith("sess-ai-mcp"))
-        if is_antigravity or not session_id:
+        if not session_id:
+            target_sid = "sess-ai-antigravity" if ("antigravity" in norm_name.lower() or "антигравит" in norm_name.lower()) else f"sess-ai-{uuid.uuid4().hex[:8]}"
+            name = "Антигравитационный ИИ (MCP)" if "antigravity" in norm_name.lower() else norm_name
+        elif session_id.startswith("sess-ai-mcp"):
             target_sid = "sess-ai-antigravity"
             name = "Антигравитационный ИИ (MCP)"
         else:

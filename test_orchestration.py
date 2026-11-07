@@ -1206,6 +1206,7 @@ class TestSmtpMailer(unittest.TestCase):
             "TTERM_SMTP_USER": "klimov@e-klimov.ru",
             "TTERM_SMTP_PASSWORD": "secret-password",
             "TTERM_MAIL_FROM": "tTerm <klimov@e-klimov.ru>",
+            "TTERM_RESEND_KEY": "re_123456789",
         }
         s = Settings.load(environ=env)
         self.assertEqual(s.smtp_host, "smtp.beget.com")
@@ -1213,6 +1214,31 @@ class TestSmtpMailer(unittest.TestCase):
         self.assertEqual(s.smtp_user, "klimov@e-klimov.ru")
         self.assertEqual(s.smtp_password, "secret-password")
         self.assertEqual(s.mail_from, "tTerm <klimov@e-klimov.ru>")
+        self.assertEqual(s.resend_key, "re_123456789")
+
+    def test_smart_and_resend_mailer(self):
+        import asyncio
+        from tterm.core.mail import Email, LogMailer, ResendMailer, SmartMailer, dispatch_telegram_code
+
+        resend = ResendMailer("re_dummy_test_key", "tTerm <login@tterm.net>")
+        self.assertEqual(resend.key, "re_dummy_test_key")
+        self.assertEqual(resend.sender, "tTerm <login@tterm.net>")
+
+        log_mailer = LogMailer()
+        smart = SmartMailer(primary=log_mailer)
+
+        email = Email(
+            to="test@example.com",
+            subject="123456 is your tTerm sign-in code",
+            text="Your tTerm sign-in code: 123456",
+        )
+
+        async def run_test():
+            await smart.send(email)
+
+        asyncio.run(run_test())
+        self.assertEqual(len(log_mailer.sent), 1)
+        self.assertEqual(log_mailer.sent[0].to, "test@example.com")
 
 
 if __name__ == "__main__":

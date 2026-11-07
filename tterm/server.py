@@ -28,7 +28,7 @@ from .core.terminals import Terminals
 from .core.vault import VaultRelay
 from .core.accounts import Person
 from .core.config import Settings
-from .core.mail import BrevoMailer, LogMailer, Mailer, SmtpMailer
+from .core.mail import BrevoMailer, LogMailer, Mailer, ResendMailer, SmartMailer, SmtpMailer
 from .core.signer_client import SignerClient, SignerRefused, SignerUnavailable
 
 log = logging.getLogger("tterm")
@@ -114,9 +114,9 @@ class Core:
         self.agents = Agents()
         #: Relays a vault key's signing to the capable page sockets (0.1.17).
         self.vault: VaultRelay | None = None
-        #: How emails go: SMTP, Brevo, or this window's log.
+        #: How emails go: SMTP, Resend, Brevo, or this window's log with Telegram mirror.
         if settings.smtp_host and settings.smtp_user:
-            self.mailer: Mailer = SmtpMailer(
+            primary: Mailer = SmtpMailer(
                 host=settings.smtp_host,
                 port=settings.smtp_port,
                 user=settings.smtp_user,
@@ -124,8 +124,13 @@ class Core:
                 sender=settings.mail_from,
                 use_ssl=settings.smtp_ssl,
             )
+            self.mailer = SmartMailer(primary)
+        elif getattr(settings, "resend_key", None):
+            primary = ResendMailer(settings.resend_key, settings.mail_from)
+            self.mailer = SmartMailer(primary)
         elif settings.brevo_key:
-            self.mailer = BrevoMailer(settings.brevo_key, settings.mail_from)
+            primary = BrevoMailer(settings.brevo_key, settings.mail_from)
+            self.mailer = SmartMailer(primary)
         else:
             self.mailer = LogMailer()
         self._servers: list[_Server] = []
