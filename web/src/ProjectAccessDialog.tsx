@@ -71,12 +71,49 @@ export function ProjectAccessDialog(props: Props) {
     terminalId = "default-term",
     machineName = "Домашний сервер (Raspberry Pi)", // i18n-ignore
     terminalLabel = "Терминал #1", // i18n-ignore
-    projectId = "default-project",
-    projectName = "Главный проект", // i18n-ignore
+    projectId: initialProjectId,
+    projectName: initialProjectName,
     me,
     onClose,
     notify,
   } = props;
+
+  const [activeProjectId, setActiveProjectId] = useState<string>(
+    initialProjectId && initialProjectId !== "default-project" ? initialProjectId : ""
+  );
+  const [activeProjectName, setActiveProjectName] = useState<string>(
+    initialProjectName && initialProjectName !== "Главный проект" ? initialProjectName : ""
+  );
+
+  useEffect(() => {
+    if (initialProjectId && initialProjectId !== "default-project") {
+      setActiveProjectId(initialProjectId);
+    }
+    if (initialProjectName && initialProjectName !== "Главный проект") {
+      setActiveProjectName(initialProjectName);
+    }
+  }, [initialProjectId, initialProjectName]);
+
+  // Auto-resolve project if not explicitly passed
+  useEffect(() => {
+    if (!activeProjectId || activeProjectId === "default-project") {
+      fetch("/api/state", { headers: { "x-tterm": "1" } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((st) => {
+          if (!st?.projects?.length) return;
+          const term = (st.terminals || []).find((t: any) => t.id === terminalId);
+          const mId = term?.machineId;
+          const found = st.projects.find((p: any) =>
+            (p.machines || []).some((m: any) => m.id === mId)
+          ) || st.projects[0];
+          if (found) {
+            setActiveProjectId(found.id);
+            setActiveProjectName(found.name);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [terminalId, activeProjectId]);
 
   // Tabs: Project & Team (Priority 1) -> Node & Docker Hierarchy -> Terminal & AI Settings
   const [activeTab, setActiveTab] = useState<"team" | "hierarchy" | "terminal">("team");
@@ -158,16 +195,18 @@ export function ProjectAccessDialog(props: Props) {
       .catch(() => {});
 
     // Load project members from API
-    fetch(`/api/orchestration/projects/${projectId}/members`, {
-      headers: { "x-tterm": "1" },
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (live && data?.members?.length) {
-          setMembers(data.members);
-        }
+    if (activeProjectId && activeProjectId !== "default-project") {
+      fetch(`/api/orchestration/projects/${activeProjectId}/members`, {
+        headers: { "x-tterm": "1" },
       })
-      .catch(() => {});
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (live && data?.members?.length) {
+            setMembers(data.members);
+          }
+        })
+        .catch(() => {});
+    }
 
     // Load auto-discovered containers
     setLoadingContainers(true);
@@ -188,7 +227,7 @@ export function ProjectAccessDialog(props: Props) {
     return () => {
       live = false;
     };
-  }, [terminalId, projectId]);
+  }, [terminalId, activeProjectId]);
 
   // Save Terminal AI Access
   const handleSaveTerminalAi = async (access: boolean, mode: "execute" | "guard" | "readonly") => {
@@ -236,11 +275,13 @@ export function ProjectAccessDialog(props: Props) {
     setNewMemberEmail("");
 
     try {
-      await fetch(`/api/orchestration/projects/${projectId}/members`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-tterm": "1" },
-        body: JSON.stringify(newM),
-      });
+      if (activeProjectId) {
+        await fetch(`/api/orchestration/projects/${activeProjectId}/members`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-tterm": "1" },
+          body: JSON.stringify(newM),
+        });
+      }
       notify("Пользователь добавлен в проект"); // i18n-ignore
     } catch {
       notify("Пользователь добавлен локально"); // i18n-ignore
@@ -253,10 +294,12 @@ export function ProjectAccessDialog(props: Props) {
 
     setMembers((prev) => prev.filter((m) => m.id !== userId));
     try {
-      await fetch(`/api/orchestration/projects/${projectId}/members/${userId}`, {
-        method: "DELETE",
-        headers: { "x-tterm": "1" },
-      });
+      if (activeProjectId) {
+        await fetch(`/api/orchestration/projects/${activeProjectId}/members/${userId}`, {
+          method: "DELETE",
+          headers: { "x-tterm": "1" },
+        });
+      }
       notify(`Участник ${userName} удален`); // i18n-ignore
     } catch {
       notify("Удалено из списка"); // i18n-ignore
@@ -269,11 +312,13 @@ export function ProjectAccessDialog(props: Props) {
       prev.map((m) => (m.id === userId ? { ...m, role: newRole } : m))
     );
     try {
-      await fetch(`/api/orchestration/projects/${projectId}/members/${userId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-tterm": "1" },
-        body: JSON.stringify({ role: newRole }),
-      });
+      if (activeProjectId) {
+        await fetch(`/api/orchestration/projects/${activeProjectId}/members/${userId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", "x-tterm": "1" },
+          body: JSON.stringify({ role: newRole }),
+        });
+      }
       notify("Роль участника обновлена"); // i18n-ignore
     } catch {}
   };
@@ -366,14 +411,70 @@ export function ProjectAccessDialog(props: Props) {
   };
 
   const [realInviteUrl, setRealInviteUrl] = useState<string>("");
+  const [isCreatingInvite, setIsCreatingInvite] = useState<boolean>(false);
+  const [aiToken, setAiToken] = useState<string>("");
+  const [isGeneratingAiToken, setIsGeneratingAiToken] = useState<boolean>(false);
+
+  // Generate / Fetch AI Key for this project and terminal
+  const fetchOrCreateAiKey = async (forcedMode?: "execute" | "guard" | "readonly") => {
+    if (!activeProjectId || activeProjectId === "default-project") return;
+    setIsGeneratingAiToken(true);
+    try {
+      const modeToUse = forcedMode || aiMode;
+      const res = await fetch("/api/orchestration/ai-keys/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-tterm": "1" },
+        body: JSON.stringify({
+          project_id: activeProjectId,
+          allowed_terminal: terminalId,
+          agent_name: "Antigravity AI (MCP)", // i18n-ignore
+          role: "container_developer",
+          ai_mode: modeToUse,
+          ttl_hours: 720,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.token) {
+          setAiToken(data.token);
+        }
+      }
+    } catch {
+    } finally {
+      setIsGeneratingAiToken(false);
+    }
+  };
 
   useEffect(() => {
-    if (showInviteModal && projectId) {
-      fetchProjectInvites(projectId).then((res) => {
+    if (activeProjectId && activeProjectId !== "default-project") {
+      fetchOrCreateAiKey();
+    }
+  }, [activeProjectId, terminalId]);
+
+  // Create persistent project invite
+  const generateNewInvite = async () => {
+    if (!activeProjectId || activeProjectId === "default-project") return;
+    setIsCreatingInvite(true);
+    try {
+      const cRes = await createProjectInvite(activeProjectId, { role: "member", expires_hours: 168 });
+      if (cRes.ok && cRes.invite) {
+        setRealInviteUrl(cRes.invite.url);
+        notify("Создана новая ссылка-приглашение"); // i18n-ignore
+      }
+    } catch {
+      notify("Ошибка создания приглашения"); // i18n-ignore
+    } finally {
+      setIsCreatingInvite(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showInviteModal && activeProjectId && activeProjectId !== "default-project") {
+      fetchProjectInvites(activeProjectId).then((res) => {
         if (res.ok && res.invites && res.invites.length > 0) {
           setRealInviteUrl(res.invites[0].url);
         } else {
-          createProjectInvite(projectId, { role: "member", expires_hours: 168 }).then((cRes) => {
+          createProjectInvite(activeProjectId, { role: "member", expires_hours: 168 }).then((cRes) => {
             if (cRes.ok && cRes.invite) {
               setRealInviteUrl(cRes.invite.url);
             }
@@ -381,14 +482,19 @@ export function ProjectAccessDialog(props: Props) {
         }
       }).catch(() => {});
     }
-  }, [showInviteModal, projectId]);
+  }, [showInviteModal, activeProjectId]);
 
-  const inviteLink = realInviteUrl || `${window.location.origin}/#invite=${projectId}`;
+  const inviteLink = realInviteUrl || (activeProjectId && activeProjectId !== "default-project"
+    ? `${window.location.origin}/#invite=${activeProjectId}`
+    : "");
+
   const mcpConfigSnippet = JSON.stringify(
     {
       url: window.location.origin,
+      token: aiToken || "tt_ai_generate_token",
       allowed_terminal: terminalId,
-      project_id: projectId,
+      project_id: activeProjectId || "default-project",
+      ai_mode: aiMode,
     },
     null,
     2
@@ -411,7 +517,7 @@ export function ProjectAccessDialog(props: Props) {
             </h2>
             <p className="dialog-subtitle">
               {/* i18n-ignore */}
-              {projectName} · {machineName} · {terminalLabel}
+              {activeProjectName || projectName} · {machineName} · {terminalLabel}
             </p>
           </div>
           <button
@@ -859,25 +965,43 @@ export function ProjectAccessDialog(props: Props) {
             {/* MCP Config Snippet */}
             <div className="mcp-config-box">
               <div className="mcp-config-head">
-                <strong>{/* i18n-ignore */}Конфигурация MCP для точечной изоляции (mcp.json)</strong>
-                <button
-                  type="button"
-                  className="btn-secondary-sm copy-btn"
-                  onClick={async () => {
-                    const ok = await copyToClipboard(mcpConfigSnippet);
-                    if (ok) {
-                      showCopiedSnippet(true);
-                      notify("Конфигурация скопирована"); // i18n-ignore
-                    } else {
-                      notify("Не удалось скопировать конфигурацию"); // i18n-ignore
-                    }
-                  }}
-                >
-                  <span key={copiedSnippet ? "snip-chk" : "snip-cp"} style={{ display: "inline-flex", alignItems: "center" }}>
-                    {copiedSnippet ? <Check size={14} /> : <Copy size={14} />}
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <strong>{/* i18n-ignore */}Конфигурация MCP для точечной изоляции (config.json)</strong>
+                  <span style={{ fontSize: 11, color: "var(--dim)" }}>
+                    {/* i18n-ignore */}
+                    Токен доступа сгенерирован для терминала {terminalLabel} в проекте {activeProjectName || projectName}
                   </span>
-                  <span>{copiedSnippet ? "Скопировано" : "Скопировать JSON"}</span> {/* i18n-ignore */}
-                </button>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    type="button"
+                    className="btn-secondary-sm"
+                    disabled={isGeneratingAiToken}
+                    onClick={() => fetchOrCreateAiKey()}
+                    title="Обновить токен доступа" // i18n-ignore
+                  >
+                    <Restart size={13} />
+                    <span>{isGeneratingAiToken ? "Генерация..." : "Новый токен"}</span> {/* i18n-ignore */}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary-sm copy-btn"
+                    onClick={async () => {
+                      const ok = await copyToClipboard(mcpConfigSnippet);
+                      if (ok) {
+                        showCopiedSnippet(true);
+                        notify("Конфигурация скопирована"); // i18n-ignore
+                      } else {
+                        notify("Не удалось скопировать конфигурацию"); // i18n-ignore
+                      }
+                    }}
+                  >
+                    <span key={copiedSnippet ? "snip-chk" : "snip-cp"} style={{ display: "inline-flex", alignItems: "center" }}>
+                      {copiedSnippet ? <Check size={14} /> : <Copy size={14} />}
+                    </span>
+                    <span>{copiedSnippet ? "Скопировано" : "Скопировать JSON"}</span> {/* i18n-ignore */}
+                  </button>
+                </div>
               </div>
               <pre className="code-snippet-pre">
                 <code>{mcpConfigSnippet}</code>
@@ -964,7 +1088,7 @@ export function ProjectAccessDialog(props: Props) {
                 </span>
                 <div className="dialog-title">
                   <h2 id="pad-invite-title" style={{ fontSize: 16, fontWeight: 600, margin: 0, color: "var(--ink)" }}>
-                    Приглашение в проект {projectName} {/* i18n-ignore */}
+                    Приглашение в проект {activeProjectName || projectName} {/* i18n-ignore */}
                   </h2>
                 </div>
               </div>
@@ -979,7 +1103,7 @@ export function ProjectAccessDialog(props: Props) {
             </div>
 
             <p style={{ fontSize: 13, color: "var(--dim)", margin: 0, lineHeight: 1.4 }}>
-              По этой ссылке пользователь или ИИ-агент может присоединиться к проекту {projectName} и получить доступ к назначенным терминалам. {/* i18n-ignore */}
+              По этой ссылке пользователь или ИИ-агент может присоединиться к проекту {activeProjectName || projectName} и получить доступ к назначенным терминалам. {/* i18n-ignore */}
             </p>
 
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -987,12 +1111,14 @@ export function ProjectAccessDialog(props: Props) {
                 type="text"
                 readOnly
                 value={inviteLink}
+                placeholder="Создание ссылки приглашения..." // i18n-ignore
                 className="text-input"
                 style={{ flex: 1, fontFamily: "monospace", fontSize: 12, padding: "8px 12px" }}
               />
               <button
                 type="button"
                 className="button-accent"
+                disabled={!inviteLink}
                 onClick={async () => {
                   const ok = await copyToClipboard(inviteLink);
                   if (ok) {
@@ -1010,8 +1136,18 @@ export function ProjectAccessDialog(props: Props) {
               </button>
             </div>
 
-            <div style={{ fontSize: 12, color: "var(--faint)" }}>
-              Срок действия ссылки: 24 часа. Назначить роль и права можно сразу после подключения. {/* i18n-ignore */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "var(--faint)" }}>
+              <span>Срок действия ссылки: 7 дней. Назначить роль и права можно сразу после подключения.</span> {/* i18n-ignore */}
+              <button
+                type="button"
+                className="button-plain small"
+                disabled={isCreatingInvite}
+                onClick={generateNewInvite}
+                style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
+              >
+                <Restart size={12} />
+                <span>{isCreatingInvite ? "Создание..." : "Создать новую"}</span> {/* i18n-ignore */}
+              </button>
             </div>
 
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>

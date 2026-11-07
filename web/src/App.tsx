@@ -602,12 +602,12 @@ export function App() {
           window.history.replaceState(null, "", window.location.pathname);
         }
         await refresh();
-        setToast("Вы успешно присоединились к проекту!");
+        setToast("Вы успешно присоединились к проекту!"); // i18n-ignore
       } else {
-        alert(res.error || "Не удалось принять приглашение");
+        alert(res.error || "Не удалось принять приглашение"); // i18n-ignore
       }
     } catch {
-      alert("Сетевая ошибка при принятии приглашения");
+      alert("Сетевая ошибка при принятии приглашения"); // i18n-ignore
     } finally {
       setIsAcceptingInvite(false);
     }
@@ -1970,9 +1970,15 @@ export function App() {
               </div>
             );
           }
+          const knownTerminal = liveTerminals.find((x) => x.id === id);
+          const terminalProject = knownTerminal
+            ? projects.find((p) => p.machines.some((m) => m.id === knownTerminal.machineId))
+            : undefined;
           return (
           <TerminalView key={id} terminalId={id} active={id === current}
             refocus={refocus}
+            projectId={terminalProject?.id}
+            projectName={terminalProject?.name}
             shownTheme={shownTheme} onStatus={onStatus} onCloseTab={closeTab}
             onOpenNew={(machineId, instead, cwd) =>
               startTerminal(machineId, instead, undefined, cwd)}
@@ -1980,7 +1986,7 @@ export function App() {
             onChanged={refresh} notify={notYet}
             machineThere={(machineId) => machineIds.has(machineId)}
             paste={paste?.terminalId === id ? paste : null} me={state.me}
-            here={hereIds.has(liveTerminals.find((x) => x.id === id)?.machineId ?? "")} />
+            here={hereIds.has(knownTerminal?.machineId ?? "")} />
           );
         })}
         {shownTabs.filter((tab) => tabKind(tab) === "keys").map((tab) => {

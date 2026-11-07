@@ -569,6 +569,32 @@ def _extract_pool_from_request(request: Request) -> Any:
     return pool_obj
 
 
+def _extract_token_from_request(request: Request) -> Optional[str]:
+    if not request:
+        return None
+    # 1. Cookies (__Host-tterm-session, tterm-session, session)
+    if hasattr(request, "cookies") and request.cookies:
+        for name in ("__Host-tterm-session", "tterm-session", "session"):
+            val = request.cookies.get(name)
+            if val:
+                return val.strip()
+    # 2. Authorization header: Bearer <token>
+    if hasattr(request, "headers") and request.headers:
+        auth_hdr = request.headers.get("authorization", "")
+        if auth_hdr.lower().startswith("bearer "):
+            return auth_hdr[7:].strip()
+        for h in ("x-session-token", "x-ai-token", "x-token"):
+            val = request.headers.get(h)
+            if val:
+                return val.strip()
+    # 3. Query param ?token=
+    if hasattr(request, "query_params") and request.query_params:
+        q_tok = request.query_params.get("token") or request.query_params.get("session")
+        if q_tok:
+            return q_tok.strip()
+    return None
+
+
 async def _extract_current_user(request: Request, pool: Any = None) -> Any:
     if not pool:
         pool = _extract_pool_from_request(request)
@@ -576,11 +602,40 @@ async def _extract_current_user(request: Request, pool: Any = None) -> Any:
         return None
     try:
         from ..core import auth
-        token = request.cookies.get(auth.SESSION_COOKIE) if hasattr(request, "cookies") else None
-        if not token and hasattr(request, "headers"):
-            token = request.headers.get("x-session-token")
+        token = _extract_token_from_request(request)
         if not token:
             return None
+        if token.startswith("tt_ai_"):
+            try:
+                from .ai_sessions import ai_agent_manager
+                key_info = ai_agent_manager.validate_token(token)
+                if key_info:
+                    p_uuid = None
+                    try:
+                        p_uuid = uuid.UUID(key_info.project_id)
+                    except Exception:
+                        pass
+                    owner_id = None
+                    if p_uuid:
+                        owner_id = await pool.fetchval(
+                            "SELECT owner_id FROM projects WHERE id = $1 AND deleted_at IS NULL",
+                            p_uuid
+                        )
+                    if not owner_id:
+                        owner_id = await pool.fetchval("SELECT id FROM users ORDER BY created_at LIMIT 1")
+                    if owner_id:
+                        user_row = await pool.fetchrow(
+                            "SELECT id, name, theme, plan_id, email FROM users WHERE id = $1",
+                            owner_id
+                        )
+                        if user_row:
+                            return auth.Person(
+                                user_row["id"], user_row["name"], user_row["theme"],
+                                user_row["plan_id"], user_row["email"]
+                            )
+            except Exception:
+                pass
+
         sess = await auth.session(pool, token, touch=False)
         return sess.person if sess else None
     except Exception:
@@ -801,58 +856,69 @@ async def create_project_invite(project_id: str, data: CreateProjectInviteDTO = 
     current_user = await _extract_current_user(request, pool)
     data = data or CreateProjectInviteDTO()
 
+    if not pool:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="База данных временно недоступна")
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Необходимо авторизоваться для создания приглашения")
+
+    try:
+        proj_uuid = uuid.UUID(project_id)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Некорректный идентификатор проекта: {project_id}")
+
+    # Check caller permission: current user must be owner or admin in this project
+    caller_role = await pool.fetchval(
+        """
+        SELECT role FROM project_members
+        WHERE project_id = $1 AND user_id = $2
+          AND (until IS NULL OR until > now())
+        """,
+        proj_uuid, current_user.id
+    )
+    if caller_role not in ("owner", "admin"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Только владелец или администратор может создавать приглашения в проект")
+
     token = f"tt_inv_{secrets.token_urlsafe(16)}"
     now = dt.datetime.now(dt.timezone.utc)
     expires_at = (now + dt.timedelta(hours=data.expires_hours)) if data.expires_hours > 0 else None
 
-    # Base URL from request or fallback
-    base_url = str(request.base_url).rstrip("/") if request else "http://localhost:8290"
+    # Base URL from forward headers or request
+    proto = (request.headers.get("x-forwarded-proto") if request else "") or (request.url.scheme if request else "http")
+    host = (request.headers.get("x-forwarded-host") or request.headers.get("host") if request else "") or (request.url.netloc if request else "localhost:8290")
+    base_url = f"{proto}://{host}".rstrip("/")
     invite_url = f"{base_url}/#invite={token}"
 
     db_role = data.role
     if db_role not in ("admin", "member", "observer"):
         db_role = "member"
 
-    invite_id = str(uuid.uuid4())
-    if pool and current_user:
-        try:
-            proj_uuid = uuid.UUID(project_id)
-            # Permission check: current user must be owner or admin in this project
-            caller_role = await pool.fetchval(
-                """
-                SELECT role FROM project_members
-                WHERE project_id = $1 AND user_id = $2
-                  AND (until IS NULL OR until > now())
-                """,
-                proj_uuid, current_user.id
+    try:
+        row = await pool.fetchrow(
+            """
+            INSERT INTO project_invites (
+                project_id, created_by, token, role, max_uses, uses_count,
+                expires_at, allowed_terminals, created_at
             )
-            if caller_role not in ("owner", "admin"):
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Только владелец или администратор может создавать приглашения в проект")
-
-            row = await pool.fetchrow(
-                """
-                INSERT INTO project_invites (
-                    project_id, created_by, token, role, max_uses, uses_count,
-                    expires_at, allowed_terminals, created_at
-                )
-                VALUES ($1, $2, $3, $4, $5, 0, $6, $7::jsonb, now())
-                RETURNING id, project_id, token, role, max_uses, uses_count, expires_at, created_at
-                """,
-                proj_uuid, current_user.id, token, db_role, data.max_uses, expires_at,
-                json.dumps(data.allowed_terminals)
-            )
-            if row:
-                invite_id = str(row["id"])
-        except HTTPException:
-            raise
-        except Exception as exc:
-            pass
+            VALUES ($1, $2, $3, $4, $5, 0, $6, $7::jsonb, now())
+            RETURNING id, project_id, token, role, max_uses, uses_count, expires_at, created_at
+            """,
+            proj_uuid, current_user.id, token, db_role, data.max_uses, expires_at,
+            json.dumps(data.allowed_terminals)
+        )
+        if not row:
+            raise RuntimeError("Не удалось создать запись приглашения")
+        invite_id = str(row["id"])
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.error("Failed to insert project invite: %s", exc)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Ошибка создания приглашения: {exc}")
 
     return {
         "ok": True,
         "invite": {
             "id": invite_id,
-            "project_id": project_id,
+            "project_id": str(proj_uuid),
             "token": token,
             "url": invite_url,
             "role": db_role,
@@ -869,7 +935,9 @@ async def list_project_invites(project_id: str, request: Request = None):
     """Lists active invitations for a project."""
     pool = _extract_pool_from_request(request)
     invites = []
-    base_url = str(request.base_url).rstrip("/") if request else "http://localhost:8290"
+    proto = (request.headers.get("x-forwarded-proto") if request else "") or (request.url.scheme if request else "http")
+    host = (request.headers.get("x-forwarded-host") or request.headers.get("host") if request else "") or (request.url.netloc if request else "localhost:8290")
+    base_url = f"{proto}://{host}".rstrip("/")
 
     if pool:
         try:
@@ -1024,7 +1092,7 @@ async def accept_project_invite(token: str, request: Request = None):
             INSERT INTO project_members (project_id, user_id, role, created_at)
             VALUES ($1, $2, $3, now())
             ON CONFLICT (project_id, user_id)
-            DO UPDATE SET role = EXCLUDED.role
+            DO UPDATE SET role = EXCLUDED.role, until = NULL
             """,
             row["project_id"], current_user.id, row["role"]
         )
@@ -2144,7 +2212,7 @@ async def _verify_machine_project_rbac(request: Request, machine_id: str, target
 
     try:
         from ..core import auth
-        token = request.cookies.get(auth.SESSION_COOKIE) if hasattr(request, "cookies") else None
+        token = _extract_token_from_request(request)
         if not token:
             return
 

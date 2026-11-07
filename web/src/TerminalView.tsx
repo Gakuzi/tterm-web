@@ -106,6 +106,8 @@ interface Props {
   here?: boolean;
   /** Who is looking: notes under blocks (0.1.20). */
   me: Me;
+  projectId?: string;
+  projectName?: string;
 }
 
 class TerminalErrorBoundary extends Component<
@@ -311,6 +313,8 @@ export function TerminalView(props: Props) {
           mode={shownMode}
           noBlocks={noBlocks}
           me={props.me}
+          projectId={props.projectId}
+          projectName={props.projectName}
           onChooseMode={choose}
           notify={props.notify}
           onUploadClick={() => fileUploadRef.current?.openFileDialog()}

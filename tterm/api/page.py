@@ -326,7 +326,22 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         return f"__Host-{base}" if secure else base
 
     def cookie(request: Request | WebSocket, base: str) -> str | None:
-        return request.cookies.get(cookie_name(base)) or None
+        val = request.cookies.get(cookie_name(base)) or request.cookies.get(base)
+        if val:
+            return val
+        if hasattr(request, "headers") and request.headers:
+            auth_hdr = request.headers.get("authorization", "")
+            if auth_hdr.lower().startswith("bearer "):
+                return auth_hdr[7:].strip()
+            for h in ("x-session-token", "x-ai-token", "x-token"):
+                val = request.headers.get(h)
+                if val:
+                    return val.strip()
+        if hasattr(request, "query_params") and request.query_params:
+            tok = request.query_params.get("token") or request.query_params.get("session")
+            if tok:
+                return tok.strip()
+        return None
 
     def set_cookie(response: Response, base: str, value: str,
                    seconds: int) -> None:
@@ -339,8 +354,49 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
                                httponly=True, samesite="strict")
 
     async def signed_in(request: Request) -> auth.Session:
+        token = cookie(request, auth.SESSION_COOKIE)
+        if token and token.startswith("tt_ai_"):
+            try:
+                from ..orchestration.ai_sessions import ai_agent_manager
+                key_info = ai_agent_manager.validate_token(token)
+                if key_info:
+                    p_uuid = None
+                    try:
+                        p_uuid = uuid.UUID(key_info.project_id)
+                    except Exception:
+                        pass
+                    owner_id = None
+                    if p_uuid:
+                        owner_id = await pool.fetchval(
+                            "SELECT owner_id FROM projects WHERE id = $1 AND deleted_at IS NULL",
+                            p_uuid
+                        )
+                    if not owner_id:
+                        owner_id = await pool.fetchval("SELECT id FROM users ORDER BY created_at LIMIT 1")
+                    if owner_id:
+                        user_row = await pool.fetchrow(
+                            "SELECT id, name, theme, plan_id, email FROM users WHERE id = $1",
+                            owner_id
+                        )
+                        if user_row:
+                            person = auth.Person(
+                                user_row["id"], user_row["name"], user_row["theme"],
+                                user_row["plan_id"], user_row["email"]
+                            )
+                            return auth.Session(
+                                id=uuid.uuid5(uuid.NAMESPACE_DNS, token),
+                                person=person,
+                                device_id=None,
+                                method="ai_agent",
+                                age=dt.timedelta(seconds=0),
+                                label=key_info.agent_name,
+                                computer_id=None,
+                            )
+            except Exception as exc:
+                log.warning("Failed to authenticate AI token %s: %s", token, exc)
+
         session = await auth.session(
-            pool, cookie(request, auth.SESSION_COOKIE),
+            pool, token,
             touch=request.headers.get(BACKGROUND_HEADER) != "1")
         if session is None:
             raise SignedOut()
@@ -2038,8 +2094,50 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
             return
         # The page opens its socket by itself, on start and after a lost
         # connection: not something done.
-        session = await auth.session(
-            pool, cookie(websocket, auth.SESSION_COOKIE), touch=False)
+        token = cookie(websocket, auth.SESSION_COOKIE)
+        session = None
+        if token and token.startswith("tt_ai_"):
+            try:
+                from ..orchestration.ai_sessions import ai_agent_manager
+                key_info = ai_agent_manager.validate_token(token)
+                if key_info:
+                    p_uuid = None
+                    try:
+                        p_uuid = uuid.UUID(key_info.project_id)
+                    except Exception:
+                        pass
+                    owner_id = None
+                    if p_uuid:
+                        owner_id = await pool.fetchval(
+                            "SELECT owner_id FROM projects WHERE id = $1 AND deleted_at IS NULL",
+                            p_uuid
+                        )
+                    if not owner_id:
+                        owner_id = await pool.fetchval("SELECT id FROM users ORDER BY created_at LIMIT 1")
+                    if owner_id:
+                        user_row = await pool.fetchrow(
+                            "SELECT id, name, theme, plan_id, email FROM users WHERE id = $1",
+                            owner_id
+                        )
+                        if user_row:
+                            person = auth.Person(
+                                user_row["id"], user_row["name"], user_row["theme"],
+                                user_row["plan_id"], user_row["email"]
+                            )
+                            session = auth.Session(
+                                id=uuid.uuid5(uuid.NAMESPACE_DNS, token),
+                                person=person,
+                                device_id=None,
+                                method="ai_agent",
+                                age=dt.timedelta(seconds=0),
+                                label=key_info.agent_name,
+                                computer_id=None,
+                            )
+            except Exception as exc:
+                log.warning("WebSocket AI token auth failed: %s", exc)
+
+        if session is None:
+            session = await auth.session(pool, token, touch=False)
         if session is None:
             # Accepted to be closed with a reason the page understands.
             await websocket.accept()

@@ -20,13 +20,15 @@ interface Props {
   notify: (text: string) => void;
   onUploadClick?: () => void;
   onSftpClick?: () => void;
+  projectId?: string;
+  projectName?: string;
 }
 
 export function TerminalHeader(props: Props) {
   const {
     terminalId, info, machineName, terminalLabel, where, running, away,
     isEnded, mode, noBlocks, me, onChooseMode, notify,
-    onUploadClick, onSftpClick,
+    onUploadClick, onSftpClick, projectId, projectName,
   } = props;
   const [accessDialogOpen, setAccessDialogOpen] = useState(false);
 
@@ -119,6 +121,8 @@ export function TerminalHeader(props: Props) {
           terminalId={terminalId}
           machineName={machineName || "Компьютер"} // i18n-ignore
           terminalLabel={terminalLabel}
+          projectId={projectId}
+          projectName={projectName}
           me={me}
           onClose={() => setAccessDialogOpen(false)}
           notify={notify}

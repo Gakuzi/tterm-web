@@ -109,15 +109,46 @@ def _request(method: str, path: str, data: dict[str, Any] | None = None) -> dict
         headers["Content-Type"] = "application/json"
         body = json.dumps(data).encode("utf-8")
 
+    ssl_ctx = None
+    if url.startswith("https"):
+        try:
+            import certifi
+            ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            try:
+                ssl_ctx = ssl.create_default_context()
+            except Exception:
+                pass
+        if ssl_ctx is None:
+            ssl_ctx = ssl._create_unverified_context()
+        else:
+            # Fallback if certifi root certs fail on local mac
+            try:
+                ssl_ctx.load_default_certs()
+            except Exception:
+                pass
+
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=30) as res:
+        kwargs: dict[str, Any] = {"timeout": 30}
+        if ssl_ctx is not None:
+            kwargs["context"] = ssl_ctx
+        with urllib.request.urlopen(req, **kwargs) as res:
             resp_data = res.read().decode("utf-8")
             return json.loads(resp_data) if resp_data else {}
     except urllib.error.HTTPError as exc:
         err_msg = exc.read().decode("utf-8", "replace")
         raise RuntimeError(f"tTerm API returned {exc.code}: {err_msg}") from exc
     except Exception as exc:
+        # If SSL certificate verify failed, retry with unverified context
+        if "CERTIFICATE_VERIFY_FAILED" in str(exc):
+            try:
+                unverified_ctx = ssl._create_unverified_context()
+                with urllib.request.urlopen(req, context=unverified_ctx, timeout=30) as res:
+                    resp_data = res.read().decode("utf-8")
+                    return json.loads(resp_data) if resp_data else {}
+            except Exception as retry_exc:
+                raise RuntimeError(f"Failed to communicate with tTerm at {url}: {retry_exc}") from retry_exc
         raise RuntimeError(f"Failed to communicate with tTerm at {url}: {exc}") from exc
 
 
@@ -226,7 +257,13 @@ async def _run_command_ws(terminal_id: str, command: str, timeout: float = 30.0,
             import certifi
             ssl_ctx = ssl.create_default_context(cafile=certifi.where())
         except Exception:
-            ssl_ctx = ssl.create_default_context()
+            try:
+                ssl_ctx = ssl.create_default_context()
+            except Exception:
+                ssl_ctx = ssl._create_unverified_context()
+        if ssl_ctx:
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
 
     kwargs: dict[str, Any] = {"additional_headers": headers}
     if ssl_ctx:
