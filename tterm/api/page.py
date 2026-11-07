@@ -13,10 +13,13 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 import html
+import logging
 import re
 import secrets
 import uuid
 from pathlib import Path
+
+log = logging.getLogger("tterm.page")
 from urllib.parse import urlencode
 
 import asyncpg

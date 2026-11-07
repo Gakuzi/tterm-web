@@ -242,13 +242,16 @@ async def _run_command_ws(terminal_id: str, command: str, timeout: float = 30.0,
 
     tterm_url = _get_url()
     tterm_session = _get_session()
+    tterm_token = _get_ai_token()
+    token_to_use = tterm_token or tterm_session
     ws_scheme = "wss" if tterm_url.startswith("https") else "ws"
     ws_host = tterm_url.split("://", 1)[1]
-    ws_url = f"{ws_scheme}://{ws_host}/api/ws"
+    ws_url = f"{ws_scheme}://{ws_host}/api/ws?token={token_to_use}"
 
     headers = [
-        ("Cookie", f"__Host-tterm-session={tterm_session}; tterm-session={tterm_session}"),
+        ("Cookie", f"__Host-tterm-session={token_to_use}; tterm-session={token_to_use}"),
         ("Origin", tterm_url),
+        ("X-AI-Token", token_to_use),
     ]
 
     ssl_ctx = None

@@ -83,6 +83,23 @@ class AIAgentSessionManager:
             created_at=now,
         )
 
+    def validate_token(self, token: str) -> Optional[AIAgentKeyDTO]:
+        """Validates an AI Agent token and returns its metadata if active."""
+        if not token or not isinstance(token, str):
+            return None
+        tok = token.strip()
+        key_dto = self._keys.get(tok)
+        if not key_dto or key_dto.revoked:
+            return None
+        if key_dto.expires_at:
+            try:
+                exp = dt.datetime.fromisoformat(key_dto.expires_at)
+                if exp < dt.datetime.now(dt.timezone.utc):
+                    return None
+            except Exception:
+                pass
+        return key_dto
+
     def generate_agent_key(
         self,
         project_id: str = "default-project",
