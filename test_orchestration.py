@@ -1240,6 +1240,54 @@ class TestSmtpMailer(unittest.TestCase):
         self.assertEqual(len(log_mailer.sent), 1)
         self.assertEqual(log_mailer.sent[0].to, "test@example.com")
 
+    def test_multilingual_code_email(self):
+        from tterm.core import letters
+
+        # Russian
+        mail_ru = letters.code_email(
+            to="user@example.com",
+            code="654321",
+            minutes=10,
+            page_url="http://82.148.241.254:8290",
+            lang="ru",
+        )
+        self.assertIn("ваш проверочный код", mail_ru.subject)
+        self.assertIn("654321", mail_ru.subject)
+        self.assertIn("Ваш проверочный код для входа в tTerm: 654321", mail_ru.text)
+        self.assertIn("Никому не сообщайте код", mail_ru.text)
+
+        # German
+        mail_de = letters.code_email(
+            to="user@example.com",
+            code="112233",
+            minutes=10,
+            page_url="http://82.148.241.254:8290",
+            lang="de",
+        )
+        self.assertIn("Anmeldecode", mail_de.subject)
+        self.assertIn("112233", mail_de.subject)
+
+        # Chinese
+        mail_zh = letters.code_email(
+            to="user@example.com",
+            code="998877",
+            minutes=10,
+            page_url="http://82.148.241.254:8290",
+            lang="zh-CN",
+        )
+        self.assertIn("登录验证码", mail_zh.subject)
+        self.assertIn("998877", mail_zh.subject)
+
+        # Fallback to English for unknown language
+        mail_fallback = letters.code_email(
+            to="user@example.com",
+            code="555444",
+            minutes=10,
+            page_url="http://82.148.241.254:8290",
+            lang="unknown-lang-xyz",
+        )
+        self.assertIn("is your tTerm sign-in code", mail_fallback.subject)
+
 
 if __name__ == "__main__":
     unittest.main()

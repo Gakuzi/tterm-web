@@ -19,7 +19,7 @@ import {
   telegramAuthStatus, validateInviteToken, verifyCode, verifyTelegramCode, type InviteValidationResult,
   type KnownDevice, type Legal, type SignedInNow, type TelegramAuthStatus, type TelegramWidgetUser,
 } from "./api";
-import { useT, type Translate } from "./i18n";
+import { LANGUAGES, showLanguage, useT, type Lang, type Translate } from "./i18n";
 import { Logo } from "./icons";
 
 const CODE_DIGITS = 6;
@@ -469,7 +469,7 @@ function EmailStep(props: {
     setProblem(null);
     try {
       if (method === "email") {
-        const sent = await askCode(props.email);
+        const sent = await askCode(props.email, t.lang);
         props.onSent(sent.email);
       } else {
         const clean = tgId.trim().replace(/^@/, "");
@@ -485,7 +485,30 @@ function EmailStep(props: {
 
   return (
     <form className="signin-form" onSubmit={(e) => void submit(e)}>
-      <h1>{t("common.sign_in")}</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <h1 style={{ margin: 0 }}>{t("common.sign_in")}</h1>
+        <select
+          value={t.lang}
+          onChange={(e) => void showLanguage(e.target.value as Lang)}
+          className="button"
+          style={{
+            fontSize: 13,
+            padding: "4px 8px",
+            background: "var(--raised)",
+            border: "1px solid var(--line)",
+            borderRadius: 6,
+            color: "var(--ink)",
+            cursor: "pointer",
+          }}
+          aria-label={"Язык интерфейса" /* i18n-ignore */}
+        >
+          {LANGUAGES.map((l) => (
+            <option key={l.code} value={l.code}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="segmented" style={{ marginBottom: 16 }} role="group">
         <button
           type="button"
@@ -802,7 +825,7 @@ function CodeStep(props: {
     setProblem(null);
     setSent(null);
     try {
-      await askCode(props.email);
+      await askCode(props.email, t.lang);
       setSentAt(Date.now());
       setNow(Date.now());
       setSpent(false);
@@ -1032,7 +1055,7 @@ function PinStep(props: {
     setAsking(true);
     setProblem(null);
     try {
-      const sent = await askCode(props.device.email);
+      const sent = await askCode(props.device.email, t.lang);
       props.onCode(sent.email);
     } catch (error) {
       setProblem(textOf(error, t));

@@ -325,7 +325,7 @@ def is_token(raw: object) -> bool:
 
 async def ask_code(pool: asyncpg.Pool, secret: bytes, mailer: Mailer, *,
                    email: str, browser: str, ip: str, page_url: str,
-                   support: str = letters.SUPPORT) -> None:
+                   support: str = letters.SUPPORT, lang: str = "en") -> None:
     """Sends a code for signing in to `email`, for this browser. Refuses,
     saying when to try again, when codes come too often: to one address,
     from one network, or in all. An email that does not go out does not
@@ -377,7 +377,7 @@ async def ask_code(pool: asyncpg.Pool, secret: bytes, mailer: Mailer, *,
     try:
         await mailer.send(letters.code_email(
             to=email, code=code, minutes=CODE_MINUTES, page_url=page_url,
-            support=support))
+            support=support, lang=lang))
     except MailFailed:
         # Nothing went out: it counts against no limit, and a new try may
         # come at once.

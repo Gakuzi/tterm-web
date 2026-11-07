@@ -6,7 +6,7 @@
 // answers that there is none, or it ended, the page hears it through
 // onSignedOut and asks to sign in; so does the socket (socket.ts).
 
-import { t as say } from "./i18n";
+import { language, t as say } from "./i18n";
 
 export type Theme = "system" | "light" | "dark";
 export type Role = "owner" | "admin" | "member" | "observer";
@@ -610,8 +610,8 @@ export function configureTelegramBot(botToken: string, botUsername?: string, cha
 }
 
 /** Sends a code for signing in to the address. */
-export function askCode(email: string): Promise<{ email: string; minutes: number }> {
-  return auth("/api/auth/code", { email });
+export function askCode(email: string, lang?: string): Promise<{ email: string; minutes: number }> {
+  return auth("/api/auth/code", { email, lang: lang || language() });
 }
 
 export function verifyCode(email: string,

@@ -49,25 +49,167 @@ def when(moment: dt.datetime) -> str:
             f"{moment:%H:%M} UTC")
 
 
+CODE_EMAIL_TRANSLATIONS = {
+    "ru": {
+        "subject": "{code} — ваш проверочный код для входа в tTerm",
+        "title": "Ваш код для входа",
+        "text_header": "Ваш проверочный код для входа в tTerm: {code}",
+        "lead": "Введите его в браузере, где вы запросили вход. Код действует {minutes} мин.",
+        "keep_title": "Никому не сообщайте код.",
+        "keep": "tTerm никогда не запрашивает код по телефону или в чатах.",
+        "ignore": "Если вы не запрашивали этот код, просто проигнорируйте письмо. Без кода никто не сможет войти.",
+        "note": "Вы получили это письмо, потому что на {host} был запрошен код подтверждения для этого адреса.",
+    },
+    "en": {
+        "subject": "{code} is your tTerm sign-in code",
+        "title": "Your sign-in code",
+        "text_header": "Your tTerm sign-in code: {code}",
+        "lead": "Enter it in the browser where you asked for it. It works for {minutes} minutes.",
+        "keep_title": "Keep it to yourself.",
+        "keep": "tTerm never asks for it by phone or in a chat.",
+        "ignore": "If you did not ask for it, ignore this email. Without the code nobody can sign in.",
+        "note": "You get this email because someone asked for a sign-in code for this address at {host}.",
+    },
+    "de": {
+        "subject": "{code} ist Ihr tTerm-Anmeldecode",
+        "title": "Ihr Anmeldecode",
+        "text_header": "Ihr tTerm-Anmeldecode: {code}",
+        "lead": "Geben Sie ihn im Browser ein, in dem Sie ihn angefordert haben. Er ist {minutes} Minuten gültig.",
+        "keep_title": "Behalten Sie ihn für sich.",
+        "keep": "tTerm fragt niemals telefonisch oder im Chat danach.",
+        "ignore": "Wenn Sie ihn nicht angefordert haben, ignorieren Sie diese E-Mail. Ohne den Code kann sich niemand anmelden.",
+        "note": "Sie erhalten diese E-Mail, da auf {host} ein Anmeldecode für diese Adresse angefordert wurde.",
+    },
+    "fr": {
+        "subject": "{code} est votre code de connexion tTerm",
+        "title": "Votre code de connexion",
+        "text_header": "Votre code de connexion tTerm : {code}",
+        "lead": "Saisissez-le dans le navigateur où vous l'avez demandé. Il est valable {minutes} minutes.",
+        "keep_title": "Ne le partagez pas.",
+        "keep": "tTerm ne vous le demandera jamais par téléphone ou dans un chat.",
+        "ignore": "Si vous n'en êtes pas à l'origine, ignorez cet e-mail. Personne ne peut se connecter sans le code.",
+        "note": "Vous recevez cet e-mail car un code de connexion a été demandé pour cette adresse sur {host}.",
+    },
+    "es": {
+        "subject": "{code} es tu código de inicio de sesión de tTerm",
+        "title": "Tu código de inicio de sesión",
+        "text_header": "Tu código de inicio de sesión de tTerm: {code}",
+        "lead": "Introdúcelo en el navegador donde lo solicitaste. Es válido por {minutes} minutos.",
+        "keep_title": "Mantenlo en secreto.",
+        "keep": "tTerm nunca te lo pedirá por teléfono ni por chat.",
+        "ignore": "Si no lo solicitaste, ignora este correo. Nadie puede iniciar sesión sin el código.",
+        "note": "Recibes este correo porque alguien solicitó un código de acceso en {host}.",
+    },
+    "it": {
+        "subject": "{code} è il tuo codice di accesso tTerm",
+        "title": "Il tuo codice di accesso",
+        "text_header": "Il tuo codice di accesso tTerm: {code}",
+        "lead": "Inseriscilo nel browser in cui l'hai richiesto. È valido per {minutes} minuti.",
+        "keep_title": "Tienilo per te.",
+        "keep": "tTerm non lo chiederà mai al telefono o in una chat.",
+        "ignore": "Se non l'hai richiesto, ignora questa email. Nessuno può accedere senza il codice.",
+        "note": "Ricevi questa email perché è stato richiesto un codice di accesso su {host}.",
+    },
+    "pt-BR": {
+        "subject": "{code} é o seu código de acesso ao tTerm",
+        "title": "Seu código de acesso",
+        "text_header": "Seu código de acesso ao tTerm: {code}",
+        "lead": "Digite-o no navegador em que você o solicitou. Ele é válido por {minutes} minutos.",
+        "keep_title": "Mantenha em segredo.",
+        "keep": "O tTerm nunca pedirá esse código por telefone ou chat.",
+        "ignore": "Se você não solicitou, ignore este e-mail. Ninguém pode entrar sem o código.",
+        "note": "Você recebeu este e-mail porque alguém solicitou um código para este endereço em {host}.",
+    },
+    "pl": {
+        "subject": "{code} to Twój kod logowania do tTerm",
+        "title": "Twój kod logowania",
+        "text_header": "Twój kod logowania do tTerm: {code}",
+        "lead": "Wprowadź go w przeglądarce, w której został zażądany. Jest ważny przez {minutes} minut.",
+        "keep_title": "Zachowaj go dla siebie.",
+        "keep": "tTerm nigdy nie prosi o kod przez telefon ani na czacie.",
+        "ignore": "Jeśli to nie Ty prosiłeś o kod, zignoruj tę wiadomość. Nikt nie zaloguje się bez kodu.",
+        "note": "Otrzymujesz tę wiadomość, ponieważ zażądano kodu logowania dla tego adresu na {host}.",
+    },
+    "tr": {
+        "subject": "{code} tTerm giriş kodunuzdur",
+        "title": "Giriş kodunuz",
+        "text_header": "tTerm giriş kodunuz: {code}",
+        "lead": "İstekte bulunduğunuz tarayıcıya girin. {minutes} dakika geçerlidir.",
+        "keep_title": "Gizli tutun.",
+        "keep": "tTerm bu kodu hiçbir zaman telefonla veya sohbet yoluyla istemez.",
+        "ignore": "Siz talep etmediyseniz bu e-postayı dikkate almayın. Kod olmadan kimse giriş yapamaz.",
+        "note": "Bu e-postayı, {host} üzerinden bu adres için bir giriş kodu istendiği için alıyorsunuz.",
+    },
+    "zh-CN": {
+        "subject": "{code} 是您的 tTerm 登录验证码",
+        "title": "您的登录验证码",
+        "text_header": "您的 tTerm 登录验证码：{code}",
+        "lead": "请在发起请求的浏览器中输入该验证码。有效期为 {minutes} 分钟。",
+        "keep_title": "请妥善保管。",
+        "keep": "tTerm 绝不会通过电话或即时聊天向您索取验证码。",
+        "ignore": "如果您没有发起此请求，请忽略此邮件。没有验证码任何人无法登录。",
+        "note": "您收到此邮件是因为有人在 {host} 请求了该邮箱的登录验证码。",
+    },
+    "ja": {
+        "subject": "{code} は tTerm のログインコードです",
+        "title": "ログインコード",
+        "text_header": "tTerm のログインコード：{code}",
+        "lead": "リクエストしたブラウザに入力してください。有効期限は {minutes} 分間です。",
+        "keep_title": "大切に保管してください。",
+        "keep": "tTerm が電話やチャットでコードを尋ねることは決してありません。",
+        "ignore": "心当たりがない場合は、このメールを破棄してください。コードがなければログインできません。",
+        "note": "{host} でこのメールアドレス宛てにログインコードがリクエストされたため送信されています。",
+    },
+    "ko": {
+        "subject": "{code} 은(는) tTerm 로그인 코드입니다",
+        "title": "로그인 코드",
+        "text_header": "tTerm 로그인 코드: {code}",
+        "lead": "요청하신 브라우저에 코드를 입력하세요. 유효 시간은 {minutes}분입니다.",
+        "keep_title": "안전하게 보관하세요.",
+        "keep": "tTerm은 전화나 채팅으로 인증 코드를 요구하지 않습니다.",
+        "ignore": "직접 요청하지 않으셨다면 이 이메일을 무시하세요. 코드 없이는 누구도 로그인할 수 없습니다.",
+        "note": "{host} 에서 이 주소로 로그인 코드가 요청되어 발송되었습니다.",
+    },
+}
+
+
+def normalize_lang(raw: str | None) -> str:
+    if not raw:
+        return "en"
+    clean = raw.strip().lower().replace("_", "-")
+    if clean.startswith("zh"):
+        return "zh-CN"
+    if clean.startswith("pt"):
+        return "pt-BR"
+    short = clean.split("-")[0]
+    if clean in CODE_EMAIL_TRANSLATIONS:
+        return clean
+    if short in CODE_EMAIL_TRANSLATIONS:
+        return short
+    return "en"
+
+
 def code_email(*, to: str, code: str, minutes: int, page_url: str,
-               support: str = SUPPORT) -> Email:
-    """The six digits for signing in. The subject starts with them, so that
-    they show in the phone's notification."""
-    subject = f"{code} is your tTerm sign-in code"
-    lead = (f"Enter it in the browser where you asked for it. It works for "
-            f"{minutes} minutes.")
-    keep = "tTerm never asks for it by phone or in a chat."
-    ignore = ("If you did not ask for it, ignore this email. Without the "
-              "code nobody can sign in.")
-    # Not the address itself: anyone may ask for a code to any address, and
-    # what they typed is no part of an email in tTerm's name.
-    note = (f"You get this email because someone asked for a sign-in code "
-            f"for this address at {_host(page_url)}.")
-    text = (f"Your tTerm sign-in code: {code}\n\n{lead}\n\n"
-            f"Keep it to yourself: {keep}\n\n{ignore}\n\n{note}\n\n"
+               support: str = SUPPORT, lang: str = "en") -> Email:
+    """The six digits for signing in localized in the user's selected language.
+    The subject starts with them, so that they show in the phone's notification."""
+    normalized_lang = normalize_lang(lang)
+    tr = CODE_EMAIL_TRANSLATIONS.get(normalized_lang, CODE_EMAIL_TRANSLATIONS["en"])
+    host_str = _host(page_url)
+
+    subject = tr["subject"].format(code=code, minutes=minutes, host=host_str)
+    lead = tr["lead"].format(code=code, minutes=minutes, host=host_str)
+    keep_title = tr["keep_title"]
+    keep = tr["keep"]
+    ignore = tr["ignore"]
+    note = tr["note"].format(host=host_str, code=code, minutes=minutes)
+    text_header = tr["text_header"].format(code=code)
+
+    text = (f"{text_header}\n\n{lead}\n\n"
+            f"{keep_title} {keep}\n\n{ignore}\n\n{note}\n\n"
             f"{_footer_text(page_url, support)}\n")
     body = (
-        _title("Your sign-in code")
+        _title(tr["title"])
         + _lead(escape(lead))
         + _gap(24)
         + '<table role="presentation" width="100%" cellpadding="0" '
@@ -79,7 +221,7 @@ def code_email(*, to: str, code: str, minutes: int, page_url: str,
           '</tr></table>'
         + f'<p style="margin:24px 0 0;padding:14px 16px;background:{GROUND};'
           f'border-radius:10px;font-size:14px;line-height:1.55;color:{INK};">'
-          f'<strong>Keep it to yourself.</strong> {escape(keep)}</p>'
+          f'<strong>{escape(keep_title)}</strong> {escape(keep)}</p>'
         + f'<p style="margin:16px 0 0;font-size:14px;line-height:1.6;'
           f'color:{DIM};">{escape(ignore)}</p>')
     return Email(to=to, subject=subject, text=text,

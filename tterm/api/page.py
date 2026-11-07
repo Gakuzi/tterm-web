@@ -63,6 +63,7 @@ class MePatch(BaseModel):
 
 class EmailBody(BaseModel):
     email: str
+    lang: str | None = None
 
 
 class CodeBody(BaseModel):
@@ -496,11 +497,13 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         if email is None:
             return _json({"error": "That does not look like an email address."},
                          422)
+        lang = body.lang or request.headers.get("accept-language", "").split(",")[0].split(";")[0].strip() or "en"
         browser = cookie(request, auth.BROWSER_COOKIE) or auth.new_token()
         try:
             await auth.ask_code(pool, secret, mailer, email=email,
                                 browser=browser, ip=client_ip(request),
-                                page_url=page_url, support=support_address)
+                                page_url=page_url, support=support_address,
+                                lang=lang)
         except auth.Refused as exc:
             return refused(exc)
         response = _json({"sent": True, "email": email,
