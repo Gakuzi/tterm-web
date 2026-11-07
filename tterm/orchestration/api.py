@@ -2104,10 +2104,13 @@ class UpdateAISessionDTO(BaseModel):
 
 
 @router.post("/ai-keys/generate")
-async def generate_ai_agent_key(data: GenerateAIKeyDTO):
+async def generate_ai_agent_key(data: GenerateAIKeyDTO, request: Request = None):
     """Generates scoped connection key and JSON bundle for an AI Agent."""
     from .ai_sessions import ai_agent_manager
     terms = data.allowed_terminals or ([data.allowed_terminal] if data.allowed_terminal else ["*"])
+    proto = (request.headers.get("x-forwarded-proto") if request else "") or (request.url.scheme if request else "http")
+    host = (request.headers.get("x-forwarded-host") or request.headers.get("host") if request else "") or (request.url.netloc if request else "localhost:8290")
+    base_url = f"{proto}://{host}".rstrip("/")
     res = ai_agent_manager.generate_agent_key(
         project_id=data.project_id,
         allowed_terminals=terms,
@@ -2116,6 +2119,7 @@ async def generate_ai_agent_key(data: GenerateAIKeyDTO):
         role=data.role,
         ai_mode=data.ai_mode,
         ttl_hours=data.ttl_hours,
+        base_url=base_url,
     )
     return res
 

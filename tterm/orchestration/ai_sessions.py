@@ -92,6 +92,7 @@ class AIAgentSessionManager:
         role: str = "container_developer",
         ai_mode: str = "guard",
         ttl_hours: int = 72,
+        base_url: str = "http://localhost:8290",
     ) -> Dict[str, Any]:
         """Generates a new scoped token and connection bundle for an AI Agent."""
         token = f"tt_ai_{secrets.token_hex(16)}"
@@ -118,7 +119,7 @@ class AIAgentSessionManager:
         # Create connection payload formatted as requested by user
         primary_term = term_list[0] if term_list and term_list[0] != "*" else "all"
         connection_json = {
-            "url": "http://localhost:8290",
+            "url": base_url,
             "token": token,
             "allowed_terminal": primary_term,
             "project_id": project_id,
@@ -132,7 +133,7 @@ class AIAgentSessionManager:
                     "command": "python3",
                     "args": ["-m", "mcp_server", "--token", token],
                     "env": {
-                        "TTERM_URL": "http://localhost:8290",
+                        "TTERM_URL": base_url,
                         "TTERM_AI_TOKEN": token,
                         "ALLOWED_TERMINAL": primary_term if primary_term != "all" else "",
                     },
