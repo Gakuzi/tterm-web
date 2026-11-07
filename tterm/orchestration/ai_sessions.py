@@ -188,6 +188,7 @@ class AIAgentSessionManager:
             name = norm_name
 
         # Prune old duplicate sess-ai-mcp-* or legacy sessions
+        is_antigravity = "antigravity" in norm_name.lower() or "антигравит" in norm_name.lower()
         for sid in list(self._sessions.keys()):
             s_item = self._sessions[sid]
             is_dup_ag = is_antigravity and ("antigravity" in s_item.agent_name.lower() or "антигравит" in s_item.agent_name.lower())
