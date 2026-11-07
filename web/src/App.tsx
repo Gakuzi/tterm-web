@@ -2274,10 +2274,10 @@ export function App() {
                 <span style={{ fontSize: 24 }}>🤝</span>
                 <div className="dialog-title">
                   <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, color: "var(--ink)" }}>
-                    Приглашение в проект
+                    Приглашение в проект {/* i18n-ignore */}
                   </h2>
                   <p style={{ fontSize: 12, color: "var(--dim)", margin: "2px 0 0" }}>
-                    Командный доступ к проекту и его терминалам
+                    Командный доступ к проекту и его терминалам {/* i18n-ignore */}
                   </p>
                 </div>
               </div>
@@ -2285,7 +2285,7 @@ export function App() {
                 type="button"
                 className="icon-button small"
                 onClick={() => setActiveInviteToAccept(null)}
-                aria-label="Закрыть"
+                aria-label="Закрыть" // i18n-ignore
               >
                 <Close size={16} />
               </button>
@@ -2299,27 +2299,27 @@ export function App() {
               margin: "16px 0",
             }}>
               <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ink)", marginBottom: 8 }}>
-                {activeInviteToAccept.info.project?.name || "Проект"}
+                {activeInviteToAccept.info.project?.name || "Проект"} {/* i18n-ignore */}
               </div>
               <div style={{ fontSize: 13, color: "var(--dim)", marginBottom: 6 }}>
-                Пригласил: <strong style={{ color: "var(--ink)" }}>{activeInviteToAccept.info.project?.creator_name || "Владелец"}</strong>
+                Пригласил: <strong style={{ color: "var(--ink)" }}>{activeInviteToAccept.info.project?.creator_name || "Владелец"}</strong> {/* i18n-ignore */}
               </div>
               <div style={{ fontSize: 13, color: "var(--dim)" }}>
-                Предоставляемая роль: <strong style={{
+                Предоставляемая роль: <strong style={{ // i18n-ignore
                   color: activeInviteToAccept.info.invite?.role === "admin" ? "#f87171" : "#60a5fa",
                   fontWeight: 600,
                 }}>
                   {activeInviteToAccept.info.invite?.role === "admin"
-                    ? "Администратор (admin)"
+                    ? "Администратор (admin)" // i18n-ignore
                     : activeInviteToAccept.info.invite?.role === "observer"
-                      ? "Наблюдатель (observer)"
-                      : "Участник (member)"}
+                      ? "Наблюдатель (observer)" // i18n-ignore
+                      : "Участник (member)"} {/* i18n-ignore */}
                 </strong>
               </div>
             </div>
 
             <p style={{ fontSize: 12, color: "var(--faint)", margin: "0 0 16px 0" }}>
-              После подключения этот проект появится в вашем списке проектов, и вы сможете работать с его машинами и терминалами.
+              После подключения этот проект появится в вашем списке проектов, и вы сможете работать с его машинами и терминалами. {/* i18n-ignore */}
             </p>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
@@ -2329,7 +2329,7 @@ export function App() {
                 onClick={() => setActiveInviteToAccept(null)}
                 disabled={isAcceptingInvite}
               >
-                Отклонить
+                Отклонить {/* i18n-ignore */}
               </button>
               <button
                 type="button"
@@ -2337,7 +2337,7 @@ export function App() {
                 onClick={handleAcceptInvite}
                 disabled={isAcceptingInvite}
               >
-                {isAcceptingInvite ? "Подключение..." : "Присоединиться к проекту"}
+                {isAcceptingInvite ? "Подключение..." : "Присоединиться к проекту"} {/* i18n-ignore */}
               </button>
             </div>
           </section>

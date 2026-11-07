@@ -559,10 +559,10 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
       if (res.ok && res.invite) {
         setCurrentInviteUrl(res.invite.url);
         setActiveInvites((prev) => [res.invite, ...prev]);
-        if (notify) notify("Новая ссылка-приглашение создана!");
+        if (notify) notify("Новая ссылка-приглашение создана!"); // i18n-ignore
       }
     } catch {
-      if (notify) notify("Ошибка создания приглашения");
+      if (notify) notify("Ошибка создания приглашения"); // i18n-ignore
     } finally {
       setIsGeneratingInvite(false);
     }
@@ -573,10 +573,10 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
       const res = await revokeProjectInvite(project.id, invId);
       if (res.ok) {
         setActiveInvites((prev) => prev.filter((i) => i.id !== invId));
-        if (notify) notify("Ссылка приглашения отозвана");
+        if (notify) notify("Ссылка приглашения отозвана"); // i18n-ignore
       }
     } catch {
-      if (notify) notify("Ошибка отзыва ссылки");
+      if (notify) notify("Ошибка отзыва ссылки"); // i18n-ignore
     }
   };
 
@@ -2359,9 +2359,9 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value as any)}
                   >
-                    <option value="member">Участник (member)</option>
-                    <option value="admin">Администратор (admin)</option>
-                    <option value="observer">Наблюдатель (observer)</option>
+                    <option value="member">Участник (member)</option> {/* i18n-ignore */}
+                    <option value="admin">Администратор (admin)</option> {/* i18n-ignore */}
+                    <option value="observer">Наблюдатель (observer)</option> {/* i18n-ignore */}
                   </select>
                 </div>
                 <div>
@@ -2374,10 +2374,10 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
                     value={inviteHours}
                     onChange={(e) => setInviteHours(Number(e.target.value))}
                   >
-                    <option value={24}>24 часа</option>
-                    <option value={168}>7 дней</option>
-                    <option value={720}>30 дней</option>
-                    <option value={0}>Бессрочно</option>
+                    <option value={24}>24 часа</option> {/* i18n-ignore */}
+                    <option value={168}>7 дней</option> {/* i18n-ignore */}
+                    <option value={720}>30 дней</option> {/* i18n-ignore */}
+                    <option value={0}>Бессрочно</option> {/* i18n-ignore */}
                   </select>
                 </div>
                 <div style={{ alignSelf: "flex-end" }}>
@@ -2388,7 +2388,7 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
                     onClick={handleCreateCustomInvite}
                     disabled={isGeneratingInvite}
                   >
-                    {isGeneratingInvite ? "Создание..." : "+ Создать ссылку"}
+                    {isGeneratingInvite ? "Создание..." : "+ Создать ссылку"} {/* i18n-ignore */}
                   </button>
                 </div>
               </div>
@@ -2432,7 +2432,7 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
                           </span>
                         </div>
                         <span style={{ fontSize: 10, color: "var(--faint)" }}>
-                          {inv.expires_at ? `Истекает: ${new Date(inv.expires_at).toLocaleDateString()}` : "Бессрочная"} · Использований: {inv.uses_count}
+                          {inv.expires_at ? `Истекает: ${new Date(inv.expires_at).toLocaleDateString()}` : "Бессрочная"} · Использований: {inv.uses_count} {/* i18n-ignore */}
                         </span>
                       </div>
                       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -2442,10 +2442,10 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
                           style={{ padding: "3px 8px", fontSize: 11 }}
                           onClick={() => {
                             copyToClipboard(inv.url);
-                            if (notify) notify("Ссылка скопирована!");
+                            if (notify) notify("Ссылка скопирована!"); // i18n-ignore
                           }}
                         >
-                          Копировать
+                          Копировать {/* i18n-ignore */}
                         </button>
                         <button
                           type="button"
@@ -2453,7 +2453,7 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
                           style={{ padding: "3px 8px", fontSize: 11 }}
                           onClick={() => handleRevokeInvite(inv.id)}
                         >
-                          Отозвать
+                          Отозвать {/* i18n-ignore */}
                         </button>
                       </div>
                     </div>

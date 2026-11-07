@@ -517,7 +517,7 @@ export function ProjectAccessDialog(props: Props) {
             </h2>
             <p className="dialog-subtitle">
               {/* i18n-ignore */}
-              {activeProjectName || projectName} · {machineName} · {terminalLabel}
+              {activeProjectName || initialProjectName || "Главный проект"} · {machineName} · {terminalLabel}
             </p>
           </div>
           <button
@@ -969,7 +969,7 @@ export function ProjectAccessDialog(props: Props) {
                   <strong>{/* i18n-ignore */}Конфигурация MCP для точечной изоляции (config.json)</strong>
                   <span style={{ fontSize: 11, color: "var(--dim)" }}>
                     {/* i18n-ignore */}
-                    Токен доступа сгенерирован для терминала {terminalLabel} в проекте {activeProjectName || projectName}
+                    Токен доступа сгенерирован для терминала {terminalLabel} в проекте {activeProjectName || initialProjectName || "Главный проект"}
                   </span>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -1088,7 +1088,7 @@ export function ProjectAccessDialog(props: Props) {
                 </span>
                 <div className="dialog-title">
                   <h2 id="pad-invite-title" style={{ fontSize: 16, fontWeight: 600, margin: 0, color: "var(--ink)" }}>
-                    Приглашение в проект {activeProjectName || projectName} {/* i18n-ignore */}
+                    Приглашение в проект {activeProjectName || initialProjectName || "Главный проект"} {/* i18n-ignore */}
                   </h2>
                 </div>
               </div>
@@ -1103,7 +1103,7 @@ export function ProjectAccessDialog(props: Props) {
             </div>
 
             <p style={{ fontSize: 13, color: "var(--dim)", margin: 0, lineHeight: 1.4 }}>
-              По этой ссылке пользователь или ИИ-агент может присоединиться к проекту {activeProjectName || projectName} и получить доступ к назначенным терминалам. {/* i18n-ignore */}
+              По этой ссылке пользователь или ИИ-агент может присоединиться к проекту {activeProjectName || initialProjectName || "Главный проект"} и получить доступ к назначенным терминалам. {/* i18n-ignore */}
             </p>
 
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

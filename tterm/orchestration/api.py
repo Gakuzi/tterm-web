@@ -1092,7 +1092,7 @@ async def accept_project_invite(token: str, request: Request = None):
             INSERT INTO project_members (project_id, user_id, role, created_at)
             VALUES ($1, $2, $3, now())
             ON CONFLICT (project_id, user_id)
-            DO UPDATE SET role = EXCLUDED.role, until = NULL
+            DO UPDATE SET role = CASE WHEN project_members.role = 'owner' THEN 'owner' ELSE EXCLUDED.role END, until = NULL
             """,
             row["project_id"], current_user.id, row["role"]
         )

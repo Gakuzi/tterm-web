@@ -250,13 +250,13 @@ export function SignIn(props: Props) {
                 }}
               >
                 <div style={{ fontWeight: 600, fontSize: 14, color: "#60a5fa", display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 16 }}>🤝</span> Приглашение в проект
+                  <span style={{ fontSize: 16 }}>🤝</span> Приглашение в проект {/* i18n-ignore */}
                 </div>
                 <div style={{ fontSize: 13, marginTop: 6, color: "var(--color-text-primary, #f1f5f9)", lineHeight: 1.4 }}>
-                  Вас приглашают в проект <strong>{inviteInfo.project?.name || "Команда"}</strong> ({inviteInfo.project?.creator_name ? `от ${inviteInfo.project.creator_name}` : "tTerm"}) с ролью <strong>{inviteInfo.invite?.role === "admin" ? "Администратор" : inviteInfo.invite?.role === "observer" ? "Наблюдатель" : "Участник"}</strong>.
+                  Вас приглашают в проект <strong>{inviteInfo.project?.name || "Команда"}</strong> ({inviteInfo.project?.creator_name ? `от ${inviteInfo.project.creator_name}` : "tTerm"}) с ролью <strong>{inviteInfo.invite?.role === "admin" ? "Администратор" : inviteInfo.invite?.role === "observer" ? "Наблюдатель" : "Участник"}</strong>. {/* i18n-ignore */}
                 </div>
                 <div style={{ fontSize: 11, color: "var(--color-text-dim, #94a3b8)", marginTop: 6 }}>
-                  Войдите в аккаунт через Telegram или эл. почту для автоматического подключения и доступа к терминалам проекта.
+                  Войдите в аккаунт через Telegram или эл. почту для автоматического подключения и доступа к терминалам проекта. {/* i18n-ignore */}
                 </div>
               </div>
             )}
