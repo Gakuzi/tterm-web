@@ -101,8 +101,10 @@ def _request(method: str, path: str, data: dict[str, Any] | None = None) -> dict
         "X-AI-Token": tterm_token,
         "X-AI-Session": MCP_SESSION_ID,
     }
-    if tterm_session:
-        headers["Cookie"] = f"__Host-tterm-session={tterm_session}; tterm-session={tterm_session}"
+    token_to_use = tterm_token or tterm_session
+    if token_to_use:
+        headers["Cookie"] = f"__Host-tterm-session={token_to_use}; tterm-session={token_to_use}"
+        headers["Authorization"] = f"Bearer {token_to_use}"
 
     body = None
     if data is not None:

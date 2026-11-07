@@ -268,22 +268,35 @@ export function AddMachine(props: Props) {
                       </details>
                     </>
                   )}
-                  {install?.byHand && (
-                    <details className="by-hand">
-                      <summary>{t("add_machine.by_hand")}</summary>
+                  {install && (
+                    <details className="by-hand" style={{ marginTop: 8 }}>
+                      <summary>{t("add_machine.by_hand")} / Повторное подключение {/* i18n-ignore */}</summary>
                       <span className="hint">
                         {t("add_machine.by_hand_hint", { version: "0.11.0" })}
                       </span>
                       <div className="command-box">
-                        <code>{install.byHand}</code>
+                        <code>
+                          {osPlatform === "windows"
+                            ? `%USERPROFILE%\\.tterm-web\\connect.bat ${install.command.split("/c/")[1]?.split(" ")[0] || ""}`
+                            : `~/.tterm-web/connect.sh ${install.command.split("/c/")[1]?.split(" ")[0] || ""}`}
+                        </code>
                         <button type="button" className="button-plain"
-                          onClick={() => copy(install.byHand,
+                          onClick={() => copy(
+                            osPlatform === "windows"
+                              ? `%USERPROFILE%\\.tterm-web\\connect.bat ${install.command.split("/c/")[1]?.split(" ")[0] || ""}`
+                              : `~/.tterm-web/connect.sh ${install.command.split("/c/")[1]?.split(" ")[0] || ""}`,
                             () => showCopiedHand(true))}>
                           {copiedHand ? <Check size={14} className="pressed-mark" />
                             : <Copy size={14} />}
                           {copiedHand ? t("common.copied") : t("common.copy")}
                         </button>
                       </div>
+                      {install?.byHand && (
+                        <div style={{ marginTop: 8, fontSize: 11, color: "var(--dim)" }}>
+                          <span>Или запуск из исходников agent.py: {/* i18n-ignore */}</span>
+                          <code style={{ fontSize: 11, display: "block", marginTop: 4 }}>{install.byHand}</code>
+                        </div>
+                      )}
                     </details>
                   )}
                 </div>

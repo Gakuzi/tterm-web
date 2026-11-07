@@ -368,6 +368,18 @@ try {
 } catch {}
 
 # 2. Also register in Windows Startup folder (running PowerShell directly in hidden mode)
+$CONNECT_BAT = Join-Path $DIR "connect.bat"
+$connectBatContent = @"
+@echo off
+if "%~1"=="" (
+    echo Usage: connect.bat ^<TTERM_TOKEN^>
+    exit /b 1
+)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "`$f = Join-Path `"`$env:USERPROFILE\.tterm-web`" `"env.json`"; if (Test-Path `$f) { `$c = Get-Content `$f -Raw | ConvertFrom-Json; `$c.token = '%~1'; `$c | ConvertTo-Json | Set-Content `$f }; Stop-Process -Name powershell -ErrorAction SilentlyContinue -FilterScript { `$_.CommandLine -like '*agent.ps1*' }; Start-Process powershell.exe -ArgumentList '-WindowStyle Hidden -ExecutionPolicy Bypass -NoProfile -File `"`$env:USERPROFILE\.tterm-web\agent.ps1`"' -WindowStyle Hidden"
+echo tTerm Agent updated with token %~1 and restarted.
+"@
+[System.IO.File]::WriteAllText($CONNECT_BAT, $connectBatContent, [System.Text.Encoding]::ASCII)
+
 $startupFolder = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Startup)
 $shortcutPath = Join-Path $startupFolder "tTermAgent.lnk"
 try {

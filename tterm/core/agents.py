@@ -916,6 +916,10 @@ async def session(ws: WebSocket, pool: asyncpg.Pool, agents: Agents,
             # dialog it came from hears that this one is connected.
             confirmed = bool(hello["key"]) and await machines.confirm_install(
                 pool, hello["token"], known["id"])
+            if confirmed:
+                known = await _known(pool, hello["key"] or hello["token"]) or known
+                link.machine_id = known["id"]
+                link.machine_name = known["name"]
             if confirmed or _passport_stale(known, link):
                 _later(_read_passport_again(pool, known["id"], link))
         else:
@@ -992,6 +996,17 @@ async def _meet(ws: WebSocket, pool: asyncpg.Pool, agents: Agents,
     # By its own key, if it brought one (tTerm Web's installer); an agent
     # started by hand has its token for a key.
     known = await _known(pool, hello["key"] or hello["token"])
+    if known is None and hello.get("key") and hello.get("token"):
+        if machines.TOKEN_RE.match(hello["key"]) and machines.TOKEN_RE.match(hello["token"]):
+            retired_m = await pool.fetchrow(
+                "SELECT m.id, m.name, p.code, m.removed_at "
+                "FROM machines m JOIN projects p ON p.id = m.project_id "
+                "WHERE m.agent_token_hash = $1 AND m.kind = 'computer'",
+                machines.token_hash(hello["key"]))
+            if retired_m is not None:
+                if await machines.confirm_install(pool, hello["token"], retired_m["id"]):
+                    known = await _known(pool, hello["key"])
+
     if known is not None:
         current = agents.get(known["id"])
         if current is not None:
@@ -1096,7 +1111,11 @@ async def _install_problem(pool: asyncpg.Pool, token: str,
     try."""
     if not machines.TOKEN_RE.match(token):
         return NOT_KNOWN, True, False
-    if key and await machines.key_retired(pool, key):
+    token_valid = bool(await pool.fetchval(
+        "SELECT EXISTS (SELECT 1 FROM install_tokens WHERE token_hash = $1 "
+        "AND kind = 'computer' AND expires_at > now() AND state IN ('waiting', 'failed'))",
+        machines.token_hash(token)))
+    if not token_valid and key and await machines.key_retired(pool, key):
         # A removed computer's installer, run again before its agent heard
         # of the removal: its key stays dead, and the dialog says what to do.
         await machines.fail_token(pool, token, KEY_RETIRED)

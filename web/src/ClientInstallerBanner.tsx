@@ -18,9 +18,11 @@ export function ClientInstallerBanner() {
   };
 
   // i18n-ignore
-  const windowsPsCmd = `powershell -ExecutionPolicy Bypass -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iwr -useb ${window.location.protocol}//${window.location.hostname}:8291/install_computer.ps1 | iex"`;
+  const origin = window.location.origin;
   // i18n-ignore
-  const linuxCmd = `curl -sSL ${window.location.protocol}//${window.location.hostname}:8291/install.sh | bash`;
+  const windowsPsCmd = `powershell -ExecutionPolicy Bypass -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; iwr -useb ${origin}/install_computer.ps1 | iex"`;
+  // i18n-ignore
+  const linuxCmd = `curl -sSL ${origin}/install.sh | bash`;
 
   return (
     <div className="client-installer-banner" style={{
@@ -94,7 +96,7 @@ export function ClientInstallerBanner() {
           </p>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
             <a
-              href={`${window.location.protocol}//${window.location.hostname}:8291/tterm-agent.exe`}
+              href={`${origin}/tterm-agent.exe`}
               download="tterm-agent.exe"
               className="button-accent"
               style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none", padding: "8px 16px", fontWeight: 600 }}
@@ -103,7 +105,7 @@ export function ClientInstallerBanner() {
               Скачать программу (.exe) {/* i18n-ignore */}
             </a>
             <a
-              href={`${window.location.protocol}//${window.location.hostname}:8291/install_windows.bat`}
+              href={`${origin}/install_windows.bat`}
               download="tterm-setup.bat"
               className="button-ghost"
               style={{ display: "inline-flex", alignItems: "center", gap: 6, textDecoration: "none", padding: "8px 14px", fontSize: 13 }}

@@ -646,48 +646,68 @@ async def confirm_install(pool: asyncpg.Pool, token: str,
     """The command from Add a machine, run on a computer that is in tTerm Web
     already: the installer kept the computer's key and updated its agent.
     The command counts as used by this computer, so that the dialog says it
-    is connected. Only a live command of the same project; True if it was
-    one. A command of another project fails, saying where the computer is:
-    a computer is in one project at a time."""
+    is connected. Automatically un-retires a removed machine or re-binds
+    to the target project with multi-project support."""
     if not TOKEN_RE.match(token):
         return False
     async with pool.acquire() as conn, conn.transaction():
-        elsewhere = await conn.fetchrow(
+        token_row = await conn.fetchrow(
             """
-            SELECT t.id
-            FROM install_tokens t, machines m
-            WHERE t.token_hash = $1 AND t.kind = 'computer'
-              AND t.expires_at > now() AND t.state IN ('waiting', 'failed')
-              AND m.id = $2 AND m.project_id <> t.project_id
-            """, token_hash(token), machine_id)
-        if elsewhere is not None:
-            await conn.execute(
-                "UPDATE install_tokens SET state = 'failed', error = $2, "
-                "updated_at = now() WHERE id = $1", elsewhere["id"],
-                "This computer is in tTerm Web already, in another project. "
-                "Remove it there first, or run ~/.tterm-web/uninstall.sh on it "
-                "and then this command.")
+            SELECT id, project_id, created_by, state
+            FROM install_tokens
+            WHERE token_hash = $1 AND kind = 'computer'
+              AND expires_at > now() AND state IN ('waiting', 'failed')
+            """, token_hash(token))
+        if token_row is None:
             return False
-        row = await conn.fetchrow(
+
+        machine_row = await conn.fetchrow(
+            "SELECT id, name, project_id, removed_at FROM machines WHERE id = $1",
+            machine_id)
+        if machine_row is None:
+            return False
+
+        # If machine was removed, un-retire it and bind to new project
+        if machine_row["removed_at"] is not None:
+            await conn.execute(
+                "UPDATE machines SET removed_at = NULL, project_id = $1, last_seen_at = now() WHERE id = $2",
+                token_row["project_id"], machine_id)
+        elif machine_row["project_id"] != token_row["project_id"]:
+            # Different project: switch primary project and bind to new project
+            await conn.execute(
+                "UPDATE machines SET project_id = $1, last_seen_at = now() WHERE id = $2",
+                token_row["project_id"], machine_id)
+
+        # Mark install token as connected
+        await conn.execute(
             """
-            UPDATE install_tokens t
+            UPDATE install_tokens
             SET state = 'connected', used_at = now(), machine_id = $2,
                 error = NULL, updated_at = now()
-            FROM machines m
-            WHERE t.token_hash = $1 AND t.kind = 'computer'
-              AND t.expires_at > now() AND t.state IN ('waiting', 'failed')
-              AND m.id = $2 AND m.project_id = t.project_id
-              AND m.removed_at IS NULL
-            RETURNING t.project_id, t.created_by, m.name
-            """, token_hash(token), machine_id)
-        if row is None:
-            return False
+            WHERE id = $1
+            """, token_row["id"], machine_id)
+
+        # Multi-project binding
+        try:
+            from ..orchestration.machines_projects import machine_project_manager
+            machine_project_manager.bind_machine_to_project(
+                machine_id=str(machine_id),
+                project_id=str(token_row["project_id"]),
+                machine_name=machine_row["name"],
+                role="member"
+            )
+        except Exception as exc:
+            log.warning("Could not bind machine to project in manager: %s", exc)
+
         await accounts.journal(conn, "machine.agent_installed",
-                               project_id=row["project_id"],
-                               user_id=row["created_by"], machine_id=machine_id,
-                               details={"name": row["name"]})
-    log.info("machine.agent_installed: %s", row["name"])
+                               project_id=token_row["project_id"],
+                               user_id=token_row["created_by"], machine_id=machine_id,
+                               details={"name": machine_row["name"]})
+    log.info("machine.agent_installed (connected/re-bound): %s", machine_row["name"])
     return True
+
+
+joined_again = confirm_install
 
 
 @dataclass

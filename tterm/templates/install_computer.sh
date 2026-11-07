@@ -393,6 +393,36 @@ $STOP
 EOF
 chmod 700 "$DIR/uninstall.sh"
 
+cat > "$DIR/connect.sh" <<EOF
+#!/bin/sh
+# tTerm Web: connect or re-bind this computer to a project
+TOKEN="\${1:-}"
+if [ -z "\$TOKEN" ]; then
+    printf 'Usage: %s <TTERM_TOKEN>\n' "\$0" >&2
+    exit 1
+fi
+DIR="$DIR"
+if [ -f "\$DIR/env" ]; then
+    if grep -q '^TTERM_TOKEN=' "\$DIR/env"; then
+        sed -i.bak "s|^TTERM_TOKEN=.*|TTERM_TOKEN=\$TOKEN|" "\$DIR/env" 2>/dev/null || sed -i "" "s|^TTERM_TOKEN=.*|TTERM_TOKEN=\$TOKEN|" "\$DIR/env"
+        rm -f "\$DIR/env.bak"
+    else
+        printf 'TTERM_TOKEN=%s\n' "\$TOKEN" >> "\$DIR/env"
+    fi
+else
+    mkdir -p "\$DIR"
+    printf 'TTERM_HUB=%s\nTTERM_TOKEN=%s\n' "$HUB" "\$TOKEN" > "\$DIR/env"
+fi
+$STOP
+if [ "$OS" = macos ]; then
+    launchctl load "$PLIST" 2>/dev/null || true
+elif [ "$OS" = linux ] && command -v systemctl >/dev/null 2>&1; then
+    systemctl --user restart tterm-web-agent.service 2>/dev/null || true
+fi
+printf 'tTerm Agent updated with token %s and reloaded.\n' "\$TOKEN"
+EOF
+chmod 700 "$DIR/connect.sh"
+
 # -------------------------------------------------------------- connected?
 
 say "Starting the agent..."
