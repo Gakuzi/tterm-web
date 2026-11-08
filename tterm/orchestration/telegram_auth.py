@@ -325,23 +325,6 @@ class TelegramConfigureDTO(BaseModel):
     client_secret: Optional[str] = Field(None, description="Telegram Client Secret")
 
 
-@router.get("/status")
-async def telegram_auth_status(request: Request):
-    """Returns whether Telegram Bot login is available, and the bot username/link."""
-    token, chat = _get_bot_token_and_chat()
-    bot_name = _get_bot_username(token) if token else ""
-    _ensure_polling_started()
-
-    return {
-        "ok": True,
-        "bot_configured": bool(token),
-        "bot_username": bot_name,
-        "bot_link": f"https://t.me/{bot_name}" if bot_name else None,
-        "client_id": _get_client_id(token),
-        "has_client_secret": bool(_get_client_secret()),
-    }
-
-
 @router.post("/configure")
 async def configure_telegram_bot(data: TelegramConfigureDTO, request: Request):
     """Validates and saves Telegram Bot credentials, launching polling immediately."""
@@ -656,6 +639,173 @@ async def telegram_bind_link(request: Request):
     }
 
 
+class LinkEmailRequest(BaseModel):
+    email: str
+
+
+class VerifyEmailCodeRequest(BaseModel):
+    email: str
+    code: str
+
+
+_pending_email_links: Dict[str, Dict[str, Any]] = {}
+
+
+@router.post("/link-email")
+async def link_email_endpoint(data: LinkEmailRequest, request: Request):
+    """Sends a 6-digit verification code to link an email address."""
+    pool_obj = getattr(getattr(request.app, "state", None), "pool", None)
+    token = request.cookies.get(auth.SESSION_COOKIE) or request.cookies.get(f"__Host-{auth.SESSION_COOKIE}")
+    sess = await auth.session(pool_obj, token) if pool_obj and token else None
+    if not sess or not hasattr(sess, "person") or not sess.person:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    user_id = sess.person.id
+
+    raw_email = auth.normalize_email(data.email)
+    if not raw_email:
+        raise HTTPException(status_code=400, detail="Неверный формат адреса электронной почты")
+
+    code = f"{random.randint(100000, 999999)}"
+    _pending_email_links[raw_email] = {
+        "code": code,
+        "user_id": user_id,
+        "expires_at": time.time() + 900,  # 15 minutes
+    }
+
+    # Deliver verification email via configured SMTP
+    try:
+        smtp_host = os.environ.get("TTERM_SMTP_HOST") or os.environ.get("SMTP_HOST") or "smtp.beget.com"
+        smtp_port = int(os.environ.get("TTERM_SMTP_PORT") or os.environ.get("SMTP_PORT") or "2525")
+        smtp_user = os.environ.get("TTERM_SMTP_USER") or os.environ.get("SMTP_USER") or "klimov@e-klimov.ru"
+        smtp_pass = os.environ.get("TTERM_SMTP_PASSWORD") or os.environ.get("SMTP_PASSWORD") or "17Ry5912@_"
+        smtp_ssl = (os.environ.get("TTERM_SMTP_SSL") or os.environ.get("SMTP_SSL") or "false").lower() == "true"
+        sender = f"tTerm <{smtp_user}>"
+
+        mailer = mail.SmtpMailer(smtp_host, smtp_port, smtp_user, smtp_pass, sender, use_ssl=smtp_ssl)
+        subject = f"{code} — код подтверждения tTerm"
+        text = (
+            f"Здравствуйте!\n\n"
+            f"Ваш код для привязки электронной почты в tTerm: {code}\n"
+            f"Код действует 15 минут.\n\n"
+            f"Если вы не запрашивали привязку, проигнорируйте это письмо.\n\n"
+            f"— Команда tTerm"
+        )
+        html_body = (
+            f"<div style='font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;background:#1A1A1A;color:#EDEDED;border-radius:12px;border:1px solid #333;'>"
+            f"<h2 style='color:#E09F3E;margin-top:0;'>Код подтверждения tTerm</h2>"
+            f"<p>Введите этот код для привязки почты <b>{raw_email}</b>:</p>"
+            f"<div style='font-size:32px;font-weight:bold;letter-spacing:6px;color:#E09F3E;background:#262626;padding:16px;text-align:center;border-radius:8px;margin:20px 0;'>{code}</div>"
+            f"<p style='color:#888;font-size:12px;'>Код действует 15 минут. Если вы не запрашивали его, проигнорируйте это письмо.</p>"
+            f"</div>"
+        )
+        await mailer.send(mail.Email(to=raw_email, subject=subject, text=text, html=html_body))
+        log.info("Sent email link code to %s", raw_email)
+    except Exception as e_mail:
+        log.warning("Could not send email code via SMTP: %s", e_mail)
+        # Notify via Telegram bot if user has chat_id
+        if telegram_bot:
+            try:
+                async with pool_obj.acquire() as conn:
+                    chat_val = await conn.fetchval("SELECT telegram_chat_id FROM users WHERE id = $1", user_id)
+                if chat_val:
+                    await telegram_bot.send_message(
+                        str(chat_val),
+                        f"🔐 <b>Код подтверждения для привязки {raw_email}:</b> <code>{code}</code>\n"
+                        f"<i>(Действует 15 минут)</i>"
+                    )
+            except Exception:
+                pass
+
+    return {"ok": True, "message": f"Код отправлен на {raw_email}"}
+
+
+@router.post("/verify-email-code")
+async def verify_email_code_endpoint(data: VerifyEmailCodeRequest, request: Request, response: Response):
+    """Verifies 6-digit code and merges/links email with Telegram account."""
+    pool_obj = getattr(getattr(request.app, "state", None), "pool", None)
+    token = request.cookies.get(auth.SESSION_COOKIE) or request.cookies.get(f"__Host-{auth.SESSION_COOKIE}")
+    sess = await auth.session(pool_obj, token) if pool_obj and token else None
+    if not sess or not hasattr(sess, "person") or not sess.person:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    current_user_id = sess.person.id
+
+    raw_email = auth.normalize_email(data.email)
+    if not raw_email:
+        raise HTTPException(status_code=400, detail="Неверный адрес почты")
+    code_entered = data.code.strip()
+
+    pending = _pending_email_links.get(raw_email)
+    if not pending or time.time() > pending["expires_at"]:
+        raise HTTPException(status_code=400, detail="Срок действия кода истёк или код не запрашивался. Запросите код заново.")
+
+    if pending["code"] != code_entered:
+        raise HTTPException(status_code=400, detail="Неверный код подтверждения")
+
+    _pending_email_links.pop(raw_email, None)
+
+    async with pool_obj.acquire() as conn:
+        async with conn.transaction():
+            curr_row = await conn.fetchrow(
+                "SELECT id, name, email, telegram_chat_id, telegram_username FROM users WHERE id = $1",
+                current_user_id
+            )
+            chat_id = curr_row["telegram_chat_id"] if curr_row else None
+            tg_uname = curr_row["telegram_username"] if curr_row else None
+
+            # Check if another account with this email exists
+            existing_email_user = await conn.fetchrow(
+                "SELECT id, name, email FROM users WHERE lower(email) = $1 AND id != $2",
+                raw_email, current_user_id
+            )
+
+            if existing_email_user:
+                target_id = existing_email_user["id"]
+                # 1. Transfer projects ownership
+                await conn.execute("UPDATE projects SET owner_id = $1 WHERE owner_id = $2", target_id, current_user_id)
+                # 2. Transfer project members
+                await conn.execute(
+                    "UPDATE project_members SET user_id = $1 WHERE user_id = $2 "
+                    "AND project_id NOT IN (SELECT project_id FROM project_members WHERE user_id = $1)",
+                    target_id, current_user_id
+                )
+                await conn.execute("DELETE FROM project_members WHERE user_id = $1", current_user_id)
+                # 3. Update target user with Telegram credentials
+                await conn.execute(
+                    "UPDATE users SET telegram_chat_id = COALESCE($1, telegram_chat_id), "
+                    "telegram_username = COALESCE($2, telegram_username) WHERE id = $3",
+                    chat_id, tg_uname, target_id
+                )
+                # 4. Remove current temporary user
+                await conn.execute("DELETE FROM users WHERE id = $1", current_user_id)
+
+                # 5. Create new session for target_id
+                new_token, _ = await auth._new_session(
+                    conn,
+                    target_id,
+                    method="code",
+                    label="Email Binding Merge",
+                    ip=request.client.host if request.client else "127.0.0.1",
+                )
+                is_secure = request.url.scheme == "https"
+                cname = f"__Host-{auth.SESSION_COOKIE}" if is_secure else auth.SESSION_COOKIE
+                response.set_cookie(
+                    cname,
+                    new_token,
+                    max_age=30 * 24 * 3600,
+                    path="/",
+                    secure=is_secure,
+                    httponly=True,
+                    samesite="lax",
+                )
+                log.info("Merged user %s into email account %s (%s)", current_user_id, target_id, raw_email)
+                return {"ok": True, "merged": True, "email": raw_email, "name": existing_email_user["name"]}
+            else:
+                # Update current account email
+                await conn.execute("UPDATE users SET email = $1 WHERE id = $2", raw_email, current_user_id)
+                log.info("Updated email of user %s to %s", current_user_id, raw_email)
+                return {"ok": True, "merged": False, "email": raw_email}
+
+
 @router.get("/status")
 async def telegram_status_endpoint(request: Request):
     """Returns Telegram bot status and current user's Telegram binding state."""
@@ -664,36 +814,58 @@ async def telegram_status_endpoint(request: Request):
     sess = await auth.session(pool_obj, token) if pool_obj and token else None
     user_id = sess.person.id if sess and hasattr(sess, "person") and sess.person else None
 
+    bot_token = telegram_bot.get_token()
+    bot_name = telegram_bot.bot_username or "ttermnofbot"
+
     bound = False
     chat_id = None
     username = None
-    user_email = sess.person.email if sess and hasattr(sess, "person") and sess.person else None
+    user_email = None
+    has_real_email = False
+    is_telegram_user = False
+    user_name = None
+
+    if sess and hasattr(sess, "person") and sess.person:
+        user_name = sess.person.name
+        if sess.person.email and not sess.person.email.startswith("tg_") and "@telegram.tterm.net" not in sess.person.email:
+            user_email = sess.person.email
+            has_real_email = True
 
     if user_id and pool_obj:
         try:
             async with pool_obj.acquire() as conn:
                 u_row = await conn.fetchrow(
-                    "SELECT telegram_chat_id, telegram_username, email FROM users WHERE id = $1", user_id
+                    "SELECT telegram_chat_id, telegram_username, email, name FROM users WHERE id = $1", user_id
                 )
                 if u_row:
-                    if u_row["email"]:
-                        user_email = u_row["email"]
+                    user_name = u_row["name"] or user_name
+                    db_email = u_row["email"]
+                    if db_email and not db_email.startswith("tg_") and "@telegram.tterm.net" not in db_email:
+                        user_email = db_email
+                        has_real_email = True
                     if u_row["telegram_chat_id"]:
                         bound = True
                         chat_id = u_row["telegram_chat_id"]
                         username = u_row["telegram_username"]
+                        is_telegram_user = True
         except Exception as e_st:
             log.debug("Error checking telegram status for user: %s", e_st)
 
     return {
         "ok": True,
-        "configured": bool(telegram_bot.get_token()),
+        "configured": bool(bot_token),
+        "bot_configured": bool(bot_token),
+        "bot_username": bot_name,
+        "bot_link": f"https://t.me/{bot_name}" if bot_name else None,
+        "client_id": _get_client_id(bot_token),
+        "has_client_secret": bool(_get_client_secret()),
         "bound": bound,
         "chat_id": chat_id,
         "username": username,
         "user_email": user_email,
-        "bot_username": telegram_bot.bot_username,
-        "bot_link": telegram_bot.bot_link,
+        "has_real_email": has_real_email,
+        "is_telegram_user": is_telegram_user,
+        "user_name": user_name,
     }
 
 
@@ -723,43 +895,64 @@ async def _finalize_telegram_signin(
     pool = getattr(getattr(request, "app", None), "state", None)
     pool_obj = getattr(pool, "pool", None) if pool else None
 
-    # Derive email
-    admin_email = os.environ.get("TTERM_OWNER_EMAIL") or os.environ.get("ADMIN_EMAIL") or "eklimov84@gmail.com"
-    # Check if this Telegram ID matches owner
-    is_admin = clean_id in ("eklimov84", "owner-user") or clean_id == os.environ.get("TELEGRAM_CHAT_ID")
-    email = admin_email if is_admin else f"tg_{clean_id}@telegram.tterm.net"
-
     first_name = user_name
     is_new = False
+    clean_chat_id = str(clean_id).strip()
+    active_email = None
 
     if pool_obj:
         try:
             async with pool_obj.acquire() as conn:
                 # 1. Check if user with this telegram_chat_id already exists in users table
                 existing = await conn.fetchrow(
-                    "SELECT id, name, email FROM users WHERE telegram_chat_id = $1", str(clean_id)
+                    "SELECT id, name, email, plan_id FROM users WHERE telegram_chat_id = $1", clean_chat_id
                 )
+
+                # 2. If not found by chat_id, check if this is Evgeniy Klimov (owner)
+                if not existing and (clean_chat_id in ("55570186", "eklimov84") or (username and username.lower() == "eklimov")):
+                    existing = await conn.fetchrow(
+                        "SELECT id, name, email, plan_id FROM users "
+                        "WHERE lower(email) IN ('eklimov84@xmail.ru', 'eklimov84@gmail.com', 'klimov@e-klimov.ru') "
+                        "ORDER BY created_at ASC LIMIT 1"
+                    )
+                    if existing:
+                        await conn.execute(
+                            "UPDATE users SET telegram_chat_id = $1, telegram_username = COALESCE($2, telegram_username) WHERE id = $3",
+                            clean_chat_id, username or "eklimov", existing["id"]
+                        )
+                        log.info("Auto-linked owner account %s to Telegram chat %s", existing["email"], clean_chat_id)
+
                 if existing:
-                    email = existing["email"]
-                    person = await _account(conn, email)
+                    active_email = existing["email"]
+                    first_name = existing["name"] or user_name
+                    person = Person(
+                        existing["id"],
+                        first_name,
+                        "system",
+                        existing["plan_id"] or "free",
+                        active_email,
+                    )
+                    if username:
+                        await conn.execute(
+                            "UPDATE users SET telegram_username = COALESCE($1, telegram_username) WHERE id = $2",
+                            username, existing["id"]
+                        )
                 else:
-                    person = await _account(conn, email)
-                    if not person:
-                        person = await _make_account(conn, email, user_name)
-                        is_new = True
+                    # Create standalone Telegram user with email=NULL
+                    uid = await conn.fetchval(
+                        "INSERT INTO users (name, telegram_chat_id, telegram_username, terms_accepted_at) "
+                        "VALUES ($1, $2, $3, now()) RETURNING id",
+                        user_name, clean_chat_id, username or None
+                    )
+                    await accounts.create_project(conn, uid, "Personal", "P")
+                    await conn.execute(
+                        "INSERT INTO sign_in_methods (user_id, kind, subject) "
+                        "VALUES ($1, 'telegram', $2) ON CONFLICT DO NOTHING", uid, clean_chat_id
+                    )
+                    person = Person(uid, user_name, "system", "free", None)
+                    is_new = True
 
                 if person:
-                    first_name = getattr(person, "first_name", user_name)
-                    # Automatically update telegram binding in DB
-                    try:
-                        await conn.execute(
-                            "UPDATE users SET telegram_chat_id = $1, "
-                            "telegram_username = COALESCE($2, telegram_username) WHERE id = $3",
-                            str(clean_id), username or None, person.id
-                        )
-                    except Exception as e_upd:
-                        log.debug("Could not update telegram_chat_id in users: %s", e_upd)
-
                     try:
                         token, _ = await _new_session(
                             conn,
@@ -787,7 +980,7 @@ async def _finalize_telegram_signin(
                         path="/",
                         secure=is_secure,
                         httponly=True,
-                        samesite="strict",
+                        samesite="lax",
                     )
         except Exception as e:
             log.warning("Database session creation failed in Telegram auth: %s", e)
@@ -797,7 +990,7 @@ async def _finalize_telegram_signin(
         "signedIn": True,
         "new": is_new,
         "name": first_name,
-        "email": email,
+        "email": active_email,
         "offerPin": False,
         "pinDigits": 6,
         "telegram_id": clean_id,

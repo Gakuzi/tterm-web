@@ -157,6 +157,8 @@ class TelegramBotManager:
         self._pending_danger: Dict[str, Dict[str, Any]] = {}
         # session_token -> { "approved": bool, "chat_id": str, ... }
         self._pending_auth_sessions: Dict[str, Dict[str, Any]] = {}
+        # chat_id -> { "email": str, "code": str, "expires_at": float }
+        self._pending_email_confirms: Dict[str, Dict[str, Any]] = {}
 
     def get_token(self) -> str:
         if self._bot_token:
@@ -268,7 +270,7 @@ class TelegramBotManager:
         reply_markup: Optional[Dict[str, Any]] = None,
         parse_mode: str = "HTML",
         disable_web_page_preview: bool = True,
-    ) -> bool:
+    ) -> Dict[str, Any]:
         payload = {
             "chat_id": str(chat_id),
             "text": text,
@@ -283,7 +285,7 @@ class TelegramBotManager:
             # Retry plain text if HTML tags were unclosed
             payload.pop("parse_mode", None)
             res = await self.call_api("sendMessage", payload)
-        return bool(res.get("ok"))
+        return res
 
     async def edit_message(
         self,
@@ -336,7 +338,8 @@ class TelegramBotManager:
         token = f"bind_{secrets.token_urlsafe(16)}"
         self._pending_binds[token] = {
             "user_id": str(uid) if uid else str(user_id),
-            "expires_at": time.time() + 600,
+            "expires_at": time.time() + 3600,  # 1 hour
+            "consumed": False,
         }
         return token, f"https://t.me/{self.bot_username}?start={token}"
 
@@ -663,8 +666,35 @@ class TelegramBotManager:
 
             # 1a. Handle /start bind_<token>
             if param.startswith("bind_"):
-                bind_data = self._pending_binds.pop(param, None)
-                if not bind_data or time.time() > bind_data["expires_at"]:
+                # First check if user is already bound in DB
+                user_row = await self.get_user_by_telegram(chat_id)
+                bind_data = self._pending_binds.get(param)
+                if bind_data and (time.time() <= bind_data.get("expires_at", 0)):
+                    target_user_id = bind_data["user_id"]
+                    bound_user = await self.bind_user_telegram(target_user_id, chat_id, username)
+                    if bound_user:
+                        user_row = bound_user
+                        bind_data["consumed"] = True
+
+                if user_row:
+                    u_email = user_row.get("email") or "аккаунт tTerm"
+                    u_name = user_row.get("name") or first_name
+                    await self.send_message(
+                        chat_id,
+                        f"✅ <b>Telegram успешно привязан!</b>\n\n"
+                        f"Здравствуйте, <b>{first_name}</b>!\n"
+                        f"Ваш профиль Telegram (@{username or chat_id}) связан с аккаунтом:\n"
+                        f"📧 <b>{u_email}</b> ({u_name})\n\n"
+                        f"💡 <b>Теперь вам доступно:</b>\n"
+                        f"• Вход в <b>tTerm</b> в 1 клик через Web App кнопкой ниже без повторного ввода паролей\n"
+                        f"• Доступ ко всем вашим проектам и терминалам\n"
+                        f"• Выполнение команд прямо в этом чате (/use)\n"
+                        f"• Мгновенные уведомления о статусах серверов\n\n"
+                        f"Нажмите кнопку <b>tTerm</b> ниже, чтобы открыть терминал:",
+                        reply_markup=self._main_keyboard(),
+                    )
+                    return
+                else:
                     await self.send_message(
                         chat_id,
                         "⚠️ <b>Срок действия ссылки привязки истёк.</b>\n"
@@ -672,28 +702,6 @@ class TelegramBotManager:
                         reply_markup=self._main_keyboard(),
                     )
                     return
-
-                target_user_id = bind_data["user_id"]
-                bound_user = await self.bind_user_telegram(target_user_id, chat_id, username)
-                if bound_user:
-                    u_email = bound_user.get("email") or "аккаунт"
-                    u_name = bound_user.get("name") or first_name
-                    await self.send_message(
-                        chat_id,
-                        f"✅ <b>Telegram успешно привязан!</b>\n\n"
-                        f"Здравствуйте, <b>{first_name}</b>!\n"
-                        f"Ваш профиль Telegram (@{username or chat_id}) успешно связан с аккаунтом:\n"
-                        f"📧 <b>{u_email}</b> ({u_name})\n\n"
-                        f"💡 <b>Теперь вам доступно:</b>\n"
-                        f"• Вход в <b>tTerm</b> в 1 клик через Web App прямо из этого чата без повторного ввода паролей и кодов\n"
-                        f"• Доступ ко всем вашим терминалам и проектам\n"
-                        f"• Мгновенные уведомления о статусах и завершении команд\n\n"
-                        f"Нажмите кнопку <b>tTerm</b> ниже, чтобы открыть терминал:",
-                        reply_markup=self._main_keyboard(),
-                    )
-                else:
-                    await self.send_message(chat_id, "❌ Не удалось привязать профиль к базе данных.")
-                return
 
             # 1b. Handle /start auth_<session_token> (1-click browser login)
             if param.startswith("auth_") or param.startswith("login_"):
@@ -730,23 +738,162 @@ class TelegramBotManager:
 
                 await self.send_message(
                     chat_id,
-                    f"👋 <b>Добро пожаловать в tTerm AI Hub!</b>\n\n"
+                    f"👋 <b>tTerm Terminal & AI Hub</b>\n\n"
                     f"👤 Профиль: <b>{user_row['name']}</b> (@{username or chat_id})\n"
                     f"🖥 Активная машина: <b>{active_m_name}</b>\n\n"
-                    f"💡 <i>Отправьте любую команду (например: <code>uptime</code>, <code>free -m</code>, <code>docker ps</code>) для запуска на активной машине.</i>",
+                    f"💡 <i>Отправляйте команды (<code>uptime</code>, <code>docker ps</code>, <code>git status</code>) прямо сюда для запуска на машине.</i>",
                     reply_markup=self._main_keyboard(),
                 )
             else:
                 await self.send_message(
                     chat_id,
                     f"👋 Здравствуйте, <b>{first_name}</b>!\n\n"
-                    f"Добро пожаловать в <b>tTerm AI Hub</b> (авторская надстройка Евгения Климова на базе tTerm AGPLv3).\n\n"
-                    f"Для привязки этого Telegram к вашему аккаунту нажмите кнопку «Привязать Telegram» в настройках на сайте или откройте встроенный Web App:",
+                    f"Добро пожаловать в <b>tTerm</b>.\n\n"
+                    f"Вы можете сразу открыть терминал кнопкой <b>tTerm</b> ниже, либо привязать существующий аккаунт с помощью команды <code>/email ваша_почта@домен.ru</code>.",
                     reply_markup=self._unbound_keyboard(),
                 )
             return
 
-        # 2. Command /app (open Web App)
+        # 2. Command /avatar (send bot logo for BotFather)
+        if text in ("/avatar", "/icon", "/logo") or text.startswith("/avatar ") or text.startswith("/icon "):
+            avatar_url = "https://e-klimov.ru/tterm_bot_avatar.png"
+            caption = (
+                "🖼 <b>Официальный аватар для бота tTerm</b>\n\n"
+                "Чтобы установить этот аватар в Telegram:\n"
+                "1. Сохраните эту картинку на устройство.\n"
+                "2. Откройте диалог с @BotFather\n"
+                "3. Отправьте команду <code>/setuserpic</code>\n"
+                "4. Выберите бота <b>@ttermnofbot</b>\n"
+                "5. Отправьте эту картинку в чат с BotFather.\n\n"
+                "<i>Готово! Логотип сразу обновится.</i>"
+            )
+            try:
+                res = await self.call_api("sendPhoto", {
+                    "chat_id": chat_id,
+                    "photo": avatar_url,
+                    "caption": caption,
+                    "parse_mode": "HTML",
+                })
+                if not res.get("ok"):
+                    await self.send_message(
+                        chat_id,
+                        f"🖼 <b>Официальный аватар бота tTerm:</b>\n{avatar_url}\n\n"
+                        f"Сохраните изображение по ссылке выше и загрузите его в @BotFather через команду <code>/setuserpic</code>."
+                    )
+            except Exception as e_av:
+                log.warning("Could not send photo: %s", e_av)
+                await self.send_message(
+                    chat_id,
+                    f"🖼 <b>Официальный аватар бота tTerm:</b>\n{avatar_url}\n\n"
+                    f"Сохраните изображение по ссылке выше и загрузите его в @BotFather через команду <code>/setuserpic</code>."
+                )
+            return
+
+        # 3. Command /email (link email from Telegram chat)
+        if text.startswith("/email"):
+            parts = text.split(maxsplit=1)
+            if len(parts) < 2 or "@" not in parts[1]:
+                await self.send_message(
+                    chat_id,
+                    "📧 <b>Привязка электронной почты:</b>\n\n"
+                    "Отправьте команду в формате:\n"
+                    "<code>/email ваша_почта@домен.ru</code>\n\n"
+                    "Мы вышлем 6-значный проверочный код для объединения ваших терминалов и проектов.",
+                    reply_markup=self._main_keyboard(),
+                )
+                return
+
+            req_email = parts[1].strip().lower()
+            code = f"{secrets.randbelow(900000) + 100000}"
+            self._pending_email_confirms[chat_id] = {
+                "email": req_email,
+                "code": code,
+                "expires_at": time.time() + 900,
+            }
+
+            try:
+                smtp_host = os.environ.get("TTERM_SMTP_HOST") or os.environ.get("SMTP_HOST") or "smtp.beget.com"
+                smtp_port = int(os.environ.get("TTERM_SMTP_PORT") or os.environ.get("SMTP_PORT") or "2525")
+                smtp_user = os.environ.get("TTERM_SMTP_USER") or os.environ.get("SMTP_USER") or "klimov@e-klimov.ru"
+                smtp_pass = os.environ.get("TTERM_SMTP_PASSWORD") or os.environ.get("SMTP_PASSWORD") or "17Ry5912@_"
+                smtp_ssl = (os.environ.get("TTERM_SMTP_SSL") or os.environ.get("SMTP_SSL") or "false").lower() == "true"
+                sender = f"tTerm <{smtp_user}>"
+
+                from tterm.core import mail
+                mailer = mail.SmtpMailer(smtp_host, smtp_port, smtp_user, smtp_pass, sender, use_ssl=smtp_ssl)
+                subject = f"{code} — код привязки в tTerm"
+                mail_text = f"Здравствуйте!\n\nВаш код для привязки Telegram к tTerm: {code}\nКод действует 15 минут.\n\n— Команда tTerm"
+                await mailer.send(mail.Email(to=req_email, subject=subject, text=mail_text))
+            except Exception as e_em:
+                log.warning("Could not send email: %s", e_em)
+
+            await self.send_message(
+                chat_id,
+                f"📧 Мы отправили 6-значный проверочный код на <code>{req_email}</code>.\n\n"
+                f"Отправьте полученный код сюда в чат для завершения привязки.",
+            )
+            return
+
+        # 4. Check if user typed 6-digit code for pending email confirm
+        if re.fullmatch(r"\d{6}", text) and chat_id in self._pending_email_confirms:
+            pending = self._pending_email_confirms[chat_id]
+            if time.time() <= pending["expires_at"] and text == pending["code"]:
+                confirm_email = pending["email"]
+                self._pending_email_confirms.pop(chat_id, None)
+
+                if self.pool:
+                    async with self.pool.acquire() as conn:
+                        async with conn.transaction():
+                            existing = await conn.fetchrow(
+                                "SELECT id, name, email FROM users WHERE lower(email) = $1", confirm_email
+                            )
+                            tg_user = await conn.fetchrow(
+                                "SELECT id, name FROM users WHERE telegram_chat_id = $1", chat_id
+                            )
+
+                            if existing:
+                                target_id = existing["id"]
+                                if tg_user and tg_user["id"] != target_id:
+                                    await conn.execute("UPDATE projects SET owner_id = $1 WHERE owner_id = $2", target_id, tg_user["id"])
+                                    await conn.execute("UPDATE project_members SET user_id = $1 WHERE user_id = $2 AND project_id NOT IN (SELECT project_id FROM project_members WHERE user_id = $1)", target_id, tg_user["id"])
+                                    await conn.execute("DELETE FROM users WHERE id = $1", tg_user["id"])
+                                await conn.execute(
+                                    "UPDATE users SET telegram_chat_id = $1, telegram_username = COALESCE($2, telegram_username) WHERE id = $3",
+                                    chat_id, username or None, target_id
+                                )
+                            elif tg_user:
+                                await conn.execute("UPDATE users SET email = $1 WHERE id = $2", confirm_email, tg_user["id"])
+
+                await self.send_message(
+                    chat_id,
+                    f"✅ <b>Почта {confirm_email} успешно привязана!</b>\n\n"
+                    f"Ваш Telegram теперь связан с вашим основным аккаунтом.\n"
+                    f"Все проекты, серверы и терминалы объединены.",
+                    reply_markup=self._main_keyboard(),
+                )
+                return
+
+        # 5. Command /web or /login (1-click browser login)
+        if text.startswith("/web") or text.startswith("/login"):
+            user_row = await self.get_user_by_telegram(chat_id)
+            if user_row and self.pool:
+                async with self.pool.acquire() as conn:
+                    from tterm.core import auth
+                    sess_token, _ = await auth._new_session(
+                        conn, user_row["id"], method="telegram", label="Telegram Bot 1-Click Login", ip="127.0.0.1"
+                    )
+                    login_url = f"{self.web_url}/?auth={sess_token}"
+                    await self.send_message(
+                        chat_id,
+                        f"🌐 <b>Вход в веб-интерфейс tTerm</b>\n\n"
+                        f"Ваша персональная ссылка для мгновенного входа:\n"
+                        f"👉 <a href='{login_url}'><b>Войти в tTerm Web ↗</b></a>\n\n"
+                        f"<i>Действует 30 дней. Открывает все ваши проекты.</i>",
+                        reply_markup={"inline_keyboard": [[{"text": "🌐 Открыть веб-интерфейс", "url": login_url}]]}
+                    )
+                    return
+
+        # 6. Command /app (open Web App)
         if text.startswith("/app"):
             await self.send_message(
                 chat_id,
@@ -760,33 +907,33 @@ class TelegramBotManager:
             )
             return
 
-        # 3. Command /machines or /use
+        # 7. Command /machines or /use
         if text.startswith("/machines") or text.startswith("/use") or text == "🖥 Машины":
             await self._show_machines_menu(chat_id)
             return
 
-        # 4. Command /help
+        # 8. Command /help
         if text.startswith("/help") or text == "ℹ️ Помощь":
             await self.send_message(
                 chat_id,
                 "📖 <b>Команды tTerm Telegram Bot</b>\n\n"
-                "• <b>/machines</b> или <b>/use</b> — выбор активной машины\n"
-                "• <b>/app</b> — открыть терминал в Telegram Web App\n"
-                "• <b>Любой текст</b> — выполнение команды на выбранной машине\n\n"
-                "🛡 <b>Безопасность:</b>\n"
-                "Разрушительные команды (rm -rf, mkfs, DROP) требуют явного подтверждения кнопкой.\n\n"
-                "⚖️ <i>Основано на открытой платформе tTerm (Denis / GNU AGPLv3). Модернизация: Евгений Климов.</i>",
+                "• <b>/use</b> или <b>/machines</b> — список ваших машин и выбор активной\n"
+                "• <b>/email &lt;почта&gt;</b> — привязать электронную почту к Telegram\n"
+                "• <b>/web</b> — ссылка для входа в веб-интерфейс без паролей\n"
+                "• <b>/avatar</b> — скачать официальный логотип бота для @BotFather\n"
+                "• <b>Любая команда</b> — запуск на выбранной машине (например: <code>uptime</code>, <code>git status</code>)\n\n"
+                "🛡 <i>Опасные команды (rm -rf, mkfs) требуют подтверждения кнопкой.</i>",
                 reply_markup=self._main_keyboard(),
             )
             return
 
-        # 5. Non-command text -> Execute on active machine!
+        # 9. Non-command text -> Execute on active machine!
         user_row = await self.get_user_by_telegram(chat_id)
         if not user_row:
             await self.send_message(
                 chat_id,
                 "⚠️ <b>Аккаунт не привязан.</b>\n"
-                "Для выполнения команд привяжите свой Telegram-аккаунт в настройках tTerm:",
+                "Для выполнения команд привяжите свой Telegram-аккаунт через /email или откройте tTerm:",
                 reply_markup=self._unbound_keyboard(),
             )
             return
@@ -804,14 +951,22 @@ class TelegramBotManager:
                 await self.send_message(
                     chat_id,
                     "⚠️ <b>Нет подключенных онлайн-машин.</b>\n"
-                    "Установите агент на компьютер или запустите сервер, чтобы выполнять команды.",
+                    "Запустите агент на компьютере или включите сервер, чтобы выполнять команды.",
                     reply_markup=self._main_keyboard(),
                 )
                 return
             else:
-                # Multiple machines: prompt user to pick
                 await self._show_machines_menu(chat_id, note="Выберите машину для выполнения команды:")
                 return
+
+        # Find active machine name
+        active_m_name = "machine"
+        active_m_kind = "server"
+        for m in machines:
+            if m["id"] == active_id:
+                active_m_name = m["name"]
+                active_m_kind = m["kind"]
+                break
 
         # Check for dangerous command
         danger_desc = None
@@ -846,10 +1001,17 @@ class TelegramBotManager:
             )
             return
 
-        # Execute command!
-        await self.send_message(chat_id, f"⏳ Запуск <code>{html.escape(text)}</code>...")
+        # Execute command with in-place streaming card!
+        m_icon = "🖥" if active_m_kind == "computer" else "🌐"
+        init_res = await self.send_message(
+            chat_id,
+            f"{m_icon} <b>{html.escape(active_m_name)}</b>\n⏳ <i>выполняется...</i>",
+            reply_markup={"inline_keyboard": [[{"text": "⏹ Прервать (Ctrl+C)", "callback_data": f"stop:{active_id}"}]]}
+        )
+        msg_id = init_res.get("result", {}).get("message_id") if isinstance(init_res, dict) else None
+
         res = await self.execute_command(user_row, active_id, text)
-        await self._send_command_result(chat_id, res)
+        await self._send_command_result(chat_id, res, initial_msg_id=msg_id)
 
     # ------------------------------------------------------------- Handler: Callback Query
     async def _handle_callback(self, callback: Dict[str, Any]) -> None:
@@ -860,24 +1022,104 @@ class TelegramBotManager:
         chat_id = str(chat.get("id"))
         msg_id = msg.get("message_id")
 
+        if data == "menu:machines":
+            await self.answer_callback(cq_id)
+            await self._show_machines_menu(chat_id)
+            return
+
+        if data == "menu:help":
+            await self.answer_callback(cq_id)
+            await self.send_message(
+                chat_id,
+                "📖 <b>Команды tTerm:</b>\n\n"
+                "• <b>/use</b> — выбор активной машины\n"
+                "• <b>/email &lt;почта&gt;</b> — связать с email\n"
+                "• <b>/avatar</b> — получить аватар бота\n"
+                "• Отправляйте shell-команды прямо в чат.",
+                reply_markup=self._main_keyboard(),
+            )
+            return
+
         if data.startswith("use:"):
             machine_id = data[4:]
             self._user_active_machines[chat_id] = machine_id
             m_name = machine_id
             if self.pool:
                 async with self.pool.acquire() as conn:
-                    m_row = await conn.fetchrow("SELECT name FROM machines WHERE id = $1", uuid.UUID(machine_id))
+                    m_row = await conn.fetchrow("SELECT name, kind FROM machines WHERE id = $1", uuid.UUID(machine_id))
                     if m_row:
                         m_name = m_row["name"]
 
-            await self.answer_callback(cq_id, f"Выбрана машина: {m_name}")
-            if msg_id:
-                await self.edit_message(
-                    chat_id, msg_id,
-                    f"✅ Активная машина установлена: <b>{m_name}</b>\n\n"
-                    f"Теперь отправляйте консольные команды прямо в чат.",
-                    reply_markup=self._main_keyboard(),
-                )
+            await self.answer_callback(cq_id, f"{m_name} активна")
+
+            # Update the menu in-place if possible
+            try:
+                user_row = await self.get_user_by_telegram(chat_id)
+                if user_row and msg_id:
+                    machines = await self.list_user_machines(user_row["id"])
+                    lines = ["<b>Your machines</b>\n"]
+                    machine_pills = []
+                    for idx, m in enumerate(machines, 1):
+                        is_active = (m["id"] == machine_id)
+                        icon = "🖥" if m["kind"] == "computer" else "🌐"
+                        ip_or_kind = m.get("ip") or m["kind"]
+                        status_text = ip_or_kind if m["online"] else "offline"
+                        lines.append(f"{icon} #{idx} <b>{html.escape(m['name'])}</b> ({m['kind']}) <i>{status_text}</i>")
+                        pill_label = f"{'🔹 ' if is_active else ''}{m['name']}"
+                        machine_pills.append({"text": pill_label, "callback_data": f"use:{m['id']}"})
+
+                    kb = []
+                    for i in range(0, len(machine_pills), 2):
+                        kb.append(machine_pills[i:i+2])
+                    kb.append([
+                        {"text": "+ Terminal", "callback_data": f"newterm:{machine_id}"},
+                        {"text": "Rename", "callback_data": f"rename:{machine_id}"},
+                        {"text": "Access", "callback_data": f"access:{machine_id}"},
+                        {"text": "Remove", "callback_data": f"remove:{machine_id}"},
+                    ])
+                    kb.append([
+                        {"text": "+ Add a machine", "callback_data": "addmachine"},
+                        {"text": "📱 tTerm", "web_app": {"url": self.web_url}},
+                    ])
+                    await self.edit_message(chat_id, msg_id, "\n".join(lines), reply_markup={"inline_keyboard": kb})
+            except Exception as e_ed:
+                log.debug("Could not edit machines view: %s", e_ed)
+
+            # Send terminal prompt
+            await self.send_message(
+                chat_id,
+                f"🖥 <b>{html.escape(m_name)}</b>\n<code>~ ❯</code>"
+            )
+            return
+
+        if data.startswith("rerun:"):
+            cmd = data[6:]
+            await self.answer_callback(cq_id, "Повторный запуск...")
+            user_row = await self.get_user_by_telegram(chat_id)
+            active_id = self._user_active_machines.get(chat_id)
+            if user_row and active_id:
+                init_res = await self.send_message(chat_id, f"⏳ Повторный запуск: <code>{html.escape(cmd)}</code>...")
+                n_msg_id = init_res.get("result", {}).get("message_id") if isinstance(init_res, dict) else None
+                res = await self.execute_command(user_row, active_id, cmd)
+                await self._send_command_result(chat_id, res, initial_msg_id=n_msg_id)
+            return
+
+        if data.startswith("newterm:"):
+            m_id = data[8:]
+            await self.answer_callback(cq_id, "Терминал готов")
+            await self.send_message(chat_id, f"🖥 <b>Новая сессия терминала</b>\n<code>~ ❯</code>")
+            return
+
+        if data == "addmachine":
+            await self.answer_callback(cq_id)
+            await self.send_message(
+                chat_id,
+                "🖥 <b>Подключение новой машины к tTerm</b>\n\n"
+                "Выполните эту команду на сервере или компьютере:\n\n"
+                f"<pre>curl -sSfL {self.web_url}/install.sh | sh</pre>\n\n"
+                "Машина автоматически появится в списке доступных через несколько секунд.",
+                reply_markup=self._main_keyboard(),
+            )
             return
 
         if data.startswith("danger:run:"):
@@ -894,7 +1136,7 @@ class TelegramBotManager:
             user_row = await self.get_user_by_telegram(chat_id)
             if user_row:
                 res = await self.execute_command(user_row, pending["machine_id"], pending["command"])
-                await self._send_command_result(chat_id, res)
+                await self._send_command_result(chat_id, res, initial_msg_id=msg_id)
             return
 
         if data.startswith("danger:cancel:"):
@@ -906,7 +1148,6 @@ class TelegramBotManager:
             return
 
         if data.startswith("approval:"):
-            # Approval gate reaction: approval:approve:<id> or approval:reject:<id>
             parts = data.split(":")
             action, appr_id = parts[1], parts[2]
             try:
@@ -939,7 +1180,7 @@ class TelegramBotManager:
         if not machines:
             await self.send_message(
                 chat_id,
-                "🖥 <b>Список машин</b>\n\n"
+                "🖥 <b>Ваши машины</b>\n\n"
                 "К вашему аккаунту пока не подключено ни одной машины.\n"
                 "Откройте tTerm, чтобы добавить компьютер или сервер.",
                 reply_markup=self._main_keyboard(),
@@ -947,53 +1188,82 @@ class TelegramBotManager:
             return
 
         active_id = self._user_active_machines.get(chat_id)
-        lines = ["🖥 <b>Доступные машины в проектах:</b>\n"]
-        buttons = []
+        if not active_id and machines:
+            active_id = machines[0]["id"]
+            self._user_active_machines[chat_id] = active_id
 
-        for m in machines:
+        lines = ["<b>Your machines</b>\n"]
+        machine_pills = []
+
+        for idx, m in enumerate(machines, 1):
             is_active = (m["id"] == active_id)
-            status_dot = "🟢" if m["online"] else "⚪"
-            active_mark = " (активна)" if is_active else ""
-            lines.append(f"{status_dot} <b>{m['name']}</b> ({m['kind']}){active_mark}")
+            icon = "🖥" if m["kind"] == "computer" else "🌐"
+            ip_or_kind = m.get("ip") or m["kind"]
+            status_text = ip_or_kind if m["online"] else "offline"
+            lines.append(f"{icon} #{idx} <b>{html.escape(m['name'])}</b> ({m['kind']}) <i>{status_text}</i>")
 
-            btn_text = f"{'⭐ ' if is_active else ''}{m['name']} ({'онлайн' if m['online'] else 'офлайн'})"
-            buttons.append([{"text": btn_text, "callback_data": f"use:{m['id']}"}])
+            pill_label = f"{'🔹 ' if is_active else ''}{m['name']}"
+            machine_pills.append({"text": pill_label, "callback_data": f"use:{m['id']}"})
 
-        lines.append(f"\n{note or 'Нажмите на кнопку, чтобы выбрать машину для выполнения команд:'}")
-        await self.send_message(chat_id, "\n".join(lines), reply_markup={"inline_keyboard": buttons})
+        # Compact action row for selected line
+        actions_row = [
+            {"text": "+ Terminal", "callback_data": f"newterm:{active_id}"},
+            {"text": "Rename", "callback_data": f"rename:{active_id}"},
+            {"text": "Access", "callback_data": f"access:{active_id}"},
+            {"text": "Remove", "callback_data": f"remove:{active_id}"},
+        ]
 
-    async def _send_command_result(self, chat_id: str, res: Dict[str, Any]) -> None:
+        add_row = [
+            {"text": "+ Add a machine", "callback_data": "addmachine"},
+            {"text": "📱 tTerm", "web_app": {"url": self.web_url}},
+        ]
+
+        keyboard = []
+        for i in range(0, len(machine_pills), 2):
+            keyboard.append(machine_pills[i:i+2])
+        keyboard.append(actions_row)
+        keyboard.append(add_row)
+
+        await self.send_message(chat_id, "\n".join(lines), reply_markup={"inline_keyboard": keyboard})
+
+    async def _send_command_result(self, chat_id: str, res: Dict[str, Any], initial_msg_id: Optional[int] = None) -> None:
         if not res.get("ok"):
-            await self.send_message(chat_id, f"❌ <b>Ошибка:</b> {res.get('error')}", reply_markup=self._main_keyboard())
+            err_msg = f"❌ <b>Ошибка:</b> {html.escape(str(res.get('error')))}"
+            if initial_msg_id:
+                await self.edit_message(chat_id, initial_msg_id, err_msg)
+            else:
+                await self.send_message(chat_id, err_msg, reply_markup=self._main_keyboard())
             return
 
         exit_code = res.get("exit_code", 0)
-        status_icon = "✅" if exit_code == 0 else f"❌ ({exit_code})"
+        status_dot = "🟢" if exit_code == 0 else "🔴"
         machine = res.get("machine", "remote")
         command = res.get("command", "")
-        duration = res.get("duration", 0)
+        duration = res.get("duration", 0.0)
         output = res.get("output", "")
+        cwd = res.get("cwd") or "~"
 
-        # Format output preview
-        preview = output[:3400] if output else "[команда выполнилась без вывода]"
-        truncated = len(output) > 3400
+        preview = output[:3200] if output else ""
+        truncated = len(output) > 3200
 
-        msg_text = (
-            f"🖥 <b>{machine}</b> · {status_icon} <i>({duration}с)</i>\n"
-            f"<code>$ {html.escape(command)}</code>\n\n"
-            f"<pre>{html.escape(preview)}</pre>"
-        )
+        # Author's clean terminal card layout:
+        # 🌐 host · 🟢 0 (0.4s)
+        # <pre>output</pre>
+        # cwd ❯
+        parts = [f"🖥 <b>{html.escape(machine)}</b> · {status_dot} {exit_code} <i>({duration:.1f}с)</i>"]
+        if preview:
+            parts.append(f"<pre>{html.escape(preview)}</pre>")
         if truncated:
-            msg_text += f"\n\n<i>... вывод обрезан (+{len(output) - 3400} символов)</i>"
+            parts.append(f"<i>... вывод сокращён (+{len(output) - 3200} симв.)</i>")
+        parts.append(f"<code>{html.escape(cwd)} ❯</code>")
 
-        await self.send_message(
-            chat_id, msg_text,
-            reply_markup={
-                "inline_keyboard": [
-                    [{"text": "tTerm", "web_app": {"url": self.web_url}}]
-                ]
-            }
-        )
+        msg_text = "\n".join(parts)
+        kb = {"inline_keyboard": [[{"text": "🔄 Повторить", "callback_data": f"rerun:{command[:64]} "}]]}
+
+        if initial_msg_id:
+            await self.edit_message(chat_id, initial_msg_id, msg_text, reply_markup=kb)
+        else:
+            await self.send_message(chat_id, msg_text, reply_markup=kb)
 
     def _main_keyboard(self) -> Dict[str, Any]:
         return {

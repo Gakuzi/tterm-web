@@ -620,6 +620,9 @@ export interface TelegramProfileStatus {
   chat_id?: string | null;
   username?: string | null;
   user_email?: string | null;
+  has_real_email?: boolean;
+  is_telegram_user?: boolean;
+  user_name?: string | null;
   bot_username: string;
   bot_link: string;
 }
@@ -637,6 +640,16 @@ export async function getTelegramProfileStatus(): Promise<TelegramProfileStatus>
   } catch {
     return { ok: false, configured: false, bound: false, bot_username: "ttermnofbot", bot_link: "https://t.me/ttermnofbot" };
   }
+}
+
+export async function linkEmailToTelegram(email: string): Promise<{ ok: boolean; message?: string }> {
+  const response = await fetch("/api/auth/telegram/link-email", change("POST", { email }));
+  return (await check(response)).json();
+}
+
+export async function verifyEmailLinkCode(email: string, code: string): Promise<{ ok: boolean; merged?: boolean; email?: string; name?: string }> {
+  const response = await fetch("/api/auth/telegram/verify-email-code", change("POST", { email, code }));
+  return (await check(response)).json();
 }
 
 export async function unbindTelegramProfile(): Promise<{ ok: boolean; bound: boolean }> {
