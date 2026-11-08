@@ -142,8 +142,14 @@ export function SignIn(props: Props) {
       } catch {}
     }
 
-    if (tgWebApp?.initData && !tgLoginTried.current) {
+    const tgAttemptKey = "tterm_tg_webapp_attempted_at";
+    const lastAttempt = sessionStorage.getItem(tgAttemptKey);
+    const now = Date.now();
+    const recentlyAttempted = lastAttempt && (now - parseInt(lastAttempt, 10)) < 15000;
+
+    if (tgWebApp?.initData && !tgLoginTried.current && !recentlyAttempted) {
       tgLoginTried.current = true;
+      sessionStorage.setItem(tgAttemptKey, String(now));
       loginWithTelegramWebApp(tgWebApp.initData)
         .then((res) => {
           if (stopped) return;
@@ -161,17 +167,7 @@ export function SignIn(props: Props) {
         .catch((err) => {
           console.debug("Telegram WebApp auto-login failed:", err);
           if (stopped) return;
-          authState()
-            .then((state) => {
-              if (stopped) return;
-              if (state.legal) setLegal(state.legal);
-              if (state.signedIn) onSignedIn();
-              else setStep({ kind: "email" });
-            })
-            .catch(() => {
-              if (stopped) return;
-              setStep({ kind: "email" });
-            });
+          setStep({ kind: "email" });
         });
       return () => {
         stopped = true;

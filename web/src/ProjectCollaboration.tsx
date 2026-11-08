@@ -87,15 +87,19 @@ function mapMachinesToNodes(
   machines: Machine[] | undefined,
   currentNodes: DiscoveredNode[]
 ): DiscoveredNode[] {
-  if (!machines || machines.length === 0) return currentNodes;
+  if (!machines || machines.length === 0) return [];
 
-  const nodeMap = new Map<string, DiscoveredNode>();
+  const validMachineIds = new Set(machines.map((m) => m.id));
+  const existingMap = new Map<string, DiscoveredNode>();
   for (const n of currentNodes) {
-    nodeMap.set(n.id, n);
+    if (validMachineIds.has(n.id)) {
+      existingMap.set(n.id, n);
+    }
   }
 
+  const result: DiscoveredNode[] = [];
   for (const m of machines) {
-    const existing = nodeMap.get(m.id);
+    const existing = existingMap.get(m.id);
     const osName = m.os || (m.passport as any)?.os || (m.kind === "computer" ? "macOS / Windows Workstation" : "Linux Server"); // i18n-ignore
     const ipAddr = m.host || (m.agent ? "WebSocket Agent" : "192.168.0.x"); // i18n-ignore
     const status = m.online !== false ? "ONLINE" : (m.lastSeen ? "OFFLINE" : "ONLINE");
@@ -135,7 +139,7 @@ function mapMachinesToNodes(
     }
 
     if (existing) {
-      nodeMap.set(m.id, {
+      result.push({
         ...existing,
         name: m.name || existing.name,
         kind: m.kind || existing.kind,
@@ -146,7 +150,7 @@ function mapMachinesToNodes(
         ports: existing.ports.length > 0 ? existing.ports : passportPorts,
       });
     } else {
-      nodeMap.set(m.id, {
+      result.push({
         id: m.id,
         name: m.name || `Машина ${m.id.slice(0, 8)}`, // i18n-ignore
         kind: m.kind || "server",
@@ -163,7 +167,7 @@ function mapMachinesToNodes(
     }
   }
 
-  return Array.from(nodeMap.values());
+  return result;
 }
 
 interface ApprovalRequest {
@@ -262,59 +266,15 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
   const [isConnectingGithub, setIsConnectingGithub] = useState(false);
   const [userGithubRepos, setUserGithubRepos] = useState<Array<{ name: string; full_name: string; html_url: string; private: boolean }>>([]);
 
-  // Multi-Node Topology & Ports state
+  // Multi-Node Topology & Ports state (Strictly project-isolated)
   const [nodes, setNodes] = useState<DiscoveredNode[]>(() => {
-    const defaultNodes: DiscoveredNode[] = [
-      {
-        id: "demo-node",
-        name: "Gateway Node (Debian Linux)", // i18n-ignore
-        kind: "server",
-        os_name: "Debian GNU/Linux 12", // i18n-ignore
-        ip_address: "192.168.1.100",
-        status: "ONLINE",
-        allowed_members: ["all"],
-        last_scanned: new Date().toISOString(),
-        ports: [
-          { port: 8290, protocol: "tcp", process: "python", listen_address: "0.0.0.0", service_hint: "tTerm Core Web UI" }, // i18n-ignore
-          { port: 8291, protocol: "tcp", process: "python", listen_address: "0.0.0.0", service_hint: "tTerm Connect Gateway" }, // i18n-ignore
-          { port: 5432, protocol: "tcp", process: "postgres", listen_address: "0.0.0.0", service_hint: "PostgreSQL Database" }, // i18n-ignore
-          { port: 6379, protocol: "tcp", process: "redis", listen_address: "0.0.0.0", service_hint: "Redis Cache" }, // i18n-ignore
-          { port: 80, protocol: "tcp", process: "nginx", listen_address: "0.0.0.0", service_hint: "Nginx Reverse Proxy" }, // i18n-ignore
-          { port: 22, protocol: "tcp", process: "sshd", listen_address: "0.0.0.0", service_hint: "OpenSSH Сервер" }, // i18n-ignore
-        ],
-        containers: [
-          { id: "0e64525d5026", name: "tterm-server-tterm-1", custom_name: "tTerm Core Web API", image: "tterm-server-tterm", status: "Up 25 minutes", ports: ["8290", "8291"] }, // i18n-ignore
-          { id: "7045c1f0de1b", name: "tterm-server-db-1", custom_name: "PostgreSQL Главная БД", image: "postgres:16-alpine", status: "Up 2 hours", ports: ["5432"] }, // i18n-ignore
-          { id: "0a70b3d94337", name: "homeassistant", custom_name: "Умный Дом Home Assistant", image: "ghcr.io/home-assistant/home-assistant:stable", status: "Up 25 minutes", ports: ["8123"] }, // i18n-ignore
-          { id: "403500e0bf72", name: "torrserver", custom_name: "Медиа-сервер TorrServer", image: "yourok/torrserver:latest", status: "Up 26 hours", ports: ["8090"] }, // i18n-ignore
-          { id: "bd245888b3c1", name: "qbittorrent", custom_name: "Фоновый Торрент-Клиент", image: "linuxserver/qbittorrent:latest", status: "Up 26 hours", ports: ["8080", "6881"] }, // i18n-ignore
-          { id: "124480d9331d", name: "mosquitto", custom_name: "MQTT Брокер Сообщений", image: "eclipse-mosquitto:latest", status: "Up 26 hours", ports: ["1883"] }, // i18n-ignore
-        ],
-      },
-      {
-        id: "macbook-air",
-        name: "MacBook Air (Рабочая станция)", // i18n-ignore
-        kind: "computer",
-        os_name: "macOS Sonoma (Darwin arm64)", // i18n-ignore
-        ip_address: "192.168.0.7",
-        status: "ONLINE",
-        allowed_members: ["all"],
-        last_scanned: new Date().toISOString(),
-        ports: [
-          { port: 22, protocol: "tcp", process: "sshd", listen_address: "0.0.0.0", service_hint: "OpenSSH Сервер" }, // i18n-ignore
-          { port: 5173, protocol: "tcp", process: "node (vite)", listen_address: "127.0.0.1", service_hint: "Vite Dev Server" }, // i18n-ignore
-          { port: 3000, protocol: "tcp", process: "node", listen_address: "127.0.0.1", service_hint: "React / Node Server" }, // i18n-ignore
-        ],
-        containers: [],
-      },
-    ];
-    return mapMachinesToNodes(project.machines, defaultNodes);
+    return mapMachinesToNodes(project.machines, []);
   });
   const [selectedNodeId, setSelectedNodeId] = useState<string>(() => {
     if (project.machines && project.machines.length > 0) {
       return project.machines[0].id;
     }
-    return "klim";
+    return "";
   });
   const [scanLoading, setScanLoading] = useState(false);
 

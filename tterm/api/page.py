@@ -357,66 +357,72 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
                                httponly=True, samesite="none" if secure else "lax")
 
     async def signed_in(request: Request) -> auth.Session:
+        tokens_to_try: list[str] = []
         raw_auth = request.headers.get("authorization", "")
-        bearer_tok = raw_auth.replace("Bearer ", "").strip() if raw_auth.startswith("Bearer ") else ""
-        token = (
-            cookie(request, auth.SESSION_COOKIE)
-            or request.headers.get("x-ai-token")
-            or bearer_tok
-        )
-        if not token:
-            token = (
-                request.cookies.get("__Host-session")
-                or request.cookies.get("session")
-                or request.cookies.get("__Host-tterm-session")
-                or request.cookies.get("tterm-session")
-            )
-        if token and token.startswith("tt_ai_"):
-            try:
-                from ..orchestration.ai_sessions import ai_agent_manager
-                key_info = ai_agent_manager.validate_token(token)
-                if key_info:
-                    p_uuid = None
-                    try:
-                        p_uuid = uuid.UUID(key_info.project_id)
-                    except Exception:
-                        pass
-                    owner_id = None
-                    if p_uuid:
-                        owner_id = await pool.fetchval(
-                            "SELECT owner_id FROM projects WHERE id = $1 AND deleted_at IS NULL",
-                            p_uuid
-                        )
-                    if not owner_id:
-                        owner_id = await pool.fetchval("SELECT id FROM users ORDER BY created_at LIMIT 1")
-                    if owner_id:
-                        user_row = await pool.fetchrow(
-                            "SELECT id, name, theme, plan_id, email FROM users WHERE id = $1",
-                            owner_id
-                        )
-                        if user_row:
-                            person = auth.Person(
-                                user_row["id"], user_row["name"], user_row["theme"],
-                                user_row["plan_id"], user_row["email"]
-                            )
-                            return auth.Session(
-                                id=uuid.uuid5(uuid.NAMESPACE_DNS, token),
-                                person=person,
-                                device_id=None,
-                                method="ai_agent",
-                                age=dt.timedelta(seconds=0),
-                                label=key_info.agent_name,
-                                computer_id=None,
-                            )
-            except Exception as exc:
-                log.warning("Failed to authenticate AI token %s: %s", token, exc)
+        if raw_auth.lower().startswith("bearer "):
+            tokens_to_try.append(raw_auth[7:].strip())
+        for h in ("x-session-token", "x-ai-token", "x-token"):
+            val = request.headers.get(h)
+            if val and val.strip() not in tokens_to_try:
+                tokens_to_try.append(val.strip())
+        for c_name in (cookie_name(auth.SESSION_COOKIE), auth.SESSION_COOKIE, "__Host-session", "session", "__Host-tterm-session", "tterm-session"):
+            val = request.cookies.get(c_name)
+            if val and val.strip() not in tokens_to_try:
+                tokens_to_try.append(val.strip())
+        if hasattr(request, "query_params") and request.query_params:
+            for q_name in ("token", "session"):
+                val = request.query_params.get(q_name)
+                if val and val.strip() not in tokens_to_try:
+                    tokens_to_try.append(val.strip())
 
-        session = await auth.session(
-            pool, token,
-            touch=request.headers.get(BACKGROUND_HEADER) != "1")
-        if session is None:
-            raise SignedOut()
-        return session
+        for token in tokens_to_try:
+            if token.startswith("tt_ai_"):
+                try:
+                    from ..orchestration.ai_sessions import ai_agent_manager
+                    key_info = ai_agent_manager.validate_token(token)
+                    if key_info:
+                        p_uuid = None
+                        try:
+                            p_uuid = uuid.UUID(key_info.project_id)
+                        except Exception:
+                            pass
+                        owner_id = None
+                        if p_uuid:
+                            owner_id = await pool.fetchval(
+                                "SELECT owner_id FROM projects WHERE id = $1 AND deleted_at IS NULL",
+                                p_uuid
+                            )
+                        if not owner_id:
+                            owner_id = await pool.fetchval("SELECT id FROM users ORDER BY created_at LIMIT 1")
+                        if owner_id:
+                            user_row = await pool.fetchrow(
+                                "SELECT id, name, theme, plan_id, email FROM users WHERE id = $1",
+                                owner_id
+                            )
+                            if user_row:
+                                person = auth.Person(
+                                    user_row["id"], user_row["name"], user_row["theme"],
+                                    user_row["plan_id"], user_row["email"]
+                                )
+                                return auth.Session(
+                                    id=uuid.uuid5(uuid.NAMESPACE_DNS, token),
+                                    person=person,
+                                    device_id=None,
+                                    method="ai_agent",
+                                    age=dt.timedelta(seconds=0),
+                                    label=key_info.agent_name,
+                                    computer_id=None,
+                                )
+                except Exception as exc:
+                    log.warning("Failed to authenticate AI token %s: %s", token, exc)
+
+            session = await auth.session(
+                pool, token,
+                touch=request.headers.get(BACKGROUND_HEADER) != "1")
+            if session is not None:
+                return session
+
+        raise SignedOut()
 
     #: The page sockets open now: a session that ends closes its own at once.
     sockets: set[PageSocket] = set()
@@ -1044,6 +1050,63 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
             "devices": await auth.devices(pool, me.id, session.device_id),
             "legal": legal,
         })
+
+    @app.post("/api/account/delete-request")
+    async def request_account_deletion(session: auth.Session = Depends(signed_in)) -> Response:
+        me = session.person
+        async with pool.acquire() as conn:
+            existing = await conn.fetchrow(
+                "SELECT id, status FROM account_deletion_requests WHERE user_id = $1 AND status = 'pending'", me.id
+            )
+            if existing:
+                return _json({"ok": True, "status": "pending", "message": "Запрос на удаление уже ожидает подтверждения."})
+
+            row = await conn.fetchrow(
+                """
+                INSERT INTO account_deletion_requests (user_id, user_name, user_email, telegram_chat_id, status)
+                VALUES ($1, $2, $3, $4, 'pending')
+                RETURNING id, requested_at
+                """,
+                me.id, me.name, me.email, getattr(me, "telegram_chat_id", None)
+            )
+
+        try:
+            from ..orchestration.telegram_bot import telegram_bot
+            if telegram_bot and telegram_bot.is_running:
+                req_id = row["id"]
+                req_mail = me.email or "без email"
+                await telegram_bot.send_message(
+                    "55570186",
+                    f"⚠️ <b>Новый запрос на удаление аккаунта tTerm</b>\n\n"
+                    f"Пользователь: <b>{me.name}</b>\n"
+                    f"Email: <b>{req_mail}</b>\n"
+                    f"ID: <code>{me.id}</code>\n"
+                    f"Дата: {row['requested_at']}\n\n"
+                    f"<i>Все данные изолированы на вашем сервере. Подтвердите или отклоните удаление:</i>",
+                    reply_markup={
+                        "inline_keyboard": [
+                            [
+                                {"text": "✅ Одобрить удаление", "callback_data": f"deluser:confirm:{req_id}"},
+                                {"text": "❌ Отклонить", "callback_data": f"deluser:reject:{req_id}"},
+                            ]
+                        ]
+                    }
+                )
+        except Exception as e_notif:
+            log.warning("Could not send deletion notification to admin: %s", e_notif)
+
+        return _json({"ok": True, "status": "pending", "message": "Запрос на удаление отправлен администратору платформы (Евгений Климов, @eklimov)."})
+
+    @app.get("/api/account/delete-request")
+    async def get_account_deletion_status(session: auth.Session = Depends(signed_in)) -> Response:
+        me = session.person
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT id, status, requested_at FROM account_deletion_requests WHERE user_id = $1 ORDER BY requested_at DESC LIMIT 1", me.id
+            )
+        if not row:
+            return _json({"status": None})
+        return _json({"status": row["status"], "requested_at": row["requested_at"].isoformat()})
 
     # --------------------------------------------- the photo (0.1.7)
 
@@ -2182,6 +2245,24 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
         return FileResponse(MAIL_LOGO, media_type="image/png", headers={
             "cache-control": "public, max-age=604800",
             "cross-origin-resource-policy": "cross-origin"})
+
+    @app.get("/bot-icon.png")
+    async def bot_icon() -> Response:
+        p = Path(__file__).resolve().parent.parent / "static" / "bot-icon.png"
+        if not p.is_file():
+            p = dist / "bot-icon.png"
+        if p.is_file():
+            return FileResponse(p, media_type="image/png", headers={"cache-control": "public, max-age=86400"})
+        return Response("Not found", status_code=404)
+
+    @app.get("/bot-preview.png")
+    async def bot_preview() -> Response:
+        p = Path(__file__).resolve().parent.parent / "static" / "bot-preview.png"
+        if not p.is_file():
+            p = dist / "bot-preview.png"
+        if p.is_file():
+            return FileResponse(p, media_type="image/png", headers={"cache-control": "public, max-age=86400"})
+        return Response("Not found", status_code=404)
 
     @app.get("/{path:path}")
     async def page(path: str) -> Response:

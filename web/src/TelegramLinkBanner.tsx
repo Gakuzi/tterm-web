@@ -10,7 +10,7 @@ import {
 
 interface TelegramLinkBannerProps {
   notify?: (text: string) => void;
-  onOpenSettings?: (section: string) => void;
+  onOpenSettings?: (section: any) => void;
 }
 
 const DISMISS_KEY = "tterm.tg_link_banner_dismissed_at";
@@ -33,7 +33,8 @@ export function TelegramLinkBanner({ notify, onOpenSettings }: TelegramLinkBanne
     typeof window !== "undefined" &&
     Boolean(
       (window as any).Telegram?.WebApp?.initData ||
-        window.location.hash.includes("tgWebAppData")
+        window.location.hash.includes("tgWebAppData") ||
+        window.location.search.includes("tgWebApp")
     );
 
   useEffect(() => {
@@ -57,13 +58,13 @@ export function TelegramLinkBanner({ notify, onOpenSettings }: TelegramLinkBanne
       const s = await getTelegramProfileStatus();
       setStatus(s);
 
-      // If user has BOTH a real email AND Telegram connected, no banner needed at all!
+      // If user has a real email AND Telegram connected or running in Telegram WebApp, no banner needed!
       if (s.has_real_email && (s.bound || isTelegramWebApp)) {
         setDismissed(true);
         return;
       }
 
-      // Inside Telegram Web App, if user lacks real email, show email link prompt
+      // Inside Telegram Web App: only show email link prompt if user has no real email yet
       if (isTelegramWebApp || s.is_telegram_user) {
         if (!s.has_real_email) {
           setDismissed(false);
@@ -178,7 +179,12 @@ export function TelegramLinkBanner({ notify, onOpenSettings }: TelegramLinkBanne
 
   const botUsername = status?.bot_username || "ttermnofbot";
   const botLink = status?.bot_link || `https://t.me/${botUsername}`;
-  const needsEmail = isTelegramWebApp || (status?.is_telegram_user && !status?.has_real_email);
+  const needsEmail = !status?.has_real_email && (isTelegramWebApp || Boolean(status?.is_telegram_user));
+
+  // If already dismissed, or if the user already has real email and is bound or in Telegram WebApp, don't show
+  if (dismissed || (status?.has_real_email && (status?.bound || isTelegramWebApp))) {
+    return null;
+  }
 
   return (
     <div

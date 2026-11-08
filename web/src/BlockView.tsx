@@ -89,19 +89,200 @@ interface Props {
   notify?: (text: string) => void;
 }
 
-export function diagnoseError(command: string, exitCode: number | null): { reason: string; fix?: string } {
+export function diagnoseError(
+  command: string,
+  exitCode: number | null,
+  renderedLines: unknown[] = []
+): { reason: string; fix?: string } {
   const cmd = command.trim();
   const first = cmd.split(/\s+/)[0] || "";
 
-  if (exitCode === 127) {
+  // Combine raw text from rendered lines for deep context analysis
+  const fullText = renderedLines
+    .map((l: any) => (typeof l === "string" ? l : (l && typeof l === "object" && "text" in l ? l.text : String(l || ""))))
+    .join("\n");
+  const plainText = fullText.replace(/<[^>]+>/g, "").trim();
+
+  // 1. Specific Git Context Analysis
+  if (cmd.startsWith("git ") || plainText.includes("fatal:") || plainText.includes("error:")) {
+    // Missing Git author identity
+    if (
+      plainText.includes("Please tell me who you are") ||
+      plainText.includes("unable to auto-detect email address") ||
+      (plainText.includes("user.email") && plainText.includes("user.name"))
+    ) {
+      return {
+        reason: "В Git не настроены имя и email автора коммитов. Система требует указать автора перед созданием коммита.", // i18n-ignore
+        fix: 'git config --global user.name "Евгений Климов" && git config --global user.email "eklimov84@xmail.ru"',
+      };
+    }
+
+    // Dubious ownership in repository
+    if (plainText.includes("detected dubious ownership in repository")) {
+      return {
+        reason: "Git заблокировал доступ к репозиторию из соображений безопасности (каталог принадлежит другому пользователю или контейнеру).", // i18n-ignore
+        fix: 'git config --global --add safe.directory "*"',
+      };
+    }
+
+    // Missing upstream branch
+    if (
+      plainText.includes("has no upstream branch") ||
+      plainText.includes("set-upstream") ||
+      (cmd.startsWith("git push") && plainText.includes("fatal: The current branch"))
+    ) {
+      const branchMatch = plainText.match(/git push --set-upstream\s+(\S+)\s+(\S+)/);
+      const fixCmd = branchMatch ? branchMatch[0] : "git push -u origin HEAD";
+      return {
+        reason: "Текущая ветка ещё не опубликована на GitHub и не имеет связанной удалённой (upstream) ветки.", // i18n-ignore
+        fix: fixCmd,
+      };
+    }
+
+    // Nothing to commit
+    if (
+      plainText.includes("nothing to commit, working tree clean") ||
+      plainText.includes("no changes added to commit")
+    ) {
+      return {
+        reason: "Нет измененных файлов для коммита: рабочая директория чиста или изменения не были добавлены в индекс через git add.", // i18n-ignore
+        fix: "git status",
+      };
+    }
+
+    // Local changes would be overwritten by checkout / merge / pull
+    if (
+      plainText.includes("Your local changes to the following files would be overwritten") ||
+      plainText.includes("Please commit your changes or stash them")
+    ) {
+      return {
+        reason: "В рабочей директории есть незакоммиченные локальные изменения, которые конфликтуют с обновлением. Сохраните их во временный стек или закоммитьте.", // i18n-ignore
+        fix: "git stash",
+      };
+    }
+
+    // Merge conflicts
+    if (plainText.includes("CONFLICT (content)") || plainText.includes("Automatic merge failed; fix conflicts")) {
+      return {
+        reason: "Обнаружен конфликт слияния файлов. Автоматическое объединение невозможно, требуется разрешить конфликты вручную.", // i18n-ignore
+        fix: "git status",
+      };
+    }
+
+    // Stale Git lock file
+    if (plainText.includes("index.lock': File exists") || plainText.includes("Unable to create") && plainText.includes(".git/index.lock")) {
+      return {
+        reason: "Файл блокировки .git/index.lock остался от предыдущего процесса Git. Другая команда либо ещё выполняется, либо аварийно завершилась.", // i18n-ignore
+        fix: "rm -f .git/index.lock",
+      };
+    }
+
+    // Push rejected (remote has new commits)
+    if (
+      plainText.includes("[rejected]") ||
+      plainText.includes("fetch first") ||
+      plainText.includes("Updates were rejected because the remote contains work")
+    ) {
+      return {
+        reason: "Отправка на GitHub отклонена: на удалённом сервере есть новые коммиты, которых нет в локальной копии. Объедините изменения перед отправкой.", // i18n-ignore
+        fix: "git pull --rebase",
+      };
+    }
+
+    // SSH Permission denied
+    if (
+      plainText.includes("Permission denied (publickey)") ||
+      plainText.includes("Could not read from remote repository")
+    ) {
+      return {
+        reason: "Ошибка SSH-аутентификации с GitHub. Проверьте подключение SSH-ключа или настройте HTTPS-доступ с токеном.", // i18n-ignore
+        fix: "ssh -T git@github.com",
+      };
+    }
+
+    // Not a git repository
+    if (plainText.includes("not a git repository")) {
+      return {
+        reason: "Текущая директория не является Git-репозиторием. Перейдите в каталог проекта (/opt/tterm-server) или инициализируйте репозиторий через git init.", // i18n-ignore
+        fix: "cd /opt/tterm-server",
+      };
+    }
+  }
+
+  // 2. Docker & Container Context Analysis
+  if (cmd.startsWith("docker ") || plainText.includes("docker")) {
+    if (plainText.includes("Cannot connect to the Docker daemon") || plainText.includes("Is the docker daemon running?")) {
+      return {
+        reason: "Служба Docker не запущена или демон остановлен в операционной системе.", // i18n-ignore
+        fix: "sudo systemctl start docker",
+      };
+    }
+    if (plainText.includes("permission denied while trying to connect to the Docker daemon socket")) {
+      return {
+        reason: "У текущего пользователя нет прав доступа к сокету docker.sock. Требуется sudo или добавление в группу docker.", // i18n-ignore
+        fix: `sudo ${cmd}`,
+      };
+    }
+    if (plainText.includes("No such container") || plainText.includes("Error: No such container")) {
+      return {
+        reason: "Указанный Docker-контейнер не найден или был удалён.", // i18n-ignore
+        fix: "docker ps -a",
+      };
+    }
+    if (cmd.startsWith("docker ") && !cmd.startsWith("sudo ") && exitCode === 1) {
+      return {
+        reason: "Команда Docker завершилась с ошибкой. Проверьте права доступа и состояние контейнеров.", // i18n-ignore
+        fix: `sudo ${cmd}`,
+      };
+    }
+  }
+
+  // 3. Port & Networking Conflicts
+  if (
+    plainText.includes("Address already in use") ||
+    plainText.includes("bind: address already in use") ||
+    plainText.includes("port is already allocated")
+  ) {
     return {
-      reason: `Команда «${first}» не найдена в системе. Проверьте правильность написания или установите нужный пакет.`, // i18n-ignore
+      reason: "Сетевой порт уже занят другим запущенным приложением или контейнером на этой машине.", // i18n-ignore
+      fix: "lsof -i -P -n | grep LISTEN",
+    };
+  }
+
+  // 4. System Package Manager (APT / DPKG)
+  if (cmd.startsWith("apt ") || cmd.startsWith("apt-get ") || plainText.includes("dpkg")) {
+    if (plainText.includes("Could not get lock") || plainText.includes("Unable to acquire the dpkg frontend lock")) {
+      return {
+        reason: "Менеджер пакетов APT заблокирован другим активным системным процессом обновления.", // i18n-ignore
+        fix: "sudo fuser -vki /var/lib/dpkg/lock-frontend",
+      };
+    }
+    if (!cmd.startsWith("sudo ")) {
+      return {
+        reason: "Установка и обновление системных пакетов требует прав суперпользователя.", // i18n-ignore
+        fix: `sudo ${cmd}`,
+      };
+    }
+  }
+
+  // 5. Systemd Services
+  if (cmd.startsWith("systemctl ") && !cmd.startsWith("sudo ")) {
+    return {
+      reason: "Управление системными службами systemd требует повышенных привилегий.", // i18n-ignore
+      fix: `sudo ${cmd}`,
+    };
+  }
+
+  // 6. Generic POSIX Signals & Exit Codes
+  if (exitCode === 127 || plainText.includes("command not found")) {
+    return {
+      reason: `Команда «${first}» не найдена в операционной системе. Проверьте правильность написания или установите пакет.`, // i18n-ignore
       fix: `which ${first}`,
     };
   }
-  if (exitCode === 126) {
+  if (exitCode === 126 || (plainText.includes("Permission denied") && !cmd.startsWith("git "))) {
     return {
-      reason: `Недостаточно прав для запуска «${first}» (Permission Denied).`, // i18n-ignore
+      reason: `Недостаточно прав для запуска «${first}» (Permission Denied). Проверьте права на исполнение или запустите через sudo.`, // i18n-ignore
       fix: `sudo ${cmd}`,
     };
   }
@@ -112,48 +293,26 @@ export function diagnoseError(command: string, exitCode: number | null): { reaso
   }
   if (exitCode === 137) {
     return {
-      reason: "Процесс принудительно остановлен системой (сигнал SIGKILL / нехватка памяти Out of Memory).", // i18n-ignore
+      reason: "Процесс принудительно остановлен системой (сигнал SIGKILL / Out of Memory / превышение лимитов ресурсов).", // i18n-ignore
     };
   }
-  if (cmd.startsWith("git push")) {
+
+  // 7. Context Extraction from Error Output
+  const errorLines = plainText
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("error:") || l.startsWith("fatal:") || l.startsWith("Error:") || l.startsWith("Exception:"));
+
+  if (errorLines.length > 0) {
     return {
-      reason: "Отправка на GitHub отклонена. На удалённом сервере есть новые коммиты, которых нет в вашей локальной копии.", // i18n-ignore
-      fix: "git pull --rebase",
+      reason: `Ошибка: ${errorLines[0]}`, // i18n-ignore
+      fix: cmd.startsWith("git ") ? undefined : (cmd.startsWith("sudo ") ? undefined : `sudo ${cmd}`),
     };
   }
-  if (cmd.startsWith("git commit") && cmd.includes("-m")) {
-    return {
-      reason: "Не удалось создать коммит. Возможно, файлы не были добавлены в индекс через git add.", // i18n-ignore
-      fix: `git add -A && ${cmd}`,
-    };
-  }
-  if (cmd.startsWith("docker ") && !cmd.startsWith("sudo ")) {
-    return {
-      reason: "Для работы с Docker требуются права суперпользователя или добавление в группу docker.", // i18n-ignore
-      fix: `sudo ${cmd}`,
-    };
-  }
-  if (cmd.startsWith("apt ") || cmd.startsWith("apt-get ")) {
-    if (!cmd.startsWith("sudo ")) {
-      return {
-        reason: "Для установки и обновления пакетов apt требуются права администратора.", // i18n-ignore
-        fix: `sudo ${cmd}`,
-      };
-    }
-    return {
-      reason: "Ошибка базы данных apt. Возможно, процесс заблокирован другим активным обновлением.", // i18n-ignore
-      fix: "sudo fuser -vki /var/lib/dpkg/lock-frontend",
-    };
-  }
-  if (cmd.startsWith("systemctl ") && !cmd.startsWith("sudo ")) {
-    return {
-      reason: "Управление службами systemd требует повышенных привилегий.", // i18n-ignore
-      fix: `sudo ${cmd}`,
-    };
-  }
+
   return {
     reason: `Команда завершилась с ошибкой (код возврата: ${exitCode}). Проверьте параметры запуска.`, // i18n-ignore
-    fix: cmd.startsWith("sudo ") ? undefined : `sudo ${cmd}`,
+    fix: cmd.startsWith("git ") ? undefined : (cmd.startsWith("sudo ") ? undefined : `sudo ${cmd}`),
   };
 }
 
@@ -464,7 +623,7 @@ export function BlockView(props: Props) {
         )}
       </div>
       {failed && aiHelpOpen && (() => {
-        const diag = diagnoseError(block.command, block.exitCode);
+        const diag = diagnoseError(block.command, block.exitCode, block.rendered?.lines || []);
         return (
           <div className="block-ai-assist">
             <div className="block-ai-head">

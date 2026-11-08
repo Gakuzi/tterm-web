@@ -21,6 +21,18 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+h1,
+h2,
+h3,
+h4,
+.brand-heading,
+.account-head h1,
+.settings-title {
+  font-family: var(--font-heading) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.14em !important;
+}
+
 a {
   color: var(--amber-ink);
 }

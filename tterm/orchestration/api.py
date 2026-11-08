@@ -1648,7 +1648,7 @@ async def list_all_nodes(
     pool_obj = getattr(pool, "pool", None) if pool else None
     if pool_obj:
         await discovery_scanner.sync_from_machines_db(pool_obj)
-    nodes = discovery_scanner.get_all_nodes(member_id)
+    nodes = discovery_scanner.get_all_nodes(member_id=member_id, project_id=project_id)
     return {"ok": True, "nodes": nodes}
 
 

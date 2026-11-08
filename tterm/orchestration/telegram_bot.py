@@ -53,6 +53,100 @@ DEFAULT_BOT_TOKEN = "9021265541:AAHZYpinnQE60ptrlL3INGvj4g-4oMY0AzY"
 DEFAULT_BOT_USERNAME = "ttermnofbot"
 DEFAULT_WEB_URL = "https://tterm.e-klimov.ru"
 
+STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
+BOT_ICON_PATH = os.path.join(STATIC_DIR, "bot-icon.png")
+BOT_PREVIEW_PATH = os.path.join(STATIC_DIR, "bot-preview.png")
+
+# Multilingual dictionary (Strictly no '&' in Russian; always 'и')
+I18N = {
+    "ru": {
+        "title_bot": "tTerm | Терминалы и ИИ-хаб",
+        "title_machines": "Ваши машины",
+        "btn_terminal": "+ Терминал",
+        "btn_rename": "Переименовать",
+        "btn_access": "Доступ",
+        "btn_remove": "Удалить",
+        "btn_add_machine": "+ Добавить машину",
+        "btn_webapp": "tTerm",
+        "btn_help": "Помощь",
+        "btn_machines": "Выбрать машину",
+        "btn_admin": "Панель администратора",
+        "server_suffix": " (Сервер)",
+        "offline": "не в сети",
+        "online": "в сети",
+        "active": "активна",
+        "no_machines_title": "🖥 <b>Ваши машины</b>",
+        "no_machines_desc": "К вашему аккаунту пока не подключено ни одной машины.\nОткройте tTerm или нажмите кнопку ниже, чтобы подключить сервер или компьютер.",
+        "admin_title": "📊 <b>Панель управления tTerm | Администратор</b>",
+        "admin_owner": "Владелец: <b>Евгений Климов</b> (@eklimov)",
+        "admin_server_info": "🟢 <b>Автономный сервер tTerm (82.148.241.254)</b>\n<i>Все данные пользователей хранятся строго в локальной БД.</i>",
+        "admin_users": "👥 <b>Зарегистрированные пользователи</b>",
+        "admin_machines": "🖥 <b>Подключенные машины</b>",
+        "admin_del_reqs": "⚠️ <b>Запросы на удаление аккаунтов</b>",
+        "admin_no_del": "<i>Нет активных запросов на удаление. Все данные изолированы на вашем сервере.</i>",
+        "btn_refresh": "🔄 Обновить",
+        "btn_approve": "✅ Одобрить",
+        "btn_reject": "❌ Отклонить",
+        "add_server_title": "Подключить сервер",
+        "add_server_desc": "Выполните команду на сервере под пользователем root:",
+        "add_pc_title": "Подключить компьютер",
+        "add_pc_desc": "Выполните команду на компьютере (без sudo):",
+        "btn_back": "« Назад к машинам",
+        "help_text": (
+            "📖 <b>Команды tTerm:</b>\n\n"
+            "• <b>/use</b> — список машин и активных окон\n"
+            "• <b>/machines</b> — переключение активной машины\n"
+            "• <b>/email &lt;почта&gt;</b> — привязать электронную почту\n"
+            "• <b>/avatar</b> — аватар и логотип бота tTerm\n"
+            "• <b>/app</b> — открыть tTerm Web App\n"
+            "• Отправляйте shell-команды прямо в чат для исполнения на активной машине."
+        ),
+    },
+    "en": {
+        "title_bot": "tTerm | Terminals and AI Hub",
+        "title_machines": "Your machines",
+        "btn_terminal": "+ Terminal",
+        "btn_rename": "Rename",
+        "btn_access": "Access",
+        "btn_remove": "Remove",
+        "btn_add_machine": "+ Add a machine",
+        "btn_webapp": "tTerm",
+        "btn_help": "Help",
+        "btn_machines": "Select machine",
+        "btn_admin": "Admin Dashboard",
+        "server_suffix": " (Server)",
+        "offline": "offline",
+        "online": "online",
+        "active": "active",
+        "no_machines_title": "🖥 <b>Your machines</b>",
+        "no_machines_desc": "No machines connected to your account yet.\nOpen tTerm or tap below to connect a server or computer.",
+        "admin_title": "📊 <b>tTerm Management Panel | Administrator</b>",
+        "admin_owner": "Owner: <b>Evgeniy Klimov</b> (@eklimov)",
+        "admin_server_info": "🟢 <b>Autonomous tTerm Server (82.148.241.254)</b>\n<i>All user data is stored strictly in the local database.</i>",
+        "admin_users": "👥 <b>Registered Users</b>",
+        "admin_machines": "🖥 <b>Connected Machines</b>",
+        "admin_del_reqs": "⚠️ <b>Account Deletion Requests</b>",
+        "admin_no_del": "<i>No active deletion requests. All data is securely isolated.</i>",
+        "btn_refresh": "🔄 Refresh",
+        "btn_approve": "✅ Approve",
+        "btn_reject": "❌ Reject",
+        "add_server_title": "Connect a server",
+        "add_server_desc": "Run this command on your server as root:",
+        "add_pc_title": "Connect a computer",
+        "add_pc_desc": "Run this command on your computer (no sudo):",
+        "btn_back": "« Back to machines",
+        "help_text": (
+            "📖 <b>tTerm Commands:</b>\n\n"
+            "• <b>/use</b> — machines and active terminals\n"
+            "• <b>/machines</b> — switch active machine\n"
+            "• <b>/email &lt;address&gt;</b> — link your email address\n"
+            "• <b>/avatar</b> — download tTerm logo and avatar\n"
+            "• <b>/app</b> — open tTerm Web App\n"
+            "• Send shell commands directly into this chat to run them on the active machine."
+        ),
+    }
+}
+
 # Danger patterns for commands run via chat
 DANGER_PATTERNS = [
     (r"\brm\s+-[rfRF]{1,4}\s+[/~]", "удаление корневых или пользовательских файлов"),
@@ -174,6 +268,15 @@ class TelegramBotManager:
         os.environ["TTERM_TELEGRAM_BOT_TOKEN"] = token
         os.environ["TELEGRAM_BOT_TOKEN"] = token
         self._bot_username = None
+
+    def _get_lang(self, user_row: Optional[Dict[str, Any]] = None, from_user: Optional[Dict[str, Any]] = None) -> str:
+        if user_row and user_row.get("language"):
+            code = str(user_row["language"]).lower()
+            return "ru" if code.startswith("ru") else "en"
+        if from_user and from_user.get("language_code"):
+            code = str(from_user["language_code"]).lower()
+            return "ru" if code.startswith("ru") else "en"
+        return "ru"
         self._bot_id = None
 
     @property
@@ -253,12 +356,24 @@ class TelegramBotManager:
                 "commands": [
                     {"command": "start", "description": "Запустить бота и проверить статус"},
                     {"command": "app", "description": "Открыть tTerm"},
+                    {"command": "use", "description": "Список машин и терминалов"},
                     {"command": "machines", "description": "Выбор активной машины"},
+                    {"command": "admin", "description": "Панель администратора (только владелец)"},
+                    {"command": "users", "description": "Список зарегистрированных пользователей"},
+                    {"command": "stats", "description": "Статистика и метрики серверов"},
+                    {"command": "email", "description": "Привязать email: /email <почта>"},
+                    {"command": "avatar", "description": "Скачать официальный логотип tTerm"},
                     {"command": "help", "description": "Справка и команды"},
                 ]
             })
+            await self.call_api("setMyDescription", {
+                "description": "tTerm — веб-терминал и оркестрация ИИ-ассистентов для управления серверами и Docker-контейнерами. Разработка и инфраструктура: Евгений Климов (@eklimov)."
+            })
+            await self.call_api("setMyShortDescription", {
+                "short_description": "Веб-терминал и оркестрация ИИ в Telegram."
+            })
         except Exception as e_cmd:
-            log.debug("Could not set bot commands: %s", e_cmd)
+            log.debug("Could not set bot commands or descriptions: %s", e_cmd)
 
         return True
 
@@ -313,6 +428,112 @@ class TelegramBotManager:
             "show_alert": show_alert,
         })
 
+    async def send_rich_message(self, chat_id: str | int, rich_message: Dict[str, Any]) -> Dict[str, Any]:
+        return await self.call_api("sendRichMessage", {
+            "chat_id": str(chat_id),
+            "rich_message": rich_message,
+        })
+
+    async def edit_rich_message(self, chat_id: str | int, message_id: int, rich_message: Dict[str, Any]) -> bool:
+        res = await self.call_api("editMessageText", {
+            "chat_id": str(chat_id),
+            "message_id": message_id,
+            "rich_message": rich_message,
+        })
+        return bool(res.get("ok"))
+
+    async def send_photo_file(
+        self,
+        chat_id: str | int,
+        file_path: str,
+        caption: str = "",
+        reply_markup: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        token = self.get_token()
+        if not token:
+            return {"ok": False, "description": "No bot token configured"}
+        if not os.path.exists(file_path):
+            return {"ok": False, "description": f"File not found: {file_path}"}
+
+        url = f"https://api.telegram.org/bot{token}/sendPhoto"
+
+        def _do_upload():
+            boundary = f"----WebKitFormBoundary{uuid.uuid4().hex}"
+            with open(file_path, "rb") as f:
+                file_bytes = f.read()
+
+            parts = []
+            parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{chat_id}\r\n".encode("utf-8"))
+            if caption:
+                parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"caption\"\r\n\r\n{caption}\r\n".encode("utf-8"))
+                parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"parse_mode\"\r\n\r\nHTML\r\n".encode("utf-8"))
+            if reply_markup:
+                parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"reply_markup\"\r\n\r\n{json.dumps(reply_markup)}\r\n".encode("utf-8"))
+
+            fname = os.path.basename(file_path)
+            mime = "image/png" if fname.endswith(".png") else "image/jpeg"
+            parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"{fname}\"\r\nContent-Type: {mime}\r\n\r\n".encode("utf-8"))
+            parts.append(file_bytes)
+            parts.append(b"\r\n")
+            parts.append(f"--{boundary}--\r\n".encode("utf-8"))
+
+            body = b"".join(parts)
+            req = urllib.request.Request(url, data=body, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}, method="POST")
+            ctx = ssl.create_default_context()
+            if certifi:
+                ctx.load_verify_locations(cafile=certifi.where())
+            with urllib.request.urlopen(req, timeout=25.0, context=ctx) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        loop = asyncio.get_running_loop()
+        try:
+            return await loop.run_in_executor(None, _do_upload)
+        except Exception as e:
+            log.warning("send_photo_file error: %s", e)
+            return {"ok": False, "description": str(e)}
+
+    async def send_document_file(
+        self,
+        chat_id: str | int,
+        filename: str,
+        content: str | bytes,
+        caption: str = "",
+    ) -> Dict[str, Any]:
+        token = self.get_token()
+        if not token:
+            return {"ok": False, "description": "No bot token configured"}
+        url = f"https://api.telegram.org/bot{token}/sendDocument"
+
+        def _do_upload():
+            boundary = f"----WebKitFormBoundary{uuid.uuid4().hex}"
+            file_bytes = content.encode("utf-8") if isinstance(content, str) else content
+
+            parts = []
+            parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{chat_id}\r\n".encode("utf-8"))
+            if caption:
+                parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"caption\"\r\n\r\n{caption}\r\n".encode("utf-8"))
+                parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"parse_mode\"\r\n\r\nHTML\r\n".encode("utf-8"))
+
+            parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"document\"; filename=\"{filename}\"\r\nContent-Type: text/plain\r\n\r\n".encode("utf-8"))
+            parts.append(file_bytes)
+            parts.append(b"\r\n")
+            parts.append(f"--{boundary}--\r\n".encode("utf-8"))
+
+            body = b"".join(parts)
+            req = urllib.request.Request(url, data=body, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}, method="POST")
+            ctx = ssl.create_default_context()
+            if certifi:
+                ctx.load_verify_locations(cafile=certifi.where())
+            with urllib.request.urlopen(req, timeout=25.0, context=ctx) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        loop = asyncio.get_running_loop()
+        try:
+            return await loop.run_in_executor(None, _do_upload)
+        except Exception as e:
+            log.warning("send_document_file error: %s", e)
+            return {"ok": False, "description": str(e)}
+
     # ------------------------------------------------------------- Lifecycle
     def start(self, pool: asyncpg.Pool, terminals: Any = None, agents: Any = None, web_url: str = DEFAULT_WEB_URL) -> None:
         self.pool = pool
@@ -338,10 +559,33 @@ class TelegramBotManager:
         token = f"bind_{secrets.token_urlsafe(16)}"
         self._pending_binds[token] = {
             "user_id": str(uid) if uid else str(user_id),
-            "expires_at": time.time() + 3600,  # 1 hour
+            "expires_at": time.time() + 7200,  # 2 hours
             "consumed": False,
         }
+        if self.pool and uid:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(self._persist_bind_token(token, uid))
+            except Exception as e_p:
+                log.debug("Could not schedule bind token persistence: %s", e_p)
         return token, f"https://t.me/{self.bot_username}?start={token}"
+
+    async def _persist_bind_token(self, token: str, user_id: uuid.UUID) -> None:
+        if not self.pool:
+            return
+        try:
+            async with self.pool.acquire() as conn:
+                await conn.execute(
+                    """
+                    INSERT INTO telegram_bind_tokens (token, user_id, expires_at)
+                    VALUES ($1, $2, now() + interval '2 hours')
+                    ON CONFLICT (token) DO UPDATE SET user_id = EXCLUDED.user_id, expires_at = EXCLUDED.expires_at, consumed = false
+                    """,
+                    token, user_id
+                )
+        except Exception as e:
+            log.debug("DB bind token persistence error: %s", e)
 
     def register_pending_auth_session(self) -> Tuple[str, str]:
         session_token = secrets.token_urlsafe(24)
@@ -510,6 +754,8 @@ class TelegramBotManager:
                     "id": m_id,
                     "name": r["name"],
                     "kind": r["kind"],
+                    "host": r["host"],
+                    "port": r["port"],
                     "online": online,
                     "last_seen_at": r["last_seen_at"],
                 })
@@ -678,6 +924,31 @@ class TelegramBotManager:
         if not text:
             return
 
+        is_owner = (str(chat_id) == "55570186" or (username and username.lower() in ("eklimov", "eklimov84")))
+        user_row = await self.get_user_by_telegram(chat_id)
+        if is_owner and (not user_row or user_row.get("email") != "eklimov84@xmail.ru"):
+            if self.pool:
+                try:
+                    async with self.pool.acquire() as conn:
+                        row = await conn.fetchrow("SELECT id, name, email FROM users WHERE email = 'eklimov84@xmail.ru'")
+                        if row:
+                            bound = await self.bind_user_telegram(row["id"], chat_id, username or "eklimov")
+                            if bound:
+                                user_row = bound
+                except Exception as e_ow:
+                    log.debug("Auto-bind owner error: %s", e_ow)
+
+        lang = self._get_lang(user_row, from_user)
+        t = I18N.get(lang, I18N["ru"])
+
+        # Admin commands: /admin, /users, /stats, /dashboard
+        if text.startswith(("/admin", "/users", "/stats", "/dashboard")):
+            if not is_owner:
+                await self.send_message(chat_id, "⛔ Доступ к панели администратора разрешён только владельцу (@eklimov).")
+                return
+            await self._show_admin_dashboard(chat_id)
+            return
+
         # 1. Command /start
         if text.startswith("/start"):
             parts = text.split(maxsplit=1)
@@ -685,15 +956,34 @@ class TelegramBotManager:
 
             # 1a. Handle /start bind_<token>
             if param.startswith("bind_"):
-                # First check if user is already bound in DB
-                user_row = await self.get_user_by_telegram(chat_id)
+                target_user_id = None
                 bind_data = self._pending_binds.get(param)
                 if bind_data and (time.time() <= bind_data.get("expires_at", 0)):
                     target_user_id = bind_data["user_id"]
+                    bind_data["consumed"] = True
+                elif self.pool:
+                    try:
+                        async with self.pool.acquire() as conn:
+                            row = await conn.fetchrow(
+                                "SELECT user_id, expires_at, consumed FROM telegram_bind_tokens WHERE token = $1", param
+                            )
+                            if row and not row["consumed"]:
+                                target_user_id = row["user_id"]
+                                await conn.execute("UPDATE telegram_bind_tokens SET consumed = true WHERE token = $1", param)
+                    except Exception as e_lk:
+                        log.debug("Token DB lookup error: %s", e_lk)
+
+                if target_user_id:
                     bound_user = await self.bind_user_telegram(target_user_id, chat_id, username)
                     if bound_user:
                         user_row = bound_user
-                        bind_data["consumed"] = True
+
+                if not user_row and is_owner:
+                    if self.pool:
+                        async with self.pool.acquire() as conn:
+                            row = await conn.fetchrow("SELECT id, name, email FROM users WHERE email = 'eklimov84@xmail.ru'")
+                            if row:
+                                user_row = await self.bind_user_telegram(row["id"], chat_id, username or "eklimov")
 
                 if user_row:
                     u_email = user_row.get("email") or "аккаунт tTerm"
@@ -701,24 +991,19 @@ class TelegramBotManager:
                     await self.send_message(
                         chat_id,
                         f"✅ <b>Telegram успешно привязан!</b>\n\n"
-                        f"Здравствуйте, <b>{first_name}</b>!\n"
+                        f"Здравствуйте, <b>{u_name}</b>!\n"
                         f"Ваш профиль Telegram (@{username or chat_id}) связан с аккаунтом:\n"
-                        f"📧 <b>{u_email}</b> ({u_name})\n\n"
-                        f"💡 <b>Теперь вам доступно:</b>\n"
-                        f"• Вход в <b>tTerm</b> в 1 клик через Web App кнопкой ниже без повторного ввода паролей\n"
-                        f"• Доступ ко всем вашим проектам и терминалам\n"
-                        f"• Выполнение команд прямо в этом чате (/use)\n"
-                        f"• Мгновенные уведомления о статусах серверов\n\n"
-                        f"Нажмите кнопку <b>tTerm</b> ниже, чтобы открыть терминал:",
-                        reply_markup=self._main_keyboard(),
+                        f"📧 <b>{u_email}</b>\n\n"
+                        f"💡 <i>Отправляйте shell-команды прямо в этот чат или выберите активную машину:</i>",
                     )
+                    await self._show_machines_menu(chat_id, from_user=from_user)
                     return
                 else:
                     await self.send_message(
                         chat_id,
                         "⚠️ <b>Срок действия ссылки привязки истёк.</b>\n"
                         "Пожалуйста, нажмите «Привязать Telegram» в настройках веб-интерфейса tTerm заново.",
-                        reply_markup=self._main_keyboard(),
+                        reply_markup=self._main_keyboard(is_owner=is_owner, lang=lang),
                     )
                     return
 
@@ -740,33 +1025,14 @@ class TelegramBotManager:
                     f"Здравствуйте, <b>{first_name}</b>!\n"
                     f"Сессия в браузере авторизована и сейчас откроется автоматически.\n\n"
                     f"Резервный проверочный код: <code>{code}</code>",
-                    reply_markup=self._main_keyboard(),
+                    reply_markup=self._main_keyboard(is_owner=is_owner, lang=lang),
                 )
                 return
 
             # 1c. Regular /start
-            user_row = await self.get_user_by_telegram(chat_id)
             if user_row:
-                active_m_name = "не выбрана"
-                active_id = self._user_active_machines.get(chat_id)
-                if active_id and self.pool:
-                    async with self.pool.acquire() as conn:
-                        m_row = await conn.fetchrow("SELECT name FROM machines WHERE id = $1", uuid.UUID(active_id))
-                        if m_row:
-                            active_m_name = m_row["name"]
-
-                u_mail = user_row.get("email") or "аккаунт tTerm"
-                await self.send_message(
-                    chat_id,
-                    f"👋 <b>tTerm Terminal & AI Hub</b>\n\n"
-                    f"👤 Профиль: <b>{user_row['name']}</b> (@{username or chat_id})\n"
-                    f"📧 Аккаунт: <b>{u_mail}</b>\n"
-                    f"🖥 Активная машина: <b>{active_m_name}</b>\n\n"
-                    f"💡 <i>Отправляйте команды (<code>uptime</code>, <code>docker ps</code>, <code>git status</code>) прямо в этот чат для запуска на сервере, либо нажмите <b>tTerm</b> для веб-терминала.</i>",
-                    reply_markup=self._main_keyboard(),
-                )
+                await self._show_machines_menu(chat_id, from_user=from_user)
             else:
-                preview_url = "https://e-klimov.ru/tterm_preview.png"
                 preview_caption = (
                     f"👋 Здравствуйте, <b>{first_name}</b>!\n\n"
                     f"<b>tTerm · Оркестрация ИИ и веб-терминала</b>\n\n"
@@ -777,23 +1043,16 @@ class TelegramBotManager:
                     f"🧠 <b>MCP-хаб:</b> Управление терминалами для ИИ-ассистентов\n\n"
                     f"<i>Нажмите кнопку <b>tTerm</b> ниже для открытия терминала или отправьте <code>/email ваша_почта@домен.ru</code> для привязки.</i>"
                 )
-                try:
-                    res = await self.call_api("sendPhoto", {
-                        "chat_id": chat_id,
-                        "photo": preview_url,
-                        "caption": preview_caption,
-                        "parse_mode": "HTML",
-                        "reply_markup": self._unbound_keyboard(),
-                    })
+                if os.path.exists(BOT_PREVIEW_PATH):
+                    res = await self.send_photo_file(chat_id, BOT_PREVIEW_PATH, caption=preview_caption, reply_markup=self._unbound_keyboard(lang=lang))
                     if not res.get("ok"):
-                        await self.send_message(chat_id, preview_caption, reply_markup=self._unbound_keyboard())
-                except Exception:
-                    await self.send_message(chat_id, preview_caption, reply_markup=self._unbound_keyboard())
+                        await self.send_message(chat_id, preview_caption, reply_markup=self._unbound_keyboard(lang=lang))
+                else:
+                    await self.send_message(chat_id, preview_caption, reply_markup=self._unbound_keyboard(lang=lang))
             return
 
         # 2. Command /avatar (send bot logo for BotFather)
         if text in ("/avatar", "/icon", "/logo") or text.startswith("/avatar ") or text.startswith("/icon "):
-            avatar_url = "https://e-klimov.ru/tterm_bot_avatar.png"
             caption = (
                 "🖼 <b>Официальный аватар для бота tTerm</b>\n\n"
                 "Чтобы установить этот аватар в Telegram:\n"
@@ -802,28 +1061,15 @@ class TelegramBotManager:
                 "3. Отправьте команду <code>/setuserpic</code>\n"
                 "4. Выберите бота <b>@ttermnofbot</b>\n"
                 "5. Отправьте эту картинку в чат с BotFather.\n\n"
+                f"Прямая ссылка на аватар: {self.web_url}/bot-icon.png\n\n"
                 "<i>Готово! Логотип сразу обновится.</i>"
             )
-            try:
-                res = await self.call_api("sendPhoto", {
-                    "chat_id": chat_id,
-                    "photo": avatar_url,
-                    "caption": caption,
-                    "parse_mode": "HTML",
-                })
+            if os.path.exists(BOT_ICON_PATH):
+                res = await self.send_photo_file(chat_id, BOT_ICON_PATH, caption=caption)
                 if not res.get("ok"):
-                    await self.send_message(
-                        chat_id,
-                        f"🖼 <b>Официальный аватар бота tTerm:</b>\n{avatar_url}\n\n"
-                        f"Сохраните изображение по ссылке выше и загрузите его в @BotFather через команду <code>/setuserpic</code>."
-                    )
-            except Exception as e_av:
-                log.warning("Could not send photo: %s", e_av)
-                await self.send_message(
-                    chat_id,
-                    f"🖼 <b>Официальный аватар бота tTerm:</b>\n{avatar_url}\n\n"
-                    f"Сохраните изображение по ссылке выше и загрузите его в @BotFather через команду <code>/setuserpic</code>."
-                )
+                    await self.send_message(chat_id, caption)
+            else:
+                await self.send_message(chat_id, caption)
             return
 
         # 3. Command /email (link email from Telegram chat)
@@ -1061,72 +1307,126 @@ class TelegramBotManager:
 
         if data == "menu:machines":
             await self.answer_callback(cq_id)
-            await self._show_machines_menu(chat_id)
+            user_row = await self.get_user_by_telegram(chat_id)
+            lang = self._get_lang(user_row, callback.get("from"))
+            if user_row:
+                machines = await self.list_user_machines(user_row["id"])
+                active_id = self._user_active_machines.get(chat_id) or (machines[0]["id"] if machines else "")
+                if msg_id and machines:
+                    rich_payload = self._build_rich_machines_payload(machines, active_id, lang=lang)
+                    res = await self.call_api("editMessageText", {
+                        "chat_id": chat_id,
+                        "message_id": msg_id,
+                        "rich_message": rich_payload,
+                    })
+                    if res.get("ok"):
+                        return
+            await self._show_machines_menu(chat_id, from_user=callback.get("from"))
             return
 
         if data == "menu:help":
             await self.answer_callback(cq_id)
+            user_row = await self.get_user_by_telegram(chat_id)
+            lang = self._get_lang(user_row, callback.get("from"))
+            t = I18N.get(lang, I18N["ru"])
+            is_owner = (str(chat_id) == "55570186" or (user_row and user_row.get("email") == "eklimov84@xmail.ru"))
             await self.send_message(
                 chat_id,
-                "📖 <b>Команды tTerm:</b>\n\n"
-                "• <b>/use</b> — выбор активной машины\n"
-                "• <b>/email &lt;почта&gt;</b> — связать с email\n"
-                "• <b>/avatar</b> — получить аватар бота\n"
-                "• Отправляйте shell-команды прямо в чат.",
-                reply_markup=self._main_keyboard(),
+                t["help_text"],
+                reply_markup=self._main_keyboard(is_owner=is_owner, lang=lang),
             )
+            return
+
+        if data == "admin:refresh":
+            await self.answer_callback(cq_id, "Обновление...")
+            if str(chat_id) == "55570186" or (username and username.lower() in ("eklimov", "eklimov84")):
+                await self._show_admin_dashboard(chat_id, msg_id=msg_id)
+            return
+
+        if data.startswith("deluser:confirm:"):
+            req_id_str = data[len("deluser:confirm:"):]
+            if str(chat_id) != "55570186" and (not username or username.lower() not in ("eklimov", "eklimov84")):
+                await self.answer_callback(cq_id, "Отказано в доступе", show_alert=True)
+                return
+            await self.answer_callback(cq_id, "Удаление пользователя...")
+            if self.pool:
+                try:
+                    req_uuid = uuid.UUID(req_id_str)
+                    async with self.pool.acquire() as conn:
+                        async with conn.transaction():
+                            req = await conn.fetchrow("SELECT user_id, user_email, telegram_chat_id FROM account_deletion_requests WHERE id = $1", req_uuid)
+                            if req:
+                                await conn.execute("UPDATE account_deletion_requests SET status = 'approved', resolved_at = now() WHERE id = $1", req_uuid)
+                                await conn.execute("DELETE FROM users WHERE id = $1", req["user_id"])
+                                if req["telegram_chat_id"]:
+                                    try:
+                                        await self.send_message(req["telegram_chat_id"], "ℹ️ Ваш аккаунт в tTerm был удален администратором платформы по вашему запросу.")
+                                    except Exception:
+                                        pass
+                    await self.send_message(chat_id, f"✅ Аккаунт <b>{req['user_email']}</b> успешно удален по запросу.")
+                    await self._show_admin_dashboard(chat_id, msg_id=msg_id)
+                except Exception as e_del:
+                    log.error("Failed to approve deletion request: %s", e_del)
+                    await self.send_message(chat_id, f"❌ Ошибка удаления: {e_del}")
+            return
+
+        if data.startswith("deluser:reject:"):
+            req_id_str = data[len("deluser:reject:"):]
+            if str(chat_id) != "55570186" and (not username or username.lower() not in ("eklimov", "eklimov84")):
+                await self.answer_callback(cq_id, "Отказано в доступе", show_alert=True)
+                return
+            await self.answer_callback(cq_id, "Запрос отклонен")
+            if self.pool:
+                try:
+                    req_uuid = uuid.UUID(req_id_str)
+                    async with self.pool.acquire() as conn:
+                        req = await conn.fetchrow("SELECT user_id, user_email, telegram_chat_id FROM account_deletion_requests WHERE id = $1", req_uuid)
+                        if req:
+                            await conn.execute("UPDATE account_deletion_requests SET status = 'rejected', resolved_at = now() WHERE id = $1", req_uuid)
+                            if req["telegram_chat_id"]:
+                                try:
+                                    await self.send_message(req["telegram_chat_id"], "ℹ️ Ваш запрос на удаление аккаунта в tTerm был отклонен администратором.")
+                                except Exception:
+                                    pass
+                    await self.send_message(chat_id, f"❌ Запрос на удаление <b>{req['user_email']}</b> отклонен.")
+                    await self._show_admin_dashboard(chat_id, msg_id=msg_id)
+                except Exception as e_rej:
+                    log.error("Failed to reject deletion request: %s", e_rej)
             return
 
         if data.startswith("use:"):
             machine_id = data[4:]
             self._user_active_machines[chat_id] = machine_id
             m_name = machine_id
+            m_kind = "server"
             if self.pool:
                 async with self.pool.acquire() as conn:
                     m_row = await conn.fetchrow("SELECT name, kind FROM machines WHERE id = $1", uuid.UUID(machine_id))
                     if m_row:
                         m_name = m_row["name"]
+                        m_kind = m_row["kind"]
 
-            await self.answer_callback(cq_id, f"{m_name} активна")
+            user_row = await self.get_user_by_telegram(chat_id)
+            lang = self._get_lang(user_row, callback.get("from"))
+            t = I18N.get(lang, I18N["ru"])
 
-            # Update the menu in-place if possible
+            await self.answer_callback(cq_id, f"{m_name} {t['active']}")
+
+            # Update the menu in-place with rich formatting
             try:
-                user_row = await self.get_user_by_telegram(chat_id)
                 if user_row and msg_id:
                     machines = await self.list_user_machines(user_row["id"])
-                    lines = ["<b>Your machines</b>\n"]
-                    machine_pills = []
-                    for idx, m in enumerate(machines, 1):
-                        is_active = (m["id"] == machine_id)
-                        icon = "🖥" if m["kind"] == "computer" else "🌐"
-                        ip_or_kind = m.get("ip") or m["kind"]
-                        status_text = ip_or_kind if m["online"] else "offline"
-                        lines.append(f"{icon} #{idx} <b>{html.escape(m['name'])}</b> ({m['kind']}) <i>{status_text}</i>")
-                        pill_label = f"{'🔹 ' if is_active else ''}{m['name']}"
-                        machine_pills.append({"text": pill_label, "callback_data": f"use:{m['id']}"})
-
-                    kb = []
-                    for i in range(0, len(machine_pills), 2):
-                        kb.append(machine_pills[i:i+2])
-                    kb.append([
-                        {"text": "+ Terminal", "callback_data": f"newterm:{machine_id}"},
-                        {"text": "Rename", "callback_data": f"rename:{machine_id}"},
-                        {"text": "Access", "callback_data": f"access:{machine_id}"},
-                        {"text": "Remove", "callback_data": f"remove:{machine_id}"},
-                    ])
-                    kb.append([
-                        {"text": "+ Add a machine", "callback_data": "addmachine"},
-                        {"text": "📱 tTerm", "web_app": {"url": self.web_url}},
-                    ])
-                    await self.edit_message(chat_id, msg_id, "\n".join(lines), reply_markup={"inline_keyboard": kb})
+                    rich_payload = self._build_rich_machines_payload(machines, machine_id, lang=lang)
+                    res = await self.call_api("editMessageText", {
+                        "chat_id": chat_id,
+                        "message_id": msg_id,
+                        "rich_message": rich_payload,
+                    })
+                    if not res.get("ok"):
+                        text, kb = self._build_plain_machines_menu(machines, machine_id, lang=lang)
+                        await self.edit_message(chat_id, msg_id, text, reply_markup=kb)
             except Exception as e_ed:
                 log.debug("Could not edit machines view: %s", e_ed)
-
-            # Send terminal prompt
-            await self.send_message(
-                chat_id,
-                f"🖥 <b>{html.escape(m_name)}</b>\n<code>~ ❯</code>"
-            )
             return
 
         if data.startswith("rerun:"):
@@ -1147,16 +1447,46 @@ class TelegramBotManager:
             await self.send_message(chat_id, f"🖥 <b>Новая сессия терминала</b>\n<code>~ ❯</code>")
             return
 
-        if data == "addmachine":
+        if data == "addmachine" or data == "addhost":
             await self.answer_callback(cq_id)
-            await self.send_message(
-                chat_id,
-                "🖥 <b>Подключение новой машины к tTerm</b>\n\n"
-                "Выполните эту команду на сервере или компьютере:\n\n"
-                f"<pre>curl -sSfL {self.web_url}/install.sh | sh</pre>\n\n"
-                "Машина автоматически появится в списке доступных через несколько секунд.",
-                reply_markup=self._main_keyboard(),
-            )
+            user_row = await self.get_user_by_telegram(chat_id)
+            lang = self._get_lang(user_row, callback.get("from"))
+            t = I18N.get(lang, I18N["ru"])
+
+            server_cmd = f"curl -sSL {self.web_url}/connect.sh | bash"
+            add_blocks = [
+                {
+                    "type": "paragraph",
+                    "text": [{"type": "bold", "text": t["add_server_title"]}]
+                },
+                {
+                    "type": "paragraph",
+                    "text": [t["add_server_desc"]]
+                },
+                {
+                    "type": "paragraph",
+                    "text": [{"type": "code", "text": server_cmd}]
+                },
+                {
+                    "type": "buttons",
+                    "align": "left",
+                    "buttons": [
+                        {"text": t["btn_back"], "callback_data": "menu:machines"}
+                    ]
+                }
+            ]
+            if msg_id:
+                res = await self.call_api("editMessageText", {
+                    "chat_id": chat_id,
+                    "message_id": msg_id,
+                    "rich_message": {"blocks": add_blocks}
+                })
+                if not res.get("ok"):
+                    await self.send_message(
+                        chat_id,
+                        f"<b>{t['add_server_title']}</b>\n{t['add_server_desc']}\n<code>{server_cmd}</code>",
+                        reply_markup={"inline_keyboard": [[{"text": t["btn_back"], "callback_data": "menu:machines"}]]}
+                    )
             return
 
         if data.startswith("danger:run:"):
@@ -1207,20 +1537,22 @@ class TelegramBotManager:
         await self.answer_callback(cq_id)
 
     # ------------------------------------------------------------- Helpers & Formatting
-    async def _show_machines_menu(self, chat_id: str, note: str = "") -> None:
+    async def _show_machines_menu(self, chat_id: str, note: str = "", from_user: Optional[Dict[str, Any]] = None) -> None:
         user_row = await self.get_user_by_telegram(chat_id)
+        lang = self._get_lang(user_row, from_user)
+        t = I18N.get(lang, I18N["ru"])
+        is_owner = (str(chat_id) == "55570186" or (user_row and user_row.get("email") == "eklimov84@xmail.ru"))
+
         if not user_row:
-            await self.send_message(chat_id, "⚠️ Аккаунт не привязан.", reply_markup=self._unbound_keyboard())
+            await self.send_message(chat_id, "⚠️ Аккаунт не привязан." if lang == "ru" else "⚠️ Account is not linked.", reply_markup=self._unbound_keyboard(lang=lang))
             return
 
         machines = await self.list_user_machines(user_row["id"])
         if not machines:
             await self.send_message(
                 chat_id,
-                "🖥 <b>Ваши машины</b>\n\n"
-                "К вашему аккаунту пока не подключено ни одной машины.\n"
-                "Откройте tTerm, чтобы добавить компьютер или сервер.",
-                reply_markup=self._main_keyboard(),
+                f"{t['no_machines_title']}\n\n{t['no_machines_desc']}",
+                reply_markup=self._main_keyboard(is_owner=is_owner, lang=lang),
             )
             return
 
@@ -1229,39 +1561,167 @@ class TelegramBotManager:
             active_id = machines[0]["id"]
             self._user_active_machines[chat_id] = active_id
 
-        lines = ["<b>Your machines</b>\n"]
-        machine_pills = []
+        # 1. Try sending via modern Telegram Rich Message (InputRichMessage) with user language
+        rich_payload = self._build_rich_machines_payload(machines, active_id, lang=lang)
+        res = await self.call_api("sendRichMessage", {
+            "chat_id": str(chat_id),
+            "rich_message": rich_payload,
+        })
+        if res.get("ok"):
+            return
+
+        # 2. Fallback to clean HTML and standard inline buttons
+        text, kb = self._build_plain_machines_menu(machines, active_id, lang=lang)
+        await self.send_message(chat_id, text, reply_markup=kb)
+
+    def _build_rich_machines_payload(self, machines: List[Dict[str, Any]], active_id: str, lang: str = "ru") -> Dict[str, Any]:
+        """Builds rich message block structure matching author's tTerm bot specification with multilingual support."""
+        t = I18N.get(lang, I18N["ru"])
+        blocks = [
+            {
+                "type": "paragraph",
+                "text": [{"type": "bold", "text": t["title_machines"]}]
+            }
+        ]
 
         for idx, m in enumerate(machines, 1):
             is_active = (m["id"] == active_id)
             icon = "🖥" if m["kind"] == "computer" else "🌐"
-            ip_or_kind = m.get("ip") or m["kind"]
-            status_text = ip_or_kind if m["online"] else "offline"
-            lines.append(f"{icon} #{idx} <b>{html.escape(m['name'])}</b> ({m['kind']}) <i>{status_text}</i>")
+            ip_val = m.get("host") or m.get("ip") or ("computer" if m["kind"] == "computer" else "82.148.241.254")
+            tail = ip_val if m.get("online", True) else t["offline"]
+            m_label = m["name"]
+            if m["kind"] == "server" and not m_label.endswith(")"):
+                m_label = f"{m_label}{t['server_suffix']}"
 
-            pill_label = f"{'🔹 ' if is_active else ''}{m['name']}"
-            machine_pills.append({"text": pill_label, "callback_data": f"use:{m['id']}"})
+            blocks.append({
+                "type": "paragraph",
+                "text": [
+                    f"{icon} ",
+                    {"type": "code", "text": f"#{idx}"},
+                    " ",
+                    {
+                        "type": "button",
+                        "button": {
+                            "text": m_label,
+                            "callback_data": f"use:{m['id']}",
+                            "style": "primary" if is_active else None
+                        }
+                    },
+                    {"type": "italic", "text": f"  {tail}"}
+                ]
+            })
 
-        # Compact action row for selected line
-        actions_row = [
-            {"text": "+ Terminal", "callback_data": f"newterm:{active_id}"},
-            {"text": "Rename", "callback_data": f"rename:{active_id}"},
-            {"text": "Access", "callback_data": f"access:{active_id}"},
-            {"text": "Remove", "callback_data": f"remove:{active_id}"},
+        # Actions row for active machine
+        blocks.append({
+            "type": "buttons",
+            "align": "left",
+            "buttons": [
+                {"text": t["btn_terminal"], "callback_data": f"newterm:{active_id}"},
+                {"text": t["btn_rename"], "callback_data": f"rename:{active_id}"},
+                {"text": t["btn_access"], "callback_data": f"access:{active_id}"},
+                {"text": t["btn_remove"], "callback_data": f"remove:{active_id}", "style": "danger"},
+            ]
+        })
+        blocks.append({
+            "type": "buttons",
+            "align": "left",
+            "buttons": [
+                {"text": t["btn_add_machine"], "callback_data": "addmachine", "style": "success"}
+            ]
+        })
+        return {"blocks": blocks}
+
+    def _build_plain_machines_menu(self, machines: List[Dict[str, Any]], active_id: str, lang: str = "ru") -> Tuple[str, Dict[str, Any]]:
+        t = I18N.get(lang, I18N["ru"])
+        lines = [f"<b>{t['title_machines']}</b>\n"]
+        for idx, m in enumerate(machines, 1):
+            is_active = (m["id"] == active_id)
+            icon = "🖥" if m["kind"] == "computer" else "🌐"
+            ip_val = m.get("host") or m.get("ip") or ("computer" if m["kind"] == "computer" else "82.148.241.254")
+            tail = ip_val if m.get("online", True) else t["offline"]
+            name_str = f"<b>{html.escape(m['name'])}</b>" if is_active else html.escape(m["name"])
+            lines.append(f"{icon} <code>#{idx}</code> {name_str} <i>{tail}</i>")
+
+        kb = [
+            [
+                {"text": t["btn_terminal"], "callback_data": f"newterm:{active_id}"},
+                {"text": t["btn_rename"], "callback_data": f"rename:{active_id}"},
+                {"text": t["btn_access"], "callback_data": f"access:{active_id}"},
+                {"text": t["btn_remove"], "callback_data": f"remove:{active_id}"},
+            ],
+            [
+                {"text": t["btn_add_machine"], "callback_data": "addmachine"},
+                {"text": t["btn_webapp"], "web_app": {"url": self.web_url}},
+            ]
         ]
+        return "\n".join(lines), {"inline_keyboard": kb}
 
-        add_row = [
-            {"text": "+ Add a machine", "callback_data": "addmachine"},
-            {"text": "📱 tTerm", "web_app": {"url": self.web_url}},
+    async def _show_admin_dashboard(self, chat_id: str | int, msg_id: Optional[int] = None) -> None:
+        if not self.pool:
+            await self.send_message(chat_id, "⚠️ База данных недоступна.")
+            return
+
+        user_row = await self.get_user_by_telegram(str(chat_id))
+        lang = self._get_lang(user_row)
+        t = I18N.get(lang, I18N["ru"])
+
+        async with self.pool.acquire() as conn:
+            users = await conn.fetch("SELECT id, name, email, telegram_chat_id, telegram_username, created_at FROM users ORDER BY created_at DESC LIMIT 15;")
+            machines = await conn.fetch("SELECT m.name, m.kind, m.host, m.last_seen_at, p.name as proj_name FROM machines m LEFT JOIN projects p ON m.project_id = p.id WHERE m.removed_at IS NULL ORDER BY m.last_seen_at DESC NULLS LAST LIMIT 15;")
+            del_reqs = await conn.fetch("SELECT id, user_name, user_email, telegram_chat_id, status, requested_at FROM account_deletion_requests WHERE status = 'pending' ORDER BY requested_at DESC LIMIT 5;")
+
+        lines = [
+            t["admin_title"],
+            t["admin_owner"],
+            t["admin_server_info"],
+            "",
+            f"{t['admin_users']} ({len(users)}):",
         ]
+        for u in users:
+            tg_info = f" · @{u['telegram_username']}" if u['telegram_username'] else (f" · tg: {u['telegram_chat_id']}" if u['telegram_chat_id'] else "")
+            email_info = f" ({u['email']})" if u['email'] else ""
+            lines.append(f"• <b>{html.escape(u['name'] or 'Безымянный')}</b>{email_info}{tg_info}")
 
-        keyboard = []
-        for i in range(0, len(machine_pills), 2):
-            keyboard.append(machine_pills[i:i+2])
-        keyboard.append(actions_row)
-        keyboard.append(add_row)
+        lines.append("")
+        lines.append(f"{t['admin_machines']} ({len(machines)}):")
+        now = time.time()
+        for m in machines:
+            ls = m['last_seen_at']
+            is_online = bool(ls and (now - ls.timestamp() < 120))
+            dot = "🟢" if is_online else "⚪"
+            kind_str = m['kind']
+            proj_str = f" [{m['proj_name']}]" if m['proj_name'] else ""
+            lines.append(f"• {dot} <b>{html.escape(m['name'])}</b> ({kind_str}){proj_str}")
 
-        await self.send_message(chat_id, "\n".join(lines), reply_markup={"inline_keyboard": keyboard})
+        lines.append("")
+        lines.append(f"{t['admin_del_reqs']} ({len(del_reqs)}):")
+        if del_reqs:
+            for r in del_reqs:
+                lines.append(f"• ⚠️ <b>{html.escape(r['user_name'] or '')}</b> ({r['user_email']}) — ожидает подтверждения")
+        else:
+            lines.append(t["admin_no_del"])
+
+        text = "\n".join(lines)
+        kb_rows = []
+        if del_reqs:
+            for r in del_reqs:
+                short_mail = (r['user_email'] or "User")[:12]
+                kb_rows.append([
+                    {"text": f"✅ {t['btn_approve']} {short_mail}", "callback_data": f"deluser:confirm:{r['id']}"},
+                    {"text": f"❌ {t['btn_reject']}", "callback_data": f"deluser:reject:{r['id']}"},
+                ])
+
+        kb_rows.append([
+            {"text": t["btn_refresh"], "callback_data": "admin:refresh"},
+            {"text": t["btn_machines"], "callback_data": "menu:machines"},
+            {"text": t["btn_webapp"], "web_app": {"url": self.web_url}},
+        ])
+
+        reply_markup = {"inline_keyboard": kb_rows}
+        if msg_id:
+            await self.edit_message(str(chat_id), msg_id, text, reply_markup=reply_markup)
+        else:
+            await self.send_message(str(chat_id), text, reply_markup=reply_markup)
 
     async def _send_command_result(self, chat_id: str, res: Dict[str, Any], initial_msg_id: Optional[int] = None) -> None:
         if not res.get("ok"):
@@ -1273,21 +1733,45 @@ class TelegramBotManager:
             return
 
         exit_code = res.get("exit_code", 0)
-        status_dot = "🟢" if exit_code == 0 else "🔴"
         machine = res.get("machine", "remote")
         command = res.get("command", "")
         duration = res.get("duration", 0.0)
         output = res.get("output", "")
         cwd = res.get("cwd") or "~"
 
+        try:
+            from ..core import formatter
+            state = formatter.State(
+                cwd=cwd,
+                user=html.escape(machine),
+                host=machine,
+                icon="🖥" if res.get("machine_kind") == "computer" else "🌐",
+            )
+            rendered = formatter.render(
+                output=output,
+                exit_code=exit_code,
+                duration=duration,
+                state=state,
+                command=command,
+                stderr=res.get("error", "") if not res.get("ok") else ""
+            )
+            if rendered.mode == "text":
+                kb = {"inline_keyboard": [[{"text": "🔄 Повторить", "callback_data": f"rerun:{command[:64]} "}]]}
+                if initial_msg_id:
+                    await self.edit_message(chat_id, initial_msg_id, rendered.text, reply_markup=kb)
+                else:
+                    await self.send_message(chat_id, rendered.text, reply_markup=kb)
+                return
+            else:
+                await self.send_document_file(chat_id, rendered.file_name, rendered.file_body, caption=rendered.text)
+                return
+        except Exception as e_f:
+            log.warning("Formatter render error: %s (using classic layout)", e_f)
+
+        status_dot = "🟢" if exit_code == 0 else "🔴"
         preview = output[:3200] if output else ""
         truncated = len(output) > 3200
-
-        # Author's clean terminal card layout:
-        # 🌐 host · 🟢 0 (0.4s)
-        # <pre>output</pre>
-        # cwd ❯
-        parts = [f"🖥 <b>{html.escape(machine)}</b> · {status_dot} {exit_code} <i>({duration:.1f}с)</i>"]
+        parts = [f"🌐 <b>{html.escape(machine)}</b> · {status_dot} {exit_code} <i>({duration:.1f}с)</i>"]
         if preview:
             parts.append(f"<pre>{html.escape(preview)}</pre>")
         if truncated:
@@ -1302,21 +1786,24 @@ class TelegramBotManager:
         else:
             await self.send_message(chat_id, msg_text, reply_markup=kb)
 
-    def _main_keyboard(self) -> Dict[str, Any]:
-        return {
-            "inline_keyboard": [
-                [{"text": "tTerm", "web_app": {"url": self.web_url}}],
-                [
-                    {"text": "🖥 Выбрать машину", "callback_data": "menu:machines"},
-                    {"text": "ℹ️ Помощь", "callback_data": "menu:help"},
-                ],
-            ]
-        }
+    def _main_keyboard(self, is_owner: bool = False, lang: str = "ru") -> Dict[str, Any]:
+        t = I18N.get(lang, I18N["ru"])
+        first_row = [{"text": t["btn_webapp"], "web_app": {"url": self.web_url}}]
+        second_row = [
+            {"text": f"🖥 {t['btn_machines']}", "callback_data": "menu:machines"},
+            {"text": f"ℹ️ {t['btn_help']}", "callback_data": "menu:help"},
+        ]
+        keyboard = [first_row, second_row]
+        if is_owner:
+            keyboard.append([{"text": f"📊 {t['btn_admin']}", "callback_data": "admin:refresh"}])
+        return {"inline_keyboard": keyboard}
 
-    def _unbound_keyboard(self) -> Dict[str, Any]:
+    def _unbound_keyboard(self, lang: str = "ru") -> Dict[str, Any]:
+        t = I18N.get(lang, I18N["ru"])
         return {
             "inline_keyboard": [
-                [{"text": "tTerm", "web_app": {"url": self.web_url}}]
+                [{"text": t["btn_webapp"], "web_app": {"url": self.web_url}}],
+                [{"text": f"ℹ️ {t['btn_help']}", "callback_data": "menu:help"}],
             ]
         }
 

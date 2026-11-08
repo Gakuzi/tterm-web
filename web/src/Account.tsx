@@ -32,7 +32,7 @@ const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const PHOTO_MAX = 5 * 1024 * 1024;
 export const NOT_A_PHOTO = "account.not_a_photo";
 
-export const SUPPORT = "support@tterm.net";
+export const SUPPORT = "support@e-klimov.ru";
 
 function limitsText(limits: AccountInfo["plan"]["limits"], t: Translate): string {
   const parts = [
@@ -245,6 +245,35 @@ export function AccountPane(props: {
   /** The photo chosen, loaded, while it is being cut to a circle. */
   const [cropping, setCropping] = useState<HTMLImageElement | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [deletePending, setDeletePending] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/account/delete-request", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && d.status === "pending") setDeletePending(true);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleRequestDelete = async () => {
+    if (!window.confirm("Вы действительно хотите отправить запрос на удаление вашего аккаунта администратору (@eklimov)? Все данные будут стёрты только после подтверждения.")) { // i18n-ignore
+      return;
+    }
+    try {
+      const res = await fetch("/api/account/delete-request", {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setDeletePending(true);
+        props.notify(data.message || "Запрос на удаление отправлен администратору"); // i18n-ignore
+      }
+    } catch {
+      props.notify("Не удалось отправить запрос на удаление"); // i18n-ignore
+    }
+  };
 
   useEffect(() => {
     if (editing) nameInput.current?.select();
@@ -412,11 +441,42 @@ export function AccountPane(props: {
       {/* Telegram Push Notification Bot for Multi-Device Alerts */}
       <TelegramNotificationSection notify={props.notify} />
 
+      {/* Brandbook & Legal Status Attribution */}
+      <Group title="Правовая информация и брендбук"> {/* i18n-ignore */}
+        <Row
+          label="Разработчик и оператор платформы" /* i18n-ignore */
+          note="IT-консалтинг, архитектура бизнес-процессов, регламентация деятельности предприятий, комплексная автоматизация (CRM, ERP, 1C, телеметрия)." /* i18n-ignore */
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span style={{ fontWeight: 600, color: "var(--amber-ink)" }}>
+              Климов Евгений Александрович {/* i18n-ignore */}
+            </span>
+            <span className="settings-value muted" style={{ fontSize: "12px" }}>
+              Плательщик налога на профессиональный доход («Самозанятый»). ИНН: 290125869000. Без НДС. {/* i18n-ignore */}
+            </span>
+          </div>
+        </Row>
+      </Group>
+
       <Group title={t("account.delete_title")}>
-        <Row label={t("account.delete")} note={t("account.delete_note", { email: support })}>
-          <button type="button" className="button-plain small" onClick={props.onSupport}>
-            {t("account_menu.write_support")}
-          </button>
+        <Row
+          label={t("account.delete")}
+          note="Запрос на удаление аккаунта направляется непосредственно администратору (@eklimov). Все пользовательские данные изолированы и не передаются третьим лицам." /* i18n-ignore */
+        >
+          {deletePending ? (
+            <div className="error-box" style={{ background: "rgba(224, 159, 62, 0.15)", borderColor: "var(--amber)", color: "var(--amber-ink)" }}>
+              ⏳ Запрос на удаление аккаунта отправлен администратору (@eklimov). {/* i18n-ignore */}
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="button-plain small"
+              style={{ color: "var(--red-ink)", borderColor: "var(--red-line)" }}
+              onClick={handleRequestDelete}
+            >
+              Запросить удаление аккаунта {/* i18n-ignore */}
+            </button>
+          )}
         </Row>
       </Group>
 

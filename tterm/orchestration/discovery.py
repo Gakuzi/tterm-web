@@ -116,6 +116,7 @@ class DiscoveredNodeDTO:
     os_name: str                     # "Raspberry Pi 4 / Debian Linux", "macOS Darwin arm64", "Ubuntu 24.04 VPS"
     ip_address: str
     status: str                      # "ONLINE", "OFFLINE"
+    project_id: Optional[str] = None
     containers: List[DiscoveredContainerDTO] = field(default_factory=list)
     ports: List[DiscoveredPortDTO] = field(default_factory=list)
     allowed_members: List[str] = field(default_factory=lambda: ["all"])
@@ -124,6 +125,7 @@ class DiscoveredNodeDTO:
     ssh_port: int = 22
     login: str = "tterm"
     cached_passport: Dict[str, Any] = field(default_factory=dict)
+    resource_visibility: Dict[str, bool] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         containers_dicts = []
@@ -141,6 +143,7 @@ class DiscoveredNodeDTO:
             "kind": self.kind,
             "os_name": self.os_name,
             "ip_address": self.ip_address,
+            "project_id": self.project_id,
             "host": self.host or self.ip_address,
             "ssh_port": self.ssh_port,
             "login": self.login,
@@ -149,6 +152,7 @@ class DiscoveredNodeDTO:
             "ports": [p.to_dict() for p in self.ports],
             "allowed_members": self.allowed_members,
             "last_scanned": self.last_scanned,
+            "resource_visibility": self.resource_visibility,
         }
 
 
@@ -162,6 +166,8 @@ class NodeDiscoveryScanner:
         self._custom_names: Dict[Tuple[str, str, str], str] = {}
         # container permissions: (node_id, container_id) -> list of member_ids
         self._container_permissions: Dict[Tuple[str, str], List[str]] = {}
+        # (machine_id, project_id, resource_name) -> is_visible: bool
+        self._resource_visibility: Dict[Tuple[str, str, str], bool] = {}
 
         self._init_defaults()
 
@@ -184,79 +190,6 @@ class NodeDiscoveryScanner:
         }
         for k, name in default_aliases.items():
             self._custom_names[("default-server", "container", k)] = name
-
-        now = dt.datetime.now(dt.timezone.utc).isoformat()
-
-        # 1. Gateway Server
-        default_node = DiscoveredNodeDTO(
-            id="default-server",
-            name="Gateway Server (Linux)",
-            kind="server",
-            os_name="Debian GNU/Linux 12",
-            ip_address="127.0.0.1",
-            status="ONLINE",
-            allowed_members=["all"],
-            last_scanned=now,
-            host="127.0.0.1",
-            ssh_port=22,
-            login="tterm",
-        )
-        self._nodes["default-server"] = default_node
-
-        default_server_raw = """===DOCKER_BEGIN===
-993bc7228911|tterm-server-tterm-1|tterm-server-tterm|Up 41 minutes|0.0.0.0:8290-8291->8290-8291/tcp, [::]:8290-8291->8290-8291/tcp
-7045c1f0de1b|tterm-server-db-1|postgres:16-alpine|Up 13 hours|5432/tcp
-===DOCKER_END===
-===PORTS_BEGIN===
-tcp LISTEN 0 4096 0.0.0.0:8290 0.0.0.0:*
-tcp LISTEN 0 4096 0.0.0.0:8291 0.0.0.0:*
-tcp LISTEN 0 4096 0.0.0.0:5432 0.0.0.0:*
-tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*
-===PORTS_END===
-===SYSTEM_BEGIN===
-Linux server 6.1.0-generic #1 SMP PREEMPT Debian aarch64 GNU/Linux
-127.0.0.1 172.17.0.1 172.18.0.1
-===SYSTEM_END==="""
-        self.parse_discovery_output("default-server", default_server_raw)
-        default_node.cached_passport = {
-            "os": "Debian GNU/Linux 12",
-            "docker_containers": [c.model_dump() for c in default_node.containers],
-            "listening_ports": [f"tcp LISTEN 0 128 0.0.0.0:{p.port} 0.0.0.0:*" for p in default_node.ports],
-        }
-
-        # 2. MacBook Air (macOS Developer Node)
-        mac_node = DiscoveredNodeDTO(
-            id="macbook-air",
-            name="MacBook Air (Рабочая станция)",
-            kind="computer",
-            os_name="macOS Sonoma (Darwin arm64)",
-            ip_address="192.168.1.101",
-            status="ONLINE",
-            allowed_members=["all"],
-            last_scanned=now,
-            host="192.168.1.101",
-            ssh_port=22,
-            login="developer",
-        )
-        self._nodes["macbook-air"] = mac_node
-
-        mac_raw = """===DOCKER_BEGIN===
-===DOCKER_END===
-===PORTS_BEGIN===
-tcp LISTEN 0 128 0.0.0.0:22 0.0.0.0:*
-tcp LISTEN 0 512 127.0.0.1:5173 0.0.0.0:*
-tcp LISTEN 0 512 127.0.0.1:3000 0.0.0.0:*
-===PORTS_END===
-===SYSTEM_BEGIN===
-Darwin MacBook-Air.local 24.3.0 Darwin Kernel Version 24.3.0: arm64
-192.168.1.101
-===SYSTEM_END="""
-        self.parse_discovery_output("macbook-air", mac_raw)
-        mac_node.cached_passport = {
-            "os": "macOS Sonoma (Darwin arm64)",
-            "docker_containers": [],
-            "listening_ports": [f"tcp LISTEN 0 128 0.0.0.0:{p.port} 0.0.0.0:*" for p in mac_node.ports],
-        }
 
     def parse_ports_output(self, ports_raw: str) -> List[DiscoveredPortDTO]:
         ports: List[DiscoveredPortDTO] = []
@@ -821,23 +754,58 @@ Darwin MacBook-Air.local 24.3.0 Darwin Kernel Version 24.3.0: arm64
         ports = [p.to_dict() for p in node.ports]
         return services, ports
 
-    def get_all_nodes(self, member_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Returns all nodes with containers and ports, respecting member permissions."""
+    def get_all_nodes(self, member_id: Optional[str] = None, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Returns nodes with containers and ports, strictly scoped by project_id and member permissions."""
         results = []
         for n in self._nodes.values():
+            # Strict Project Isolation: if project_id is given, node MUST match it
+            if project_id and n.project_id and str(n.project_id) != str(project_id):
+                continue
+
             if member_id and member_id not in ["me", "admin"] and "all" not in n.allowed_members:
                 if member_id not in n.allowed_members:
                     continue
 
             n_dict = n.to_dict()
 
-            if member_id and member_id not in ["me", "admin"]:
-                filtered_c = []
-                for c in n.containers:
+            # Filter containers based on project-level visibility and member scoping
+            filtered_c = []
+            for c in n.containers:
+                # 1. Project-level container visibility
+                if project_id:
+                    vis = self._resource_visibility.get((n.id, str(project_id), c.name))
+                    if vis is False:
+                        continue
+
+                # 2. Member-level container scoping
+                if member_id and member_id not in ["me", "admin"]:
                     allowed = self._container_permissions.get((n.id, c.id))
-                    if allowed is None or "all" in allowed or member_id in allowed:
-                        filtered_c.append(c.model_dump())
-                n_dict["containers"] = filtered_c
+                    if allowed is not None and "all" not in allowed and member_id not in allowed:
+                        continue
+
+                c_dump = c.model_dump() if hasattr(c, "model_dump") else dict(c)
+                # Filter services inside container
+                if project_id and "services" in c_dump:
+                    srv_filtered = []
+                    for s in c_dump["services"]:
+                        s_name = s.get("name", "") if isinstance(s, dict) else getattr(s, "name", "")
+                        s_vis = self._resource_visibility.get((n.id, str(project_id), s_name))
+                        if s_vis is not False:
+                            srv_filtered.append(s)
+                    c_dump["services"] = srv_filtered
+
+                filtered_c.append(c_dump)
+
+            n_dict["containers"] = filtered_c
+
+            # Filter listening ports based on project-level visibility
+            if project_id:
+                filtered_p = []
+                for p in n.ports:
+                    p_vis = self._resource_visibility.get((n.id, str(project_id), str(p.port)))
+                    if p_vis is not False:
+                        filtered_p.append(p.to_dict())
+                n_dict["ports"] = filtered_p
 
             results.append(n_dict)
         return results
