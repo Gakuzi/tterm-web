@@ -132,7 +132,10 @@ async def ensure_local_owner(pool: asyncpg.Pool, name: str,
             "SELECT id FROM users WHERE lower(email) = $1 AND NOT is_local_owner",
             email)
         if taken is not None:
-            raise ValueError(f"{email} already belongs to another account")
+            await conn.execute("UPDATE users SET is_local_owner = false")
+            await conn.execute("UPDATE users SET is_local_owner = true WHERE id = $1", taken)
+            row = await conn.fetchrow(
+                "SELECT id, name, theme, plan_id, email FROM users WHERE id = $1", taken)
         if row is None:
             user_id = await conn.fetchval(
                 "INSERT INTO users (name, email, is_local_owner) "

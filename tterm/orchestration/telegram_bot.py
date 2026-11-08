@@ -33,6 +33,7 @@ import logging
 import os
 import re
 import secrets
+import shutil
 import ssl
 import time
 import urllib.error
@@ -80,8 +81,6 @@ I18N = {
         "server_suffix": " (Сервер)",
         "offline": "не в сети",
         "online": "в сети",
-        "active": "активна",
-        "no_machines_title": "🖥 <b>Ваши машины</b>",
         "no_machines_desc": "К вашему аккаунту пока не подключено ни одной машины.\nОткройте tTerm или нажмите кнопку ниже, чтобы подключить сервер или компьютер.",
         "admin_title": "📊 <b>Панель управления tTerm | Администратор</b>",
         "admin_owner": "Владелец: <b>Евгений Климов</b> (@eklimov)",
@@ -129,7 +128,6 @@ I18N = {
         "offline": "offline",
         "online": "online",
         "active": "active",
-        "no_machines_title": "🖥 <b>Your machines</b>",
         "no_machines_desc": "No machines connected to your account yet.\nOpen tTerm or tap below to connect a server or computer.",
         "admin_title": "📊 <b>tTerm Management Panel | Administrator</b>",
         "admin_owner": "Owner: <b>Evgeniy Klimov</b> (@eklimov)",
@@ -788,7 +786,9 @@ class TelegramBotManager:
                 FROM machines m
                 JOIN projects p ON p.id = m.project_id
                 LEFT JOIN project_members pm ON pm.project_id = p.id
-                WHERE m.removed_at IS NULL AND (p.owner_id = $1 OR pm.user_id = $1)
+                WHERE m.removed_at IS NULL
+                  AND p.deleted_at IS NULL
+                  AND (p.owner_id = $1 OR (pm.user_id = $1 AND (pm.until IS NULL OR pm.until > now())))
                 ORDER BY m.name
                 """, user_id
             )
@@ -2568,11 +2568,42 @@ class TelegramBotManager:
 
         machines = await self.list_user_machines(user_row["id"])
         if not machines:
-            await self.send_message(
-                chat_id,
-                f"{t['no_machines_title']}\n\n{t['no_machines_desc']}",
-                reply_markup=self._main_keyboard(is_owner=is_owner, lang=lang),
-            )
+            empty_blocks = [
+                {
+                    "type": "paragraph",
+                    "text": [{"type": "bold", "text": t["title_machines"]}]
+                },
+                {
+                    "type": "paragraph",
+                    "text": [t["no_machines_desc"]]
+                },
+                {
+                    "type": "buttons",
+                    "align": "left",
+                    "buttons": [
+                        {"text": t["btn_add_machine"], "callback_data": "addmachine", "style": "success"},
+                        {"text": "🏠 Главное меню", "callback_data": "menu:main"},
+                        {"text": "🇷🇺/🇬🇧 Язык", "callback_data": "togglelang"},
+                    ]
+                }
+            ]
+            res = await self.call_api("sendRichMessage", {
+                "chat_id": str(chat_id),
+                "rich_message": {"blocks": empty_blocks},
+            })
+            if not res.get("ok"):
+                empty_kb = {
+                    "inline_keyboard": [
+                        [{"text": t["btn_add_machine"], "callback_data": "addmachine"}],
+                        [{"text": "🏠 Главное меню", "callback_data": "menu:main"}],
+                        [{"text": t["btn_webapp"], "web_app": {"url": self.web_url}}],
+                    ]
+                }
+                await self.send_message(
+                    chat_id,
+                    f"{t['no_machines_title']}\n\n{t['no_machines_desc']}",
+                    reply_markup=empty_kb,
+                )
             return
 
         active_id = self._user_active_machines.get(chat_id)

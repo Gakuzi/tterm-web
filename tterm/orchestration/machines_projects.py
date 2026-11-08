@@ -47,9 +47,8 @@ class MachineProjectManager:
         self._load_from_disk()
 
     def _preload_defaults(self):
-        """Preloads default bindings: nodes server-node and workstation-node bound to default-project."""
-        self.bind_machine_to_project("server-node", "default-project", "Default Project", save=False)
-        self.bind_machine_to_project("workstation-node", "default-project", "Default Project", save=False)
+        """Clean defaults: no fictitious or cross-tenant nodes preloaded."""
+        pass
 
     def _save_to_disk(self):
         try:

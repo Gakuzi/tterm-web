@@ -754,12 +754,27 @@ class NodeDiscoveryScanner:
         ports = [p.to_dict() for p in node.ports]
         return services, ports
 
-    def get_all_nodes(self, member_id: Optional[str] = None, project_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Returns nodes with containers and ports, strictly scoped by project_id and member permissions."""
+    def get_all_nodes(
+        self,
+        member_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        allowed_project_ids: Optional[Set[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Returns nodes with containers and ports, strictly scoped by project_id and user allowed projects."""
         results = []
         for n in self._nodes.values():
-            # Strict Project Isolation: if project_id is given, node MUST match it
-            if project_id and n.project_id and str(n.project_id) != str(project_id):
+            # If target project_id specified, node MUST belong to it
+            if project_id:
+                if not n.project_id or str(n.project_id) != str(project_id):
+                    continue
+
+            # Strict Multi-Tenant isolation: if allowed_project_ids is provided, node MUST belong to one of user's projects
+            if allowed_project_ids is not None:
+                if not n.project_id or str(n.project_id) not in allowed_project_ids:
+                    continue
+
+            # If neither project_id nor allowed_project_ids is provided, prevent unauthorized global leak
+            if not project_id and allowed_project_ids is None:
                 continue
 
             if member_id and member_id not in ["me", "admin"] and "all" not in n.allowed_members:
@@ -845,7 +860,7 @@ class NodeDiscoveryScanner:
             return list(self._nodes.values())
         try:
             rows = await pool.fetch("""
-                SELECT id, name, kind, host, port, passport, last_seen_at
+                SELECT id, name, kind, host, port, passport, last_seen_at, project_id
                 FROM machines
                 WHERE removed_at IS NULL
             """)
@@ -855,6 +870,7 @@ class NodeDiscoveryScanner:
                 kind = r["kind"] or "server"
                 host = r["host"] or ""
                 port = r["port"] or 22
+                proj_id = str(r["project_id"]) if r["project_id"] else None
                 pp = r["passport"]
                 if isinstance(pp, str):
                     try:
@@ -876,6 +892,7 @@ class NodeDiscoveryScanner:
                         os_name=os_name,
                         ip_address=ip,
                         status="ONLINE" if r.get("last_seen_at") else "ONLINE",
+                        project_id=proj_id,
                         host=host,
                         ssh_port=port,
                         login="tterm",
@@ -885,6 +902,7 @@ class NodeDiscoveryScanner:
                 else:
                     node.name = name
                     node.kind = kind
+                    node.project_id = proj_id
                     if host:
                         node.host = host
                         node.ip_address = host

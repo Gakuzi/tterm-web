@@ -187,15 +187,59 @@ from .git_sync import git_sync_manager, ProjectGitConfigDTO
 
 
 @router.get("/git-configs")
-async def list_all_project_git_configs():
-    """Returns Git repository bindings for all configured projects."""
+async def list_all_project_git_configs(request: Request = None):
+    """Returns Git repository bindings for only projects accessible to the authenticated user."""
+    pool = _extract_pool_from_request(request)
+    user = await _extract_current_user(request, pool)
+    if not user:
+        return {"ok": True, "configs": {}}
+
+    allowed_pids = set()
+    if pool:
+        try:
+            async with pool.acquire() as conn:
+                rows = await conn.fetch(
+                    """
+                    SELECT p.id FROM projects p
+                    LEFT JOIN project_members pm ON pm.project_id = p.id
+                    WHERE p.deleted_at IS NULL AND (p.owner_id = $1 OR (pm.user_id = $1 AND (pm.until IS NULL OR pm.until > now())))
+                    """,
+                    user.id,
+                )
+                allowed_pids = {str(r["id"]) for r in rows}
+        except Exception:
+            pass
+
     all_configs = git_sync_manager.get_all_configs()
-    return {"ok": True, "configs": {pid: cfg.model_dump() for pid, cfg in all_configs.items()}}
+    user_configs = {pid: cfg.model_dump() for pid, cfg in all_configs.items() if pid in allowed_pids}
+    return {"ok": True, "configs": user_configs}
 
 
 @router.get("/projects/{project_id}/git-config")
-async def get_project_git_config(project_id: str):
+async def get_project_git_config(project_id: str, request: Request = None):
     """Returns the Git repository binding and terminal branch settings for a project."""
+    pool = _extract_pool_from_request(request)
+    user = await _extract_current_user(request, pool)
+    if not user:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+
+    if pool:
+        try:
+            p_uuid = uuid.UUID(str(project_id).strip())
+            async with pool.acquire() as conn:
+                has_access = await conn.fetchval(
+                    """
+                    SELECT 1 FROM projects p
+                    LEFT JOIN project_members pm ON pm.project_id = p.id
+                    WHERE p.id = $1 AND p.deleted_at IS NULL AND (p.owner_id = $2 OR (pm.user_id = $2 AND (pm.until IS NULL OR pm.until > now())))
+                    """,
+                    p_uuid, user.id,
+                )
+                if not has_access:
+                    raise HTTPException(status_code=403, detail="Доступ к проекту запрещён")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Некорректный UUID проекта")
+
     cfg = git_sync_manager.get_config(project_id)
     return {"ok": True, "config": cfg.model_dump()}
 
@@ -224,16 +268,29 @@ async def update_project_git_config(project_id: str, data: ProjectGitConfigDTO, 
 
 @router.get("/projects-list")
 async def list_projects_for_frontend(request: Request):
-    """Returns a list of all projects with id, name, and code for easy frontend dropdowns."""
-    pool = getattr(request.app.state, "pool", None)
+    """Returns a list of projects accessible to the authenticated user for frontend dropdowns."""
+    pool = _extract_pool_from_request(request)
     if not pool:
         from ..core.accounts import pool as default_pool
         pool = default_pool
     if not pool:
         return {"ok": True, "projects": []}
+    user = await _extract_current_user(request, pool)
+    if not user:
+        return {"ok": True, "projects": []}
     try:
         async with pool.acquire() as conn:
-            rows = await conn.fetch("SELECT id, name, code, personal FROM projects ORDER BY created_at ASC")
+            rows = await conn.fetch(
+                """
+                SELECT DISTINCT p.id, p.name, p.code,
+                       (p.id = (SELECT id FROM projects WHERE owner_id = $1 ORDER BY created_at, id LIMIT 1)) AS personal
+                FROM projects p
+                LEFT JOIN project_members pm ON pm.project_id = p.id
+                WHERE p.deleted_at IS NULL AND (p.owner_id = $1 OR (pm.user_id = $1 AND (pm.until IS NULL OR pm.until > now())))
+                ORDER BY p.name ASC
+                """,
+                user.id
+            )
             return {
                 "ok": True,
                 "projects": [
@@ -247,7 +304,8 @@ async def list_projects_for_frontend(request: Request):
                 ]
             }
     except Exception as e:
-        log.warning("Could not list projects from db: %s", e)
+        log.warning("Could not list projects for user: %s", e)
+        return {"ok": True, "projects": []}
         return {"ok": True, "projects": []}
 
 
@@ -1642,22 +1700,71 @@ async def list_all_nodes(
     project_id: Optional[str] = Query(None),
     request: Request = None,
 ):
-    """Lists all connected nodes, their containers and open listening ports."""
+    """Lists all connected nodes, their containers and open listening ports strictly scoped by user permissions."""
     from .discovery import discovery_scanner
-    pool = getattr(getattr(request, "app", None), "state", None)
-    pool_obj = getattr(pool, "pool", None) if pool else None
-    if pool_obj:
-        await discovery_scanner.sync_from_machines_db(pool_obj)
-    nodes = discovery_scanner.get_all_nodes(member_id=member_id, project_id=project_id)
+    pool = _extract_pool_from_request(request)
+    user = await _extract_current_user(request, pool)
+    if not user:
+        return {"ok": True, "nodes": []}
+
+    allowed_pids = set()
+    if pool:
+        try:
+            async with pool.acquire() as conn:
+                rows = await conn.fetch(
+                    """
+                    SELECT p.id FROM projects p
+                    LEFT JOIN project_members pm ON pm.project_id = p.id
+                    WHERE p.deleted_at IS NULL AND (p.owner_id = $1 OR (pm.user_id = $1 AND (pm.until IS NULL OR pm.until > now())))
+                    """,
+                    user.id,
+                )
+                allowed_pids = {str(r["id"]) for r in rows}
+        except Exception as e:
+            log.warning("Could not fetch user allowed projects: %s", e)
+
+    if pool:
+        await discovery_scanner.sync_from_machines_db(pool)
+
+    # If project_id is given but user is not a member of it, deny access
+    if project_id and str(project_id) not in allowed_pids:
+        return {"ok": True, "nodes": []}
+
+    nodes = discovery_scanner.get_all_nodes(
+        member_id=member_id,
+        project_id=project_id,
+        allowed_project_ids=allowed_pids,
+    )
     return {"ok": True, "nodes": nodes}
 
 
 @router.get("/nodes/{node_id}")
-async def get_single_node(node_id: str):
-    """Returns details for a specific connected node."""
+async def get_single_node(node_id: str, request: Request = None):
+    """Returns details for a specific connected node if caller has project access."""
     from .discovery import discovery_scanner
+    pool = _extract_pool_from_request(request)
+    user = await _extract_current_user(request, pool)
+    if not user:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+
+    allowed_pids = set()
+    if pool:
+        try:
+            async with pool.acquire() as conn:
+                rows = await conn.fetch(
+                    """
+                    SELECT p.id FROM projects p
+                    LEFT JOIN project_members pm ON pm.project_id = p.id
+                    WHERE p.deleted_at IS NULL AND (p.owner_id = $1 OR (pm.user_id = $1 AND (pm.until IS NULL OR pm.until > now())))
+                    """,
+                    user.id,
+                )
+                allowed_pids = {str(r["id"]) for r in rows}
+        except Exception:
+            pass
+
     node = discovery_scanner.get_node(node_id)
-    if not node:
+    if not node or not node.project_id or str(node.project_id) not in allowed_pids:
         raise HTTPException(status_code=404, detail=f"Node {node_id} not found")
     return {"ok": True, "node": node.to_dict()}
 
@@ -1954,11 +2061,13 @@ async def disconnect_github_account(request: Request = None):
 async def get_vault_overview(user_id: Optional[str] = Query(None), request: Request = None):
     """Returns masked summary of credentials stored in the user's AES-256-GCM encrypted vault."""
     from .encrypted_vault import encrypted_vault
-    uid = _extract_user_id(request, user_id)
-    pool = getattr(getattr(request, "app", None), "state", None)
-    pool_obj = getattr(pool, "pool", None) if pool else None
+    pool = _extract_pool_from_request(request)
+    user = await _extract_current_user(request, pool)
+    if not user:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    uid = str(user.id)
     try:
-        overview = await encrypted_vault.get_masked_overview(uid, pool=pool_obj)
+        overview = await encrypted_vault.get_masked_overview(uid, pool=pool)
         return overview
     except Exception as e:
         return {
@@ -1973,11 +2082,13 @@ async def get_vault_overview(user_id: Optional[str] = Query(None), request: Requ
 async def get_vault_data(user_id: Optional[str] = Query(None), request: Request = None):
     """Returns decrypted secrets for the authenticated user session."""
     from .encrypted_vault import encrypted_vault
-    uid = _extract_user_id(request, user_id)
-    pool = getattr(getattr(request, "app", None), "state", None)
-    pool_obj = getattr(pool, "pool", None) if pool else None
+    pool = _extract_pool_from_request(request)
+    user = await _extract_current_user(request, pool)
+    if not user:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    uid = str(user.id)
     try:
-        secrets = await encrypted_vault.load_secrets(uid, pool=pool_obj)
+        secrets = await encrypted_vault.load_secrets(uid, pool=pool)
         return {
             "ok": True,
             "user_id": uid,
@@ -1999,9 +2110,12 @@ async def save_vault_secrets(data: VaultSaveDTO, request: Request = None):
     from .encrypted_vault import encrypted_vault
     from .github_app import github_manager
 
-    uid = _extract_user_id(request, data.user_id)
-    pool = getattr(getattr(request, "app", None), "state", None)
-    pool_obj = getattr(pool, "pool", None) if pool else None
+    pool = _extract_pool_from_request(request)
+    user = await _extract_current_user(request, pool)
+    if not user:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    uid = str(user.id)
+    pool_obj = pool
 
     try:
         saved = await encrypted_vault.save_secrets(uid, data.secrets, pool=pool_obj, merge=data.merge)
