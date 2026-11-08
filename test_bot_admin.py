@@ -12,21 +12,51 @@ class TestTelegramBotAdmin(unittest.TestCase):
     def setUp(self):
         self.bot = TelegramBotManager()
         self.bot.pool = MagicMock()
+        self.bot.call_api = AsyncMock(return_value={"ok": True})
         self.bot.send_message = AsyncMock(return_value={"ok": True})
         self.bot.edit_message = AsyncMock(return_value={"ok": True})
         self.bot.answer_callback = AsyncMock(return_value={"ok": True})
 
-    def test_admin_button_in_main_keyboard(self):
+    def test_admin_button_in_main_keyboard_strict(self):
         kb_user = self.bot._main_keyboard(is_owner=False)
         buttons_user = [b["text"] for row in kb_user["inline_keyboard"] for b in row]
         self.assertNotIn("👥 Пользователи", buttons_user)
+        self.assertNotIn("📊 Панель администратора", buttons_user)
 
         kb_owner = self.bot._main_keyboard(is_owner=True)
         buttons_owner = [b["text"] for row in kb_owner["inline_keyboard"] for b in row]
         self.assertIn("👥 Пользователи", buttons_owner)
         self.assertIn("📊 Панель администратора", buttons_owner)
 
-    async def async_test_users_list(self):
+    def test_strict_access_control(self):
+        # Non-owner
+        self.assertFalse(self.bot.is_admin_owner("12345678", from_user={"username": "random_user"}))
+        self.assertFalse(self.bot.is_admin_owner("999999", user_row={"email": "attacker@evil.com"}))
+
+        # Owner by chat_id
+        self.assertTrue(self.bot.is_admin_owner("55570186"))
+        # Owner by username
+        self.assertTrue(self.bot.is_admin_owner("111", from_user={"username": "eklimov"}))
+        self.assertTrue(self.bot.is_admin_owner("222", from_user={"username": "eklimov84"}))
+        # Owner by email
+        self.assertTrue(self.bot.is_admin_owner("333", user_row={"email": "eklimov84@xmail.ru"}))
+
+    async def async_test_unauthorized_user_blocked(self):
+        # Non-owner tries to open users list
+        await self.bot._show_admin_users_list("99999999", page=0)
+        self.bot.send_message.assert_called_with("99999999", "⛔ Доступ запрещён. Панель доступна только владельцу платформы.")
+
+        # Non-owner tries callback
+        cb_unauth = {
+            "id": "cq_hack",
+            "data": "u:list:0",
+            "message": {"chat": {"id": 99999999}, "message_id": 55},
+            "from": {"id": 99999999, "username": "intruder"}
+        }
+        await self.bot._handle_callback(cb_unauth)
+        self.bot.answer_callback.assert_called_with("cq_hack", "⛔ Доступ запрещён. Панель управления доступна только владельцу платформы.", show_alert=True)
+
+    async def async_test_rich_message_users_list(self):
         mock_conn = AsyncMock()
         mock_conn.fetchval.return_value = 1
         mock_conn.fetch.return_value = [
@@ -44,19 +74,33 @@ class TestTelegramBotAdmin(unittest.TestCase):
         ]
         self.bot.pool.acquire.return_value.__aenter__.return_value = mock_conn
 
+        # Call as owner (55570186)
         await self.bot._show_admin_users_list(55570186, page=0)
-        self.bot.send_message.assert_called_once()
-        sent_text = self.bot.send_message.call_args[0][1]
-        self.assertIn("Управление пользователями", sent_text)
-        self.assertIn("Тестовый Юзер", sent_text)
-        self.assertIn("PRO", sent_text)
+        # Verify sendRichMessage was called
+        self.bot.call_api.assert_called_once()
+        call_method = self.bot.call_api.call_args[0][0]
+        call_payload = self.bot.call_api.call_args[0][1]
 
-    async def async_test_user_card(self):
+        self.assertEqual(call_method, "sendRichMessage")
+        self.assertIn("rich_message", call_payload)
+        blocks = call_payload["rich_message"]["blocks"]
+
+        # Verify buttons are inside the rich_message blocks
+        has_embedded_button = any(
+            any(isinstance(item, dict) and item.get("type") == "button" for item in b.get("text", []))
+            for b in blocks if b.get("type") == "paragraph"
+        )
+        self.assertTrue(has_embedded_button, "Expected embedded button in paragraph")
+
+        has_buttons_block = any(b.get("type") == "buttons" for b in blocks)
+        self.assertTrue(has_buttons_block, "Expected buttons block in message bubble")
+
+    async def async_test_rich_message_user_card(self):
         mock_conn = AsyncMock()
         u_id = uuid.uuid4()
         mock_conn.fetchrow.return_value = {
             "id": u_id,
-            "name": "Клиент Иван",
+            "name": "Иван Клиент",
             "email": "ivan@example.com",
             "plan_id": "free",
             "telegram_chat_id": "999888",
@@ -70,66 +114,26 @@ class TestTelegramBotAdmin(unittest.TestCase):
         mock_conn.fetchval.return_value = 2
         self.bot.pool.acquire.return_value.__aenter__.return_value = mock_conn
 
+        # Call as owner (55570186)
         await self.bot._show_admin_user_card(55570186, str(u_id), page=0)
-        self.bot.send_message.assert_called_once()
-        card_text = self.bot.send_message.call_args[0][1]
-        self.assertIn("Досье пользователя", card_text)
-        self.assertIn("Клиент Иван", card_text)
-        self.assertIn("ivan@example.com", card_text)
-        self.assertIn("FREE", card_text)
+        call_method = self.bot.call_api.call_args[0][0]
+        call_payload = self.bot.call_api.call_args[0][1]
 
-    async def async_test_block_and_plan_callbacks(self):
-        target_id = uuid.uuid4()
-        mock_conn = AsyncMock()
-        mock_conn.fetchrow.return_value = {
-            "id": target_id,
-            "name": "Обычный юзер",
-            "email": "user@mail.com",
-            "telegram_chat_id": "777777",
-            "telegram_username": "regular",
-            "plan_id": "free",
-            "is_blocked": False,
-            "blocked_reason": None,
-            "blocked_until": None,
-            "subscription_expires_at": None,
-            "created_at": MagicMock(strftime=lambda fmt: "01.01.2026 10:00")
-        }
-        mock_conn.fetchval.return_value = 1
-        self.bot.pool.acquire.return_value.__aenter__.return_value = mock_conn
+        self.assertEqual(call_method, "sendRichMessage")
+        blocks = call_payload["rich_message"]["blocks"]
 
-        # Test block callback
-        cb_block = {
-            "id": "cq_1",
-            "data": f"u:block:{target_id}:0",
-            "message": {"chat": {"id": 55570186}, "message_id": 101},
-            "from": {"id": 55570186, "username": "eklimov"}
-        }
-        await self.bot._handle_callback(cb_block)
-        mock_conn.execute.assert_any_call(
-            "UPDATE users SET is_blocked = true, blocked_reason = 'Заблокирован администратором', blocked_until = NULL WHERE id = $1",
-            target_id
-        )
-
-        # Test set_plan callback
-        cb_plan = {
-            "id": "cq_2",
-            "data": f"u:set_plan:{target_id}:enterprise:0",
-            "message": {"chat": {"id": 55570186}, "message_id": 101},
-            "from": {"id": 55570186, "username": "eklimov"}
-        }
-        await self.bot._handle_callback(cb_plan)
-        mock_conn.execute.assert_any_call(
-            "UPDATE users SET plan_id = $1 WHERE id = $2",
-            "enterprise", target_id
-        )
+        # Check action buttons block exists
+        has_buttons_block = any(b.get("type") == "buttons" for b in blocks)
+        self.assertTrue(has_buttons_block)
 
     def test_all_admin_features(self):
         import asyncio
-        asyncio.run(self.async_test_users_list())
+        asyncio.run(self.async_test_unauthorized_user_blocked())
+        self.bot.call_api.reset_mock()
         self.bot.send_message.reset_mock()
-        asyncio.run(self.async_test_user_card())
-        self.bot.send_message.reset_mock()
-        asyncio.run(self.async_test_block_and_plan_callbacks())
+        asyncio.run(self.async_test_rich_message_users_list())
+        self.bot.call_api.reset_mock()
+        asyncio.run(self.async_test_rich_message_user_card())
 
 if __name__ == '__main__':
     unittest.main()

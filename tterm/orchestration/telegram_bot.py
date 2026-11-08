@@ -258,6 +258,32 @@ class TelegramBotManager:
         # chat_id -> { "action": "name"|"email", "target_id": str, "page": int, "msg_id": Optional[int] }
         self._pending_user_edit: Dict[str, Dict[str, Any]] = {}
 
+    def is_admin_owner(
+        self,
+        chat_id: str | int,
+        from_user: Optional[Dict[str, Any]] = None,
+        user_row: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Strict authorization gate: only Evgeniy Klimov can access admin features."""
+        chat_str = str(chat_id).strip()
+        if chat_str == "55570186":
+            return True
+        if from_user:
+            un = (from_user.get("username") or "").strip().lower()
+            if un in ("eklimov", "eklimov84"):
+                return True
+        if user_row:
+            email = (user_row.get("email") or "").strip().lower()
+            if email == "eklimov84@xmail.ru":
+                return True
+            tg_id = str(user_row.get("telegram_chat_id") or "").strip()
+            if tg_id == "55570186":
+                return True
+            un = (user_row.get("telegram_username") or "").strip().lower()
+            if un in ("eklimov", "eklimov84"):
+                return True
+        return False
+
     def get_token(self) -> str:
         if self._bot_token:
             return self._bot_token
@@ -1052,15 +1078,15 @@ class TelegramBotManager:
 
         # Admin commands: /admin, /users, /stats, /dashboard
         if text.startswith("/users"):
-            if not is_owner:
-                await self.send_message(chat_id, "⛔ Доступ разрешён только владельцу (@eklimov).")
+            if not self.is_admin_owner(chat_id, from_user=from_user, user_row=user_row):
+                await self.send_message(chat_id, "⛔ Доступ запрещён. Панель управления доступна только владельцу платформы.")
                 return
             await self._show_admin_users_list(chat_id, page=0)
             return
 
         if text.startswith(("/admin", "/stats", "/dashboard")):
-            if not is_owner:
-                await self.send_message(chat_id, "⛔ Доступ к панели администратора разрешён только владельцу (@eklimov).")
+            if not self.is_admin_owner(chat_id, from_user=from_user, user_row=user_row):
+                await self.send_message(chat_id, "⛔ Доступ запрещён. Панель управления доступна только владельцу платформы.")
                 return
             await self._show_admin_dashboard(chat_id)
             return
@@ -1476,8 +1502,8 @@ class TelegramBotManager:
 
         # Admin User Management Callbacks
         if data.startswith("u:"):
-            if not is_owner:
-                await self.answer_callback(cq_id, "Доступ только для владельца (@eklimov)", show_alert=True)
+            if not self.is_admin_owner(chat_id, from_user=from_user):
+                await self.answer_callback(cq_id, "⛔ Доступ запрещён. Панель управления доступна только владельцу платформы.", show_alert=True)
                 return
 
             parts = data.split(":")
@@ -2219,7 +2245,397 @@ class TelegramBotManager:
         ]
         return "\n".join(lines), {"inline_keyboard": kb}
 
+
+    # ------------------------------------------------------------- Rich Message Builders for Admin
+    def _build_rich_admin_dashboard_payload(
+        self,
+        users: List[Any],
+        machines: List[Any],
+        del_reqs: List[Any],
+        lang: str = "ru",
+    ) -> Dict[str, Any]:
+        blocks: List[Dict[str, Any]] = [
+            {
+                "type": "paragraph",
+                "text": [{"type": "bold", "text": "Панель управления tTerm | Администратор"}]
+            },
+            {
+                "type": "paragraph",
+                "text": [{"type": "italic", "text": "Владелец: Евгений Климов (@eklimov) • Сервер: 82.148.241.254"}]
+            },
+            {
+                "type": "paragraph",
+                "text": [{"type": "bold", "text": f"👥 Пользователи (всего: {len(users)}):"}]
+            }
+        ]
+
+        for u in users[:6]:
+            u_name = u["name"] or "Пользователь"
+            plan = (u.get("plan_id") or "free").upper()
+            tg_info = f"@{u['telegram_username']}" if u.get("telegram_username") else (u.get("email") or "ID:" + str(u["id"])[:8])
+            blocks.append({
+                "type": "paragraph",
+                "text": [
+                    "• ",
+                    {"type": "code", "text": f"[{plan}]"},
+                    " ",
+                    {
+                        "type": "button",
+                        "button": {
+                            "text": u_name[:14],
+                            "callback_data": f"u:view:{u['id']}:0",
+                        }
+                    },
+                    {"type": "italic", "text": f"  {tg_info}"}
+                ]
+            })
+
+        blocks.append({
+            "type": "paragraph",
+            "text": [{"type": "bold", "text": f"🖥 Подключенные машины ({len(machines)}):"}]
+        })
+        now = time.time()
+        for m in machines[:5]:
+            ls = m['last_seen_at']
+            is_online = bool(ls and (now - ls.timestamp() < 120))
+            dot = "🟢 " if is_online else "⚪ "
+            blocks.append({
+                "type": "paragraph",
+                "text": [
+                    dot,
+                    {"type": "bold", "text": m["name"]},
+                    {"type": "italic", "text": f" ({m['kind']})"}
+                ]
+            })
+
+        if del_reqs:
+            blocks.append({
+                "type": "paragraph",
+                "text": [{"type": "bold", "text": "⚠️ Запросы на удаление:"}]
+            })
+            del_btns = []
+            for r in del_reqs[:3]:
+                short_email = (r["user_email"] or "user")[:12]
+                del_btns.append({"text": f"✅ {short_email}", "callback_data": f"deluser:confirm:{r['id']}", "style": "danger"})
+            if del_btns:
+                blocks.append({"type": "buttons", "align": "left", "buttons": del_btns})
+
+        blocks.append({
+            "type": "buttons",
+            "align": "left",
+            "buttons": [
+                {"text": "👥 Управление пользователями", "callback_data": "u:list:0", "style": "primary"},
+                {"text": "🖥 Машины", "callback_data": "menu:machines"},
+                {"text": "🔄 Обновить", "callback_data": "admin:refresh"},
+            ]
+        })
+        return {"blocks": blocks}
+
+    def _build_rich_users_list_payload(
+        self,
+        users: List[Any],
+        total_count: int,
+        page: int,
+        total_pages: int,
+        lang: str = "ru",
+    ) -> Dict[str, Any]:
+        blocks: List[Dict[str, Any]] = [
+            {
+                "type": "paragraph",
+                "text": [{"type": "bold", "text": "👥 Управление пользователями tTerm"}]
+            },
+            {
+                "type": "paragraph",
+                "text": [{"type": "italic", "text": f"Всего в системе: {total_count} • Страница {page + 1} из {total_pages}"}]
+            }
+        ]
+
+        now_dt = datetime.now(timezone.utc)
+        for idx, u in enumerate(users, start=page * 5 + 1):
+            is_blk = u["is_blocked"] and (not u["blocked_until"] or u["blocked_until"] > now_dt)
+            status_dot = "🔴 " if is_blk else "🟢 "
+            plan = (u["plan_id"] or "free").upper()
+            u_name = u["name"] or "Пользователь"
+            info_sub = f"@{u['telegram_username']}" if u["telegram_username"] else (u["email"] or "нет контакта")
+
+            btn_entry: Dict[str, Any] = {
+                "text": f"{u_name[:16]}",
+                "callback_data": f"u:view:{u['id']}:{page}",
+            }
+            if is_blk:
+                btn_entry["style"] = "danger"
+
+            blocks.append({
+                "type": "paragraph",
+                "text": [
+                    f"{idx}. {status_dot}",
+                    {"type": "code", "text": f"[{plan}]"},
+                    " ",
+                    {
+                        "type": "button",
+                        "button": btn_entry
+                    },
+                    {"type": "italic", "text": f"  {info_sub}"}
+                ]
+            })
+
+        nav_buttons = []
+        if page > 0:
+            nav_buttons.append({"text": "⬅️ Назад", "callback_data": f"u:list:{page - 1}"})
+        nav_buttons.append({"text": f"🔄 {page + 1}/{total_pages}", "callback_data": f"u:list:{page}"})
+        if page < total_pages - 1:
+            nav_buttons.append({"text": "Вперёд ➡️", "callback_data": f"u:list:{page + 1}"})
+        if nav_buttons:
+            blocks.append({"type": "buttons", "align": "left", "buttons": nav_buttons})
+
+        blocks.append({
+            "type": "buttons",
+            "align": "left",
+            "buttons": [
+                {"text": "📊 В панель", "callback_data": "admin:refresh", "style": "primary"},
+                {"text": "🖥 Машины", "callback_data": "menu:machines"},
+            ]
+        })
+        return {"blocks": blocks}
+
+    def _build_rich_user_card_payload(
+        self,
+        u: Any,
+        machines_count: int,
+        projects_count: int,
+        page: int,
+        lang: str = "ru",
+    ) -> Dict[str, Any]:
+        is_target_owner = (str(u["telegram_chat_id"]) == "55570186" or (u["email"] and u["email"].lower() == "eklimov84@xmail.ru"))
+        now_dt = datetime.now(timezone.utc)
+        is_curr_blocked = u["is_blocked"] and (not u["blocked_until"] or u["blocked_until"] > now_dt)
+
+        status_text = "🟢 Активен"
+        if is_curr_blocked:
+            if u["blocked_until"]:
+                status_text = f"⏳ Временный блок (до {u['blocked_until'].strftime('%d.%m.%Y %H:%M')})"
+            else:
+                status_text = "🔴 Заблокирован бессрочно"
+
+        sub_exp = u["subscription_expires_at"].strftime('%d.%m.%Y') if u["subscription_expires_at"] else "Бессрочно"
+        tg_val = f"@{u['telegram_username']} ({u['telegram_chat_id']})" if u["telegram_chat_id"] else "не привязан"
+
+        blocks: List[Dict[str, Any]] = [
+            {
+                "type": "paragraph",
+                "text": [{"type": "bold", "text": f"👤 Досье пользователя: {u['name'] or 'Безымянный'}"}]
+            },
+            {
+                "type": "paragraph",
+                "text": ["• Имя: ", {"type": "bold", "text": u["name"] or "—"}]
+            },
+            {
+                "type": "paragraph",
+                "text": ["• Email: ", {"type": "code", "text": u["email"] or "нет email"}]
+            },
+            {
+                "type": "paragraph",
+                "text": ["• Статус: ", {"type": "bold", "text": status_text}]
+            },
+            {
+                "type": "paragraph",
+                "text": ["• Тариф: ", {"type": "bold", "text": (u["plan_id"] or "free").upper()}, " (подписка: ", {"type": "italic", "text": sub_exp}, ")"]
+            },
+            {
+                "type": "paragraph",
+                "text": ["• Telegram: ", {"type": "italic", "text": tg_val}]
+            },
+            {
+                "type": "paragraph",
+                "text": ["• Ресурсы: Машин: ", {"type": "bold", "text": str(machines_count)}, " | Проектов: ", {"type": "bold", "text": str(projects_count)}]
+            },
+            {
+                "type": "paragraph",
+                "text": ["• ID: ", {"type": "code", "text": str(u["id"])}]
+            }
+        ]
+
+        if u.get("blocked_reason"):
+            blocks.append({
+                "type": "paragraph",
+                "text": [{"type": "italic", "text": f"Причина блокировки: {u['blocked_reason']}"}]
+            })
+
+        if not is_target_owner:
+            if not is_curr_blocked:
+                blocks.append({
+                    "type": "buttons",
+                    "align": "left",
+                    "buttons": [
+                        {"text": "🚫 Блок бессрочно", "callback_data": f"u:block:{u['id']}:{page}", "style": "danger"},
+                        {"text": "⏱ Блок 24ч", "callback_data": f"u:block24:{u['id']}:{page}"},
+                    ]
+                })
+            else:
+                blocks.append({
+                    "type": "buttons",
+                    "align": "left",
+                    "buttons": [
+                        {"text": "✅ Разблокировать", "callback_data": f"u:unblock:{u['id']}:{page}", "style": "success"},
+                    ]
+                })
+
+        tg_buttons = []
+        if u["telegram_chat_id"]:
+            if not is_target_owner:
+                tg_buttons.append({"text": "🔗 Отвязать Telegram", "callback_data": f"u:unbind:{u['id']}:{page}", "style": "danger"})
+        else:
+            tg_buttons.append({"text": "🔑 Создать ссылку привязки", "callback_data": f"u:bindlink:{u['id']}:{page}", "style": "success"})
+        if tg_buttons:
+            blocks.append({"type": "buttons", "align": "left", "buttons": tg_buttons})
+
+        blocks.append({
+            "type": "buttons",
+            "align": "left",
+            "buttons": [
+                {"text": "💎 Сменить тариф", "callback_data": f"u:plan_menu:{u['id']}:{page}", "style": "primary"},
+                {"text": "⏳ Срок подписки", "callback_data": f"u:sub_menu:{u['id']}:{page}"},
+            ]
+        })
+
+        blocks.append({
+            "type": "buttons",
+            "align": "left",
+            "buttons": [
+                {"text": "✏️ Изменить имя", "callback_data": f"u:edit_name:{u['id']}:{page}"},
+                {"text": "✉️ Изменить Email", "callback_data": f"u:edit_email:{u['id']}:{page}"},
+            ]
+        })
+
+        if not is_target_owner:
+            blocks.append({
+                "type": "buttons",
+                "align": "left",
+                "buttons": [
+                    {"text": "🗑 Удалить пользователя", "callback_data": f"u:ask_del:{u['id']}:{page}", "style": "danger"},
+                ]
+            })
+
+        blocks.append({
+            "type": "buttons",
+            "align": "left",
+            "buttons": [
+                {"text": "« К списку пользователей", "callback_data": f"u:list:{page}"},
+                {"text": "📊 В панель", "callback_data": "admin:refresh"},
+            ]
+        })
+        return {"blocks": blocks}
+
+    def _build_rich_plan_menu_payload(self, target_user_id: str, page: int, lang: str = "ru") -> Dict[str, Any]:
+        return {
+            "blocks": [
+                {
+                    "type": "paragraph",
+                    "text": [{"type": "bold", "text": "💎 Выберите тарифный план для пользователя:"}]
+                },
+                {
+                    "type": "paragraph",
+                    "text": ["• FREE — 50 машин, 24 терминала"]
+                },
+                {
+                    "type": "paragraph",
+                    "text": ["• PRO — 200 машин, 100 терминалов"]
+                },
+                {
+                    "type": "paragraph",
+                    "text": ["• ENTERPRISE — 1000 машин, 500 терминалов"]
+                },
+                {
+                    "type": "buttons",
+                    "align": "left",
+                    "buttons": [
+                        {"text": "Free", "callback_data": f"u:set_plan:{target_user_id}:free:{page}"},
+                        {"text": "Pro", "callback_data": f"u:set_plan:{target_user_id}:pro:{page}", "style": "primary"},
+                        {"text": "Enterprise", "callback_data": f"u:set_plan:{target_user_id}:enterprise:{page}", "style": "success"},
+                    ]
+                },
+                {
+                    "type": "buttons",
+                    "align": "left",
+                    "buttons": [
+                        {"text": "« Назад к карточке", "callback_data": f"u:view:{target_user_id}:{page}"}
+                    ]
+                }
+            ]
+        }
+
+    def _build_rich_sub_menu_payload(self, target_user_id: str, page: int, lang: str = "ru") -> Dict[str, Any]:
+        return {
+            "blocks": [
+                {
+                    "type": "paragraph",
+                    "text": [{"type": "bold", "text": "⏳ Управление сроком действия подписки:"}]
+                },
+                {
+                    "type": "paragraph",
+                    "text": ["Выберите срок продления доступа пользователя к платформе:"]
+                },
+                {
+                    "type": "buttons",
+                    "align": "left",
+                    "buttons": [
+                        {"text": "+30 дней", "callback_data": f"u:set_sub:{target_user_id}:30:{page}"},
+                        {"text": "+90 дней", "callback_data": f"u:set_sub:{target_user_id}:90:{page}"},
+                    ]
+                },
+                {
+                    "type": "buttons",
+                    "align": "left",
+                    "buttons": [
+                        {"text": "+365 дней", "callback_data": f"u:set_sub:{target_user_id}:365:{page}", "style": "primary"},
+                        {"text": "Бессрочно", "callback_data": f"u:set_sub:{target_user_id}:forever:{page}", "style": "success"},
+                    ]
+                },
+                {
+                    "type": "buttons",
+                    "align": "left",
+                    "buttons": [
+                        {"text": "« Назад к карточке", "callback_data": f"u:view:{target_user_id}:{page}"}
+                    ]
+                }
+            ]
+        }
+
+    def _build_rich_del_confirm_payload(self, u_name: str, u_email: str, target_user_id: str, page: int, lang: str = "ru") -> Dict[str, Any]:
+        return {
+            "blocks": [
+                {
+                    "type": "paragraph",
+                    "text": [{"type": "bold", "text": "⚠️ ПОДТВЕРЖДЕНИЕ БЕЗВОЗВРАТНОГО УДАЛЕНИЯ"}]
+                },
+                {
+                    "type": "paragraph",
+                    "text": [
+                        "Вы собираетесь удалить аккаунт: ",
+                        {"type": "bold", "text": u_name},
+                        " (", {"type": "code", "text": u_email}, ")"
+                    ]
+                },
+                {
+                    "type": "paragraph",
+                    "text": [{"type": "italic", "text": "Все терминалы, сессии и токены пользователя будут удалены навсегда."}]
+                },
+                {
+                    "type": "buttons",
+                    "align": "left",
+                    "buttons": [
+                        {"text": "🔥 ДА, УДАЛИТЬ", "callback_data": f"u:do_del:{target_user_id}:{page}", "style": "danger"},
+                        {"text": "❌ Отмена", "callback_data": f"u:view:{target_user_id}:{page}"},
+                    ]
+                }
+            ]
+        }
+
     async def _show_admin_dashboard(self, chat_id: str | int, msg_id: Optional[int] = None) -> None:
+        if not self.is_admin_owner(chat_id):
+            await self.send_message(chat_id, "⛔ Доступ запрещён. Панель доступна только владельцу платформы.")
+            return
+
         if not self.pool:
             await self.send_message(chat_id, "⚠️ База данных недоступна.")
             return
@@ -2229,10 +2645,29 @@ class TelegramBotManager:
         t = I18N.get(lang, I18N["ru"])
 
         async with self.pool.acquire() as conn:
-            users = await conn.fetch("SELECT id, name, email, telegram_chat_id, telegram_username, created_at FROM users ORDER BY created_at DESC LIMIT 15;")
+            users = await conn.fetch("SELECT id, name, email, plan_id, telegram_chat_id, telegram_username, created_at FROM users ORDER BY created_at DESC LIMIT 15;")
             machines = await conn.fetch("SELECT m.name, m.kind, m.host, m.last_seen_at, p.name as proj_name FROM machines m LEFT JOIN projects p ON m.project_id = p.id WHERE m.removed_at IS NULL ORDER BY m.last_seen_at DESC NULLS LAST LIMIT 15;")
             del_reqs = await conn.fetch("SELECT id, user_name, user_email, telegram_chat_id, status, requested_at FROM account_deletion_requests WHERE status = 'pending' ORDER BY requested_at DESC LIMIT 5;")
 
+        # Try sending as modern Telegram Rich Message (buttons embedded in message bubble)
+        rich_payload = self._build_rich_admin_dashboard_payload(users, machines, del_reqs, lang=lang)
+        if msg_id:
+            res = await self.call_api("editMessageText", {
+                "chat_id": str(chat_id),
+                "message_id": msg_id,
+                "rich_message": rich_payload,
+            })
+            if res.get("ok"):
+                return
+        else:
+            res = await self.call_api("sendRichMessage", {
+                "chat_id": str(chat_id),
+                "rich_message": rich_payload,
+            })
+            if res.get("ok"):
+                return
+
+        # Fallback to standard message with inline buttons only if Rich Message unsupported
         lines = [
             t["admin_title"],
             t["admin_owner"],
@@ -2278,9 +2713,6 @@ class TelegramBotManager:
             {"text": "👥 Управление пользователями", "callback_data": "u:list:0"},
         ])
         kb_rows.append([
-            {"text": "👥 Управление пользователями", "callback_data": "u:list:0"},
-        ])
-        kb_rows.append([
             {"text": t["btn_refresh"], "callback_data": "admin:refresh"},
             {"text": t["btn_machines"], "callback_data": "menu:machines"},
             {"text": t["btn_webapp"], "web_app": {"url": self.web_url}},
@@ -2295,9 +2727,16 @@ class TelegramBotManager:
 
     # ------------------------------------------------------------- Admin: User Management
     async def _show_admin_users_list(self, chat_id: str | int, page: int = 0, msg_id: Optional[int] = None) -> None:
+        if not self.is_admin_owner(chat_id):
+            await self.send_message(chat_id, "⛔ Доступ запрещён. Панель доступна только владельцу платформы.")
+            return
+
         if not self.pool:
             await self.send_message(chat_id, "⚠️ База данных недоступна.")
             return
+
+        user_row = await self.get_user_by_telegram(str(chat_id))
+        lang = self._get_lang(user_row)
 
         page_size = 5
         async with self.pool.acquire() as conn:
@@ -2311,6 +2750,25 @@ class TelegramBotManager:
                 page_size, offset
             )
 
+        # 1. Try modern Telegram Rich Message (Buttons embedded inside the message bubble)
+        rich_payload = self._build_rich_users_list_payload(users, total_count, page, total_pages, lang=lang)
+        if msg_id:
+            res = await self.call_api("editMessageText", {
+                "chat_id": str(chat_id),
+                "message_id": msg_id,
+                "rich_message": rich_payload,
+            })
+            if res.get("ok"):
+                return
+        else:
+            res = await self.call_api("sendRichMessage", {
+                "chat_id": str(chat_id),
+                "rich_message": rich_payload,
+            })
+            if res.get("ok"):
+                return
+
+        # 2. Fallback to standard inline buttons only if Rich Message unsupported
         lines = [
             "👥 <b>Управление пользователями tTerm</b>",
             f"Всего пользователей: <b>{total_count}</b> • Стр. <b>{page + 1}/{total_pages}</b>",
@@ -2335,7 +2793,6 @@ class TelegramBotManager:
         kb_rows = []
         kb_rows.extend(user_buttons)
 
-        # Pagination
         nav_row = []
         if page > 0:
             nav_row.append({"text": "⬅️ Назад", "callback_data": f"u:list:{page - 1}"})
@@ -2359,6 +2816,10 @@ class TelegramBotManager:
             await self.send_message(str(chat_id), text, reply_markup=reply_markup)
 
     async def _show_admin_user_card(self, chat_id: str | int, target_user_id: str, page: int = 0, msg_id: Optional[int] = None) -> None:
+        if not self.is_admin_owner(chat_id):
+            await self.send_message(chat_id, "⛔ Доступ запрещён. Панель доступна только владельцу платформы.")
+            return
+
         if not self.pool:
             await self.send_message(chat_id, "⚠️ База данных недоступна.")
             return
@@ -2367,6 +2828,9 @@ class TelegramBotManager:
         if not t_uuid:
             await self.send_message(chat_id, "❌ Неверный ID пользователя.")
             return
+
+        user_row = await self.get_user_by_telegram(str(chat_id))
+        lang = self._get_lang(user_row)
 
         async with self.pool.acquire() as conn:
             u = await conn.fetchrow(
@@ -2381,6 +2845,25 @@ class TelegramBotManager:
             machines_count = await conn.fetchval("SELECT count(*) FROM machines WHERE created_by = $1 AND removed_at IS NULL;", t_uuid) or 0
             projects_count = await conn.fetchval("SELECT count(*) FROM projects WHERE owner_id = $1;", t_uuid) or 0
 
+        # 1. Try modern Telegram Rich Message (Buttons embedded inside the message bubble)
+        rich_payload = self._build_rich_user_card_payload(u, machines_count, projects_count, page, lang=lang)
+        if msg_id:
+            res = await self.call_api("editMessageText", {
+                "chat_id": str(chat_id),
+                "message_id": msg_id,
+                "rich_message": rich_payload,
+            })
+            if res.get("ok"):
+                return
+        else:
+            res = await self.call_api("sendRichMessage", {
+                "chat_id": str(chat_id),
+                "rich_message": rich_payload,
+            })
+            if res.get("ok"):
+                return
+
+        # 2. Fallback to standard inline buttons only if Rich Message unsupported
         is_target_owner = (str(u["telegram_chat_id"]) == "55570186" or (u["email"] and u["email"].lower() == "eklimov84@xmail.ru"))
         now_dt = datetime.now(timezone.utc)
         is_curr_blocked = u["is_blocked"] and (not u["blocked_until"] or u["blocked_until"] > now_dt)
@@ -2412,8 +2895,6 @@ class TelegramBotManager:
             lines.append(f"• <b>Причина блокировки:</b> <i>{html.escape(u['blocked_reason'])}</i>")
 
         kb_rows = []
-
-        # Row 1: Access / Block actions (disallowed on owner)
         if not is_target_owner:
             if not is_curr_blocked:
                 kb_rows.append([
@@ -2425,30 +2906,25 @@ class TelegramBotManager:
                     {"text": "✅ Разблокировать", "callback_data": f"u:unblock:{u['id']}:{page}"},
                 ])
 
-        # Row 2: Telegram connection
         if u["telegram_chat_id"]:
             if not is_target_owner:
                 kb_rows.append([{"text": "🔗 Отвязать Telegram", "callback_data": f"u:unbind:{u['id']}:{page}"}])
         else:
             kb_rows.append([{"text": "🔑 Создать ссылку привязки", "callback_data": f"u:bindlink:{u['id']}:{page}"}])
 
-        # Row 3: Plan and Subscription
         kb_rows.append([
             {"text": "💎 Сменить тариф", "callback_data": f"u:plan_menu:{u['id']}:{page}"},
             {"text": "⏳ Срок подписки", "callback_data": f"u:sub_menu:{u['id']}:{page}"},
         ])
 
-        # Row 4: Edit profile fields
         kb_rows.append([
             {"text": "✏️ Изменить имя", "callback_data": f"u:edit_name:{u['id']}:{page}"},
             {"text": "✉️ Изменить Email", "callback_data": f"u:edit_email:{u['id']}:{page}"},
         ])
 
-        # Row 5: Delete user
         if not is_target_owner:
             kb_rows.append([{"text": "🗑 Удалить пользователя", "callback_data": f"u:ask_del:{u['id']}:{page}"}])
 
-        # Row 6: Return navigation
         kb_rows.append([
             {"text": "« К списку пользователей", "callback_data": f"u:list:{page}"},
             {"text": "📊 В панель", "callback_data": "admin:refresh"},
@@ -2463,11 +2939,34 @@ class TelegramBotManager:
             await self.send_message(str(chat_id), text, reply_markup=reply_markup)
 
     async def _show_admin_plan_menu(self, chat_id: str | int, target_user_id: str, page: int = 0, msg_id: Optional[int] = None) -> None:
+        if not self.is_admin_owner(chat_id):
+            return
+
+        user_row = await self.get_user_by_telegram(str(chat_id))
+        lang = self._get_lang(user_row)
+
+        rich_payload = self._build_rich_plan_menu_payload(target_user_id, page, lang=lang)
+        if msg_id:
+            res = await self.call_api("editMessageText", {
+                "chat_id": str(chat_id),
+                "message_id": msg_id,
+                "rich_message": rich_payload,
+            })
+            if res.get("ok"):
+                return
+        else:
+            res = await self.call_api("sendRichMessage", {
+                "chat_id": str(chat_id),
+                "rich_message": rich_payload,
+            })
+            if res.get("ok"):
+                return
+
         text = "💎 <b>Выберите тарифный план для пользователя:</b>\n\n• <b>FREE:</b> 50 машин, 24 терминала\n• <b>PRO:</b> 200 машин, 100 терминалов\n• <b>ENTERPRISE:</b> 1000 машин, 500 терминалов"
         kb = [
-            [{"text": "Free (Стандартный)", "callback_data": f"u:set_plan:{target_user_id}:free:{page}"}],
-            [{"text": "Pro (Расширенный)", "callback_data": f"u:set_plan:{target_user_id}:pro:{page}"}],
-            [{"text": "Enterprise (Безлимитный)", "callback_data": f"u:set_plan:{target_user_id}:enterprise:{page}"}],
+            [{"text": "Free", "callback_data": f"u:set_plan:{target_user_id}:free:{page}"}],
+            [{"text": "Pro", "callback_data": f"u:set_plan:{target_user_id}:pro:{page}"}],
+            [{"text": "Enterprise", "callback_data": f"u:set_plan:{target_user_id}:enterprise:{page}"}],
             [{"text": "« Назад к карточке", "callback_data": f"u:view:{target_user_id}:{page}"}],
         ]
         if msg_id:
@@ -2476,6 +2975,29 @@ class TelegramBotManager:
             await self.send_message(str(chat_id), text, reply_markup={"inline_keyboard": kb})
 
     async def _show_admin_sub_menu(self, chat_id: str | int, target_user_id: str, page: int = 0, msg_id: Optional[int] = None) -> None:
+        if not self.is_admin_owner(chat_id):
+            return
+
+        user_row = await self.get_user_by_telegram(str(chat_id))
+        lang = self._get_lang(user_row)
+
+        rich_payload = self._build_rich_sub_menu_payload(target_user_id, page, lang=lang)
+        if msg_id:
+            res = await self.call_api("editMessageText", {
+                "chat_id": str(chat_id),
+                "message_id": msg_id,
+                "rich_message": rich_payload,
+            })
+            if res.get("ok"):
+                return
+        else:
+            res = await self.call_api("sendRichMessage", {
+                "chat_id": str(chat_id),
+                "rich_message": rich_payload,
+            })
+            if res.get("ok"):
+                return
+
         text = "⏳ <b>Управление сроком действия подписки:</b>\n\nВыберите продление срока доступа пользователя к платформе:"
         kb = [
             [
@@ -2494,11 +3016,17 @@ class TelegramBotManager:
             await self.send_message(str(chat_id), text, reply_markup={"inline_keyboard": kb})
 
     async def _show_admin_del_confirm(self, chat_id: str | int, target_user_id: str, page: int = 0, msg_id: Optional[int] = None) -> None:
+        if not self.is_admin_owner(chat_id):
+            return
+
         if not self.pool:
             return
         t_uuid = _parse_uuid(target_user_id)
         if not t_uuid:
             return
+
+        user_row = await self.get_user_by_telegram(str(chat_id))
+        lang = self._get_lang(user_row)
 
         async with self.pool.acquire() as conn:
             u = await conn.fetchrow("SELECT name, email FROM users WHERE id = $1", t_uuid)
@@ -2508,6 +3036,23 @@ class TelegramBotManager:
         u_name = u["name"] or "Пользователь"
         u_email = u["email"] or "без email"
 
+        rich_payload = self._build_rich_del_confirm_payload(u_name, u_email, target_user_id, page, lang=lang)
+        if msg_id:
+            res = await self.call_api("editMessageText", {
+                "chat_id": str(chat_id),
+                "message_id": msg_id,
+                "rich_message": rich_payload,
+            })
+            if res.get("ok"):
+                return
+        else:
+            res = await self.call_api("sendRichMessage", {
+                "chat_id": str(chat_id),
+                "rich_message": rich_payload,
+            })
+            if res.get("ok"):
+                return
+
         text = (
             f"⚠️ <b>ПОДТВЕРЖДЕНИЕ УДАЛЕНИЯ АККАУНТА</b>\n\n"
             f"Вы собираетесь безвозвратно удалить пользователя:\n"
@@ -2516,7 +3061,7 @@ class TelegramBotManager:
             f"<b>Вы подтверждаете удаление?</b>"
         )
         kb = [
-            [{"text": "🔥 ДА, УДАЛИТЬ БЕЗВОЗВРАТНО", "callback_data": f"u:do_del:{target_user_id}:{page}"}],
+            [{"text": "🔥 ДА, УДАЛИТЬ", "callback_data": f"u:do_del:{target_user_id}:{page}"}],
             [{"text": "❌ Отмена", "callback_data": f"u:view:{target_user_id}:{page}"}],
         ]
         if msg_id:
