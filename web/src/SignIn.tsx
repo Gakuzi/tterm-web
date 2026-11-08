@@ -15,7 +15,7 @@ import {
 } from "react";
 import {
   askCode, authState, checkTelegramAuthSession, configureTelegramBot, createTelegramAuthSession,
-  loginWithTelegramWidget, quickSignIn, Refused, requestTelegramCode, setQuickCode, signUp,
+  loginWithTelegramWebApp, loginWithTelegramWidget, quickSignIn, Refused, requestTelegramCode, setQuickCode, signUp,
   telegramAuthStatus, validateInviteToken, verifyCode, verifyTelegramCode, type InviteValidationResult,
   type KnownDevice, type Legal, type SignedInNow, type TelegramAuthStatus, type TelegramWidgetUser,
 } from "./api";
@@ -130,6 +130,26 @@ export function SignIn(props: Props) {
 
   useEffect(() => {
     let stopped = false;
+
+    // Telegram WebApp (Mini App) instant zero-click auto-login
+    const tgWebApp = (window as any).Telegram?.WebApp;
+    if (tgWebApp) {
+      try {
+        tgWebApp.ready();
+        tgWebApp.expand();
+      } catch {}
+      if (tgWebApp.initData) {
+        loginWithTelegramWebApp(tgWebApp.initData)
+          .then((res) => {
+            if (stopped) return;
+            if (res.signedIn) onSignedIn();
+          })
+          .catch((err) => {
+            console.debug("Telegram WebApp auto-login:", err);
+          });
+      }
+    }
+
     authState()
       .then((state) => {
         if (stopped) return;

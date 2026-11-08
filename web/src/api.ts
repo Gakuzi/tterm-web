@@ -601,6 +601,32 @@ export function loginWithTelegramWidget(user: TelegramWidgetUser): Promise<Signe
   return auth("/api/auth/telegram/login-widget", user);
 }
 
+export function loginWithTelegramWebApp(initData: string): Promise<SignedInNow> {
+  return auth("/api/auth/telegram/webapp-login", { init_data: initData });
+}
+
+export function getTelegramBindLink(): Promise<{ ok: boolean; bind_token: string; bot_username: string; bind_url: string }> {
+  return request("GET", "/api/auth/telegram/bind-link");
+}
+
+export interface TelegramProfileStatus {
+  ok: boolean;
+  configured: boolean;
+  bound: boolean;
+  chat_id?: string | null;
+  username?: string | null;
+  bot_username: string;
+  bot_link: string;
+}
+
+export function getTelegramProfileStatus(): Promise<TelegramProfileStatus> {
+  return request("GET", "/api/auth/telegram/status");
+}
+
+export function unbindTelegramProfile(): Promise<{ ok: boolean; bound: boolean }> {
+  return request("POST", "/api/auth/telegram/unbind");
+}
+
 export function configureTelegramBot(botToken: string, botUsername?: string, chatId?: string): Promise<{ ok: boolean; bot_username?: string; bot_link?: string; message?: string }> {
   return fetch("/api/auth/telegram/configure", {
     method: "POST",

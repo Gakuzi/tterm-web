@@ -36,6 +36,7 @@ from .notifications_bot import (
     get_user_telegram_config,
     save_user_telegram_config,
 )
+from .telegram_bot import telegram_bot, validate_webapp_init_data
 
 log = logging.getLogger("tterm.orchestration.telegram_auth")
 
@@ -318,6 +319,10 @@ class TelegramWidgetAuth(BaseModel):
     photo_url: Optional[str] = None
     auth_date: int
     hash: str
+
+
+class TelegramWebAppLoginRequest(BaseModel):
+    init_data: str = Field(..., description="Raw window.Telegram.WebApp.initData")
 
 
 class TelegramConfigureDTO(BaseModel):
@@ -609,7 +614,100 @@ async def telegram_widget_login(data: TelegramWidgetAuth, request: Request, resp
         request=request,
         response=response,
         method_label=f"Telegram Widget (@{data.username or tg_id_str})",
+        username=data.username or "",
     )
+
+
+@router.post("/webapp-login")
+async def telegram_webapp_login(data: TelegramWebAppLoginRequest, request: Request, response: Response):
+    """Authenticates via official Telegram WebApp initData HMAC-SHA256."""
+    token = telegram_bot.get_token()
+    user_data = validate_webapp_init_data(data.init_data, token)
+    if not user_data:
+        raise HTTPException(status_code=401, detail="Неверная подпись данных Telegram WebApp")
+
+    tg_id_str = str(user_data.get("id"))
+    username = user_data.get("username", "")
+    first_name = user_data.get("first_name", "")
+    last_name = user_data.get("last_name", "")
+    name = f"{first_name} {last_name}".strip() or (username or f"TG {tg_id_str}")
+
+    return await _finalize_telegram_signin(
+        clean_id=tg_id_str,
+        user_name=name,
+        request=request,
+        response=response,
+        method_label=f"Telegram WebApp (@{username or tg_id_str})",
+        username=username,
+    )
+
+
+@router.get("/bind-link")
+async def telegram_bind_link(request: Request):
+    """Generates a secure 1-click binding link for the currently signed-in user."""
+    pool_obj = getattr(getattr(request.app, "state", None), "pool", None)
+    if not pool_obj:
+        raise HTTPException(status_code=500, detail="Database not ready")
+    token = request.cookies.get(auth.SESSION_COOKIE) or request.cookies.get(f"__Host-{auth.SESSION_COOKIE}")
+    user_id = await auth.session(pool_obj, token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+
+    token_str, link = telegram_bot.register_pending_bind(str(user_id))
+    return {
+        "ok": True,
+        "bind_token": token_str,
+        "bot_username": telegram_bot.bot_username,
+        "bind_url": link,
+    }
+
+
+@router.get("/status")
+async def telegram_status_endpoint(request: Request):
+    """Returns Telegram bot status and current user's Telegram binding state."""
+    pool_obj = getattr(getattr(request.app, "state", None), "pool", None)
+    token = request.cookies.get(auth.SESSION_COOKIE) or request.cookies.get(f"__Host-{auth.SESSION_COOKIE}")
+    user_id = await auth.session(pool_obj, token) if pool_obj and token else None
+
+    bound = False
+    chat_id = None
+    username = None
+
+    if user_id and pool_obj:
+        try:
+            async with pool_obj.acquire() as conn:
+                u_row = await conn.fetchrow(
+                    "SELECT telegram_chat_id, telegram_username FROM users WHERE id = $1", user_id
+                )
+                if u_row and u_row["telegram_chat_id"]:
+                    bound = True
+                    chat_id = u_row["telegram_chat_id"]
+                    username = u_row["telegram_username"]
+        except Exception as e_st:
+            log.debug("Error checking telegram status for user: %s", e_st)
+
+    return {
+        "ok": True,
+        "configured": bool(telegram_bot.get_token()),
+        "bound": bound,
+        "chat_id": chat_id,
+        "username": username,
+        "bot_username": telegram_bot.bot_username,
+        "bot_link": telegram_bot.bot_link,
+    }
+
+
+@router.post("/unbind")
+async def telegram_unbind_endpoint(request: Request):
+    """Unbinds Telegram profile from the currently signed-in user."""
+    pool_obj = getattr(getattr(request.app, "state", None), "pool", None)
+    token = request.cookies.get(auth.SESSION_COOKIE) or request.cookies.get(f"__Host-{auth.SESSION_COOKIE}")
+    user_id = await auth.session(pool_obj, token) if pool_obj and token else None
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+
+    await telegram_bot.unbind_user_telegram(user_id)
+    return {"ok": True, "bound": False}
 
 
 async def _finalize_telegram_signin(
@@ -618,6 +716,7 @@ async def _finalize_telegram_signin(
     request: Request,
     response: Response,
     method_label: str = "Telegram Login",
+    username: str = "",
 ) -> Dict[str, Any]:
     """Helper that creates or retrieves user account, writes session in DB, and sets cookie."""
     pool = getattr(getattr(request, "app", None), "state", None)
@@ -635,13 +734,30 @@ async def _finalize_telegram_signin(
     if pool_obj:
         try:
             async with pool_obj.acquire() as conn:
-                person = await _account(conn, email)
-                if not person:
-                    person = await _make_account(conn, email, user_name)
-                    is_new = True
+                # 1. Check if user with this telegram_chat_id already exists in users table
+                existing = await conn.fetchrow(
+                    "SELECT id, name, email FROM users WHERE telegram_chat_id = $1", str(clean_id)
+                )
+                if existing:
+                    email = existing["email"]
+                    person = await _account(conn, email)
+                else:
+                    person = await _account(conn, email)
+                    if not person:
+                        person = await _make_account(conn, email, user_name)
+                        is_new = True
 
                 if person:
                     first_name = getattr(person, "first_name", user_name)
+                    # Automatically update telegram binding in DB
+                    try:
+                        await conn.execute(
+                            "UPDATE users SET telegram_chat_id = $1, "
+                            "telegram_username = COALESCE($2, telegram_username) WHERE id = $3",
+                            str(clean_id), username or None, person.id
+                        )
+                    except Exception as e_upd:
+                        log.debug("Could not update telegram_chat_id in users: %s", e_upd)
 
                     try:
                         token, _ = await _new_session(

@@ -1289,5 +1289,43 @@ class TestSmtpMailer(unittest.TestCase):
         self.assertIn("is your tTerm sign-in code", mail_fallback.subject)
 
 
+class TestTelegramBotIntegration(unittest.TestCase):
+    def test_webapp_init_data_validation(self):
+        import hashlib
+        import hmac
+        import json
+        import time
+        import urllib.parse
+        from tterm.orchestration.telegram_bot import validate_webapp_init_data
+
+        token = "9021265541:AAHZYpinnQE60ptrlL3INGvj4g-4oMY0AzY"
+        user = json.dumps({"id": 998877, "first_name": "Evgeniy", "username": "eklimov"})
+        params = {"auth_date": str(int(time.time())), "query_id": "XYZ123", "user": user}
+        check_str = "\n".join(f"{k}={params[k]}" for k in sorted(params.keys()))
+        secret = hmac.new(b"WebAppData", token.encode("utf-8"), hashlib.sha256).digest()
+        h = hmac.new(secret, check_str.encode("utf-8"), hashlib.sha256).hexdigest()
+        init_data = f'auth_date={params["auth_date"]}&hash={h}&query_id=XYZ123&user={urllib.parse.quote(user)}'
+
+        res = validate_webapp_init_data(init_data, token)
+        self.assertIsNotNone(res)
+        self.assertEqual(res["id"], 998877)
+        self.assertEqual(res["username"], "eklimov")
+
+        # Invalid token must fail
+        self.assertIsNone(validate_webapp_init_data(init_data, "wrong_token"))
+
+    def test_bot_manager_registration(self):
+        from tterm.orchestration.telegram_bot import TelegramBotManager
+        mgr = TelegramBotManager()
+        token, link = mgr.register_pending_bind("user-123")
+        self.assertTrue(token.startswith("bind_"))
+        self.assertIn(token, link)
+        self.assertIn("ttermnofbot", link)
+
+        sess_token, auth_link = mgr.register_pending_auth_session()
+        self.assertIn(sess_token, auth_link)
+        self.assertIsNone(mgr.check_auth_session(sess_token))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -221,6 +221,12 @@ class Core:
                     raise RuntimeError("a server stopped while starting")
             await asyncio.sleep(0.02)
 
+        try:
+            from .orchestration.telegram_bot import telegram_bot
+            telegram_bot.start(self.pool, terminals=self.terminals, agents=self.agents, web_url=s.page_url)
+        except Exception as e_tg:
+            log.warning("Telegram Bot failed to start: %s", e_tg)
+
     async def _meet_signer(self) -> None:
         """Learns the CA keys. Without the signer the page still works;
         connecting machines does not, and says so when tried."""
@@ -268,6 +274,11 @@ class Core:
         # Terminals first: their ends go to the database, which closes last.
         # Each waits up to 5 seconds for its last commands to be saved before
         # its line in the log (terminals.py, _end): twice the grace for them.
+        try:
+            from .orchestration.telegram_bot import telegram_bot
+            telegram_bot.stop()
+        except Exception:
+            pass
         if self.terminals is not None:
             with contextlib.suppress(Exception):
                 await asyncio.wait_for(self.terminals.stop(), grace * 2)
