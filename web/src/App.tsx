@@ -574,8 +574,23 @@ export function App() {
 
       if (token && state) {
         validateInviteToken(token)
-          .then((res) => {
+          .then(async (res) => {
             if (res.valid) {
+              // Instantly auto-accept for logged in user
+              try {
+                const acceptRes = await acceptProjectInvite(token);
+                if (acceptRes.accepted) {
+                  sessionStorage.removeItem("tterm_pending_invite");
+                  if (window.location.hash.includes("invite") || window.location.hash.includes("token")) {
+                    window.history.replaceState(null, "", window.location.pathname);
+                  }
+                  await refresh();
+                  setToast(`Вы успешно присоединились к проекту «${res.project?.name || "Проект"}»!`); // i18n-ignore
+                  return;
+                }
+              } catch {
+                // Fallback to manual acceptance modal if auto-accept fails
+              }
               setActiveInviteToAccept({ token, info: res });
             } else {
               sessionStorage.removeItem("tterm_pending_invite");

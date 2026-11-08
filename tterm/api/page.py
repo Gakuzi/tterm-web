@@ -350,14 +350,27 @@ def create_page_app(pool: asyncpg.Pool, dist: Path, page_url: str,
                    seconds: int) -> None:
         response.set_cookie(cookie_name(base), value, max_age=seconds,
                             path="/", secure=secure, httponly=True,
-                            samesite="strict")
+                            samesite="none" if secure else "lax")
 
     def clear_cookie(response: Response, base: str) -> None:
         response.delete_cookie(cookie_name(base), path="/", secure=secure,
-                               httponly=True, samesite="strict")
+                               httponly=True, samesite="none" if secure else "lax")
 
     async def signed_in(request: Request) -> auth.Session:
-        token = cookie(request, auth.SESSION_COOKIE)
+        raw_auth = request.headers.get("authorization", "")
+        bearer_tok = raw_auth.replace("Bearer ", "").strip() if raw_auth.startswith("Bearer ") else ""
+        token = (
+            cookie(request, auth.SESSION_COOKIE)
+            or request.headers.get("x-ai-token")
+            or bearer_tok
+        )
+        if not token:
+            token = (
+                request.cookies.get("__Host-session")
+                or request.cookies.get("session")
+                or request.cookies.get("__Host-tterm-session")
+                or request.cookies.get("tterm-session")
+            )
         if token and token.startswith("tt_ai_"):
             try:
                 from ..orchestration.ai_sessions import ai_agent_manager

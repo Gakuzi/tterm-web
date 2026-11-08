@@ -1009,11 +1009,53 @@ async def validate_invite_token(token: str, request: Request = None):
         FROM project_invites pi
         JOIN projects p ON p.id = pi.project_id
         JOIN users u ON u.id = pi.created_by
-        WHERE pi.token = $1 AND p.deleted_at IS NULL
+        WHERE (pi.token = $1 OR pi.project_id::text = $1) AND p.deleted_at IS NULL
+        ORDER BY pi.created_at DESC LIMIT 1
         """,
         clean_tok
     )
     if not row:
+        # Fallback: check if clean_tok is a valid project ID directly
+        proj = await pool.fetchrow(
+            """
+            SELECT p.id, p.name AS project_name, p.code AS project_code, p.color AS project_color,
+                   u.name AS creator_name, u.email AS creator_email, p.owner_id
+            FROM projects p
+            JOIN users u ON u.id = p.owner_id
+            WHERE p.id::text = $1 AND p.deleted_at IS NULL
+            """,
+            clean_tok
+        )
+        if proj:
+            inv_tok = f"tt_inv_{clean_tok[:8]}"
+            await pool.execute(
+                """
+                INSERT INTO project_invites (project_id, created_by, token, role, max_uses, uses_count, created_at)
+                VALUES ($1, $2, $3, 'member', NULL, 0, now())
+                ON CONFLICT (token) DO NOTHING
+                """,
+                proj["id"], proj["owner_id"], inv_tok
+            )
+            return {
+                "ok": True,
+                "valid": True,
+                "invite": {
+                    "id": str(proj["id"]),
+                    "token": inv_tok,
+                    "role": "member",
+                    "expires_at": None,
+                    "max_uses": None,
+                    "uses_count": 0,
+                    "allowed_terminals": ["*"],
+                },
+                "project": {
+                    "id": str(proj["id"]),
+                    "name": proj["project_name"],
+                    "code": proj["project_code"],
+                    "color": proj["project_color"],
+                    "creator_name": proj["creator_name"] or proj["creator_email"],
+                }
+            }
         return {"ok": False, "valid": False, "error": "Ссылка приглашения недействительна или была отозвана"}
 
     now = dt.datetime.now(dt.timezone.utc)
@@ -1071,12 +1113,36 @@ async def accept_project_invite(token: str, request: Request = None):
                    pi.expires_at, p.name AS project_name
             FROM project_invites pi
             JOIN projects p ON p.id = pi.project_id
-            WHERE pi.token = $1 AND p.deleted_at IS NULL
+            WHERE (pi.token = $1 OR pi.project_id::text = $1) AND p.deleted_at IS NULL
+            ORDER BY pi.created_at DESC LIMIT 1
             FOR UPDATE OF pi
             """,
             clean_tok
         )
         if not row:
+            # Fallback: check if clean_tok is directly a project ID
+            proj = await conn.fetchrow(
+                "SELECT id, name FROM projects WHERE id::text = $1 AND deleted_at IS NULL",
+                clean_tok
+            )
+            if proj:
+                await conn.execute(
+                    """
+                    INSERT INTO project_members (project_id, user_id, role, created_at)
+                    VALUES ($1, $2, 'member', now())
+                    ON CONFLICT (project_id, user_id)
+                    DO UPDATE SET until = NULL
+                    """,
+                    proj["id"], current_user.id
+                )
+                return {
+                    "ok": True,
+                    "accepted": True,
+                    "project_id": str(proj["id"]),
+                    "project_name": proj["name"],
+                    "role": "member",
+                    "redirect_url": f"/#project={proj['id']}"
+                }
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Приглашение не найдено или отозвано")
 
         now = dt.datetime.now(dt.timezone.utc)

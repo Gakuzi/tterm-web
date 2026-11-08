@@ -103,7 +103,7 @@ def _request(method: str, path: str, data: dict[str, Any] | None = None) -> dict
     }
     token_to_use = tterm_token or tterm_session
     if token_to_use:
-        headers["Cookie"] = f"__Host-tterm-session={token_to_use}; tterm-session={token_to_use}"
+        headers["Cookie"] = f"__Host-session={token_to_use}; session={token_to_use}; __Host-tterm-session={token_to_use}; tterm-session={token_to_use}"
         headers["Authorization"] = f"Bearer {token_to_use}"
 
     body = None
@@ -251,9 +251,10 @@ async def _run_command_ws(terminal_id: str, command: str, timeout: float = 30.0,
     ws_url = f"{ws_scheme}://{ws_host}/api/ws?token={token_to_use}"
 
     headers = [
-        ("Cookie", f"__Host-tterm-session={token_to_use}; tterm-session={token_to_use}"),
+        ("Cookie", f"__Host-session={token_to_use}; session={token_to_use}; __Host-tterm-session={token_to_use}; tterm-session={token_to_use}"),
         ("Origin", tterm_url),
         ("X-AI-Token", token_to_use),
+        ("Authorization", f"Bearer {token_to_use}"),
     ]
 
     ssl_ctx = None

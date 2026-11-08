@@ -325,8 +325,14 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
   const [aiSessions, setAiSessions] = useState<AIAgentSession[]>([]);
   const [showAiKeyModal, setShowAiKeyModal] = useState(false);
   const [selectedTerminalForAi, setSelectedTerminalForAi] = useState<string>(
-    terminals.find((t) => t.id === "c56de979-35aa-4828-9056-3dbaab629e0d")?.id || terminals[0]?.id || "c56de979-35aa-4828-9056-3dbaab629e0d"
+    terminals[0]?.id || "*"
   );
+
+  useEffect(() => {
+    if (terminals && terminals.length > 0 && (!selectedTerminalForAi || selectedTerminalForAi === "*")) {
+      setSelectedTerminalForAi(terminals[0].id);
+    }
+  }, [terminals]);
   const [aiAgentName, setAiAgentName] = useState("Antigravity AI Agent"); /* i18n-ignore */
   const [aiRole, setAiRole] = useState("container_developer");
   const [aiMode, setAiMode] = useState<"guard" | "execute" | "readonly">("guard");
@@ -531,7 +537,7 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
 
   // Load and auto-create project invitation links
   useEffect(() => {
-    if (showInviteModal && project?.id) {
+    if (project?.id) {
       fetchProjectInvites(project.id)
         .then((res) => {
           if (res.ok && res.invites) {
@@ -1090,10 +1096,8 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
   };
 
   const availableTerminalOptions = [
-    ...terminals.map((t) => ({ id: t.id, label: `${t.name || "terminal"} (${t.machine}) [${t.id.slice(0, 8)}...]` })),
-    ...(!terminals.some((t) => t.id === "c56de979-35aa-4828-9056-3dbaab629e0d")
-      ? [{ id: "c56de979-35aa-4828-9056-3dbaab629e0d", label: "c56de979-35aa-4828-9056-3dbaab629e0d (Целевой терминал проекта)" /* i18n-ignore */ }]
-      : []),
+    { id: "*", label: "🌟 Все терминалы проекта (полный доступ)" /* i18n-ignore */ },
+    ...terminals.map((t) => ({ id: t.id, label: `${t.name || "Терминал"} (${t.machine || "Машина"}) [${t.id.slice(0, 8)}...]` })),
   ];
 
   const handleUpdateSessionPermissions = async (sessionId: string, updates: Record<string, any>) => {
@@ -2884,8 +2888,10 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
                         onClick={() => {
                           const jsonText = JSON.stringify({
                             url: generatedAiKeyResult.connection_json.url,
+                            token: generatedAiKeyResult.connection_json.token || generatedAiKeyResult.key?.token,
                             allowed_terminal: generatedAiKeyResult.connection_json.allowed_terminal,
-                            project_id: generatedAiKeyResult.connection_json.project_id,
+                            project_id: project.id || generatedAiKeyResult.connection_json.project_id,
+                            ai_mode: generatedAiKeyResult.connection_json.ai_mode || aiMode,
                           }, null, 2);
                           copyToClipboard(jsonText);
                           if (notify) notify("JSON скопирован в буфер обмена!"); /* i18n-ignore */
@@ -2898,8 +2904,10 @@ export function ProjectCollaboration({ project, terminals, me, notify, activeSec
                     <pre style={{ margin: 0, padding: "10px", background: "rgba(0,0,0,0.4)", borderRadius: 6, fontSize: 12, fontFamily: "monospace", color: "#a7f3d0" }}>
                       {JSON.stringify({
                         url: generatedAiKeyResult.connection_json.url,
+                        token: generatedAiKeyResult.connection_json.token || generatedAiKeyResult.key?.token,
                         allowed_terminal: generatedAiKeyResult.connection_json.allowed_terminal,
-                        project_id: generatedAiKeyResult.connection_json.project_id,
+                        project_id: project.id || generatedAiKeyResult.connection_json.project_id,
+                        ai_mode: generatedAiKeyResult.connection_json.ai_mode || aiMode,
                       }, null, 2)}
                     </pre>
                   </div>

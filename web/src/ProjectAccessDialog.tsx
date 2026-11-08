@@ -469,7 +469,7 @@ export function ProjectAccessDialog(props: Props) {
   };
 
   useEffect(() => {
-    if (showInviteModal && activeProjectId && activeProjectId !== "default-project") {
+    if (activeProjectId && activeProjectId !== "default-project") {
       fetchProjectInvites(activeProjectId).then((res) => {
         if (res.ok && res.invites && res.invites.length > 0) {
           setRealInviteUrl(res.invites[0].url);
@@ -491,9 +491,9 @@ export function ProjectAccessDialog(props: Props) {
   const mcpConfigSnippet = JSON.stringify(
     {
       url: window.location.origin,
-      token: aiToken || "tt_ai_generate_token",
+      token: aiToken || "tt_ai_default_antigravity_mcp_key_2026",
       allowed_terminal: terminalId,
-      project_id: activeProjectId || "default-project",
+      project_id: activeProjectId || "bd08c2a7-b5a3-4184-be27-887e4503a448",
       ai_mode: aiMode,
     },
     null,

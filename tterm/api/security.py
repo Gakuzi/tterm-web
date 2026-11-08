@@ -39,7 +39,7 @@ CSP = ("default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://telegra
        "font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://e-klimov.ru https://*.e-klimov.ru https://telegram.org https://*.telegram.org; "
        "connect-src 'self' https://e-klimov.ru https://telegram.org https://oauth.telegram.org; "
        "frame-src 'self' https://oauth.telegram.org https://telegram.org; "
-       "frame-ancestors 'none'; base-uri 'none'; form-action 'self'; "
+       "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org https://telegram.org; base-uri 'none'; form-action 'self'; "
        "object-src 'none'")
 
 
@@ -56,10 +56,7 @@ def page_csp(nonce: str | None = None) -> str:
 PAGE_HEADERS: list[tuple[bytes, bytes]] = [
     (b"content-security-policy", page_csp().encode()),
     (b"x-content-type-options", b"nosniff"),
-    (b"x-frame-options", b"DENY"),
     (b"referrer-policy", b"no-referrer"),
-    (b"cross-origin-opener-policy", b"same-origin"),
-    (b"cross-origin-resource-policy", b"same-origin"),
     (b"permissions-policy",
      b"camera=(), microphone=(), geolocation=(), usb=(), payment=()"),
 ]
