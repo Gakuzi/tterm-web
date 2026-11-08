@@ -289,16 +289,8 @@ async def _telegram_polling_worker(token: str):
 
 
 def _ensure_polling_started():
-    """Starts the background Telegram polling worker if token is available."""
-    global _polling_task
-    token, _ = _get_bot_token_and_chat()
-    if token and (_polling_task is None or _polling_task.done()):
-        try:
-            loop = asyncio.get_running_loop()
-            _polling_task = loop.create_task(_telegram_polling_worker(token))
-            log.info("Spawned Telegram polling background task.")
-        except RuntimeError:
-            pass
+    """Delegated to unified telegram_bot engine to prevent 409 getUpdates conflict."""
+    pass
 
 
 class TelegramCodeRequest(BaseModel):
