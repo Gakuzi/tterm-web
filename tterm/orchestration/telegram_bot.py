@@ -245,6 +245,7 @@ class TelegramBotManager:
 
         # chat_id -> active machine_id (UUID str)
         self._user_active_machines: Dict[str, str] = {}
+        self._pending_rename: Dict[str, str] = {}
         # bind_token -> { "user_id": str, "expires_at": float }
         self._pending_binds: Dict[str, Dict[str, Any]] = {}
         # chat_id -> { "command": str, "machine_id": str, "expires_at": float }
@@ -273,11 +274,15 @@ class TelegramBotManager:
         if user_row and user_row.get("language"):
             code = str(user_row["language"]).lower()
             return "ru" if code.startswith("ru") else "en"
+        if user_row and (user_row.get("email") == "eklimov84@xmail.ru" or str(user_row.get("telegram_chat_id")) == "55570186"):
+            return "ru"
         if from_user and from_user.get("language_code"):
             code = str(from_user["language_code"]).lower()
-            return "ru" if code.startswith("ru") else "en"
+            if any(code.startswith(prefix) for prefix in ("ru", "be", "uk", "kk")):
+                return "ru"
+            if code.startswith("en"):
+                return "en"
         return "ru"
-        self._bot_id = None
 
     @property
     def bot_username(self) -> str:
@@ -941,6 +946,45 @@ class TelegramBotManager:
         lang = self._get_lang(user_row, from_user)
         t = I18N.get(lang, I18N["ru"])
 
+        # Pending rename response
+        if chat_id in self._pending_rename and not text.startswith("/"):
+            m_id = self._pending_rename.pop(chat_id)
+            m_uuid = _parse_uuid(m_id)
+            new_name = text.strip()
+            if m_uuid and self.pool:
+                try:
+                    async with self.pool.acquire() as conn:
+                        await conn.execute("UPDATE machines SET name = $1 WHERE id = $2", new_name, m_uuid)
+                    await self.send_message(chat_id, f"✅ Имя машины обновлено: <b>{html.escape(new_name)}</b>")
+                except Exception as e_rn:
+                    log.error("Rename machine failed: %s", e_rn)
+                    await self.send_message(chat_id, f"❌ Ошибка переименования: {e_rn}")
+            await self._show_machines_menu(chat_id, from_user=from_user)
+            return
+
+        # Language command /lang or /language
+        if text.startswith(("/lang", "/language")):
+            parts = text.split()
+            if len(parts) > 1 and parts[1].lower() in ("ru", "en"):
+                new_lang = parts[1].lower()
+                if user_row and self.pool:
+                    async with self.pool.acquire() as conn:
+                        await conn.execute("UPDATE users SET language = $1 WHERE id = $2", new_lang, user_row["id"])
+                lang_msg = "🇷🇺 Язык интерфейса переключен на русский." if new_lang == "ru" else "🇬🇧 Interface language set to English."
+                await self.send_message(chat_id, lang_msg, reply_markup=self._main_keyboard(is_owner=is_owner, lang=new_lang))
+                await self._show_machines_menu(chat_id, from_user=from_user)
+                return
+            lang_kb = {
+                "inline_keyboard": [
+                    [
+                        {"text": "🇷🇺 Русский", "callback_data": "setlang:ru"},
+                        {"text": "🇬🇧 English", "callback_data": "setlang:en"},
+                    ]
+                ]
+            }
+            await self.send_message(chat_id, "🌐 Выберите язык интерфейса / Select interface language:", reply_markup=lang_kb)
+            return
+
         # Admin commands: /admin, /users, /stats, /dashboard
         if text.startswith(("/admin", "/users", "/stats", "/dashboard")):
             if not is_owner:
@@ -965,11 +1009,11 @@ class TelegramBotManager:
                     try:
                         async with self.pool.acquire() as conn:
                             row = await conn.fetchrow(
-                                "SELECT user_id, expires_at, consumed FROM telegram_bind_tokens WHERE token = $1", param
+                                "SELECT user_id, expires_at, consumed FROM telegram_bind_tokens WHERE token = ", param
                             )
                             if row and not row["consumed"]:
                                 target_user_id = row["user_id"]
-                                await conn.execute("UPDATE telegram_bind_tokens SET consumed = true WHERE token = $1", param)
+                                await conn.execute("UPDATE telegram_bind_tokens SET consumed = true WHERE token = ", param)
                     except Exception as e_lk:
                         log.debug("Token DB lookup error: %s", e_lk)
 
@@ -977,6 +1021,18 @@ class TelegramBotManager:
                     bound_user = await self.bind_user_telegram(target_user_id, chat_id, username)
                     if bound_user:
                         user_row = bound_user
+                        u_email = user_row.get("email") or "аккаунт tTerm"
+                        u_name = user_row.get("name") or first_name
+                        msg_bound = (
+                            f"✅ <b>Telegram успешно привязан!</b>\n\n"
+                            f"Здравствуйте, <b>{u_name}</b>!\n"
+                            f"Ваш профиль Telegram (@{username or chat_id}) связан с аккаунтом:\n"
+                            f"📧 <b>{u_email}</b>\n\n"
+                            "💡 <i>Отправляйте shell-команды прямо в этот чат или выберите активную машину:</i>"
+                        )
+                        await self.send_message(chat_id, msg_bound)
+                        await self._show_machines_menu(chat_id, from_user=from_user)
+                        return
 
                 if not user_row and is_owner:
                     if self.pool:
@@ -988,14 +1044,14 @@ class TelegramBotManager:
                 if user_row:
                     u_email = user_row.get("email") or "аккаунт tTerm"
                     u_name = user_row.get("name") or first_name
-                    await self.send_message(
-                        chat_id,
-                        f"✅ <b>Telegram успешно привязан!</b>\n\n"
+                    msg_auth = (
+                        f"✅ <b>Вы авторизованы в tTerm!</b>\n\n"
                         f"Здравствуйте, <b>{u_name}</b>!\n"
-                        f"Ваш профиль Telegram (@{username or chat_id}) связан с аккаунтом:\n"
+                        f"Ваш Telegram-профиль (@{username or chat_id}) связан с аккаунтом:\n"
                         f"📧 <b>{u_email}</b>\n\n"
-                        f"💡 <i>Отправляйте shell-команды прямо в этот чат или выберите активную машину:</i>",
+                        "💡 <i>Отправляйте shell-команды прямо в этот чат или выберите активную машину:</i>"
                     )
+                    await self.send_message(chat_id, msg_auth)
                     await self._show_machines_menu(chat_id, from_user=from_user)
                     return
                 else:
@@ -1007,7 +1063,7 @@ class TelegramBotManager:
                     )
                     return
 
-            # 1b. Handle /start auth_<session_token> (1-click browser login)
+                        # 1b. Handle /start auth_<session_token> (1-click browser login)
             if param.startswith("auth_") or param.startswith("login_"):
                 session_key = param.split("_", 1)[1]
                 code = f"{secrets.randbelow(900000) + 100000}"
@@ -1192,7 +1248,7 @@ class TelegramBotManager:
 
         # 7. Command /machines or /use
         if text.startswith("/machines") or text.startswith("/use") or text == "🖥 Машины":
-            await self._show_machines_menu(chat_id)
+            await self._show_machines_menu(chat_id, from_user=from_user)
             return
 
         # 8. Command /help
@@ -1239,7 +1295,7 @@ class TelegramBotManager:
                 )
                 return
             else:
-                await self._show_machines_menu(chat_id, note="Выберите машину для выполнения команды:")
+                await self._show_machines_menu(chat_id, note="Выберите машину для выполнения команды:", from_user=from_user)
                 return
 
         # Find active machine name
@@ -1397,11 +1453,12 @@ class TelegramBotManager:
         if data.startswith("use:"):
             machine_id = data[4:]
             self._user_active_machines[chat_id] = machine_id
+            m_uuid = _parse_uuid(machine_id)
             m_name = machine_id
             m_kind = "server"
-            if self.pool:
+            if self.pool and m_uuid:
                 async with self.pool.acquire() as conn:
-                    m_row = await conn.fetchrow("SELECT name, kind FROM machines WHERE id = $1", uuid.UUID(machine_id))
+                    m_row = await conn.fetchrow("SELECT name, kind FROM machines WHERE id = $1", m_uuid)
                     if m_row:
                         m_name = m_row["name"]
                         m_kind = m_row["kind"]
@@ -1443,8 +1500,196 @@ class TelegramBotManager:
 
         if data.startswith("newterm:"):
             m_id = data[8:]
-            await self.answer_callback(cq_id, "Терминал готов")
-            await self.send_message(chat_id, f"🖥 <b>Новая сессия терминала</b>\n<code>~ ❯</code>")
+            m_uuid = _parse_uuid(m_id)
+            user_row = await self.get_user_by_telegram(chat_id)
+            lang = self._get_lang(user_row, callback.get("from"))
+            m_name = m_id
+            if self.pool and m_uuid:
+                async with self.pool.acquire() as conn:
+                    m_row = await conn.fetchrow("SELECT name FROM machines WHERE id = $1", m_uuid)
+                    if m_row:
+                        m_name = m_row["name"]
+            self._user_active_machines[chat_id] = m_id
+            await self.answer_callback(cq_id, "Терминал готов" if lang == "ru" else "Terminal ready")
+            await self.send_message(
+                chat_id,
+                f"🖥 <b>Терминал активен: {html.escape(m_name)}</b>\n\n"
+                f"Отправляйте команды прямо в этот чат (например: <code>uptime</code>, <code>git status</code>, <code>docker ps</code>).\n"
+                f"Или откройте терминал в Web App через кнопку <b>tTerm</b> ниже.",
+                reply_markup={"inline_keyboard": [[{"text": "💻 Открыть терминал в Web App", "web_app": {"url": self.web_url}}]]}
+            )
+            return
+
+        if data.startswith("rename:"):
+            m_id = data[7:]
+            await self.answer_callback(cq_id)
+            self._pending_rename[chat_id] = m_id
+            await self.send_message(
+                chat_id,
+                "✏️ <b>Переименование машины</b>\nОтправьте новое имя для этой машины ответным сообщением в чат:"
+            )
+            return
+
+        if data.startswith("access:"):
+            m_id = data[7:]
+            await self.answer_callback(cq_id)
+            user_row = await self.get_user_by_telegram(chat_id)
+            lang = self._get_lang(user_row, callback.get("from"))
+            t = I18N.get(lang, I18N["ru"])
+            m_uuid = _parse_uuid(m_id)
+            m_name = m_id
+            members_list = []
+            if self.pool and m_uuid:
+                async with self.pool.acquire() as conn:
+                    m_row = await conn.fetchrow("SELECT name, project_id FROM machines WHERE id = $1", m_uuid)
+                    if m_row:
+                        m_name = m_row["name"]
+                        rows = await conn.fetch(
+                            """SELECT u.name, u.email, pm.role
+                            FROM project_members pm
+                            JOIN users u ON u.id = pm.user_id
+                            WHERE pm.project_id = $1""", m_row["project_id"]
+                        )
+                        for r in rows:
+                            members_list.append(f"• <b>{r['name'] or r['email']}</b> ({r['role']})")
+
+            members_text = "\n".join(members_list) if members_list else ("• <i>Доступ только у владельца</i>" if lang == "ru" else "• <i>Owner only</i>")
+            acc_blocks = [
+                {
+                    "type": "paragraph",
+                    "text": [{"type": "bold", "text": f"Доступ к машине: {m_name}" if lang == "ru" else f"Access to machine: {m_name}"}]
+                },
+                {
+                    "type": "paragraph",
+                    "text": [f"Участники с доступом к этой машине:\n{members_text}" if lang == "ru" else f"Project members with access:\n{members_text}"]
+                },
+                {
+                    "type": "buttons",
+                    "align": "left",
+                    "buttons": [
+                        {"text": t["btn_back"], "callback_data": "menu:machines"}
+                    ]
+                }
+            ]
+            if msg_id:
+                res = await self.call_api("editMessageText", {
+                    "chat_id": chat_id,
+                    "message_id": msg_id,
+                    "rich_message": {"blocks": acc_blocks}
+                })
+                if res.get("ok"):
+                    return
+            await self.send_message(chat_id, f"🔑 <b>Доступ к {m_name}</b>\n\n{members_text}", reply_markup={"inline_keyboard": [[{"text": t["btn_back"], "callback_data": "menu:machines"}]]})
+            return
+
+        if data.startswith("askrm:"):
+            m_id = data[6:]
+            await self.answer_callback(cq_id)
+            user_row = await self.get_user_by_telegram(chat_id)
+            lang = self._get_lang(user_row, callback.get("from"))
+            t = I18N.get(lang, I18N["ru"])
+            m_name = m_id
+            m_uuid = _parse_uuid(m_id)
+            if self.pool and m_uuid:
+                async with self.pool.acquire() as conn:
+                    row = await conn.fetchrow("SELECT name FROM machines WHERE id = $1", m_uuid)
+                    if row:
+                        m_name = row["name"]
+
+            rm_title = f"Удалить машину {m_name} из списка?" if lang == "ru" else f"Remove {m_name} from list?"
+            rm_desc = "Подключение будет разорвано. Вы сможете добавить эту машину повторно в любое время." if lang == "ru" else "The connection will be removed. You can reconnect it at any time."
+            rm_yes = "Да, удалить" if lang == "ru" else "Yes, remove"
+            rm_cancel = "Отмена" if lang == "ru" else "Cancel"
+
+            rm_blocks = [
+                {
+                    "type": "paragraph",
+                    "text": [{"type": "bold", "text": rm_title}]
+                },
+                {
+                    "type": "paragraph",
+                    "text": [rm_desc]
+                },
+                {
+                    "type": "buttons",
+                    "align": "left",
+                    "buttons": [
+                        {"text": f"🗑 {rm_yes}", "callback_data": f"remove:{m_id}", "style": "danger"},
+                        {"text": rm_cancel, "callback_data": "menu:machines"}
+                    ]
+                }
+            ]
+            if msg_id:
+                res = await self.call_api("editMessageText", {
+                    "chat_id": chat_id,
+                    "message_id": msg_id,
+                    "rich_message": {"blocks": rm_blocks}
+                })
+                if res.get("ok"):
+                    return
+            await self.send_message(chat_id, f"⚠️ <b>{rm_title}</b>\n\n{rm_desc}", reply_markup={"inline_keyboard": [
+                [{"text": f"🗑 {rm_yes}", "callback_data": f"remove:{m_id}"}, {"text": rm_cancel, "callback_data": "menu:machines"}]
+            ]})
+            return
+
+        if data.startswith("remove:"):
+            m_id = data[7:]
+            user_row = await self.get_user_by_telegram(chat_id)
+            lang = self._get_lang(user_row, callback.get("from"))
+            await self.answer_callback(cq_id, "Машина удалена" if lang == "ru" else "Machine removed")
+            m_uuid = _parse_uuid(m_id)
+            if self.pool and m_uuid:
+                async with self.pool.acquire() as conn:
+                    await conn.execute("UPDATE machines SET removed_at = now() WHERE id = $1", m_uuid)
+
+            # Switch active machine if needed
+            if self._user_active_machines.get(chat_id) == m_id:
+                self._user_active_machines.pop(chat_id, None)
+
+            if user_row and msg_id:
+                machines = await self.list_user_machines(user_row["id"])
+                active_id = self._user_active_machines.get(chat_id) or (machines[0]["id"] if machines else "")
+                rich_payload = self._build_rich_machines_payload(machines, active_id, lang=lang)
+                res = await self.call_api("editMessageText", {
+                    "chat_id": chat_id,
+                    "message_id": msg_id,
+                    "rich_message": rich_payload,
+                })
+                if res.get("ok"):
+                    return
+            await self._show_machines_menu(chat_id, from_user=callback.get("from"))
+            return
+
+        if data == "togglelang":
+            user_row = await self.get_user_by_telegram(chat_id)
+            curr_lang = self._get_lang(user_row, callback.get("from"))
+            new_lang = "en" if curr_lang == "ru" else "ru"
+            if user_row and self.pool:
+                async with self.pool.acquire() as conn:
+                        await conn.execute("UPDATE users SET language = $1 WHERE id = $2", new_lang, user_row["id"])
+            await self.answer_callback(cq_id, "Язык: Русский" if new_lang == "ru" else "Language: English")
+            if user_row and msg_id:
+                machines = await self.list_user_machines(user_row["id"])
+                active_id = self._user_active_machines.get(chat_id) or (machines[0]["id"] if machines else "")
+                rich_payload = self._build_rich_machines_payload(machines, active_id, lang=new_lang)
+                res = await self.call_api("editMessageText", {
+                    "chat_id": chat_id,
+                    "message_id": msg_id,
+                    "rich_message": rich_payload,
+                })
+                if res.get("ok"):
+                    return
+            await self._show_machines_menu(chat_id, from_user=callback.get("from"))
+            return
+
+        if data.startswith("setlang:"):
+            new_lang = data[8:]
+            user_row = await self.get_user_by_telegram(chat_id)
+            if user_row and self.pool:
+                async with self.pool.acquire() as conn:
+                        await conn.execute("UPDATE users SET language = $1 WHERE id = $2", new_lang, user_row["id"])
+            await self.answer_callback(cq_id, "Язык: Русский" if new_lang == "ru" else "Language: English")
+            await self._show_machines_menu(chat_id, from_user=callback.get("from"))
             return
 
         if data == "addmachine" or data == "addhost":
@@ -1454,6 +1699,7 @@ class TelegramBotManager:
             t = I18N.get(lang, I18N["ru"])
 
             server_cmd = f"curl -sSL {self.web_url}/connect.sh | bash"
+            pc_cmd = f"curl -sSL {self.web_url}/a/connect | bash"
             add_blocks = [
                 {
                     "type": "paragraph",
@@ -1466,6 +1712,18 @@ class TelegramBotManager:
                 {
                     "type": "paragraph",
                     "text": [{"type": "code", "text": server_cmd}]
+                },
+                {
+                    "type": "paragraph",
+                    "text": [{"type": "bold", "text": t["add_pc_title"]}]
+                },
+                {
+                    "type": "paragraph",
+                    "text": [t["add_pc_desc"]]
+                },
+                {
+                    "type": "paragraph",
+                    "text": [{"type": "code", "text": pc_cmd}]
                 },
                 {
                     "type": "buttons",
@@ -1484,7 +1742,8 @@ class TelegramBotManager:
                 if not res.get("ok"):
                     await self.send_message(
                         chat_id,
-                        f"<b>{t['add_server_title']}</b>\n{t['add_server_desc']}\n<code>{server_cmd}</code>",
+                        f"<b>{t['add_server_title']}</b>\n{t['add_server_desc']}\n<code>{server_cmd}</code>\n\n"
+                        f"<b>{t['add_pc_title']}</b>\n{t['add_pc_desc']}\n<code>{pc_cmd}</code>",
                         reply_markup={"inline_keyboard": [[{"text": t["btn_back"], "callback_data": "menu:machines"}]]}
                     )
             return
@@ -1585,9 +1844,11 @@ class TelegramBotManager:
         ]
 
         for idx, m in enumerate(machines, 1):
-            is_active = (m["id"] == active_id)
+            is_active = (str(m["id"]) == str(active_id))
             icon = "🖥" if m["kind"] == "computer" else "🌐"
-            ip_val = m.get("host") or m.get("ip") or ("computer" if m["kind"] == "computer" else "82.148.241.254")
+            ip_val = m.get("host") or m.get("ip") or ("компьютер" if m["kind"] == "computer" else "82.148.241.254")
+            if lang == "en":
+                ip_val = m.get("host") or m.get("ip") or ("computer" if m["kind"] == "computer" else "82.148.241.254")
             tail = ip_val if m.get("online", True) else t["offline"]
             m_label = m["name"]
             if m["kind"] == "server" and not m_label.endswith(")"):
@@ -1619,14 +1880,15 @@ class TelegramBotManager:
                 {"text": t["btn_terminal"], "callback_data": f"newterm:{active_id}"},
                 {"text": t["btn_rename"], "callback_data": f"rename:{active_id}"},
                 {"text": t["btn_access"], "callback_data": f"access:{active_id}"},
-                {"text": t["btn_remove"], "callback_data": f"remove:{active_id}", "style": "danger"},
+                {"text": t["btn_remove"], "callback_data": f"askrm:{active_id}", "style": "danger"},
             ]
         })
         blocks.append({
             "type": "buttons",
             "align": "left",
             "buttons": [
-                {"text": t["btn_add_machine"], "callback_data": "addmachine", "style": "success"}
+                {"text": t["btn_add_machine"], "callback_data": "addmachine", "style": "success"},
+                {"text": "🇷🇺/🇬🇧 Язык", "callback_data": "togglelang"},
             ]
         })
         return {"blocks": blocks}
