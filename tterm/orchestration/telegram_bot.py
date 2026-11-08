@@ -1854,6 +1854,12 @@ class TelegramBotManager:
             if m["kind"] == "server" and not m_label.endswith(")"):
                 m_label = f"{m_label}{t['server_suffix']}"
 
+            btn_dict = {
+                "text": m_label,
+                "callback_data": f"use:{m['id']}",
+            }
+            if is_active:
+                btn_dict["style"] = "primary"
             blocks.append({
                 "type": "paragraph",
                 "text": [
@@ -1862,11 +1868,7 @@ class TelegramBotManager:
                     " ",
                     {
                         "type": "button",
-                        "button": {
-                            "text": m_label,
-                            "callback_data": f"use:{m['id']}",
-                            "style": "primary" if is_active else None
-                        }
+                        "button": btn_dict
                     },
                     {"type": "italic", "text": f"  {tail}"}
                 ]
