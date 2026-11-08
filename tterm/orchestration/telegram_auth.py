@@ -29,7 +29,8 @@ except ImportError:
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from ..core import auth
+from ..core import accounts, auth
+from ..core.accounts import Person
 from ..core.auth import SESSION_COOKIE, _account, _make_account, _new_session
 from .encrypted_vault import encrypted_vault
 from .notifications_bot import (
@@ -971,27 +972,46 @@ async def _finalize_telegram_signin(
                             ip=request.client.host if request.client else "127.0.0.1",
                         )
 
-                    is_secure = request.url.scheme == "https"
-                    cookie_name = f"__Host-{SESSION_COOKIE}" if is_secure else SESSION_COOKIE
+                    is_secure = (
+                        request.url.scheme == "https"
+                        or request.headers.get("x-forwarded-proto") == "https"
+                        or "e-klimov.ru" in request.headers.get("host", "")
+                    )
+                    # Set __Host-tterm-session (for standard browsers over HTTPS)
+                    if is_secure:
+                        response.set_cookie(
+                            f"__Host-{SESSION_COOKIE}",
+                            token,
+                            max_age=30 * 24 * 3600,
+                            path="/",
+                            secure=True,
+                            httponly=True,
+                            samesite="none",
+                        )
+                    # Also set tterm-session without __Host- for Telegram WebApp / iframe compatibility
                     response.set_cookie(
-                        cookie_name,
+                        SESSION_COOKIE,
                         token,
                         max_age=30 * 24 * 3600,
                         path="/",
                         secure=is_secure,
                         httponly=True,
-                        samesite="lax",
+                        samesite="none" if is_secure else "lax",
                     )
-        except Exception as e:
-            log.warning("Database session creation failed in Telegram auth: %s", e)
 
-    return {
-        "ok": True,
-        "signedIn": True,
-        "new": is_new,
-        "name": first_name,
-        "email": active_email,
-        "offerPin": False,
-        "pinDigits": 6,
-        "telegram_id": clean_id,
-    }
+                    return {
+                        "ok": True,
+                        "signedIn": True,
+                        "token": token,
+                        "new": is_new,
+                        "name": first_name,
+                        "email": active_email,
+                        "offerPin": False,
+                        "pinDigits": 6,
+                        "telegram_id": clean_id,
+                    }
+        except Exception as e:
+            log.exception("Database session creation failed in Telegram auth: %s", e)
+            raise HTTPException(status_code=500, detail=f"Database error during Telegram sign-in: {e}")
+
+    raise HTTPException(status_code=500, detail="Database pool is not available")

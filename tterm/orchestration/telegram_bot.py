@@ -364,20 +364,39 @@ class TelegramBotManager:
         if not self.pool:
             return None
         async with self.pool.acquire() as conn:
-            # Check users by telegram_chat_id
+            # 1. Check users by telegram_chat_id
             row = await conn.fetchrow(
                 "SELECT id, name, email, is_local_owner, plan_id, telegram_chat_id, telegram_username "
                 "FROM users WHERE telegram_chat_id = $1", str(chat_id)
             )
             if row:
                 return row
-            # Check if this chat_id matches the single owner configured in environment
+            # 2. Check sign_in_methods table
+            m_row = await conn.fetchrow(
+                "SELECT u.id, u.name, u.email, u.is_local_owner, u.plan_id, u.telegram_chat_id, u.telegram_username "
+                "FROM sign_in_methods s JOIN users u ON u.id = s.user_id "
+                "WHERE s.kind = 'telegram' AND s.subject = $1", str(chat_id)
+            )
+            if m_row:
+                await conn.execute("UPDATE users SET telegram_chat_id = $1 WHERE id = $2", str(chat_id), m_row["id"])
+                return m_row
+            # 3. Check owner chat ID from environment or Evgeniy Klimov known ID
             owner_chat = os.environ.get("TTERM_TELEGRAM_CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID")
-            if owner_chat and str(chat_id) == str(owner_chat):
-                owner = await conn.fetchrow("SELECT id, name, email, is_local_owner, plan_id FROM users WHERE is_local_owner = true LIMIT 1")
+            if (owner_chat and str(chat_id) == str(owner_chat)) or str(chat_id) == "55570186":
+                owner = await conn.fetchrow(
+                    "SELECT id, name, email, is_local_owner, plan_id, telegram_chat_id, telegram_username "
+                    "FROM users WHERE lower(email) IN ('eklimov84@xmail.ru', 'eklimov84@gmail.com', 'klimov@e-klimov.ru') "
+                    "ORDER BY (lower(email) = 'eklimov84@xmail.ru') DESC, created_at ASC LIMIT 1"
+                )
                 if owner:
-                    await conn.execute("UPDATE users SET telegram_chat_id = $1 WHERE id = $2", str(chat_id), owner["id"])
-                    return await conn.fetchrow("SELECT id, name, email, is_local_owner, plan_id, telegram_chat_id, telegram_username FROM users WHERE id = $1", owner["id"])
+                    await conn.execute(
+                        "UPDATE users SET telegram_chat_id = $1, telegram_username = COALESCE(telegram_username, 'eklimov') WHERE id = $2",
+                        str(chat_id), owner["id"]
+                    )
+                    return await conn.fetchrow(
+                        "SELECT id, name, email, is_local_owner, plan_id, telegram_chat_id, telegram_username "
+                        "FROM users WHERE id = $1", owner["id"]
+                    )
         return None
 
     async def bind_user_telegram(self, user_id: Any, chat_id: str | int, username: str = "") -> Optional[Dict[str, Any]]:
@@ -736,22 +755,40 @@ class TelegramBotManager:
                         if m_row:
                             active_m_name = m_row["name"]
 
+                u_mail = user_row.get("email") or "аккаунт tTerm"
                 await self.send_message(
                     chat_id,
                     f"👋 <b>tTerm Terminal & AI Hub</b>\n\n"
                     f"👤 Профиль: <b>{user_row['name']}</b> (@{username or chat_id})\n"
+                    f"📧 Аккаунт: <b>{u_mail}</b>\n"
                     f"🖥 Активная машина: <b>{active_m_name}</b>\n\n"
-                    f"💡 <i>Отправляйте команды (<code>uptime</code>, <code>docker ps</code>, <code>git status</code>) прямо сюда для запуска на машине.</i>",
+                    f"💡 <i>Отправляйте команды (<code>uptime</code>, <code>docker ps</code>, <code>git status</code>) прямо в этот чат для запуска на сервере, либо нажмите <b>tTerm</b> для веб-терминала.</i>",
                     reply_markup=self._main_keyboard(),
                 )
             else:
-                await self.send_message(
-                    chat_id,
+                preview_url = "https://e-klimov.ru/tterm_preview.png"
+                preview_caption = (
                     f"👋 Здравствуйте, <b>{first_name}</b>!\n\n"
-                    f"Добро пожаловать в <b>tTerm</b>.\n\n"
-                    f"Вы можете сразу открыть терминал кнопкой <b>tTerm</b> ниже, либо привязать существующий аккаунт с помощью команды <code>/email ваша_почта@домен.ru</code>.",
-                    reply_markup=self._unbound_keyboard(),
+                    f"<b>tTerm · Оркестрация ИИ и веб-терминала</b>\n\n"
+                    f"💻 <b>Web App:</b> Полноценный терминал прямо в Telegram\n"
+                    f"💬 <b>Серверы:</b> Выполнение команд через сообщения бота\n"
+                    f"🔔 <b>Push-уведомления:</b> Окончание команд, сборка Docker\n"
+                    f"🛡 <b>Безопасность:</b> Подтверждение опасных команд\n"
+                    f"🧠 <b>MCP-хаб:</b> Управление терминалами для ИИ-ассистентов\n\n"
+                    f"<i>Нажмите кнопку <b>tTerm</b> ниже для открытия терминала или отправьте <code>/email ваша_почта@домен.ru</code> для привязки.</i>"
                 )
+                try:
+                    res = await self.call_api("sendPhoto", {
+                        "chat_id": chat_id,
+                        "photo": preview_url,
+                        "caption": preview_caption,
+                        "parse_mode": "HTML",
+                        "reply_markup": self._unbound_keyboard(),
+                    })
+                    if not res.get("ok"):
+                        await self.send_message(chat_id, preview_caption, reply_markup=self._unbound_keyboard())
+                except Exception:
+                    await self.send_message(chat_id, preview_caption, reply_markup=self._unbound_keyboard())
             return
 
         # 2. Command /avatar (send bot logo for BotFather)

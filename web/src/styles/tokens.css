@@ -7,22 +7,22 @@
 
 :root,
 .tt-dark {
-  --ground: #0D0E11;
-  --surface: #16181C;
-  --raised: #1D2026;
-  --line: #262A31;
-  --live: #121419;
-  --sep: #3A3F48;
-  --ink: #EDEFF3;
-  --dim: #9AA0AA;
-  --faint: #7D838E;
-  --amber: #E9A33F;
-  --amber-ink: #E9A33F;
+  --ground: #141414;
+  --surface: #1A1A1A;
+  --raised: #222222;
+  --line: #2E2E2E;
+  --live: #181818;
+  --sep: #3D3D3D;
+  --ink: #F4F1EA;
+  --dim: #C5BFB5;
+  --faint: #9E988E;
+  --amber: #E09F3E;
+  --amber-ink: #E09F3E;
   --amber-dim: #B8802F;
   --amber-hover: #F2BD69;
-  --amber-tint: rgba(233, 163, 63, .12);
-  --amber-ring: rgba(233, 163, 63, .28);
-  --on-accent: #0D0E11;
+  --amber-tint: rgba(224, 159, 62, .15);
+  --amber-ring: rgba(224, 159, 62, .35);
+  --on-accent: #1A1A1A;
   --green: #46B95C;
   --green-ink: #46B95C;
   --green-tint: rgba(70, 185, 92, .12);

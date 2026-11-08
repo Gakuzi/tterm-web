@@ -1,1 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="116" fill="#131417"/><path d="M118 168 L206 256 L118 344" fill="none" stroke="#46B95C" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/><path d="M330 140 L330 316 C330 344 344 356 372 350" fill="none" stroke="#EDEFF3" stroke-width="56" stroke-linecap="round"/><path d="M272 212 L392 212" fill="none" stroke="#EDEFF3" stroke-width="56" stroke-linecap="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <circle cx="256" cy="256" r="256" fill="#1A1A1A"/>
+  <!-- Terminal window outline -->
+  <rect x="130" y="140" width="252" height="232" rx="36" fill="none" stroke="#E09F3E" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Top bar dots -->
+  <circle cx="168" cy="172" r="8" fill="#F4F1EA"/>
+  <circle cx="192" cy="172" r="8" fill="#E09F3E"/>
+  <circle cx="216" cy="172" r="8" fill="#E09F3E"/>
+  <!-- Divider line -->
+  <line x1="130" y1="194" x2="382" y2="194" stroke="#E09F3E" stroke-width="12"/>
+  <!-- 't' crossing left border -->
+  <path d="M106 270 L156 270 M132 236 L132 296 C132 312 142 320 158 320" fill="none" stroke="#E09F3E" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- '>' prompt in white/ivory -->
+  <path d="M198 226 L248 270 L198 314" fill="none" stroke="#F4F1EA" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- '_' underscore cursor in white/ivory -->
+  <line x1="262" y1="314" x2="310" y2="314" stroke="#F4F1EA" stroke-width="24" stroke-linecap="round"/>
+</svg>

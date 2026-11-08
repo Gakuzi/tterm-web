@@ -128,6 +128,8 @@ export function SignIn(props: Props) {
     if (props.note) setNote(props.note);
   }, [props.note]);
 
+  const tgLoginTried = useRef(false);
+
   useEffect(() => {
     let stopped = false;
 
@@ -138,16 +140,42 @@ export function SignIn(props: Props) {
         tgWebApp.ready();
         tgWebApp.expand();
       } catch {}
-      if (tgWebApp.initData) {
-        loginWithTelegramWebApp(tgWebApp.initData)
-          .then((res) => {
+    }
+
+    if (tgWebApp?.initData && !tgLoginTried.current) {
+      tgLoginTried.current = true;
+      loginWithTelegramWebApp(tgWebApp.initData)
+        .then((res) => {
+          if (stopped) return;
+          if (res.signedIn) {
+            onSignedIn();
+            return;
+          }
+          return authState().then((state) => {
             if (stopped) return;
-            if (res.signedIn) onSignedIn();
-          })
-          .catch((err) => {
-            console.debug("Telegram WebApp auto-login:", err);
+            if (state.legal) setLegal(state.legal);
+            if (state.signedIn) onSignedIn();
+            else setStep({ kind: "email" });
           });
-      }
+        })
+        .catch((err) => {
+          console.debug("Telegram WebApp auto-login failed:", err);
+          if (stopped) return;
+          authState()
+            .then((state) => {
+              if (stopped) return;
+              if (state.legal) setLegal(state.legal);
+              if (state.signedIn) onSignedIn();
+              else setStep({ kind: "email" });
+            })
+            .catch(() => {
+              if (stopped) return;
+              setStep({ kind: "email" });
+            });
+        });
+      return () => {
+        stopped = true;
+      };
     }
 
     authState()
@@ -252,34 +280,34 @@ export function SignIn(props: Props) {
       <header className="signin-brand" style={{ display: "flex", alignItems: "center", gap: 14, paddingTop: 40, paddingBottom: 16 }}>
         <a href="https://e-klimov.ru" target="_blank" rel="noreferrer" style={{ display: "inline-flex", textDecoration: "none" }}>
           <img
-            src="/monogram_gold_badge.png"
-            alt={"Евгений Климов" /* i18n-ignore */}
-            width={44}
-            height={44}
-            style={{ borderRadius: 10, boxShadow: "0 2px 10px rgba(0,0,0,0.35)", border: "1px solid rgba(224, 159, 62, 0.3)" }}
+            src="/tterm_icon.png"
+            alt={"tTerm" /* i18n-ignore */}
+            width={46}
+            height={46}
+            style={{ borderRadius: "50%", boxShadow: "0 2px 14px rgba(224, 159, 62, 0.25)", border: "1px solid rgba(224, 159, 62, 0.4)" }}
           />
         </a>
         <div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontWeight: 700, fontSize: 20, color: "var(--ink)", letterSpacing: "-0.01em" }}>
-              Евгений Климов {/* i18n-ignore */}
+            <span style={{ fontWeight: 700, fontSize: 22, color: "#F4F1EA", letterSpacing: "0.02em", fontFamily: "Montserrat, sans-serif" /* i18n-ignore */ }}>
+              tTerm {/* i18n-ignore */}
             </span>
             <span style={{
               fontSize: 10,
               fontWeight: 600,
               color: "#E09F3E",
               background: "rgba(224, 159, 62, 0.15)",
-              padding: "2px 7px",
-              borderRadius: 10,
-              border: "1px solid rgba(224, 159, 62, 0.35)",
+              padding: "2px 8px",
+              borderRadius: 12,
+              border: "1px solid rgba(224, 159, 62, 0.4)",
               textTransform: "uppercase",
-              letterSpacing: "0.04em",
+              letterSpacing: "0.08em",
             }}>
-              AI Hub {/* i18n-ignore */}
+              AI Orchestration {/* i18n-ignore */}
             </span>
           </div>
-          <span style={{ fontSize: 12, color: "var(--dim)", fontWeight: 400 }}>
-            tTerm Web & AI Agent Orchestration {/* i18n-ignore */}
+          <span style={{ fontSize: 11, color: "#E5DEC9", fontWeight: 400, marginTop: 2 }}>
+            Инфраструктура Евгения Климова · ИТ-консалтинг {/* i18n-ignore */}
           </span>
         </div>
       </header>
@@ -319,32 +347,43 @@ export function SignIn(props: Props) {
       <div className="signin-attribution" style={{
         maxWidth: 440,
         margin: "20px auto 12px",
-        padding: "12px 16px",
-        borderRadius: 10,
-        background: "rgba(22, 24, 28, 0.8)",
-        border: "1px solid rgba(224, 159, 62, 0.25)",
-        boxShadow: "0 4px 16px rgba(0, 0, 0, 0.25)",
-        fontSize: 11,
-        lineHeight: 1.45,
+        padding: "14px 18px",
+        borderRadius: 12,
+        background: "#1F1F1F",
+        border: "1px solid rgba(224, 159, 62, 0.35)",
+        boxShadow: "0 4px 20px rgba(0, 0, 0, 0.35)",
+        fontSize: 12,
+        lineHeight: 1.5,
         textAlign: "center",
       }}>
-        <div style={{ color: "#E09F3E", fontWeight: 600, fontSize: 11, marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        <div style={{
+          color: "#E09F3E",
+          fontWeight: 600,
+          fontSize: 11,
+          marginBottom: 6,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+        }}>
           <span>⚖️</span> Открытая лицензия и авторские права {/* i18n-ignore */}
         </div>
-        <div style={{ color: "var(--ink)", fontSize: 11, marginBottom: 4 }}>
-          Платформа создана на основе открытого проекта <a href="https://tterm.net" target="_blank" rel="noreferrer" style={{ color: "#E09F3E", textDecoration: "underline", fontWeight: 600 }}>tTerm</a> (автор: Denis, репозиторий <a href="https://github.com/tterm-net/tterm-app" target="_blank" rel="noreferrer" style={{ color: "#E09F3E", textDecoration: "underline" }}>GitHub</a>), распространяемого по свободной лицензии <a href="https://github.com/tterm-net/tterm-app/blob/main/LICENSE" target="_blank" rel="noreferrer" style={{ color: "#E09F3E", textDecoration: "underline" }}>GNU AGPLv3</a>. {/* i18n-ignore */}
+        <div style={{ color: "#F4F1EA", fontSize: 11, marginBottom: 6 }}>
+          Платформа создана на базе <a href="https://tterm.net" target="_blank" rel="noreferrer" style={{ color: "#E09F3E", textDecoration: "underline", fontWeight: 600 }}>tTerm</a> (автор: Denis, репозиторий <a href="https://github.com/tterm-net/tterm-app" target="_blank" rel="noreferrer" style={{ color: "#E09F3E", textDecoration: "underline" }}>GitHub</a>) по свободной лицензии <a href="https://github.com/tterm-net/tterm-app/blob/main/LICENSE" target="_blank" rel="noreferrer" style={{ color: "#E09F3E", textDecoration: "underline" }}>GNU AGPLv3</a>. {/* i18n-ignore */}
         </div>
-        <div style={{ color: "var(--faint)", fontSize: 10 }}>
-          Оркестрация ИИ, протокол MCP и командный доступ разработаны <a href="https://e-klimov.ru" target="_blank" rel="noreferrer" style={{ color: "var(--ink)", fontWeight: 500, textDecoration: "underline" }}>Евгением Климовым</a>. Исходные права tTerm сохранены в полном объёме. {/* i18n-ignore */}
+        <div style={{ color: "#E5DEC9", fontSize: 10 }}>
+          Оркестрация ИИ, протокол MCP и командный доступ разработаны <a href="https://e-klimov.ru" target="_blank" rel="noreferrer" style={{ color: "#E09F3E", fontWeight: 600, textDecoration: "underline" }}>Евгением Климовым</a>. Исходные права tTerm сохранены в полном объёме. {/* i18n-ignore */}
         </div>
       </div>
 
-      <footer className="signin-footer" style={{ display: "flex", gap: 16, alignItems: "center", justifyContent: "center", flexWrap: "wrap", fontSize: 12 }}>
-        <a href={`mailto:${legal.support}`}>{legal.support}</a>
-        <span style={{ color: "var(--sep)" }}>·</span>
-        <a href="https://e-klimov.ru" target="_blank" rel="noreferrer" style={{ color: "var(--dim)" }}>e-klimov.ru {/* i18n-ignore */}</a>
-        <span style={{ color: "var(--sep)" }}>·</span>
-        <a href="https://github.com/tterm-net/tterm-app" target="_blank" rel="noreferrer" style={{ color: "var(--dim)" }}>GNU AGPLv3 {/* i18n-ignore */}</a>
+      <footer className="signin-footer" style={{ display: "flex", gap: 16, alignItems: "center", justifyContent: "center", flexWrap: "wrap", fontSize: 12, color: "#E5DEC9" }}>
+        <a href={`mailto:${legal.support}`} style={{ color: "#F4F1EA", textDecoration: "none" }}>{legal.support}</a>
+        <span style={{ color: "#E09F3E" }}>·</span>
+        <a href="https://e-klimov.ru" target="_blank" rel="noreferrer" style={{ color: "#F4F1EA", textDecoration: "none" }}>e-klimov.ru {/* i18n-ignore */}</a>
+        <span style={{ color: "#E09F3E" }}>·</span>
+        <a href="https://github.com/tterm-net/tterm-app" target="_blank" rel="noreferrer" style={{ color: "#F4F1EA", textDecoration: "none" }}>GNU AGPLv3 {/* i18n-ignore */}</a>
       </footer>
     </main>
   );

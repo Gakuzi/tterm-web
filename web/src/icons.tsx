@@ -283,19 +283,21 @@ export function Dots({ size = 16 }: Props) {
   );
 }
 
-/** The tTerm mark. Its colours are fixed: it is the same in both themes. */
+/** The tTerm mark in Klimov brand style: circular dark icon with amber terminal window and prompt. */
 export function Logo({ size = 40 }: Props) {
   return (
-    <svg width={size} height={size} viewBox="0 0 512 512" role="img"
-      aria-label="tTerm">
-      <rect width="512" height="512" rx="116" fill="#131417" />
-      <path d="M118 168 L206 256 L118 344" fill="none" stroke="#E9A33F"
-        strokeWidth="56" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M330 140 L330 316 C330 344 344 356 372 350" fill="none"
-        stroke="#EDEFF3" strokeWidth="56" strokeLinecap="round" />
-      <path d="M272 212 L392 212" fill="none" stroke="#EDEFF3"
-        strokeWidth="56" strokeLinecap="round" />
-    </svg>
+    <img
+      src="/tterm_icon.png"
+      alt="tTerm"
+      width={size}
+      height={size}
+      style={{
+        borderRadius: "50%",
+        display: "inline-block",
+        verticalAlign: "middle",
+        objectFit: "cover",
+      }}
+    />
   );
 }
 

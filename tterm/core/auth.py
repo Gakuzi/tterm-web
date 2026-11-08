@@ -355,7 +355,11 @@ async def ask_code(pool: asyncpg.Pool, secret: bytes, mailer: Mailer, *,
             raise TooSoon("Too many codes from this network. Try again in an "
                           "hour.", wait=3600)
         new = not await conn.fetchval(
-            "SELECT EXISTS (SELECT 1 FROM users WHERE lower(email) = $1)", email)
+            "SELECT EXISTS ("
+            "  SELECT 1 FROM users WHERE lower(email) = $1 "
+            "  UNION "
+            "  SELECT 1 FROM sign_in_methods WHERE kind = 'email' AND lower(subject) = $1"
+            ")", email)
         day = await conn.fetchrow(
             "SELECT count(*) AS codes, count(*) FILTER (WHERE new_account) "
             "AS signups FROM login_codes "
@@ -526,11 +530,15 @@ async def _try_code(pool: asyncpg.Pool, secret: bytes, *, email: str,
 async def _account(conn: asyncpg.Connection, email: str) -> Person | None:
     """The account of an address, if it has one."""
     row = await conn.fetchrow(
-        "SELECT id, name, theme, plan_id FROM users WHERE lower(email) = $1",
+        "SELECT u.id, u.name, u.theme, u.plan_id, u.email "
+        "FROM users u "
+        "LEFT JOIN sign_in_methods s ON s.user_id = u.id AND s.kind = 'email' "
+        "WHERE lower(u.email) = lower($1) OR lower(s.subject) = lower($1) "
+        "ORDER BY (lower(u.email) = lower($1)) DESC LIMIT 1",
         email)
     if row is None:
         return None
-    return Person(row["id"], row["name"], row["theme"], row["plan_id"], email)
+    return Person(row["id"], row["name"], row["theme"], row["plan_id"], row["email"] or email)
 
 
 async def _make_account(conn: asyncpg.Connection, email: str,

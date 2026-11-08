@@ -418,7 +418,28 @@ export function onSignedOut(listener: () => void): () => void {
   return () => signedOutListeners.delete(listener);
 }
 
+export function getStoredSessionToken(): string | null {
+  try {
+    return localStorage.getItem("tterm_session_token");
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredSessionToken(token: string | null): void {
+  try {
+    if (token) localStorage.setItem("tterm_session_token", token);
+    else localStorage.removeItem("tterm_session_token");
+  } catch {}
+}
+
+export function authHeaders(): Record<string, string> {
+  const tok = getStoredSessionToken();
+  return tok ? { "x-session-token": tok } : {};
+}
+
 export function signedOutNow(): void {
+  setStoredSessionToken(null);
   for (const listener of signedOutListeners) listener();
 }
 
@@ -452,7 +473,7 @@ async function check(response: Response): Promise<Response> {
 function change(method: string, body: unknown): RequestInit {
   return {
     method,
-    headers: { "content-type": "application/json", "x-tterm": "1" },
+    headers: { "content-type": "application/json", "x-tterm": "1", ...authHeaders() },
     body: JSON.stringify(body),
   };
 }
@@ -463,7 +484,7 @@ const BACKGROUND = { "x-tterm-background": "1" };
 
 export async function loadState(background = false): Promise<State> {
   const response = await fetch("/api/state", {
-    headers: { accept: "application/json", ...(background ? BACKGROUND : {}) },
+    headers: { accept: "application/json", ...(background ? BACKGROUND : {}), ...authHeaders() },
     cache: "no-store",
   });
   return (await check(response)).json();
@@ -548,7 +569,10 @@ async function auth<T>(path: string, body?: unknown): Promise<T> {
 }
 
 export async function authState(): Promise<AuthState> {
-  const response = await fetch("/api/auth/state", { cache: "no-store" });
+  const response = await fetch("/api/auth/state", {
+    cache: "no-store",
+    headers: { accept: "application/json", ...authHeaders() },
+  });
   return (await check(response)).json();
 }
 
@@ -601,8 +625,12 @@ export function loginWithTelegramWidget(user: TelegramWidgetUser): Promise<Signe
   return auth("/api/auth/telegram/login-widget", user);
 }
 
-export function loginWithTelegramWebApp(initData: string): Promise<SignedInNow> {
-  return auth("/api/auth/telegram/webapp-login", { init_data: initData });
+export async function loginWithTelegramWebApp(initData: string): Promise<SignedInNow> {
+  const res = await auth<SignedInNow & { token?: string }>("/api/auth/telegram/webapp-login", { init_data: initData });
+  if (res.token) {
+    setStoredSessionToken(res.token);
+  }
+  return res;
 }
 
 export async function getTelegramBindLink(): Promise<{ ok: boolean; bind_token: string; bot_username: string; bot_link: string; bind_url: string }> {

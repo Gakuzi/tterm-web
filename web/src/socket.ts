@@ -258,7 +258,12 @@ class Socket {
     if (this.ws || this.signedOut) return;
     window.clearTimeout(this.timer);
     const scheme = location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${scheme}://${location.host}/api/ws`);
+    let tokenParam = "";
+    try {
+      const tok = localStorage.getItem("tterm_session_token");
+      if (tok) tokenParam = `?token=${encodeURIComponent(tok)}`;
+    } catch {}
+    const ws = new WebSocket(`${scheme}://${location.host}/api/ws${tokenParam}`);
     ws.binaryType = "arraybuffer";
     this.ws = ws;
     ws.onopen = () => {
