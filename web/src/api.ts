@@ -605,8 +605,12 @@ export function loginWithTelegramWebApp(initData: string): Promise<SignedInNow> 
   return auth("/api/auth/telegram/webapp-login", { init_data: initData });
 }
 
-export function getTelegramBindLink(): Promise<{ ok: boolean; bind_token: string; bot_username: string; bind_url: string }> {
-  return request("GET", "/api/auth/telegram/bind-link");
+export async function getTelegramBindLink(): Promise<{ ok: boolean; bind_token: string; bot_username: string; bot_link: string; bind_url: string }> {
+  const response = await fetch("/api/auth/telegram/bind-link", {
+    cache: "no-store",
+    headers: { accept: "application/json", "x-tterm": "1" },
+  });
+  return (await check(response)).json();
 }
 
 export interface TelegramProfileStatus {
@@ -620,12 +624,24 @@ export interface TelegramProfileStatus {
   bot_link: string;
 }
 
-export function getTelegramProfileStatus(): Promise<TelegramProfileStatus> {
-  return request("GET", "/api/auth/telegram/status");
+export async function getTelegramProfileStatus(): Promise<TelegramProfileStatus> {
+  try {
+    const response = await fetch("/api/auth/telegram/status", {
+      cache: "no-store",
+      headers: { accept: "application/json", "x-tterm": "1" },
+    });
+    if (!response.ok) {
+      return { ok: false, configured: false, bound: false, bot_username: "ttermnofbot", bot_link: "https://t.me/ttermnofbot" };
+    }
+    return response.json();
+  } catch {
+    return { ok: false, configured: false, bound: false, bot_username: "ttermnofbot", bot_link: "https://t.me/ttermnofbot" };
+  }
 }
 
-export function unbindTelegramProfile(): Promise<{ ok: boolean; bound: boolean }> {
-  return request("POST", "/api/auth/telegram/unbind");
+export async function unbindTelegramProfile(): Promise<{ ok: boolean; bound: boolean }> {
+  const response = await fetch("/api/auth/telegram/unbind", change("POST", {}));
+  return (await check(response)).json();
 }
 
 export function configureTelegramBot(botToken: string, botUsername?: string, chatId?: string): Promise<{ ok: boolean; bot_username?: string; bot_link?: string; message?: string }> {
