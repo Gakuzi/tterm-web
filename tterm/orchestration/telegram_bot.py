@@ -71,7 +71,12 @@ I18N = {
         "btn_webapp": "tTerm",
         "btn_help": "Помощь",
         "btn_machines": "Выбрать машину",
+        "btn_main_menu": "Главное меню",
         "btn_admin": "Панель администратора",
+        "btn_stats": "Метрики",
+        "btn_all_machines": "Все машины",
+        "btn_users": "Пользователи",
+        "btn_link_email": "Привязать почту",
         "server_suffix": " (Сервер)",
         "offline": "не в сети",
         "online": "в сети",
@@ -114,7 +119,12 @@ I18N = {
         "btn_webapp": "tTerm",
         "btn_help": "Help",
         "btn_machines": "Select machine",
+        "btn_main_menu": "Main Menu",
         "btn_admin": "Admin Dashboard",
+        "btn_stats": "Metrics",
+        "btn_all_machines": "All Machines",
+        "btn_users": "Users",
+        "btn_link_email": "Link Email",
         "server_suffix": " (Server)",
         "offline": "offline",
         "online": "online",
@@ -384,21 +394,28 @@ class TelegramBotManager:
         except Exception as e:
             log.warning("Failed to configure Telegram WebApp Menu Button: %s", e)
 
-        # Configure official Bot commands
+        # Configure official Bot commands with strict scopes (public vs owner)
         try:
+            # 1. Default scope for all public users (minimal, safe commands only)
             await self.call_api("setMyCommands", {
                 "commands": [
-                    {"command": "start", "description": "Запустить бота и проверить статус"},
-                    {"command": "app", "description": "Открыть tTerm"},
-                    {"command": "use", "description": "Список машин и терминалов"},
-                    {"command": "machines", "description": "Выбор активной машины"},
-                    {"command": "admin", "description": "Панель администратора (только владелец)"},
-                    {"command": "users", "description": "Список зарегистрированных пользователей"},
-                    {"command": "stats", "description": "Статистика и метрики серверов"},
-                    {"command": "email", "description": "Привязать email: /email <почта>"},
-                    {"command": "avatar", "description": "Скачать официальный логотип tTerm"},
-                    {"command": "help", "description": "Справка и команды"},
-                ]
+                    {"command": "start", "description": "Главное меню tTerm"},
+                    {"command": "app", "description": "Открыть tTerm Web"},
+                    {"command": "help", "description": "Справка и поддержка"},
+                ],
+                "scope": {"type": "default"}
+            })
+            # 2. Owner-only scope for Telegram ID 55570186
+            await self.call_api("setMyCommands", {
+                "commands": [
+                    {"command": "start", "description": "Главное меню"},
+                    {"command": "admin", "description": "Панель администратора"},
+                    {"command": "users", "description": "Управление пользователями"},
+                    {"command": "stats", "description": "Статистика и метрики"},
+                    {"command": "app", "description": "Открыть tTerm Web"},
+                    {"command": "help", "description": "Справка"},
+                ],
+                "scope": {"type": "chat", "chat_id": 55570186}
             })
             await self.call_api("setMyDescription", {
                 "description": "tTerm — веб-терминал и оркестрация ИИ-ассистентов для управления серверами и Docker-контейнерами. Разработка и инфраструктура: Евгений Климов (@eklimov)."
@@ -1076,15 +1093,27 @@ class TelegramBotManager:
             await self.send_message(chat_id, "🌐 Выберите язык интерфейса / Select interface language:", reply_markup=lang_kb)
             return
 
-        # Admin commands: /admin, /users, /stats, /dashboard
-        if text.startswith("/users"):
+        # Main Menu: /menu or button text
+        if text in ("/menu", "🏠 Главное меню", "Главное меню"):
+            await self._show_main_menu(chat_id, from_user=from_user)
+            return
+
+        # Owner commands & buttons: /admin, /users, /stats, /dashboard
+        if text.startswith("/users") or text in ("👥 Пользователи", "Управление пользователями"):
             if not self.is_admin_owner(chat_id, from_user=from_user, user_row=user_row):
                 await self.send_message(chat_id, "⛔ Доступ запрещён. Панель управления доступна только владельцу платформы.")
                 return
             await self._show_admin_users_list(chat_id, page=0)
             return
 
-        if text.startswith(("/admin", "/stats", "/dashboard")):
+        if text.startswith("/stats") or text in ("📈 Метрики", "📈 Телеметрия", "Метрики системы"):
+            if not self.is_admin_owner(chat_id, from_user=from_user, user_row=user_row):
+                await self.send_message(chat_id, "⛔ Доступ запрещён. Панель управления доступна только владельцу платформы.")
+                return
+            await self._show_admin_stats(chat_id)
+            return
+
+        if text.startswith(("/admin", "/dashboard")) or text in ("👑 Панель управления", "👑 Админ-панель", "📊 Панель администратора"):
             if not self.is_admin_owner(chat_id, from_user=from_user, user_row=user_row):
                 await self.send_message(chat_id, "⛔ Доступ запрещён. Панель управления доступна только владельцу платформы.")
                 return
@@ -1183,26 +1212,8 @@ class TelegramBotManager:
                 )
                 return
 
-            # 1c. Regular /start
-            if user_row:
-                await self._show_machines_menu(chat_id, from_user=from_user)
-            else:
-                preview_caption = (
-                    f"👋 Здравствуйте, <b>{first_name}</b>!\n\n"
-                    f"<b>tTerm · Оркестрация ИИ и веб-терминала</b>\n\n"
-                    f"💻 <b>Web App:</b> Полноценный терминал прямо в Telegram\n"
-                    f"💬 <b>Серверы:</b> Выполнение команд через сообщения бота\n"
-                    f"🔔 <b>Push-уведомления:</b> Окончание команд, сборка Docker\n"
-                    f"🛡 <b>Безопасность:</b> Подтверждение опасных команд\n"
-                    f"🧠 <b>MCP-хаб:</b> Управление терминалами для ИИ-ассистентов\n\n"
-                    f"<i>Нажмите кнопку <b>tTerm</b> ниже для открытия терминала или отправьте <code>/email ваша_почта@домен.ru</code> для привязки.</i>"
-                )
-                if os.path.exists(BOT_PREVIEW_PATH):
-                    res = await self.send_photo_file(chat_id, BOT_PREVIEW_PATH, caption=preview_caption, reply_markup=self._unbound_keyboard(lang=lang))
-                    if not res.get("ok"):
-                        await self.send_message(chat_id, preview_caption, reply_markup=self._unbound_keyboard(lang=lang))
-                else:
-                    await self.send_message(chat_id, preview_caption, reply_markup=self._unbound_keyboard(lang=lang))
+            # 1c. Regular /start -> Open Main Menu
+            await self._show_main_menu(chat_id, from_user=from_user)
             return
 
         # 2. Command /avatar (send bot logo for BotFather)
@@ -1350,17 +1361,28 @@ class TelegramBotManager:
             return
 
         # 8. Command /help
-        if text.startswith("/help") or text == "ℹ️ Помощь":
+        if text.startswith("/help") or text in ("ℹ️ Помощь", "📖 Справка"):
+            help_lines = [
+                "📖 <b>Справка tTerm | Веб-терминал и ИИ-хаб</b>\n",
+                "• <b>Главное меню:</b> нажимайте кнопки интерфейса или команду <code>/start</code>",
+                "• <b>/machines</b> или кнопка <b>🖥 Машины:</b> выбор активного сервера или ПК",
+                "• <b>/email &lt;почта&gt;:</b> привязать электронную почту к Telegram",
+                "• <b>/app:</b> открыть полноэкранный веб-терминал tTerm прямо в Telegram",
+                "• <b>Команды:</b> отправляйте shell-команды прямо в этот чат для запуска на активной машине",
+                "\n🛡 <i>Опасные команды (rm -rf, reboot) требуют обязательного подтверждения кнопкой.</i>",
+            ]
+            if is_owner:
+                help_lines.extend([
+                    "\n👑 <b>Функции владельца платформы:</b>",
+                    "• <b>/admin</b> — панель управления tTerm",
+                    "• <b>/users</b> — управление пользователями и тарифами",
+                    "• <b>/stats</b> — телеметрия и системные метрики сервера",
+                    "<i>Все функции также доступны через кнопки Главного меню.</i>"
+                ])
             await self.send_message(
                 chat_id,
-                "📖 <b>Команды tTerm Telegram Bot</b>\n\n"
-                "• <b>/use</b> или <b>/machines</b> — список ваших машин и выбор активной\n"
-                "• <b>/email &lt;почта&gt;</b> — привязать электронную почту к Telegram\n"
-                "• <b>/web</b> — ссылка для входа в веб-интерфейс без паролей\n"
-                "• <b>/avatar</b> — скачать официальный логотип бота для @BotFather\n"
-                "• <b>Любая команда</b> — запуск на выбранной машине (например: <code>uptime</code>, <code>git status</code>)\n\n"
-                "🛡 <i>Опасные команды (rm -rf, mkfs) требуют подтверждения кнопкой.</i>",
-                reply_markup=self._main_keyboard(),
+                "\n".join(help_lines),
+                reply_markup=self._main_keyboard(is_owner=is_owner, lang=lang),
             )
             return
 
@@ -1462,15 +1484,33 @@ class TelegramBotManager:
         username = (from_user.get("username") or "").strip()
         is_owner = (str(chat_id) == "55570186" or (username and username.lower() in ("eklimov", "eklimov84")))
 
+        if data == "menu:main":
+            await self.answer_callback(cq_id)
+            await self._show_main_menu(chat_id, from_user=callback.get("from"), msg_id=msg_id)
+            return
+
+        if data == "menu:email":
+            await self.answer_callback(cq_id)
+            await self.send_message(
+                chat_id,
+                "📧 <b>Привязка электронной почты:</b>\n\n"
+                "Отправьте в чат команду в формате:\n"
+                "<code>/email ваша_почта@домен.ru</code>\n\n"
+                "Мы вышлем 6-значный проверочный код для объединения ваших терминалов и проектов.",
+                reply_markup={"inline_keyboard": [[{"text": "🏠 Главное меню", "callback_data": "menu:main"}]]}
+            )
+            return
+
         if data == "menu:machines":
             await self.answer_callback(cq_id)
             user_row = await self.get_user_by_telegram(chat_id)
             lang = self._get_lang(user_row, callback.get("from"))
+            is_owner = self.is_admin_owner(chat_id, from_user=from_user, user_row=user_row)
             if user_row:
                 machines = await self.list_user_machines(user_row["id"])
                 active_id = self._user_active_machines.get(chat_id) or (machines[0]["id"] if machines else "")
                 if msg_id and machines:
-                    rich_payload = self._build_rich_machines_payload(machines, active_id, lang=lang)
+                    rich_payload = self._build_rich_machines_payload(machines, active_id, lang=lang, is_owner=is_owner)
                     res = await self.call_api("editMessageText", {
                         "chat_id": chat_id,
                         "message_id": msg_id,
@@ -1486,7 +1526,7 @@ class TelegramBotManager:
             user_row = await self.get_user_by_telegram(chat_id)
             lang = self._get_lang(user_row, callback.get("from"))
             t = I18N.get(lang, I18N["ru"])
-            is_owner = (str(chat_id) == "55570186" or (user_row and user_row.get("email") == "eklimov84@xmail.ru"))
+            is_owner = self.is_admin_owner(chat_id, from_user=from_user, user_row=user_row)
             await self.send_message(
                 chat_id,
                 t["help_text"],
@@ -1494,10 +1534,28 @@ class TelegramBotManager:
             )
             return
 
+        if data == "admin:stats":
+            if not self.is_admin_owner(chat_id, from_user=from_user):
+                await self.answer_callback(cq_id, "⛔ Доступ запрещён. Панель управления доступна только владельцу платформы.", show_alert=True)
+                return
+            await self.answer_callback(cq_id, "Сбор метрик...")
+            await self._show_admin_stats(chat_id, msg_id=msg_id)
+            return
+
+        if data == "admin:machines":
+            if not self.is_admin_owner(chat_id, from_user=from_user):
+                await self.answer_callback(cq_id, "⛔ Доступ запрещён. Панель управления доступна только владельцу платформы.", show_alert=True)
+                return
+            await self.answer_callback(cq_id, "Загрузка списка машин...")
+            await self._show_admin_all_machines(chat_id, msg_id=msg_id)
+            return
+
         if data == "admin:refresh":
+            if not self.is_admin_owner(chat_id, from_user=from_user):
+                await self.answer_callback(cq_id, "⛔ Доступ запрещён. Панель управления доступна только владельцу платформы.", show_alert=True)
+                return
             await self.answer_callback(cq_id, "Обновление...")
-            if str(chat_id) == "55570186" or (username and username.lower() in ("eklimov", "eklimov84")):
-                await self._show_admin_dashboard(chat_id, msg_id=msg_id)
+            await self._show_admin_dashboard(chat_id, msg_id=msg_id)
             return
 
         # Admin User Management Callbacks
@@ -2120,12 +2178,389 @@ class TelegramBotManager:
 
         await self.answer_callback(cq_id)
 
-    # ------------------------------------------------------------- Helpers & Formatting
+    # ------------------------------------------------------------- Helpers & Formatting: Main Menu
+    async def _show_main_menu(
+        self,
+        chat_id: str | int,
+        from_user: Optional[Dict[str, Any]] = None,
+        msg_id: Optional[int] = None,
+    ) -> None:
+        user_row = await self.get_user_by_telegram(str(chat_id))
+        is_owner = self.is_admin_owner(chat_id, from_user=from_user, user_row=user_row)
+        lang = self._get_lang(user_row, from_user)
+        t = I18N.get(lang, I18N["ru"])
+
+        machines = []
+        if user_row:
+            machines = await self.list_user_machines(user_row["id"])
+
+        rich_payload = self._build_rich_main_menu_payload(user_row, machines, is_owner=is_owner, lang=lang)
+        if msg_id:
+            res = await self.call_api("editMessageText", {
+                "chat_id": str(chat_id),
+                "message_id": msg_id,
+                "rich_message": rich_payload,
+            })
+            if res.get("ok"):
+                return
+
+        res = await self.call_api("sendRichMessage", {
+            "chat_id": str(chat_id),
+            "rich_message": rich_payload,
+        })
+        if res.get("ok"):
+            return
+
+        text, kb = self._build_plain_main_menu(user_row, machines, is_owner=is_owner, lang=lang)
+        if msg_id:
+            await self.edit_message(str(chat_id), msg_id, text, reply_markup=kb)
+        else:
+            await self.send_message(str(chat_id), text, reply_markup=kb)
+
+    def _build_rich_main_menu_payload(
+        self,
+        user_row: Optional[Any],
+        machines: List[Dict[str, Any]],
+        is_owner: bool = False,
+        lang: str = "ru",
+    ) -> Dict[str, Any]:
+        t = I18N.get(lang, I18N["ru"])
+        online_count = sum(1 for m in machines if m.get("online"))
+
+        blocks: List[Dict[str, Any]] = [
+            {
+                "type": "paragraph",
+                "text": [{"type": "bold", "text": "tTerm | Главное меню" if lang == "ru" else "tTerm | Main Menu"}]
+            }
+        ]
+
+        if is_owner:
+            blocks.append({
+                "type": "paragraph",
+                "text": [
+                    "👑 ", {"type": "bold", "text": "Владелец сервиса: "}, "Евгений Климов (@eklimov)\n",
+                    "🛡 ", {"type": "bold", "text": "Сервер: "}, "82.148.241.254 (Автономный узел)\n",
+                    "🖥 ", {"type": "bold", "text": "Ваши машины: "}, f"{len(machines)} ({online_count} онлайн)\n",
+                    "⚡ ", {"type": "italic", "text": "Полный административный контроль платформы"}
+                ]
+            })
+        elif user_row:
+            u_name = user_row.get("name") or "Пользователь"
+            u_email = user_row.get("email") or "—"
+            u_plan = (user_row.get("plan_id") or "free").upper()
+            blocks.append({
+                "type": "paragraph",
+                "text": [
+                    "👤 ", {"type": "bold", "text": f"{u_name}\n"},
+                    "📧 ", {"type": "bold", "text": "Email: "}, f"{u_email}\n",
+                    "💎 ", {"type": "bold", "text": "Тариф: "}, {"type": "code", "text": f"[{u_plan}]"}, "\n",
+                    "🖥 ", {"type": "bold", "text": "Машины: "}, f"{len(machines)} ({online_count} онлайн)"
+                ]
+            })
+        else:
+            blocks.append({
+                "type": "paragraph",
+                "text": [
+                    {"type": "bold", "text": "Добро пожаловать в tTerm!\n"},
+                    {"type": "italic", "text": "Веб-терминал и платформа управления серверами и ИИ-ассистентами.\n"},
+                    "Для выполнения shell-команд привяжите свой аккаунт через кнопку «Привязать почту»."
+                ]
+            })
+
+        # Core User Navigation Buttons
+        blocks.append({
+            "type": "buttons",
+            "align": "left",
+            "buttons": [
+                {"text": "🖥 Мои машины", "callback_data": "menu:machines", "style": "primary"},
+                {"text": "💻 tTerm Web", "web_app": {"url": self.web_url}},
+            ]
+        })
+        blocks.append({
+            "type": "buttons",
+            "align": "left",
+            "buttons": [
+                {"text": "✉️ Привязать почту", "callback_data": "menu:email"},
+                {"text": "📖 Справка", "callback_data": "menu:help"},
+                {"text": "🇷🇺/🇬🇧 Язык", "callback_data": "togglelang"},
+            ]
+        })
+
+        # EXCLUSIVE OWNER BUTTONS (Strictly visible only to owner!)
+        if is_owner:
+            blocks.append({
+                "type": "paragraph",
+                "text": [{"type": "bold", "text": "👑 Управление платформой (Владелец):"}]
+            })
+            blocks.append({
+                "type": "buttons",
+                "align": "left",
+                "buttons": [
+                    {"text": "📊 Панель управления", "callback_data": "admin:refresh", "style": "primary"},
+                    {"text": "👥 Пользователи", "callback_data": "u:list:0", "style": "primary"},
+                ]
+            })
+            blocks.append({
+                "type": "buttons",
+                "align": "left",
+                "buttons": [
+                    {"text": "📈 Метрики системы", "callback_data": "admin:stats"},
+                    {"text": "🖥 Все машины", "callback_data": "admin:machines"},
+                ]
+            })
+
+        return {"blocks": blocks}
+
+    def _build_plain_main_menu(
+        self,
+        user_row: Optional[Any],
+        machines: List[Dict[str, Any]],
+        is_owner: bool = False,
+        lang: str = "ru",
+    ) -> Tuple[str, Dict[str, Any]]:
+        t = I18N.get(lang, I18N["ru"])
+        online_count = sum(1 for m in machines if m.get("online"))
+
+        lines = ["<b>tTerm | Главное меню</b>\n"]
+        if is_owner:
+            lines.append("👑 <b>Владелец сервиса:</b> Евгений Климов (@eklimov)")
+            lines.append("🛡 <b>Сервер:</b> 82.148.241.254 (Автономный узел)")
+            lines.append(f"🖥 <b>Ваши машины:</b> {len(machines)} ({online_count} онлайн)")
+            lines.append("<i>Полный административный контроль платформы</i>")
+        elif user_row:
+            u_name = html.escape(user_row.get("name") or "Пользователь")
+            u_email = html.escape(user_row.get("email") or "—")
+            u_plan = html.escape((user_row.get("plan_id") or "free").upper())
+            lines.append(f"👤 <b>{u_name}</b>")
+            lines.append(f"📧 <b>Email:</b> {u_email}")
+            lines.append(f"💎 <b>Тариф:</b> <code>[{u_plan}]</code>")
+            lines.append(f"🖥 <b>Машины:</b> {len(machines)} ({online_count} онлайн)")
+        else:
+            lines.append("👋 <b>Добро пожаловать в tTerm!</b>")
+            lines.append("Веб-терминал и автономная платформа оркестрации серверов.")
+
+        kb_rows = [
+            [
+                {"text": "🖥 Мои машины", "callback_data": "menu:machines"},
+                {"text": "💻 tTerm Web", "web_app": {"url": self.web_url}},
+            ],
+            [
+                {"text": "✉️ Привязать почту", "callback_data": "menu:email"},
+                {"text": "📖 Справка", "callback_data": "menu:help"},
+                {"text": "🇷🇺/🇬🇧 Язык", "callback_data": "togglelang"},
+            ]
+        ]
+        if is_owner:
+            kb_rows.append([
+                {"text": "📊 Панель управления", "callback_data": "admin:refresh"},
+                {"text": "👥 Пользователи", "callback_data": "u:list:0"},
+            ])
+            kb_rows.append([
+                {"text": "📈 Метрики системы", "callback_data": "admin:stats"},
+                {"text": "🖥 Все машины", "callback_data": "admin:machines"},
+            ])
+
+        return "\n".join(lines), {"inline_keyboard": kb_rows}
+
+    # ------------------------------------------------------------- Helpers & Formatting: Stats & All Machines
+    async def _show_admin_stats(self, chat_id: str | int, msg_id: Optional[int] = None) -> None:
+        if not self.is_admin_owner(chat_id):
+            await self.send_message(chat_id, "⛔ Доступ запрещён. Панель доступна только владельцу платформы.")
+            return
+
+        load1, load5, load15 = os.getloadavg() if hasattr(os, "getloadavg") else (0.0, 0.0, 0.0)
+        total_disk, used_disk, free_disk = shutil.disk_usage("/")
+        disk_pct = (used_disk / total_disk) * 100 if total_disk else 0
+
+        mem_total, mem_avail = 0, 0
+        try:
+            with open("/proc/meminfo", "r") as f:
+                for line in f:
+                    if line.startswith("MemTotal:"):
+                        mem_total = int(line.split()[1]) // 1024
+                    elif line.startswith("MemAvailable:"):
+                        mem_avail = int(line.split()[1]) // 1024
+        except Exception:
+            pass
+        mem_used = mem_total - mem_avail
+        mem_pct = (mem_used / mem_total * 100) if mem_total else 0
+
+        users_count = 0
+        machines_count = 0
+        online_machines = 0
+        projects_count = 0
+        if self.pool:
+            try:
+                async with self.pool.acquire() as conn:
+                    users_count = await conn.fetchval("SELECT count(*) FROM users;") or 0
+                    machines_count = await conn.fetchval("SELECT count(*) FROM machines WHERE removed_at IS NULL;") or 0
+                    projects_count = await conn.fetchval("SELECT count(*) FROM projects;") or 0
+                    online_machines = await conn.fetchval("SELECT count(*) FROM machines WHERE removed_at IS NULL AND last_seen_at > NOW() - INTERVAL '2 minutes';") or 0
+            except Exception as e_db:
+                log.debug("Stats DB query error: %s", e_db)
+
+        payload = {
+            "blocks": [
+                {
+                    "type": "paragraph",
+                    "text": [{"type": "bold", "text": "📈 Телеметрия и метрики платформы tTerm"}]
+                },
+                {
+                    "type": "paragraph",
+                    "text": [
+                        "⚡ ", {"type": "bold", "text": "CPU Load: "}, f"{load1:.2f}, {load5:.2f}, {load15:.2f}\n",
+                        "🧠 ", {"type": "bold", "text": "RAM: "}, f"{mem_used} МБ / {mem_total} МБ ({mem_pct:.1f}%)\n",
+                        "💾 ", {"type": "bold", "text": "Диск (/): "}, f"{used_disk // (1024**3)} ГБ / {total_disk // (1024**3)} ГБ ({disk_pct:.1f}%)\n",
+                        "👥 ", {"type": "bold", "text": "Всего пользователей: "}, f"{users_count}\n",
+                        "🖥 ", {"type": "bold", "text": "Машин в БД: "}, f"{machines_count} ({online_machines} онлайн)\n",
+                        "📁 ", {"type": "bold", "text": "Проектов: "}, f"{projects_count}\n",
+                        "🟢 ", {"type": "italic", "text": "Сервер 82.148.241.254 работает в штатном режиме"}
+                    ]
+                },
+                {
+                    "type": "buttons",
+                    "align": "left",
+                    "buttons": [
+                        {"text": "🔄 Обновить метрики", "callback_data": "admin:stats", "style": "primary"},
+                        {"text": "📊 В панель", "callback_data": "admin:refresh"},
+                        {"text": "🏠 Главное меню", "callback_data": "menu:main"},
+                    ]
+                }
+            ]
+        }
+
+        if msg_id:
+            res = await self.call_api("editMessageText", {
+                "chat_id": str(chat_id),
+                "message_id": msg_id,
+                "rich_message": payload,
+            })
+            if res.get("ok"):
+                return
+
+        res = await self.call_api("sendRichMessage", {
+            "chat_id": str(chat_id),
+            "rich_message": payload,
+        })
+        if res.get("ok"):
+            return
+
+        text_lines = [
+            "📈 <b>Телеметрия и метрики платформы tTerm</b>\n",
+            f"⚡ <b>CPU Load:</b> {load1:.2f}, {load5:.2f}, {load15:.2f}",
+            f"🧠 <b>RAM:</b> {mem_used} МБ / {mem_total} МБ ({mem_pct:.1f}%)",
+            f"💾 <b>Диск:</b> {used_disk // (1024**3)} ГБ / {total_disk // (1024**3)} ГБ ({disk_pct:.1f}%)",
+            f"👥 <b>Всего пользователей:</b> {users_count}",
+            f"🖥 <b>Машин в БД:</b> {machines_count} ({online_machines} онлайн)",
+            f"📁 <b>Проектов:</b> {projects_count}",
+            "\n🟢 <i>Сервер 82.148.241.254 работает штатно</i>",
+        ]
+        kb = {
+            "inline_keyboard": [
+                [{"text": "🔄 Обновить", "callback_data": "admin:stats"}, {"text": "📊 В панель", "callback_data": "admin:refresh"}],
+                [{"text": "🏠 Главное меню", "callback_data": "menu:main"}]
+            ]
+        }
+        if msg_id:
+            await self.edit_message(str(chat_id), msg_id, "\n".join(text_lines), reply_markup=kb)
+        else:
+            await self.send_message(str(chat_id), "\n".join(text_lines), reply_markup=kb)
+
+    async def _show_admin_all_machines(self, chat_id: str | int, msg_id: Optional[int] = None) -> None:
+        if not self.is_admin_owner(chat_id):
+            await self.send_message(chat_id, "⛔ Доступ запрещён. Панель доступна только владельцу платформы.")
+            return
+
+        if not self.pool:
+            await self.send_message(chat_id, "⚠️ База данных недоступна.")
+            return
+
+        async with self.pool.acquire() as conn:
+            machines = await conn.fetch("""
+                SELECT m.id, m.name, m.kind, m.host, m.last_seen_at, p.name as proj_name, u.name as user_name, u.email as user_email
+                FROM machines m
+                LEFT JOIN projects p ON m.project_id = p.id
+                LEFT JOIN users u ON p.owner_id = u.id
+                WHERE m.removed_at IS NULL
+                ORDER BY m.last_seen_at DESC NULLS LAST
+                LIMIT 20;
+            """)
+
+        blocks: List[Dict[str, Any]] = [
+            {
+                "type": "paragraph",
+                "text": [{"type": "bold", "text": f"🖥 Все подключенные машины ({len(machines)}):"}]
+            }
+        ]
+
+        now = time.time()
+        for idx, m in enumerate(machines, 1):
+            ls = m['last_seen_at']
+            is_online = bool(ls and (now - ls.timestamp() < 120))
+            dot = "🟢 " if is_online else "⚪ "
+            u_desc = m['user_name'] or m['user_email'] or "без владельца"
+            blocks.append({
+                "type": "paragraph",
+                "text": [
+                    dot,
+                    {"type": "code", "text": f"#{idx}"},
+                    " ",
+                    {"type": "bold", "text": m["name"]},
+                    {"type": "italic", "text": f" ({m['kind']}) — {u_desc}"}
+                ]
+            })
+
+        blocks.append({
+            "type": "buttons",
+            "align": "left",
+            "buttons": [
+                {"text": "🔄 Обновить", "callback_data": "admin:machines", "style": "primary"},
+                {"text": "📊 В панель", "callback_data": "admin:refresh"},
+                {"text": "🏠 Главное меню", "callback_data": "menu:main"},
+            ]
+        })
+
+        if msg_id:
+            res = await self.call_api("editMessageText", {
+                "chat_id": str(chat_id),
+                "message_id": msg_id,
+                "rich_message": {"blocks": blocks},
+            })
+            if res.get("ok"):
+                return
+
+        res = await self.call_api("sendRichMessage", {
+            "chat_id": str(chat_id),
+            "rich_message": {"blocks": blocks},
+        })
+        if res.get("ok"):
+            return
+
+        lines = [f"<b>🖥 Все машины системы ({len(machines)})</b>\n"]
+        for idx, m in enumerate(machines, 1):
+            ls = m['last_seen_at']
+            is_online = bool(ls and (now - ls.timestamp() < 120))
+            dot = "🟢" if is_online else "⚪"
+            u_desc = html.escape(m['user_name'] or m['user_email'] or "без владельца")
+            lines.append(f"{dot} <code>#{idx}</code> <b>{html.escape(m['name'])}</b> <i>({html.escape(m['kind'])}) — {u_desc}</i>")
+
+        kb = {
+            "inline_keyboard": [
+                [{"text": "🔄 Обновить", "callback_data": "admin:machines"}, {"text": "📊 В панель", "callback_data": "admin:refresh"}],
+                [{"text": "🏠 Главное меню", "callback_data": "menu:main"}]
+            ]
+        }
+        if msg_id:
+            await self.edit_message(str(chat_id), msg_id, "\n".join(lines), reply_markup=kb)
+        else:
+            await self.send_message(str(chat_id), "\n".join(lines), reply_markup=kb)
+
+    # ------------------------------------------------------------- Helpers & Formatting: Machines Menu
     async def _show_machines_menu(self, chat_id: str, note: str = "", from_user: Optional[Dict[str, Any]] = None) -> None:
         user_row = await self.get_user_by_telegram(chat_id)
         lang = self._get_lang(user_row, from_user)
         t = I18N.get(lang, I18N["ru"])
-        is_owner = (str(chat_id) == "55570186" or (user_row and user_row.get("email") == "eklimov84@xmail.ru"))
+        is_owner = self.is_admin_owner(chat_id, from_user=from_user, user_row=user_row)
 
         if not user_row:
             await self.send_message(chat_id, "⚠️ Аккаунт не привязан." if lang == "ru" else "⚠️ Account is not linked.", reply_markup=self._unbound_keyboard(lang=lang))
@@ -2146,7 +2581,7 @@ class TelegramBotManager:
             self._user_active_machines[chat_id] = active_id
 
         # 1. Try sending via modern Telegram Rich Message (InputRichMessage) with user language
-        rich_payload = self._build_rich_machines_payload(machines, active_id, lang=lang)
+        rich_payload = self._build_rich_machines_payload(machines, active_id, lang=lang, is_owner=is_owner)
         res = await self.call_api("sendRichMessage", {
             "chat_id": str(chat_id),
             "rich_message": rich_payload,
@@ -2155,10 +2590,10 @@ class TelegramBotManager:
             return
 
         # 2. Fallback to clean HTML and standard inline buttons
-        text, kb = self._build_plain_machines_menu(machines, active_id, lang=lang)
+        text, kb = self._build_plain_machines_menu(machines, active_id, lang=lang, is_owner=is_owner)
         await self.send_message(chat_id, text, reply_markup=kb)
 
-    def _build_rich_machines_payload(self, machines: List[Dict[str, Any]], active_id: str, lang: str = "ru") -> Dict[str, Any]:
+    def _build_rich_machines_payload(self, machines: List[Dict[str, Any]], active_id: str, lang: str = "ru", is_owner: bool = False) -> Dict[str, Any]:
         """Builds rich message block structure matching author's tTerm bot specification with multilingual support."""
         t = I18N.get(lang, I18N["ru"])
         blocks = [
@@ -2215,12 +2650,22 @@ class TelegramBotManager:
             "align": "left",
             "buttons": [
                 {"text": t["btn_add_machine"], "callback_data": "addmachine", "style": "success"},
+                {"text": "🏠 Главное меню", "callback_data": "menu:main"},
                 {"text": "🇷🇺/🇬🇧 Язык", "callback_data": "togglelang"},
             ]
         })
+        if is_owner:
+            blocks.append({
+                "type": "buttons",
+                "align": "left",
+                "buttons": [
+                    {"text": "👑 Админ-панель", "callback_data": "admin:refresh", "style": "primary"},
+                    {"text": "👥 Пользователи", "callback_data": "u:list:0", "style": "primary"},
+                ]
+            })
         return {"blocks": blocks}
 
-    def _build_plain_machines_menu(self, machines: List[Dict[str, Any]], active_id: str, lang: str = "ru") -> Tuple[str, Dict[str, Any]]:
+    def _build_plain_machines_menu(self, machines: List[Dict[str, Any]], active_id: str, lang: str = "ru", is_owner: bool = False) -> Tuple[str, Dict[str, Any]]:
         t = I18N.get(lang, I18N["ru"])
         lines = [f"<b>{t['title_machines']}</b>\n"]
         for idx, m in enumerate(machines, 1):
@@ -2240,9 +2685,15 @@ class TelegramBotManager:
             ],
             [
                 {"text": t["btn_add_machine"], "callback_data": "addmachine"},
+                {"text": "🏠 Главное меню", "callback_data": "menu:main"},
                 {"text": t["btn_webapp"], "web_app": {"url": self.web_url}},
             ]
         ]
+        if is_owner:
+            kb.append([
+                {"text": "👑 Админ-панель", "callback_data": "admin:refresh"},
+                {"text": "👥 Пользователи", "callback_data": "u:list:0"},
+            ])
         return "\n".join(lines), {"inline_keyboard": kb}
 
 
@@ -2325,7 +2776,16 @@ class TelegramBotManager:
             "align": "left",
             "buttons": [
                 {"text": "👥 Управление пользователями", "callback_data": "u:list:0", "style": "primary"},
-                {"text": "🖥 Машины", "callback_data": "menu:machines"},
+                {"text": "📈 Метрики", "callback_data": "admin:stats"},
+                {"text": "🖥 Все машины", "callback_data": "admin:machines"},
+            ]
+        })
+        blocks.append({
+            "type": "buttons",
+            "align": "left",
+            "buttons": [
+                {"text": "🏠 Главное меню", "callback_data": "menu:main"},
+                {"text": "🖥 Мои машины", "callback_data": "menu:machines"},
                 {"text": "🔄 Обновить", "callback_data": "admin:refresh"},
             ]
         })
@@ -2393,6 +2853,7 @@ class TelegramBotManager:
             "align": "left",
             "buttons": [
                 {"text": "📊 В панель", "callback_data": "admin:refresh", "style": "primary"},
+                {"text": "🏠 Главное меню", "callback_data": "menu:main"},
                 {"text": "🖥 Машины", "callback_data": "menu:machines"},
             ]
         })
@@ -2522,6 +2983,7 @@ class TelegramBotManager:
             "buttons": [
                 {"text": "« К списку пользователей", "callback_data": f"u:list:{page}"},
                 {"text": "📊 В панель", "callback_data": "admin:refresh"},
+                {"text": "🏠 Главное меню", "callback_data": "menu:main"},
             ]
         })
         return {"blocks": blocks}
@@ -3134,7 +3596,10 @@ class TelegramBotManager:
 
     def _main_keyboard(self, is_owner: bool = False, lang: str = "ru") -> Dict[str, Any]:
         t = I18N.get(lang, I18N["ru"])
-        first_row = [{"text": t["btn_webapp"], "web_app": {"url": self.web_url}}]
+        first_row = [
+            {"text": "🏠 Главное меню", "callback_data": "menu:main"},
+            {"text": t["btn_webapp"], "web_app": {"url": self.web_url}},
+        ]
         second_row = [
             {"text": f"🖥 {t['btn_machines']}", "callback_data": "menu:machines"},
             {"text": f"ℹ️ {t['btn_help']}", "callback_data": "menu:help"},
@@ -3142,10 +3607,30 @@ class TelegramBotManager:
         keyboard = [first_row, second_row]
         if is_owner:
             keyboard.append([
-                {"text": f"📊 {t['btn_admin']}", "callback_data": "admin:refresh"},
+                {"text": f"👑 {t['btn_admin']}", "callback_data": "admin:refresh"},
                 {"text": "👥 Пользователи", "callback_data": "u:list:0"},
             ])
+            keyboard.append([
+                {"text": "📈 Метрики", "callback_data": "admin:stats"},
+                {"text": "🖥 Все машины", "callback_data": "admin:machines"},
+            ])
         return {"inline_keyboard": keyboard}
+
+    def _persistent_reply_keyboard(self, is_owner: bool = False, lang: str = "ru") -> Dict[str, Any]:
+        keyboard = [
+            [{"text": "🏠 Главное меню"}, {"text": "🖥 Мои машины"}],
+            [{"text": "💻 tTerm Web", "web_app": {"url": self.web_url}}, {"text": "📖 Справка"}],
+        ]
+        if is_owner:
+            keyboard.append([
+                {"text": "👑 Панель управления"},
+                {"text": "👥 Пользователи"},
+            ])
+        return {
+            "keyboard": keyboard,
+            "resize_keyboard": True,
+            "is_persistent": True
+        }
 
     def _unbound_keyboard(self, lang: str = "ru") -> Dict[str, Any]:
         t = I18N.get(lang, I18N["ru"])

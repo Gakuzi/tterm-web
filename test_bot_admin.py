@@ -21,12 +21,47 @@ class TestTelegramBotAdmin(unittest.TestCase):
         kb_user = self.bot._main_keyboard(is_owner=False)
         buttons_user = [b["text"] for row in kb_user["inline_keyboard"] for b in row]
         self.assertNotIn("👥 Пользователи", buttons_user)
-        self.assertNotIn("📊 Панель администратора", buttons_user)
+        self.assertNotIn("👑 Панель администратора", buttons_user)
+        self.assertNotIn("📈 Метрики", buttons_user)
+        self.assertNotIn("🖥 Все машины", buttons_user)
+        self.assertIn("🏠 Главное меню", buttons_user)
 
         kb_owner = self.bot._main_keyboard(is_owner=True)
         buttons_owner = [b["text"] for row in kb_owner["inline_keyboard"] for b in row]
         self.assertIn("👥 Пользователи", buttons_owner)
-        self.assertIn("📊 Панель администратора", buttons_owner)
+        self.assertIn("👑 Панель администратора", buttons_owner)
+        self.assertIn("📈 Метрики", buttons_owner)
+        self.assertIn("🖥 Все машины", buttons_owner)
+
+    def test_rich_main_menu_payload_isolation(self):
+        # User payload
+        user_row = {"name": "Обычный Юзер", "email": "user@example.com", "plan_id": "free"}
+        payload_user = self.bot._build_rich_main_menu_payload(user_row, [], is_owner=False)
+        user_callbacks = [
+            btn["callback_data"]
+            for b in payload_user["blocks"] if b.get("type") == "buttons"
+            for btn in b.get("buttons", [])
+            if "callback_data" in btn
+        ]
+        self.assertNotIn("admin:refresh", user_callbacks)
+        self.assertNotIn("u:list:0", user_callbacks)
+        self.assertNotIn("admin:stats", user_callbacks)
+        self.assertNotIn("admin:machines", user_callbacks)
+        self.assertIn("menu:machines", user_callbacks)
+        self.assertIn("menu:email", user_callbacks)
+
+        # Owner payload
+        payload_owner = self.bot._build_rich_main_menu_payload(user_row, [], is_owner=True)
+        owner_callbacks = [
+            btn["callback_data"]
+            for b in payload_owner["blocks"] if b.get("type") == "buttons"
+            for btn in b.get("buttons", [])
+            if "callback_data" in btn
+        ]
+        self.assertIn("admin:refresh", owner_callbacks)
+        self.assertIn("u:list:0", owner_callbacks)
+        self.assertIn("admin:stats", owner_callbacks)
+        self.assertIn("admin:machines", owner_callbacks)
 
     def test_strict_access_control(self):
         # Non-owner
@@ -126,6 +161,25 @@ class TestTelegramBotAdmin(unittest.TestCase):
         has_buttons_block = any(b.get("type") == "buttons" for b in blocks)
         self.assertTrue(has_buttons_block)
 
+    async def async_test_main_menu_and_stats(self):
+        # 1. Main menu for owner
+        self.bot.get_user_by_telegram = AsyncMock(return_value={"id": uuid.uuid4(), "name": "Климов Евгений", "email": "eklimov84@xmail.ru"})
+        self.bot.list_user_machines = AsyncMock(return_value=[{"id": "m1", "name": "tterm-vps", "kind": "server", "online": True}])
+        await self.bot._show_main_menu(55570186)
+        self.bot.call_api.assert_called_with("sendRichMessage", unittest.mock.ANY)
+        payload = self.bot.call_api.call_args[0][1]["rich_message"]
+        self.assertIn("blocks", payload)
+
+        # 2. Unauthorized callback for stats
+        cb_stats = {
+            "id": "cq_stats_hack",
+            "data": "admin:stats",
+            "message": {"chat": {"id": 88888888}, "message_id": 99},
+            "from": {"id": 88888888, "username": "hacker"}
+        }
+        await self.bot._handle_callback(cb_stats)
+        self.bot.answer_callback.assert_called_with("cq_stats_hack", "⛔ Доступ запрещён. Панель управления доступна только владельцу платформы.", show_alert=True)
+
     def test_all_admin_features(self):
         import asyncio
         asyncio.run(self.async_test_unauthorized_user_blocked())
@@ -134,6 +188,8 @@ class TestTelegramBotAdmin(unittest.TestCase):
         asyncio.run(self.async_test_rich_message_users_list())
         self.bot.call_api.reset_mock()
         asyncio.run(self.async_test_rich_message_user_card())
+        self.bot.call_api.reset_mock()
+        asyncio.run(self.async_test_main_menu_and_stats())
 
 if __name__ == '__main__':
     unittest.main()
