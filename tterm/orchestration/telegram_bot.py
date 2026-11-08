@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+from datetime import datetime, timezone
 import hashlib
 import hmac
 import html
@@ -254,6 +255,8 @@ class TelegramBotManager:
         self._pending_auth_sessions: Dict[str, Dict[str, Any]] = {}
         # chat_id -> { "email": str, "code": str, "expires_at": float }
         self._pending_email_confirms: Dict[str, Dict[str, Any]] = {}
+        # chat_id -> { "action": "name"|"email", "target_id": str, "page": int, "msg_id": Optional[int] }
+        self._pending_user_edit: Dict[str, Dict[str, Any]] = {}
 
     def get_token(self) -> str:
         if self._bot_token:
@@ -946,6 +949,68 @@ class TelegramBotManager:
         lang = self._get_lang(user_row, from_user)
         t = I18N.get(lang, I18N["ru"])
 
+        # Pending admin user profile editing
+        if chat_id in self._pending_user_edit and is_owner:
+            edit_info = self._pending_user_edit.pop(chat_id)
+            target_uuid = _parse_uuid(edit_info.get("target_id"))
+            page = edit_info.get("page", 0)
+            if text.strip().lower() == "/cancel":
+                await self.send_message(chat_id, "❌ Редактирование отменено.")
+                if target_uuid:
+                    await self._show_admin_user_card(chat_id, str(target_uuid), page=page)
+                return
+
+            action = edit_info.get("action")
+            if action == "name":
+                new_name = text.strip()
+                if 1 <= len(new_name) <= 200 and self.pool and target_uuid:
+                    try:
+                        async with self.pool.acquire() as conn:
+                            await conn.execute("UPDATE users SET name = $1 WHERE id = $2", new_name, target_uuid)
+                        await self.send_message(chat_id, f"✅ Имя пользователя изменено на: <b>{html.escape(new_name)}</b>")
+                    except Exception as e_un:
+                        await self.send_message(chat_id, f"❌ Ошибка обновления имени: {e_un}")
+                else:
+                    await self.send_message(chat_id, "❌ Некорректная длина имени (от 1 до 200 символов).")
+            elif action == "email":
+                new_email = text.strip().lower()
+                if "@" in new_email and "." in new_email and self.pool and target_uuid:
+                    try:
+                        async with self.pool.acquire() as conn:
+                            await conn.execute("UPDATE users SET email = $1 WHERE id = $2", new_email, target_uuid)
+                        await self.send_message(chat_id, f"✅ Email пользователя изменен на: <b>{html.escape(new_email)}</b>")
+                    except Exception as e_em:
+                        await self.send_message(chat_id, f"❌ Ошибка обновления Email: {e_em}")
+                else:
+                    await self.send_message(chat_id, "❌ Некорректный формат email адреса.")
+
+            if target_uuid:
+                await self._show_admin_user_card(chat_id, str(target_uuid), page=page)
+            return
+
+        # Check blocked user status (unless owner)
+        if user_row and not is_owner:
+            if user_row.get("is_blocked"):
+                blocked_until = user_row.get("blocked_until")
+                now_dt = datetime.now(timezone.utc)
+                if blocked_until and blocked_until < now_dt:
+                    if self.pool:
+                        try:
+                            async with self.pool.acquire() as conn:
+                                await conn.execute("UPDATE users SET is_blocked = false, blocked_until = NULL, blocked_reason = NULL WHERE id = $1", user_row["id"])
+                        except Exception:
+                            pass
+                    user_row = dict(user_row)
+                    user_row["is_blocked"] = False
+                else:
+                    reason = user_row.get("blocked_reason") or "Доступ к сервису временно ограничен администрацией платформы."
+                    until_str = f"\nСрок: до <b>{blocked_until.strftime('%d.%m.%Y %H:%M UTC')}</b>" if blocked_until else "\nСрок: <b>бессрочно</b>"
+                    await self.send_message(
+                        chat_id,
+                        f"🚫 <b>Доступ ограничен</b>\n\nВаш аккаунт в tTerm заблокирован.\nПричина: <i>{html.escape(reason)}</i>{until_str}\n\nПо вопросам разблокировки: @eklimov"
+                    )
+                    return
+
         # Pending rename response
         if chat_id in self._pending_rename and not text.startswith("/"):
             m_id = self._pending_rename.pop(chat_id)
@@ -986,7 +1051,14 @@ class TelegramBotManager:
             return
 
         # Admin commands: /admin, /users, /stats, /dashboard
-        if text.startswith(("/admin", "/users", "/stats", "/dashboard")):
+        if text.startswith("/users"):
+            if not is_owner:
+                await self.send_message(chat_id, "⛔ Доступ разрешён только владельцу (@eklimov).")
+                return
+            await self._show_admin_users_list(chat_id, page=0)
+            return
+
+        if text.startswith(("/admin", "/stats", "/dashboard")):
             if not is_owner:
                 await self.send_message(chat_id, "⛔ Доступ к панели администратора разрешён только владельцу (@eklimov).")
                 return
@@ -1360,6 +1432,9 @@ class TelegramBotManager:
         chat = msg.get("chat") or {}
         chat_id = str(chat.get("id"))
         msg_id = msg.get("message_id")
+        from_user = callback.get("from") or {}
+        username = (from_user.get("username") or "").strip()
+        is_owner = (str(chat_id) == "55570186" or (username and username.lower() in ("eklimov", "eklimov84")))
 
         if data == "menu:machines":
             await self.answer_callback(cq_id)
@@ -1398,6 +1473,230 @@ class TelegramBotManager:
             if str(chat_id) == "55570186" or (username and username.lower() in ("eklimov", "eklimov84")):
                 await self._show_admin_dashboard(chat_id, msg_id=msg_id)
             return
+
+        # Admin User Management Callbacks
+        if data.startswith("u:"):
+            if not is_owner:
+                await self.answer_callback(cq_id, "Доступ только для владельца (@eklimov)", show_alert=True)
+                return
+
+            parts = data.split(":")
+            subaction = parts[1] if len(parts) > 1 else ""
+
+            if subaction == "list":
+                page = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
+                await self.answer_callback(cq_id)
+                await self._show_admin_users_list(chat_id, page=page, msg_id=msg_id)
+                return
+
+            if subaction == "view":
+                target_user_id = parts[2] if len(parts) > 2 else ""
+                page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+                await self.answer_callback(cq_id)
+                await self._show_admin_user_card(chat_id, target_user_id, page=page, msg_id=msg_id)
+                return
+
+            if subaction == "block":
+                target_user_id = parts[2] if len(parts) > 2 else ""
+                page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+                t_uuid = _parse_uuid(target_user_id)
+                if t_uuid and self.pool:
+                    async with self.pool.acquire() as conn:
+                        target_row = await conn.fetchrow("SELECT telegram_chat_id, email FROM users WHERE id = $1", t_uuid)
+                        if target_row and (str(target_row["telegram_chat_id"]) == "55570186" or target_row["email"] == "eklimov84@xmail.ru"):
+                            await self.answer_callback(cq_id, "Нельзя заблокировать владельца платформы!", show_alert=True)
+                            return
+                        await conn.execute("UPDATE users SET is_blocked = true, blocked_reason = 'Заблокирован администратором', blocked_until = NULL WHERE id = $1", t_uuid)
+                        if target_row and target_row["telegram_chat_id"]:
+                            try:
+                                await self.send_message(target_row["telegram_chat_id"], "🚫 <b>Ваш аккаунт в tTerm заблокирован администратором платформы.</b>\nПо вопросам: @eklimov")
+                            except Exception:
+                                pass
+                await self.answer_callback(cq_id, "Пользователь заблокирован")
+                await self._show_admin_user_card(chat_id, target_user_id, page=page, msg_id=msg_id)
+                return
+
+            if subaction == "block24":
+                target_user_id = parts[2] if len(parts) > 2 else ""
+                page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+                t_uuid = _parse_uuid(target_user_id)
+                if t_uuid and self.pool:
+                    async with self.pool.acquire() as conn:
+                        target_row = await conn.fetchrow("SELECT telegram_chat_id, email FROM users WHERE id = $1", t_uuid)
+                        if target_row and (str(target_row["telegram_chat_id"]) == "55570186" or target_row["email"] == "eklimov84@xmail.ru"):
+                            await self.answer_callback(cq_id, "Нельзя заблокировать владельца!", show_alert=True)
+                            return
+                        await conn.execute("UPDATE users SET is_blocked = true, blocked_reason = 'Временное ограничение доступа (24 часа)', blocked_until = now() + INTERVAL '24 hours' WHERE id = $1", t_uuid)
+                        if target_row and target_row["telegram_chat_id"]:
+                            try:
+                                await self.send_message(target_row["telegram_chat_id"], "⏱ <b>Доступ к tTerm временно ограничен на 24 часа.</b>\nПо вопросам: @eklimov")
+                            except Exception:
+                                pass
+                await self.answer_callback(cq_id, "Блок на 24ч установлен")
+                await self._show_admin_user_card(chat_id, target_user_id, page=page, msg_id=msg_id)
+                return
+
+            if subaction == "unblock":
+                target_user_id = parts[2] if len(parts) > 2 else ""
+                page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+                t_uuid = _parse_uuid(target_user_id)
+                if t_uuid and self.pool:
+                    async with self.pool.acquire() as conn:
+                        await conn.execute("UPDATE users SET is_blocked = false, blocked_reason = NULL, blocked_until = NULL WHERE id = $1", t_uuid)
+                        target_row = await conn.fetchrow("SELECT telegram_chat_id FROM users WHERE id = $1", t_uuid)
+                        if target_row and target_row["telegram_chat_id"]:
+                            try:
+                                await self.send_message(target_row["telegram_chat_id"], "✅ <b>Ваш аккаунт в tTerm разблокирован.</b> Доступ восстановлен.")
+                            except Exception:
+                                pass
+                await self.answer_callback(cq_id, "Пользователь разблокирован")
+                await self._show_admin_user_card(chat_id, target_user_id, page=page, msg_id=msg_id)
+                return
+
+            if subaction == "unbind":
+                target_user_id = parts[2] if len(parts) > 2 else ""
+                page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+                t_uuid = _parse_uuid(target_user_id)
+                if t_uuid and self.pool:
+                    async with self.pool.acquire() as conn:
+                        target_row = await conn.fetchrow("SELECT telegram_chat_id, email FROM users WHERE id = $1", t_uuid)
+                        if target_row and (str(target_row["telegram_chat_id"]) == "55570186" or target_row["email"] == "eklimov84@xmail.ru"):
+                            await self.answer_callback(cq_id, "Нельзя отвязать Telegram владельца!", show_alert=True)
+                            return
+                        old_tg = target_row["telegram_chat_id"] if target_row else None
+                        await conn.execute("UPDATE users SET telegram_chat_id = NULL, telegram_username = NULL WHERE id = $1", t_uuid)
+                        if old_tg:
+                            try:
+                                await self.send_message(old_tg, "ℹ️ Ваш Telegram-аккаунт был отвязан от профиля tTerm администратором платформы.")
+                            except Exception:
+                                pass
+                await self.answer_callback(cq_id, "Telegram успешно отвязан")
+                await self._show_admin_user_card(chat_id, target_user_id, page=page, msg_id=msg_id)
+                return
+
+            if subaction == "bindlink":
+                target_user_id = parts[2] if len(parts) > 2 else ""
+                t_uuid = _parse_uuid(target_user_id)
+                if t_uuid:
+                    token, url = self.register_pending_bind(t_uuid)
+                    await self.answer_callback(cq_id)
+                    await self.send_message(
+                        chat_id,
+                        f"🔑 <b>Ссылка для привязки Telegram пользователя:</b>\n\n<code>{url}</code>\n\nОтправьте эту ссылку пользователю. Срок действия: 2 часа."
+                    )
+                return
+
+            if subaction == "plan_menu":
+                target_user_id = parts[2] if len(parts) > 2 else ""
+                page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+                await self.answer_callback(cq_id)
+                await self._show_admin_plan_menu(chat_id, target_user_id, page=page, msg_id=msg_id)
+                return
+
+            if subaction == "set_plan":
+                target_user_id = parts[2] if len(parts) > 2 else ""
+                new_plan = parts[3] if len(parts) > 3 else "free"
+                page = int(parts[4]) if len(parts) > 4 and parts[4].isdigit() else 0
+                t_uuid = _parse_uuid(target_user_id)
+                if t_uuid and self.pool and new_plan in ("free", "pro", "enterprise"):
+                    async with self.pool.acquire() as conn:
+                        await conn.execute("UPDATE users SET plan_id = $1 WHERE id = $2", new_plan, t_uuid)
+                    await self.answer_callback(cq_id, f"Тариф изменён на {new_plan.upper()}")
+                await self._show_admin_user_card(chat_id, target_user_id, page=page, msg_id=msg_id)
+                return
+
+            if subaction == "sub_menu":
+                target_user_id = parts[2] if len(parts) > 2 else ""
+                page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+                await self.answer_callback(cq_id)
+                await self._show_admin_sub_menu(chat_id, target_user_id, page=page, msg_id=msg_id)
+                return
+
+            if subaction == "set_sub":
+                target_user_id = parts[2] if len(parts) > 2 else ""
+                sub_val = parts[3] if len(parts) > 3 else "forever"
+                page = int(parts[4]) if len(parts) > 4 and parts[4].isdigit() else 0
+                t_uuid = _parse_uuid(target_user_id)
+                if t_uuid and self.pool:
+                    async with self.pool.acquire() as conn:
+                        if sub_val == "forever":
+                            await conn.execute("UPDATE users SET subscription_expires_at = NULL WHERE id = $1", t_uuid)
+                            await self.answer_callback(cq_id, "Подписка бессрочно")
+                        elif sub_val.isdigit():
+                            days = int(sub_val)
+                            await conn.execute(
+                                "UPDATE users SET subscription_expires_at = COALESCE(GREATEST(subscription_expires_at, now()), now()) + ($1 || ' days')::interval WHERE id = $2",
+                                str(days), t_uuid
+                            )
+                            await self.answer_callback(cq_id, f"Подписка продлена на {days} дн.")
+                await self._show_admin_user_card(chat_id, target_user_id, page=page, msg_id=msg_id)
+                return
+
+            if subaction == "edit_name":
+                target_user_id = parts[2] if len(parts) > 2 else ""
+                page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+                self._pending_user_edit[chat_id] = {
+                    "action": "name",
+                    "target_id": target_user_id,
+                    "page": page,
+                    "msg_id": msg_id
+                }
+                await self.answer_callback(cq_id)
+                await self.send_message(
+                    chat_id,
+                    "✏️ <b>Изменение имени пользователя:</b>\n\nОтправьте новое имя следующим сообщением (или введите <code>/cancel</code> для отмены):"
+                )
+                return
+
+            if subaction == "edit_email":
+                target_user_id = parts[2] if len(parts) > 2 else ""
+                page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+                self._pending_user_edit[chat_id] = {
+                    "action": "email",
+                    "target_id": target_user_id,
+                    "page": page,
+                    "msg_id": msg_id
+                }
+                await self.answer_callback(cq_id)
+                await self.send_message(
+                    chat_id,
+                    "✉️ <b>Изменение Email пользователя:</b>\n\nОтправьте новый email следующим сообщением (или введите <code>/cancel</code> для отмены):"
+                )
+                return
+
+            if subaction == "ask_del":
+                target_user_id = parts[2] if len(parts) > 2 else ""
+                page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+                await self.answer_callback(cq_id)
+                await self._show_admin_del_confirm(chat_id, target_user_id, page=page, msg_id=msg_id)
+                return
+
+            if subaction == "do_del":
+                target_user_id = parts[2] if len(parts) > 2 else ""
+                page = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+                t_uuid = _parse_uuid(target_user_id)
+                if t_uuid and self.pool:
+                    async with self.pool.acquire() as conn:
+                        target_row = await conn.fetchrow("SELECT telegram_chat_id, email, name FROM users WHERE id = $1", t_uuid)
+                        if target_row and (str(target_row["telegram_chat_id"]) == "55570186" or target_row["email"] == "eklimov84@xmail.ru"):
+                            await self.answer_callback(cq_id, "Нельзя удалить владельца платформы!", show_alert=True)
+                            return
+                        old_tg = target_row["telegram_chat_id"] if target_row else None
+                        del_email = target_row["email"] if target_row else "User"
+                        async with conn.transaction():
+                            await conn.execute("UPDATE machines SET created_by = NULL WHERE created_by = $1", t_uuid)
+                            await conn.execute("DELETE FROM terminals WHERE owner_id = $1", t_uuid)
+                            await conn.execute("DELETE FROM projects WHERE owner_id = $1", t_uuid)
+                            await conn.execute("DELETE FROM users WHERE id = $1", t_uuid)
+                        if old_tg:
+                            try:
+                                await self.send_message(old_tg, "ℹ️ Ваш аккаунт в сервисе tTerm был удален администратором платформы.")
+                            except Exception:
+                                pass
+                    await self.answer_callback(cq_id, f"Пользователь {del_email} удален", show_alert=True)
+                await self._show_admin_users_list(chat_id, page=page, msg_id=msg_id)
+                return
+
 
         if data.startswith("deluser:confirm:"):
             req_id_str = data[len("deluser:confirm:"):]
@@ -1976,6 +2275,12 @@ class TelegramBotManager:
                 ])
 
         kb_rows.append([
+            {"text": "👥 Управление пользователями", "callback_data": "u:list:0"},
+        ])
+        kb_rows.append([
+            {"text": "👥 Управление пользователями", "callback_data": "u:list:0"},
+        ])
+        kb_rows.append([
             {"text": t["btn_refresh"], "callback_data": "admin:refresh"},
             {"text": t["btn_machines"], "callback_data": "menu:machines"},
             {"text": t["btn_webapp"], "web_app": {"url": self.web_url}},
@@ -1986,6 +2291,238 @@ class TelegramBotManager:
             await self.edit_message(str(chat_id), msg_id, text, reply_markup=reply_markup)
         else:
             await self.send_message(str(chat_id), text, reply_markup=reply_markup)
+
+
+    # ------------------------------------------------------------- Admin: User Management
+    async def _show_admin_users_list(self, chat_id: str | int, page: int = 0, msg_id: Optional[int] = None) -> None:
+        if not self.pool:
+            await self.send_message(chat_id, "⚠️ База данных недоступна.")
+            return
+
+        page_size = 5
+        async with self.pool.acquire() as conn:
+            total_count = await conn.fetchval("SELECT count(*) FROM users;") or 0
+            total_pages = max(1, (total_count + page_size - 1) // page_size)
+            page = max(0, min(page, total_pages - 1))
+            offset = page * page_size
+            users = await conn.fetch(
+                "SELECT id, name, email, plan_id, telegram_chat_id, telegram_username, is_blocked, blocked_until, created_at "
+                "FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2;",
+                page_size, offset
+            )
+
+        lines = [
+            "👥 <b>Управление пользователями tTerm</b>",
+            f"Всего пользователей: <b>{total_count}</b> • Стр. <b>{page + 1}/{total_pages}</b>",
+            "<i>Выберите пользователя для управления профилем, блокировкой и тарифом:</i>",
+            ""
+        ]
+
+        now_dt = datetime.now(timezone.utc)
+        user_buttons = []
+        for idx, u in enumerate(users, start=offset + 1):
+            is_blk = u["is_blocked"] and (not u["blocked_until"] or u["blocked_until"] > now_dt)
+            status_dot = "🔴" if is_blk else "🟢"
+            plan = (u["plan_id"] or "free").upper()
+            u_name = u["name"] or "Безымянный"
+            tg_str = f" · @{u['telegram_username']}" if u["telegram_username"] else (f" · tg:{u['telegram_chat_id']}" if u["telegram_chat_id"] else " · <i>без tg</i>")
+            email_str = f" ({u['email']})" if u["email"] else ""
+            lines.append(f"{idx}. {status_dot} <b>{html.escape(u_name)}</b> [{plan}]{email_str}{tg_str}")
+
+            short_label = f"👤 {u_name[:16]} [{plan}]"
+            user_buttons.append([{"text": short_label, "callback_data": f"u:view:{u['id']}:{page}"}])
+
+        kb_rows = []
+        kb_rows.extend(user_buttons)
+
+        # Pagination
+        nav_row = []
+        if page > 0:
+            nav_row.append({"text": "⬅️ Назад", "callback_data": f"u:list:{page - 1}"})
+        nav_row.append({"text": f"🔄 {page + 1}/{total_pages}", "callback_data": f"u:list:{page}"})
+        if page < total_pages - 1:
+            nav_row.append({"text": "Вперёд ➡️", "callback_data": f"u:list:{page + 1}"})
+        if nav_row:
+            kb_rows.append(nav_row)
+
+        kb_rows.append([
+            {"text": "📊 В панель", "callback_data": "admin:refresh"},
+            {"text": "🖥 Машины", "callback_data": "menu:machines"},
+        ])
+
+        text = "\n".join(lines)
+        reply_markup = {"inline_keyboard": kb_rows}
+
+        if msg_id:
+            await self.edit_message(str(chat_id), msg_id, text, reply_markup=reply_markup)
+        else:
+            await self.send_message(str(chat_id), text, reply_markup=reply_markup)
+
+    async def _show_admin_user_card(self, chat_id: str | int, target_user_id: str, page: int = 0, msg_id: Optional[int] = None) -> None:
+        if not self.pool:
+            await self.send_message(chat_id, "⚠️ База данных недоступна.")
+            return
+
+        t_uuid = _parse_uuid(target_user_id)
+        if not t_uuid:
+            await self.send_message(chat_id, "❌ Неверный ID пользователя.")
+            return
+
+        async with self.pool.acquire() as conn:
+            u = await conn.fetchrow(
+                "SELECT id, name, email, plan_id, telegram_chat_id, telegram_username, is_blocked, blocked_reason, blocked_until, subscription_expires_at, created_at "
+                "FROM users WHERE id = $1;",
+                t_uuid
+            )
+            if not u:
+                await self.send_message(chat_id, "❌ Пользователь не найден в базе данных.")
+                return
+
+            machines_count = await conn.fetchval("SELECT count(*) FROM machines WHERE created_by = $1 AND removed_at IS NULL;", t_uuid) or 0
+            projects_count = await conn.fetchval("SELECT count(*) FROM projects WHERE owner_id = $1;", t_uuid) or 0
+
+        is_target_owner = (str(u["telegram_chat_id"]) == "55570186" or (u["email"] and u["email"].lower() == "eklimov84@xmail.ru"))
+        now_dt = datetime.now(timezone.utc)
+        is_curr_blocked = u["is_blocked"] and (not u["blocked_until"] or u["blocked_until"] > now_dt)
+
+        status_text = "🟢 Активен"
+        if is_curr_blocked:
+            if u["blocked_until"]:
+                status_text = f"⏳ Временный блок (до {u['blocked_until'].strftime('%d.%m.%Y %H:%M UTC')})"
+            else:
+                status_text = "🔴 Заблокирован бессрочно"
+
+        sub_exp_text = u["subscription_expires_at"].strftime('%d.%m.%Y') if u["subscription_expires_at"] else "Бессрочно"
+        tg_text = f"@{u['telegram_username']} (<code>{u['telegram_chat_id']}</code>)" if u["telegram_chat_id"] else "<i>Не привязан</i>"
+
+        lines = [
+            f"👤 <b>Досье пользователя tTerm</b>",
+            "",
+            f"• <b>Имя:</b> {html.escape(u['name'] or 'Не указано')}",
+            f"• <b>Email:</b> {html.escape(u['email'] or 'Не указан')}",
+            f"• <b>Статус:</b> {status_text}",
+            f"• <b>Тарифный план:</b> <b>{(u['plan_id'] or 'free').upper()}</b>",
+            f"• <b>Подписка активна до:</b> {sub_exp_text}",
+            f"• <b>Telegram:</b> {tg_text}",
+            f"• <b>Регистрация:</b> {u['created_at'].strftime('%d.%m.%Y %H:%M')}",
+            f"• <b>Ресурсы:</b> Машин: <b>{machines_count}</b> • Проектов: <b>{projects_count}</b>",
+            f"• <b>UUID:</b> <code>{u['id']}</code>",
+        ]
+        if u.get("blocked_reason"):
+            lines.append(f"• <b>Причина блокировки:</b> <i>{html.escape(u['blocked_reason'])}</i>")
+
+        kb_rows = []
+
+        # Row 1: Access / Block actions (disallowed on owner)
+        if not is_target_owner:
+            if not is_curr_blocked:
+                kb_rows.append([
+                    {"text": "🚫 Блок бессрочно", "callback_data": f"u:block:{u['id']}:{page}"},
+                    {"text": "⏱ Блок на 24ч", "callback_data": f"u:block24:{u['id']}:{page}"},
+                ])
+            else:
+                kb_rows.append([
+                    {"text": "✅ Разблокировать", "callback_data": f"u:unblock:{u['id']}:{page}"},
+                ])
+
+        # Row 2: Telegram connection
+        if u["telegram_chat_id"]:
+            if not is_target_owner:
+                kb_rows.append([{"text": "🔗 Отвязать Telegram", "callback_data": f"u:unbind:{u['id']}:{page}"}])
+        else:
+            kb_rows.append([{"text": "🔑 Создать ссылку привязки", "callback_data": f"u:bindlink:{u['id']}:{page}"}])
+
+        # Row 3: Plan and Subscription
+        kb_rows.append([
+            {"text": "💎 Сменить тариф", "callback_data": f"u:plan_menu:{u['id']}:{page}"},
+            {"text": "⏳ Срок подписки", "callback_data": f"u:sub_menu:{u['id']}:{page}"},
+        ])
+
+        # Row 4: Edit profile fields
+        kb_rows.append([
+            {"text": "✏️ Изменить имя", "callback_data": f"u:edit_name:{u['id']}:{page}"},
+            {"text": "✉️ Изменить Email", "callback_data": f"u:edit_email:{u['id']}:{page}"},
+        ])
+
+        # Row 5: Delete user
+        if not is_target_owner:
+            kb_rows.append([{"text": "🗑 Удалить пользователя", "callback_data": f"u:ask_del:{u['id']}:{page}"}])
+
+        # Row 6: Return navigation
+        kb_rows.append([
+            {"text": "« К списку пользователей", "callback_data": f"u:list:{page}"},
+            {"text": "📊 В панель", "callback_data": "admin:refresh"},
+        ])
+
+        text = "\n".join(lines)
+        reply_markup = {"inline_keyboard": kb_rows}
+
+        if msg_id:
+            await self.edit_message(str(chat_id), msg_id, text, reply_markup=reply_markup)
+        else:
+            await self.send_message(str(chat_id), text, reply_markup=reply_markup)
+
+    async def _show_admin_plan_menu(self, chat_id: str | int, target_user_id: str, page: int = 0, msg_id: Optional[int] = None) -> None:
+        text = "💎 <b>Выберите тарифный план для пользователя:</b>\n\n• <b>FREE:</b> 50 машин, 24 терминала\n• <b>PRO:</b> 200 машин, 100 терминалов\n• <b>ENTERPRISE:</b> 1000 машин, 500 терминалов"
+        kb = [
+            [{"text": "Free (Стандартный)", "callback_data": f"u:set_plan:{target_user_id}:free:{page}"}],
+            [{"text": "Pro (Расширенный)", "callback_data": f"u:set_plan:{target_user_id}:pro:{page}"}],
+            [{"text": "Enterprise (Безлимитный)", "callback_data": f"u:set_plan:{target_user_id}:enterprise:{page}"}],
+            [{"text": "« Назад к карточке", "callback_data": f"u:view:{target_user_id}:{page}"}],
+        ]
+        if msg_id:
+            await self.edit_message(str(chat_id), msg_id, text, reply_markup={"inline_keyboard": kb})
+        else:
+            await self.send_message(str(chat_id), text, reply_markup={"inline_keyboard": kb})
+
+    async def _show_admin_sub_menu(self, chat_id: str | int, target_user_id: str, page: int = 0, msg_id: Optional[int] = None) -> None:
+        text = "⏳ <b>Управление сроком действия подписки:</b>\n\nВыберите продление срока доступа пользователя к платформе:"
+        kb = [
+            [
+                {"text": "+30 дней", "callback_data": f"u:set_sub:{target_user_id}:30:{page}"},
+                {"text": "+90 дней", "callback_data": f"u:set_sub:{target_user_id}:90:{page}"},
+            ],
+            [
+                {"text": "+365 дней", "callback_data": f"u:set_sub:{target_user_id}:365:{page}"},
+                {"text": "Бессрочно", "callback_data": f"u:set_sub:{target_user_id}:forever:{page}"},
+            ],
+            [{"text": "« Назад к карточке", "callback_data": f"u:view:{target_user_id}:{page}"}],
+        ]
+        if msg_id:
+            await self.edit_message(str(chat_id), msg_id, text, reply_markup={"inline_keyboard": kb})
+        else:
+            await self.send_message(str(chat_id), text, reply_markup={"inline_keyboard": kb})
+
+    async def _show_admin_del_confirm(self, chat_id: str | int, target_user_id: str, page: int = 0, msg_id: Optional[int] = None) -> None:
+        if not self.pool:
+            return
+        t_uuid = _parse_uuid(target_user_id)
+        if not t_uuid:
+            return
+
+        async with self.pool.acquire() as conn:
+            u = await conn.fetchrow("SELECT name, email FROM users WHERE id = $1", t_uuid)
+            if not u:
+                return
+
+        u_name = u["name"] or "Пользователь"
+        u_email = u["email"] or "без email"
+
+        text = (
+            f"⚠️ <b>ПОДТВЕРЖДЕНИЕ УДАЛЕНИЯ АККАУНТА</b>\n\n"
+            f"Вы собираетесь безвозвратно удалить пользователя:\n"
+            f"👤 <b>{html.escape(u_name)}</b> ({html.escape(u_email)})\n\n"
+            f"Все сессии, терминалы и привязки будут аннулированы.\n\n"
+            f"<b>Вы подтверждаете удаление?</b>"
+        )
+        kb = [
+            [{"text": "🔥 ДА, УДАЛИТЬ БЕЗВОЗВРАТНО", "callback_data": f"u:do_del:{target_user_id}:{page}"}],
+            [{"text": "❌ Отмена", "callback_data": f"u:view:{target_user_id}:{page}"}],
+        ]
+        if msg_id:
+            await self.edit_message(str(chat_id), msg_id, text, reply_markup={"inline_keyboard": kb})
+        else:
+            await self.send_message(str(chat_id), text, reply_markup={"inline_keyboard": kb})
 
     async def _send_command_result(self, chat_id: str, res: Dict[str, Any], initial_msg_id: Optional[int] = None) -> None:
         if not res.get("ok"):
@@ -2059,7 +2596,10 @@ class TelegramBotManager:
         ]
         keyboard = [first_row, second_row]
         if is_owner:
-            keyboard.append([{"text": f"📊 {t['btn_admin']}", "callback_data": "admin:refresh"}])
+            keyboard.append([
+                {"text": f"📊 {t['btn_admin']}", "callback_data": "admin:refresh"},
+                {"text": "👥 Пользователи", "callback_data": "u:list:0"},
+            ])
         return {"inline_keyboard": keyboard}
 
     def _unbound_keyboard(self, lang: str = "ru") -> Dict[str, Any]:
