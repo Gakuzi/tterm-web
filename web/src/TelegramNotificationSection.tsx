@@ -50,10 +50,33 @@ export function TelegramNotificationSection(props: TelegramNotificationSectionPr
       if (res.bind_url) {
         window.open(res.bind_url, "_blank");
         notify("🚀 Перейдите в Telegram и нажмите кнопку «Запустить» (/start) для завершения привязки"); // i18n-ignore
+
+        // Start background polling to automatically detect when user clicks /start in Telegram
+        let tries = 0;
+        const interval = setInterval(async () => {
+          tries += 1;
+          try {
+            const next = await getTelegramProfileStatus();
+            if (next.bound) {
+              clearInterval(interval);
+              setStatus(next);
+              setIsLinking(false);
+              playNotificationChime(true);
+              notify("✅ Telegram-профиль успешно привязан к вашему аккаунту!"); // i18n-ignore
+            }
+          } catch {
+            // Ignore error during polling
+          }
+          if (tries >= 30) {
+            clearInterval(interval);
+            setIsLinking(false);
+          }
+        }, 2500);
+      } else {
+        setIsLinking(false);
       }
     } catch (e) {
       notify(`❌ Ошибка получения ссылки привязки: ${(e as Error).message}`); // i18n-ignore
-    } finally {
       setIsLinking(false);
     }
   };
@@ -162,12 +185,15 @@ export function TelegramNotificationSection(props: TelegramNotificationSectionPr
 
       {!isBound ? (
         <Row
-          label={"Привязка в 1 клик" /* i18n-ignore */}
+          label={"Привязка и синхронизация в 1 клик" /* i18n-ignore */}
           note={
             /* i18n-ignore */
-            "Нажмите кнопку, чтобы привязать ваш Telegram. После привязки вы сможете получать уведомления, подтверждать действия и работать через Telegram Web App."
+            "Вы вошли в tTerm по почте. Нажмите кнопку, чтобы привязать официального бота @" +
+            botUsername +
+            /* i18n-ignore */
+            ". Аккаунты мгновенно объединятся: вы сможете запускать tTerm прямо в Telegram (Web App) сразу под вашим профилем и проектами без повторного ввода кодов, а также получать оперативные уведомления о терминалах."
           }
-          words={"привязать подключить telegram бот" /* i18n-ignore */}
+          words={"привязать подключить telegram бот синхронизация webapp" /* i18n-ignore */}
         >
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
             <button
@@ -188,7 +214,7 @@ export function TelegramNotificationSection(props: TelegramNotificationSectionPr
               }}
             >
               <Plane size={15} />
-              <span>{isLinking ? "Открытие Telegram…" : "✈️ Привязать Telegram-профиль"}</span> {/* i18n-ignore */}
+              <span>{isLinking ? "Связывание с Telegram…" : "✈️ Привязать Telegram-бота"}</span> {/* i18n-ignore */}
             </button>
           </div>
         </Row>

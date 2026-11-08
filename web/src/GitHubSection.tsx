@@ -707,32 +707,66 @@ export function GitHubSection(props: Props) {
         ) : (
           // ================= NOT CONNECTED STATUS =================
           <>
-            <Row
-              label="Авторизация через OAuth" /* i18n-ignore */
-              note="Быстрый вход в 1 клик через официальное веб-приложение GitHub." /* i18n-ignore */
+            <div
+              style={{
+                background: "rgba(224, 159, 62, 0.06)",
+                border: "1px solid rgba(224, 159, 62, 0.25)",
+                borderRadius: "10px",
+                padding: "14px 18px",
+                marginBottom: "16px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              }}
             >
-              <button
-                type="button"
-                className="button-accent"
-                disabled={connecting}
-                onClick={() => void handleOAuthLogin()}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  fontWeight: 600,
-                }}
-              >
+              <div style={{ fontWeight: 600, fontSize: "13px", color: "var(--ink, #EDEFF3)", display: "flex", alignItems: "center", gap: 6 }}>
                 <GitHub size={16} />
-                <span>{connecting ? "Подключение..." : "🔗 Войти через GitHub"}</span> {/* i18n-ignore */}
-              </button>
-            </Row>
+                <span>Инструкция по подключению GitHub к tTerm</span> {/* i18n-ignore */}
+              </div>
+              <p style={{ margin: 0, fontSize: "12px", lineHeight: "1.5", color: "var(--dim, #9AA0AA)" }}>
+                {/* i18n-ignore */}
+                Для работы с вашими репозиториями, автоматических коммитов и pull request'ов выберите удобный способ:
+              </p>
+              <ul style={{ margin: "2px 0 0 16px", padding: 0, fontSize: "12px", lineHeight: "1.6", color: "var(--dim, #9AA0AA)" }}>
+                <li>
+                  <strong style={{ color: "#E09F3E" }}>{"Способ 1 (Рекомендуемый): Персональный токен (PAT)" /* i18n-ignore */}</strong>{" "}
+                  {"— самый простой способ. Перейдите по ссылке " /* i18n-ignore */}
+                  <a
+                    href="https://github.com/settings/tokens/new?scopes=repo,read:user,user:email&description=tTerm"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ color: "#E09F3E", textDecoration: "underline" }}
+                  >
+                    {"создать токен GitHub с правами repo и user ↗" /* i18n-ignore */}
+                  </a>
+                  {", скопируйте токен " /* i18n-ignore */}
+                  <code>ghp_...</code>
+                  {" и вставьте в поле ниже." /* i18n-ignore */}
+                </li>
+                <li>
+                  <strong style={{ color: "var(--ink, #EDEFF3)" }}>{"Способ 2: Вход через OAuth" /* i18n-ignore */}</strong>{" "}
+                  {"— для входа в 1 клик зарегистрируйте OAuth App в " /* i18n-ignore */}
+                  <a
+                    href="https://github.com/settings/developers"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ color: "var(--ink, #EDEFF3)", textDecoration: "underline" }}
+                  >
+                    {"GitHub Developer Settings ↗" /* i18n-ignore */}
+                  </a>
+                  {". В настройках укажите " /* i18n-ignore */}
+                  <b>{"Authorization callback URL: " /* i18n-ignore */}</b>
+                  <code style={{ color: "#E09F3E" }}>{typeof window !== "undefined" ? window.location.origin : "https://tterm.e-klimov.ru"}</code>
+                  {"." /* i18n-ignore */}
+                </li>
+              </ul>
+            </div>
 
             <Row
-              label="Альтернатива: Персональный токен (PAT)" /* i18n-ignore */
-              note="Personal Access Token (classic) с правами repo и user для прямого подключения без OAuth приложения." /* i18n-ignore */
+              label="Персональный токен (PAT) — Рекомендуется" /* i18n-ignore */
+              note="Быстрое и надежное подключение без настройки OAuth приложения. Права: repo, read:user." /* i18n-ignore */
             >
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%", maxWidth: "380px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", width: "100%", maxWidth: "420px" }}>
                 <div style={{ display: "flex", gap: "6px" }}>
                   <input
                     type="password"
@@ -759,21 +793,38 @@ export function GitHubSection(props: Props) {
                   </button>
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--dim, #9AA0AA)", lineHeight: "1.4" }}>
-                  {"Создайте токен на " /* i18n-ignore */}
+                  {"Ссылка для создания: " /* i18n-ignore */}
                   <a
-                    href="https://github.com/settings/tokens" /* i18n-ignore */
+                    href="https://github.com/settings/tokens/new?scopes=repo,read:user,user:email&description=tTerm" /* i18n-ignore */
                     target="_blank"
                     rel="noreferrer"
                     style={{ color: "var(--amber, #E9A33F)", textDecoration: "underline" }}
                   >
-                    {"github.com/settings/tokens" /* i18n-ignore */}
+                    {"github.com/settings/tokens (готовые права) ↗" /* i18n-ignore */}
                   </a>
-                  {" с правами " /* i18n-ignore */}
-                  <code>repo</code>
-                  {" и " /* i18n-ignore */}
-                  <code>user</code>.
                 </div>
               </div>
+            </Row>
+
+            <Row
+              label="Вход через GitHub OAuth" /* i18n-ignore */
+              note="Авторизация через OAuth App сервера tTerm." /* i18n-ignore */
+            >
+              <button
+                type="button"
+                className="button-ghost"
+                disabled={connecting}
+                onClick={() => void handleOAuthLogin()}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  fontWeight: 600,
+                }}
+              >
+                <GitHub size={16} />
+                <span>{connecting ? "Подключение..." : "🔗 Войти через GitHub OAuth"}</span> {/* i18n-ignore */}
+              </button>
             </Row>
 
             {/* Optional OAuth App Credentials for server administrator */}

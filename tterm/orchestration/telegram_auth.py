@@ -641,15 +641,17 @@ async def telegram_bind_link(request: Request):
     if not pool_obj:
         raise HTTPException(status_code=500, detail="Database not ready")
     token = request.cookies.get(auth.SESSION_COOKIE) or request.cookies.get(f"__Host-{auth.SESSION_COOKIE}")
-    user_id = await auth.session(pool_obj, token)
-    if not user_id:
+    sess = await auth.session(pool_obj, token)
+    if not sess or not hasattr(sess, "person") or not sess.person:
         raise HTTPException(status_code=401, detail="Требуется авторизация")
+    user_id = sess.person.id
 
-    token_str, link = telegram_bot.register_pending_bind(str(user_id))
+    token_str, link = telegram_bot.register_pending_bind(user_id)
     return {
         "ok": True,
         "bind_token": token_str,
         "bot_username": telegram_bot.bot_username,
+        "bot_link": telegram_bot.bot_link,
         "bind_url": link,
     }
 
@@ -659,22 +661,27 @@ async def telegram_status_endpoint(request: Request):
     """Returns Telegram bot status and current user's Telegram binding state."""
     pool_obj = getattr(getattr(request.app, "state", None), "pool", None)
     token = request.cookies.get(auth.SESSION_COOKIE) or request.cookies.get(f"__Host-{auth.SESSION_COOKIE}")
-    user_id = await auth.session(pool_obj, token) if pool_obj and token else None
+    sess = await auth.session(pool_obj, token) if pool_obj and token else None
+    user_id = sess.person.id if sess and hasattr(sess, "person") and sess.person else None
 
     bound = False
     chat_id = None
     username = None
+    user_email = sess.person.email if sess and hasattr(sess, "person") and sess.person else None
 
     if user_id and pool_obj:
         try:
             async with pool_obj.acquire() as conn:
                 u_row = await conn.fetchrow(
-                    "SELECT telegram_chat_id, telegram_username FROM users WHERE id = $1", user_id
+                    "SELECT telegram_chat_id, telegram_username, email FROM users WHERE id = $1", user_id
                 )
-                if u_row and u_row["telegram_chat_id"]:
-                    bound = True
-                    chat_id = u_row["telegram_chat_id"]
-                    username = u_row["telegram_username"]
+                if u_row:
+                    if u_row["email"]:
+                        user_email = u_row["email"]
+                    if u_row["telegram_chat_id"]:
+                        bound = True
+                        chat_id = u_row["telegram_chat_id"]
+                        username = u_row["telegram_username"]
         except Exception as e_st:
             log.debug("Error checking telegram status for user: %s", e_st)
 
@@ -684,6 +691,7 @@ async def telegram_status_endpoint(request: Request):
         "bound": bound,
         "chat_id": chat_id,
         "username": username,
+        "user_email": user_email,
         "bot_username": telegram_bot.bot_username,
         "bot_link": telegram_bot.bot_link,
     }
@@ -694,9 +702,10 @@ async def telegram_unbind_endpoint(request: Request):
     """Unbinds Telegram profile from the currently signed-in user."""
     pool_obj = getattr(getattr(request.app, "state", None), "pool", None)
     token = request.cookies.get(auth.SESSION_COOKIE) or request.cookies.get(f"__Host-{auth.SESSION_COOKIE}")
-    user_id = await auth.session(pool_obj, token) if pool_obj and token else None
-    if not user_id:
+    sess = await auth.session(pool_obj, token) if pool_obj and token else None
+    if not sess or not hasattr(sess, "person") or not sess.person:
         raise HTTPException(status_code=401, detail="Требуется авторизация")
+    user_id = sess.person.id
 
     await telegram_bot.unbind_user_telegram(user_id)
     return {"ok": True, "bound": False}

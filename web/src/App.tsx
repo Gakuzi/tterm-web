@@ -40,6 +40,7 @@ import { draftsOf, forgetDrafts, markDeleted } from "./drafts";
 import { initNotificationBot } from "./notifications";
 import { NotificationPromptBanner } from "./NotificationPromptBanner";
 import { NotificationHttpNoticeModal } from "./NotificationHttpNoticeModal";
+import { TelegramLinkBanner } from "./TelegramLinkBanner";
 import { NoteView, primeNote, type SaveState, type Typed } from "./NoteView";
 import { summary, titled, toMarkdown } from "./noteText";
 import {
@@ -1969,6 +1970,7 @@ export function App() {
         onStopRename={stopRenaming} />
 
       <NotificationPromptBanner notify={notYet} />
+      <TelegramLinkBanner notify={notYet} onOpenSettings={openSettings} />
 
       {/* Under the Settings window the page stays as it was, but Tab does
           not reach it: nothing typed there goes to a terminal under it. */}

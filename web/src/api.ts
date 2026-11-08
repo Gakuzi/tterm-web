@@ -615,6 +615,7 @@ export interface TelegramProfileStatus {
   bound: boolean;
   chat_id?: string | null;
   username?: string | null;
+  user_email?: string | null;
   bot_username: string;
   bot_link: string;
 }

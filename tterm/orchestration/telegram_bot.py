@@ -63,6 +63,33 @@ DANGER_PATTERNS = [
 ]
 
 
+def _parse_uuid(val: Any) -> Optional[uuid.UUID]:
+    """Safely extracts UUID from UUID objects, Sessions, Persons, or string representations."""
+    if not val:
+        return None
+    if isinstance(val, uuid.UUID):
+        return val
+    if hasattr(val, "person") and hasattr(val.person, "id"):
+        p_id = val.person.id
+        return p_id if isinstance(p_id, uuid.UUID) else _parse_uuid(p_id)
+    if hasattr(val, "id"):
+        v_id = val.id
+        return v_id if isinstance(v_id, uuid.UUID) else _parse_uuid(v_id)
+    if isinstance(val, str):
+        val = val.strip()
+        match = re.search(r"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})", val)
+        if match:
+            try:
+                return uuid.UUID(match.group(1))
+            except Exception:
+                pass
+        try:
+            return uuid.UUID(val)
+        except Exception:
+            pass
+    return None
+
+
 def validate_webapp_init_data(init_data: str, bot_token: str) -> Optional[Dict[str, Any]]:
     """
     Validates Telegram WebApp initData according to official Telegram documentation:
@@ -203,12 +230,12 @@ class TelegramBotManager:
 
         log.info("Initialized Telegram Bot: @%s (%s, ID: %s)", self._bot_username, self._bot_first_name, self._bot_id)
 
-        # Set persistent Web App Chat Menu Button
+        # Set persistent Web App Chat Menu Button (Strictly 'tTerm' without rocket/words)
         try:
             menu_btn_res = await self.call_api("setChatMenuButton", {
                 "menu_button": {
                     "type": "web_app",
-                    "text": "tTerm Web",
+                    "text": "tTerm",
                     "web_app": {
                         "url": self.web_url
                     }
@@ -217,6 +244,19 @@ class TelegramBotManager:
             log.info("Telegram WebApp Menu Button configured: %s", menu_btn_res.get("ok"))
         except Exception as e:
             log.warning("Failed to configure Telegram WebApp Menu Button: %s", e)
+
+        # Configure official Bot commands
+        try:
+            await self.call_api("setMyCommands", {
+                "commands": [
+                    {"command": "start", "description": "Запустить бота и проверить статус"},
+                    {"command": "app", "description": "Открыть tTerm"},
+                    {"command": "machines", "description": "Выбор активной машины"},
+                    {"command": "help", "description": "Справка и команды"},
+                ]
+            })
+        except Exception as e_cmd:
+            log.debug("Could not set bot commands: %s", e_cmd)
 
         return True
 
@@ -291,10 +331,11 @@ class TelegramBotManager:
         log.info("Telegram Bot service stopped.")
 
     # ------------------------------------------------------------- Binding
-    def register_pending_bind(self, user_id: str) -> Tuple[str, str]:
+    def register_pending_bind(self, user_id: Any) -> Tuple[str, str]:
+        uid = _parse_uuid(user_id)
         token = f"bind_{secrets.token_urlsafe(16)}"
         self._pending_binds[token] = {
-            "user_id": user_id,
+            "user_id": str(uid) if uid else str(user_id),
             "expires_at": time.time() + 600,
         }
         return token, f"https://t.me/{self.bot_username}?start={token}"
@@ -336,26 +377,86 @@ class TelegramBotManager:
                     return await conn.fetchrow("SELECT id, name, email, is_local_owner, plan_id, telegram_chat_id, telegram_username FROM users WHERE id = $1", owner["id"])
         return None
 
-    async def bind_user_telegram(self, user_id: uuid.UUID | str, chat_id: str, username: str = "") -> bool:
+    async def bind_user_telegram(self, user_id: Any, chat_id: str | int, username: str = "") -> Optional[Dict[str, Any]]:
+        """Binds Telegram profile to a user account, merging temporary/dummy accounts if needed."""
         if not self.pool:
-            return False
-        uid = uuid.UUID(str(user_id)) if isinstance(user_id, str) else user_id
-        async with self.pool.acquire() as conn:
-            await conn.execute(
-                "UPDATE users SET telegram_chat_id = $1, telegram_username = $2 WHERE id = $3",
-                str(chat_id), username.lstrip("@"), uid
-            )
-        log.info("Bound user %s to Telegram chat %s (@%s)", uid, chat_id, username)
-        return True
+            return None
+        uid = _parse_uuid(user_id)
+        if not uid:
+            log.warning("bind_user_telegram received invalid user_id: %r", user_id)
+            return None
 
-    async def unbind_user_telegram(self, user_id: uuid.UUID | str) -> bool:
+        chat_str = str(chat_id)
+        clean_uname = username.lstrip("@").strip() if username else None
+
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                # 1. Check if there was an orphan dummy user or other record with this chat_id
+                old_users = await conn.fetch(
+                    "SELECT id, email, name FROM users WHERE telegram_chat_id = $1 AND id != $2",
+                    chat_str, uid
+                )
+                for old_u in old_users:
+                    old_id = old_u["id"]
+                    old_email = old_u["email"] or ""
+                    # If this was an auto-created dummy telegram user
+                    if old_email.startswith("tg_") and old_email.endswith("@telegram.tterm.net"):
+                        # Reassign any projects & machine memberships to the primary user
+                        await conn.execute("UPDATE projects SET owner_id = $1 WHERE owner_id = $2", uid, old_id)
+                        await conn.execute("UPDATE project_members SET user_id = $1 WHERE user_id = $2", uid, old_id)
+                        # Delete the orphan dummy user
+                        await conn.execute("DELETE FROM users WHERE id = $1", old_id)
+                        log.info("Merged dummy user %s into primary user %s", old_id, uid)
+                    else:
+                        # Clear telegram_chat_id on any other account to avoid duplicate bindings
+                        await conn.execute(
+                            "UPDATE users SET telegram_chat_id = NULL, telegram_username = NULL WHERE id = $1",
+                            old_id
+                        )
+
+                # 2. Update target user
+                await conn.execute(
+                    "UPDATE users SET telegram_chat_id = $1, telegram_username = COALESCE($2, telegram_username) WHERE id = $3",
+                    chat_str, clean_uname, uid
+                )
+
+                # 3. Record in sign_in_methods
+                await conn.execute("DELETE FROM sign_in_methods WHERE kind = 'telegram' AND subject = $1", chat_str)
+                await conn.execute(
+                    """
+                    INSERT INTO sign_in_methods (user_id, kind, subject)
+                    VALUES ($1, 'telegram', $2)
+                    ON CONFLICT DO NOTHING
+                    """,
+                    uid, chat_str
+                )
+
+                # Return bound user info
+                record = await conn.fetchrow(
+                    "SELECT id, name, email, plan_id, telegram_chat_id, telegram_username FROM users WHERE id = $1",
+                    uid
+                )
+                log.info("Bound user %s to Telegram chat %s (@%s)", uid, chat_str, clean_uname)
+                return dict(record) if record else {"id": uid}
+
+    async def unbind_user_telegram(self, user_id: Any) -> bool:
         if not self.pool:
             return False
-        uid = uuid.UUID(str(user_id)) if isinstance(user_id, str) else user_id
+        uid = _parse_uuid(user_id)
+        if not uid:
+            return False
         async with self.pool.acquire() as conn:
-            await conn.execute(
-                "UPDATE users SET telegram_chat_id = NULL, telegram_username = NULL WHERE id = $1", uid
-            )
+            async with conn.transaction():
+                # Find current telegram_chat_id to clean sign_in_methods
+                row = await conn.fetchrow("SELECT telegram_chat_id FROM users WHERE id = $1", uid)
+                if row and row["telegram_chat_id"]:
+                    await conn.execute(
+                        "DELETE FROM sign_in_methods WHERE kind = 'telegram' AND subject = $1",
+                        row["telegram_chat_id"]
+                    )
+                await conn.execute(
+                    "UPDATE users SET telegram_chat_id = NULL, telegram_username = NULL WHERE id = $1", uid
+                )
         log.info("Unbound Telegram from user %s", uid)
         return True
 
@@ -573,18 +674,21 @@ class TelegramBotManager:
                     return
 
                 target_user_id = bind_data["user_id"]
-                ok = await self.bind_user_telegram(target_user_id, chat_id, username)
-                if ok:
+                bound_user = await self.bind_user_telegram(target_user_id, chat_id, username)
+                if bound_user:
+                    u_email = bound_user.get("email") or "аккаунт"
+                    u_name = bound_user.get("name") or first_name
                     await self.send_message(
                         chat_id,
-                        f"✅ <b>Telegram-профиль успешно привязан!</b>\n\n"
+                        f"✅ <b>Telegram успешно привязан!</b>\n\n"
                         f"Здравствуйте, <b>{first_name}</b>!\n"
-                        f"Ваш Telegram (@{username or chat_id}) теперь привязан к личному кабинету <b>tTerm AI Hub</b>.\n\n"
-                        f"📲 Сюда будут приходить:\n"
-                        f"• Коды авторизации и уведомления о входе\n"
-                        f"• Оповещения о завершении длительных команд\n"
-                        f"• Запросы подтверждения опасных действий (Approval Gate)\n\n"
-                        f"Вы также можете отправлять консольные команды прямо в этот чат или открыть полноэкранный терминал по кнопке ниже.",
+                        f"Ваш профиль Telegram (@{username or chat_id}) успешно связан с аккаунтом:\n"
+                        f"📧 <b>{u_email}</b> ({u_name})\n\n"
+                        f"💡 <b>Теперь вам доступно:</b>\n"
+                        f"• Вход в <b>tTerm</b> в 1 клик через Web App прямо из этого чата без повторного ввода паролей и кодов\n"
+                        f"• Доступ ко всем вашим терминалам и проектам\n"
+                        f"• Мгновенные уведомления о статусах и завершении команд\n\n"
+                        f"Нажмите кнопку <b>tTerm</b> ниже, чтобы открыть терминал:",
                         reply_markup=self._main_keyboard(),
                     )
                 else:
@@ -646,11 +750,11 @@ class TelegramBotManager:
         if text.startswith("/app"):
             await self.send_message(
                 chat_id,
-                "💻 <b>tTerm Web App</b>\n"
-                "Нажмите кнопку ниже, чтобы открыть полнофункциональный веб-терминал прямо внутри Telegram:",
+                "💻 <b>tTerm</b>\n"
+                "Нажмите кнопку ниже, чтобы открыть терминал прямо внутри Telegram:",
                 reply_markup={
                     "inline_keyboard": [
-                        [{"text": "🚀 Открыть tTerm (Web App)", "web_app": {"url": self.web_url}}]
+                        [{"text": "tTerm", "web_app": {"url": self.web_url}}]
                     ]
                 },
             )
@@ -886,7 +990,7 @@ class TelegramBotManager:
             chat_id, msg_text,
             reply_markup={
                 "inline_keyboard": [
-                    [{"text": "💻 Открыть в tTerm (Web App)", "web_app": {"url": self.web_url}}]
+                    [{"text": "tTerm", "web_app": {"url": self.web_url}}]
                 ]
             }
         )
@@ -894,7 +998,7 @@ class TelegramBotManager:
     def _main_keyboard(self) -> Dict[str, Any]:
         return {
             "inline_keyboard": [
-                [{"text": "🚀 Открыть tTerm (Web App)", "web_app": {"url": self.web_url}}],
+                [{"text": "tTerm", "web_app": {"url": self.web_url}}],
                 [
                     {"text": "🖥 Выбрать машину", "callback_data": "menu:machines"},
                     {"text": "ℹ️ Помощь", "callback_data": "menu:help"},
@@ -905,7 +1009,7 @@ class TelegramBotManager:
     def _unbound_keyboard(self) -> Dict[str, Any]:
         return {
             "inline_keyboard": [
-                [{"text": "🚀 Открыть tTerm (Web App)", "web_app": {"url": self.web_url}}]
+                [{"text": "tTerm", "web_app": {"url": self.web_url}}]
             ]
         }
 
