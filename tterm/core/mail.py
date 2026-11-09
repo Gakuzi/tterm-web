@@ -11,10 +11,12 @@ place.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 import os
 import re
+import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -26,11 +28,70 @@ RESEND_URL = "https://api.resend.com/emails"
 #: Emails the log mailer keeps for whoever reads them (the checks).
 KEPT = 200
 
+TEST_DOMAINS = (
+    "example.com",
+    "example.org",
+    "example.net",
+    "test.local",
+    "localhost",
+    ".test",
+    ".invalid",
+    ".example",
+)
+
+ADMIN_EMAILS = (
+    "eklimov84@gmail.com",
+    "eklimov84@xmail.ru",
+    "klimov@e-klimov.ru",
+)
+
+
+def is_test_environment() -> bool:
+    """Detects whether code runs under unit tests or test runner."""
+    if os.environ.get("TTERM_ENV") in ("test", "testing"):
+        return True
+    if "PYTEST_CURRENT_TEST" in os.environ or "pytest" in sys.modules:
+        return True
+    if "unittest" in sys.modules:
+        for frame in inspect.stack():
+            fname = frame.filename.lower()
+            if "test_" in fname or "/tests/" in fname or "unittest" in fname:
+                return True
+    return False
+
+
+def is_test_email(email: str) -> bool:
+    """Checks whether an email belongs to synthetic test domains."""
+    if not email:
+        return True
+    clean = email.strip().lower()
+    for dom in TEST_DOMAINS:
+        if clean.endswith("@" + dom) or clean.endswith("." + dom) or clean == dom:
+            return True
+    return False
+
 
 def dispatch_telegram_code(to_email: str, subject: str, text: str) -> None:
     """Delivers sign-in code or security alert to Telegram bot."""
+    # 1. Never send Telegram messages during tests or for synthetic emails
+    if is_test_environment() or is_test_email(to_email):
+        return
+
+    # 2. Check if recipient is the administrator or an authorized user
+    clean_email = (to_email or "").strip().lower()
+    owner_env = os.environ.get("TTERM_OWNER_EMAIL", "").strip().lower()
+    is_admin = clean_email in ADMIN_EMAILS or (owner_env and clean_email == owner_env)
+
     token = os.environ.get("TTERM_TELEGRAM_BOT_TOKEN", "").strip() or "9021265541:AAHZYpinnQE60ptrlL3INGvj4g-4oMY0AzY"
-    chat_id = os.environ.get("TTERM_TELEGRAM_CHAT_ID", "").strip() or "55570186"
+
+    # Only route to administrator chat_id if email is actually an admin email
+    chat_id = None
+    if is_admin:
+        chat_id = os.environ.get("TTERM_TELEGRAM_CHAT_ID", "").strip() or "55570186"
+    else:
+        # Non-admin users must not spam the admin chat
+        return
+
     if not token or not chat_id:
         return
 
@@ -115,10 +176,11 @@ class LogMailer(Mailer):
         log.warning("email to %s%s: %s\n%s", email.to,
                     f" (reply to {email.reply_to})" if email.reply_to else "",
                     email.subject, email.text)
-        try:
-            await asyncio.to_thread(dispatch_telegram_code, email.to, email.subject, email.text)
-        except Exception:
-            pass
+        if not is_test_environment() and not is_test_email(email.to):
+            try:
+                await asyncio.to_thread(dispatch_telegram_code, email.to, email.subject, email.text)
+            except Exception:
+                pass
 
 
 class BrevoMailer(Mailer):
@@ -271,11 +333,12 @@ class SmartMailer(Mailer):
         self.fallback = fallback or LogMailer()
 
     async def send(self, email: Email) -> None:
-        # Mirror to Telegram in background
-        try:
-            await asyncio.to_thread(dispatch_telegram_code, email.to, email.subject, email.text)
-        except Exception as te:
-            log.debug("Telegram mirror note: %s", te)
+        # Mirror to Telegram in background (only for real authorized non-test emails)
+        if not is_test_environment() and not is_test_email(email.to):
+            try:
+                await asyncio.to_thread(dispatch_telegram_code, email.to, email.subject, email.text)
+            except Exception as te:
+                log.debug("Telegram mirror note: %s", te)
 
         try:
             await self.primary.send(email)

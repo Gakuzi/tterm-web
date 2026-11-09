@@ -472,7 +472,11 @@ async def request_telegram_code(data: TelegramCodeRequest, request: Request):
     )
 
     token, default_chat = _get_bot_token_and_chat()
-    target_chat = chat_id or default_chat
+    # Only route to default_chat if the user is explicitly the system owner/admin
+    target_chat = chat_id
+    if not target_chat and default_chat:
+        if clean_id.lower() in ("55570186", "eklimov84", "owner-user") or clean_id == default_chat:
+            target_chat = default_chat
     delivered = False
     bot_name = _get_bot_username(token)
 
