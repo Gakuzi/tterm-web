@@ -377,20 +377,42 @@ class TelegramBotManager:
 
         log.info("Initialized Telegram Bot: @%s (%s, ID: %s)", self._bot_username, self._bot_first_name, self._bot_id)
 
-        # Set persistent Web App Chat Menu Button (Strictly 'tTerm' without rocket/words)
+        # Do NOT configure live Telegram bot with mock/test URLs
+        if any(x in self.web_url for x in ("test", "localhost", "127.0.0.1", "example")):
+            log.info("Skipping Telegram API profile updates for mock web_url: %s", self.web_url)
+            return True
+
+        target_url = self.web_url if self.web_url.endswith("/") else f"{self.web_url}/"
+
+        # Set persistent Web App Chat Menu Button globally
         try:
             menu_btn_res = await self.call_api("setChatMenuButton", {
                 "menu_button": {
                     "type": "web_app",
                     "text": "tTerm",
                     "web_app": {
-                        "url": self.web_url
+                        "url": target_url
                     }
                 }
             })
-            log.info("Telegram WebApp Menu Button configured: %s", menu_btn_res.get("ok"))
+            log.info("Global Telegram WebApp Menu Button configured: %s (url: %s)", menu_btn_res.get("ok"), target_url)
         except Exception as e:
             log.warning("Failed to configure Telegram WebApp Menu Button: %s", e)
+
+        # Pin per-chat menu button for owner
+        try:
+            await self.call_api("setChatMenuButton", {
+                "chat_id": 55570186,
+                "menu_button": {
+                    "type": "web_app",
+                    "text": "tTerm",
+                    "web_app": {
+                        "url": target_url
+                    }
+                }
+            })
+        except Exception as e_owner:
+            log.debug("Failed to pin owner chat menu button: %s", e_owner)
 
         # Configure official Bot commands with strict scopes (public vs owner)
         try:
@@ -588,7 +610,13 @@ class TelegramBotManager:
         self.pool = pool
         self.terminals = terminals
         self.agents = agents
-        self.web_url = web_url or DEFAULT_WEB_URL
+        clean_url = (web_url or DEFAULT_WEB_URL).strip()
+        if any(x in clean_url for x in ("test", "localhost", "127.0.0.1", "example")):
+            log.info("TelegramBotManager: mock web_url detected (%s). Skipping live polling.", clean_url)
+            self.web_url = DEFAULT_WEB_URL
+            return
+
+        self.web_url = clean_url
         self._running = True
 
         if self._polling_task is None or self._polling_task.done():
@@ -990,6 +1018,22 @@ class TelegramBotManager:
                     log.debug("Auto-bind owner error: %s", e_ow)
 
         lang = self._get_lang(user_row, from_user)
+
+        # Ensure user has the official WebApp button in menu
+        target_menu_url = self.web_url if self.web_url.endswith("/") else f"{self.web_url}/"
+        if not any(x in target_menu_url for x in ("test", "localhost", "127.0.0.1", "example")):
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self.call_api("setChatMenuButton", {
+                    "chat_id": chat_id,
+                    "menu_button": {
+                        "type": "web_app",
+                        "text": "tTerm",
+                        "web_app": {"url": target_menu_url}
+                    }
+                }))
+            except Exception:
+                pass
         t = I18N.get(lang, I18N["ru"])
 
         # Pending admin user profile editing

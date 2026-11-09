@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import logging
 import socket
 import sys
@@ -222,8 +223,13 @@ class Core:
             await asyncio.sleep(0.02)
 
         try:
-            from .orchestration.telegram_bot import telegram_bot
-            telegram_bot.start(self.pool, terminals=self.terminals, agents=self.agents, web_url=s.page_url)
+            is_mock_url = any(x in (s.page_url or "") for x in ("test", "localhost", "127.0.0.1", "example"))
+            is_test_env = "PYTEST_CURRENT_TEST" in os.environ or "unittest" in sys.modules
+            if not (is_mock_url or is_test_env):
+                from .orchestration.telegram_bot import telegram_bot
+                telegram_bot.start(self.pool, terminals=self.terminals, agents=self.agents, web_url=s.page_url)
+            else:
+                log.info("Telegram Bot start skipped in test/mock environment (url: %s)", s.page_url)
         except Exception as e_tg:
             log.warning("Telegram Bot failed to start: %s", e_tg)
 

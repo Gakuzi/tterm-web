@@ -37,7 +37,7 @@ REQUEST_HEADER = "x-tterm"
 CSP = ("default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://telegram.org; "
        "style-src 'self'{nonce} 'unsafe-inline'; "
        "font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://e-klimov.ru https://*.e-klimov.ru https://telegram.org https://*.telegram.org; "
-       "connect-src 'self' https://e-klimov.ru https://telegram.org https://oauth.telegram.org; "
+       "connect-src 'self' wss: https://e-klimov.ru https://*.e-klimov.ru https://telegram.org https://oauth.telegram.org; "
        "frame-src 'self' https://oauth.telegram.org https://telegram.org; "
        "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org https://telegram.org; base-uri 'none'; form-action 'self'; "
        "object-src 'none'")
